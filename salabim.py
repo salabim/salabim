@@ -1,26 +1,34 @@
-CLONED
-from __future__ import print_function # compatibility with Python 2.x
-from __future__ import division # compatibility with Python 2.x
-
 '''
 salabim  discrete event simulation module
 '''
+from __future__ import print_function # compatibility with Python 2.x
+from __future__ import division # compatibility with Python 2.x
 
 import platform
 Pythonista=(platform.system()=='Darwin')
+
 
 import heapq
 import random
 import time
 import math
 import copy
+import collections
+
+try:
+    import numpy
+    import cv2
+    numpy_and_cv2_installed=True
+except:
+    numpy_and_cv2_installed=False
 
 try:
     from PIL import Image
     from PIL import ImageDraw
     from PIL import ImageFont
+    pil_installed=True
 except:
-    pass
+    pil_installed=False
 
 if Pythonista:
     import scene
@@ -33,10 +41,10 @@ else:
 try:
     from numpy import inf,nan
 except:
-    inf=1e100
-    nan='nan'
+    inf=float('inf')
+    nan=float('nan')
 
-__version__='1.0.0'
+__version__='1.0.7'
 
 data='data'
 current='current'
@@ -44,130 +52,148 @@ standby='standby'
 passive='passive'
 scheduled='scheduled'
 
+class SalabimException(Exception):
+    def __init__(self,value):
+        self.value=value
+        
+    def __str__(self):
+        return self.value
+
 if Pythonista:
         
     class MyScene(scene.Scene):
+        ''' internal class for Pythonista animation '''
         def __init__(self,*args,**kwargs):
+            global an_scene
             scene.Scene.__init__(self,*args,**kwargs)
-            animation.scene=self
+            An.scene=self
 
         def setup(self):
             pass
         
         def touch_ended(self,touch):
-            for ao in animation.animation_objects:            
-                if ao.type=='button':
+            for uio in An.env.ui_objects:            
+                if uio.type=='button':
                     if touch.location in \
-                      scene.Rect(ao.x-2,ao.y-2,ao.width+2,ao.height+2):
-                        ao.action()
-                if ao.type=='slider':
+                      scene.Rect(uio.x-2,uio.y-2,uio.width+2,uio.height+2):
+                        uio.action()
+                if uio.type=='slider':
                     if touch.location in\
-                      scene.Rect(ao.x-2,ao.y-2,ao.width+4,ao.height+4):
-                        xsel=touch.location[0]-ao.x
-                        ao._v=ao.vmin+round(-0.5+xsel/ao.xdelta)*ao.resolution
-                        if ao.action!=None:
-                            ao.action()                        
+                      scene.Rect(uio.x-2,uio.y-2,uio.width+4,uio.height+4):
+                        xsel=touch.location[0]-uio.x
+                        uio._v=uio.vmin+round(-0.5+xsel/uio.xdelta)*uio.resolution
+                        if uio.action!=None:
+                            uio.action(uio._v)                        
                                   
         def draw(self):   
-            global animation
-            scene.background(pythonistacolor(animation.background_color))
-                
-            if animation.running:
-                if animation.paused:
-                    t = animation.start_animation_time
+            
+            if An.env!=None:
+                scene.background(pythonistacolor(colorspec_to_tuple(An.background_color)))
+                if An.paused:
+                    An.t = An.start_animation_time
                 else:
-                    t = \
-                      animation.start_animation_time+\
+                    An.t = \
+                      An.start_animation_time+\
                       ((time.time()-\
-                      animation.start_animation_clocktime)*\
-                      animation.animation_speed)                
-                animation.t=t
-                while animation.env.peek<t:
-                    animation.env.step()
-                    if animation.env._current_component==animation.env._main:
-                        animation.env.print_trace(\
-                          '%10.3f' % animation.env._now,\
-                          animation.env._main._name,'current')                            
-                        animation.env._scheduled_time=inf
-                        animation.env._status=current
-                        animation.running=False
+                      An.start_animation_clocktime)*self.speed)                
+
+                while An.env.peek<An.t:
+                    An.env.step()
+                    if An.env._current_component==An.env._main:
+                        An.env.print_trace(\
+                          '%10.3f' % An.env._now,\
+                          An.env._main._name,'current')                            
+                        An.env._main._scheduled_time=inf
+                        An.env._main._status=current
+                        An.env.an_quit()
                         return
-           
-                animation.animation_objects.sort\
-                  (key=lambda obj:(-obj.layer,obj.sequence))
+
+                if not An.paused:
+                    An.frametimes.append(time.time())
+                    
+                An.env.an_objects.sort\
+                  (key=lambda obj:(-obj.layer(An.t),obj.sequence))
                 touchvalues=self.touches.values()
-                for ao in animation.animation_objects:
-                    if type(ao) == Component.Animate:
-                        im,x,y=ao.pil_image(t)
-                        if im!=None:
-                            try:
-                                ims=scene.load_pil_image(im)
-                                scene.image(ims,x,y,*im.size)
-                            except:
-                                pass
-                            
-                    elif ao.type=='button':
-                        linewidth=ao.linewidth
+                
+                capture_image=Image.new('RGB',
+                  (An.width,An.height),colorspec_to_tuple(An.background_color))
+                                
+                for ao in An.env.an_objects:
+                    ao.make_pil_image(An.t)
+                    if ao._image_visible:
+                        capture_image.paste(ao._image,
+                          (int(ao._image_x),
+                          int(An.height-ao._image_y-ao._image.size[1])),
+                          ao._image)
+                              
+                ims=scene.load_pil_image(capture_image)
+                scene.image(ims,0,0,*capture_image.size)                
+                   
+                for uio in An.env.ui_objects:
+                                                                          
+                    if uio.type=='button':
+                        linewidth=uio.linewidth
                             
                         scene.push_matrix()
-                        scene.fill(pythonistacolor(ao.fillcolor))
-                        scene.stroke(pythonistacolor(ao.linecolor))
+                        scene.fill(pythonistacolor(uio.fillcolor))
+                        scene.stroke(pythonistacolor(uio.linecolor))
                         scene.stroke_weight(linewidth)
-                        scene.rect(ao.x,ao.y,ao.width,ao.height)
-                        scene.tint(ao.color)
-                        scene.translate(ao.x+ao.width/2,ao.y+ao.height/2)
-                        scene.text(str_or_function(ao.text),\
-                          ao.font,ao.fontsize,alignment=5)
+                        scene.rect(uio.x,uio.y,uio.width,uio.height)
+                        scene.tint(uio.color)
+                        scene.translate(uio.x+uio.width/2,uio.y+uio.height/2)
+                        scene.text(uio.text(),uio.font,uio.fontsize,alignment=5)
                         scene.tint(1,1,1,1)
                           #required for proper loading of images 
                         scene.pop_matrix()
-                    elif ao.type=='slider':
+                    elif uio.type=='slider':
                         scene.push_matrix()
-                        scene.tint(pythonistacolor(ao.labelcolor))   
-                        v=ao.vmin
-                        x=ao.x+ao.xdelta/2
-                        y=ao.y
+                        scene.tint(pythonistacolor(uio.labelcolor))   
+                        v=uio.vmin
+                        x=uio.x+uio.xdelta/2
+                        y=uio.y
                         mindist=inf
-                        v=ao.vmin
-                        while v<=ao.vmax:
-                            if abs(v-ao.v)<mindist:
-                                mindist=abs(v-ao._v)
+                        v=uio.vmin
+                        while v<=uio.vmax:
+                            if abs(v-uio.v)<mindist:
+                                mindist=abs(v-uio._v)
                                 vsel=v
-                            v+=ao.resolution
-                        thisv=ao._v
+                            v+=uio.resolution
+                        thisv=uio._v
                         for touch in touchvalues:
                             if touch.location in\
-                              scene.Rect(ao.x,ao.y,ao.width,ao.height):
-                                xsel=touch.location[0]-ao.x
-                                vsel=round(-0.5+xsel/ao.xdelta)*ao.resolution
+                              scene.Rect(uio.x,uio.y,uio.width,uio.height):
+                                xsel=touch.location[0]-uio.x
+                                vsel=round(-0.5+xsel/uio.xdelta)*uio.resolution
                                 thisv=vsel
-                        scene.stroke(pythonistacolor(ao.linecolor))
-                        v=ao.vmin
+                        scene.stroke(pythonistacolor(uio.linecolor))
+                        v=uio.vmin
                         xfirst=-1
-                        while v<=ao.vmax:
+                        while v<=uio.vmax:
                             if xfirst==-1:
                                 xfirst=x
                             if v==vsel:
                                 scene.stroke_weight(3)
                             else:
                                 scene.stroke_weight(1)
-                            scene.line(x,y,x,y+ao.height)
-                            v+=ao.resolution
-                            x+=ao.xdelta
+                            scene.line(x,y,x,y+uio.height)
+                            v+=uio.resolution
+                            x+=uio.xdelta
                                 
                                 
                         scene.push_matrix()
-                        scene.translate(xfirst,ao.y+ao.height+2)
-                        scene.text(ao.label,ao.font,ao.fontsize,alignment=9)     
+                        scene.translate(xfirst,uio.y+uio.height+2)
+                        scene.text(uio.label,uio.font,uio.fontsize,alignment=9)     
                         scene.pop_matrix()
-                        scene.translate(ao.x+ao.width,y+ao.height+2)    
+                        scene.translate(uio.x+uio.width,y+uio.height+2)    
                         scene.text(str(thisv)+' ',\
-                          ao.font,ao.fontsize,alignment=7)                 
+                          uio.font,uio.fontsize,alignment=7)                 
                         scene.tint(1,1,1,1)
                           #required for proper loading of images later                                
                         scene.pop_matrix() 
-                                  
+                                                                               
 class Qmember():
+    ''' internal class '''
+    
     def __init__(self):
         pass
         
@@ -182,22 +208,28 @@ class Qmember():
         self.queue=q
         self.enter_time=c.env._now
         q._length+=1
+        for iter in q._iter_touched:
+            q._iter_touched[iter]=True
         q._maximum_length=max(q._maximum_length,q._length)
         c._qmembers[q]=self
-        q.env.print_trace('','',c._name,'enter '+q._name)            
+        q.env.print_trace('','',c._name,'enter '+q._name)        
 
 class Queue(object):
     '''
     queue object
     
-    arguments:
-        name        name of the queue.
-                    if the name ends with a period (.),
-                      auto serializing will be applied
-                    if omitted, the name queue (serialized)
-        env         environment where the queue is defined
-                    if omitted, default_env will be used
+    Parameters
+    ----------
+    name : str
+        name of the queue |n|
+        if the name ends with a period (.),
+        auto serializing will be applied |n|
+        if omitted, the name queue (serialized)
+    env : Environment
+        environment where the queue is defined |n|
+        if omitted, default_env will be used
     '''
+   
     def __init__(self,name=None,env=None):
         if env is None:
             self.env=default_env
@@ -206,7 +238,7 @@ class Queue(object):
         if name is None:
             name='queue.'
         self._name,self._base_name,self._sequence_number=\
-          self.env._reformatnameQ(name)
+          _reformatname(name,self.env._nameserializeQueue)
         self._head=Qmember()
         self._tail=Qmember()
         self._head.successor=self._tail
@@ -219,6 +251,8 @@ class Queue(object):
         self._tail.priority=0
         self._resource=None #used to reorder request queues, if req'd
         self._length=0
+        self._iter_sequence=0
+        self._iter_touched={}
         self.reset_statistics()
         
     def __repr__(self):
@@ -242,16 +276,18 @@ class Queue(object):
         '''
         returns and/or sets the name of a queue
         
-        arguments:
-            txt         name of the queue
-                        if txt ends with a period, the name will be serialized
+        Parameters
+        ----------
+        txt : str
+            name of the queue |n|
+            if txt ends with a period, the name will be serialized
         '''
         return self._name
         
     @name.setter
     def name(self,txt):
         self._name,self._base_name,self._sequence_number=\
-          self.env._reformatnameQ(txt)
+          _reformatname(txt,self.env._nameserializeQueue)
         
     @property
     def base_name(self):
@@ -268,7 +304,7 @@ class Queue(object):
 
         normally this will be the integer value of a serialized name,
         but also non serialized names (without a dot at the end)
-          will be numbered)
+        will be numbered)
         '''
         return self._sequence_number        
 
@@ -293,14 +329,15 @@ class Queue(object):
         '''
         adds a component to the tail of a queue
     
-        arguments:
-            component            component to be added to the
-                                   tail of the queue
-                                 may not be member of the queue yet
+        Parameters
+        ----------
+        component : Component
+            component to be added to the tail of the queue |n|
+            may not be member of the queue yet
                                  
         the priority will be set to
-          the priority of the tail of the queue, if any
-          or 0 if queue is empty
+        the priority of the tail of the queue, if any
+        or 0 if queue is empty
         '''
         component.enter(self)
 
@@ -308,14 +345,16 @@ class Queue(object):
         '''
         adds a component to the head of a queue
     
-        arguments:
-            component            component to be added to the
-                                   head of the queue
-                                 may not be member of the queue yet
+        Parameters
+        ----------
+        
+        component : Component
+            component to be added to the head of the queue |n|
+            may not be member of the queue yet
                                  
         the priority will be set to 
-          the priority of the head of the queue, if any
-          or 0 if queue is empty
+        the priority of the head of the queue, if any
+        or 0 if queue is empty
         '''
         component.enter_to_head(self)
 
@@ -323,14 +362,17 @@ class Queue(object):
         '''
         adds a component to a queue, just in front of a component
     
-        arguments:
-            component            component to be added to the queue
-                                 may not be member of the queue yet            
-            poscomponent         component in front of which component
-                                   will be inserted
-                                 must be member of the queue
+        Parameters
+        ----------
+        component : Component
+            component to be added to the queue |n|
+            may not be member of the queue yet
+                        
+        poscomponent : Component
+            component in front of which component will be inserted |n|
+            must be member of the queue
         
-        the priority of component will be set to the priority of popcomponent 
+        the priority of component will be set to the priority of poscomponent 
         '''
         component.enter_in_front_off(self,poscomponent)
 
@@ -338,14 +380,17 @@ class Queue(object):
         '''
         adds a component to a queue, just behind a component
     
-        arguments:
-            component            component to be added to the queue
-                                 may not be member of the queue yet            
-            popcomponent         component behind which component
-                                   will be inserted
-                                 must be member of the queue 
+        Parameters
+        ----------
+        component : Component
+            component to be added to the queue |n|
+            may not be member of the queue yet
+                        
+        poscomponent : Component
+            component behind which component will be inserted |n|
+            must be member of the queue
         
-        the priority of component will be set to the priority of popcomponent
+        the priority of component will be set to the priority of poscomponent 
         '''
         component.enter_behind(self,poscomponent) 
         
@@ -353,11 +398,17 @@ class Queue(object):
         '''
         adds a component to a queue, according to the priority
     
-        arguments:
-            component            component to be added to the queue
-                                 may not be member of the queue yet
+        Parameters
+        ----------
+        component : Component
+            component to be added to the queue |n|
+            may not be member of the queue yet
+                        
+        priority : float
+            priority of the component|n|
             
-            priority             used to sort the component in the queue
+        component will be placed just after the last component with
+        a priority <= priority
         '''
         component.enter_sorted(self,priority)
 
@@ -365,9 +416,11 @@ class Queue(object):
         '''
         removes component from the queue
     
-        arguments:
-            component                component to be removed
-                                     must be member of the queue
+        Parameters
+        ----------
+        component : Component
+           component to be removed |n|
+           must be member of the queue
         '''
         component.leave(self)
         
@@ -388,7 +441,7 @@ class Queue(object):
     @property
     def pop(self):
         '''
-        removes the head component and returns it, if any.
+        removes the head component and returns it, if any. |n|
         Otherwise return None
         '''
         c=self.head
@@ -398,9 +451,13 @@ class Queue(object):
     
     def successor(self,component):
         ''' 
-        arguments:
-            component            component whose successor to return
-                                 must be member of the queue
+        successor in queue
+        
+        Parameters
+        ----------
+        component : Component
+            component whose successor to return |n|
+            must be member of the queue
          
         returns the successor of component, if any. None otherwise
         '''
@@ -408,66 +465,129 @@ class Queue(object):
 
     def predecessor(self,component):
         ''' 
-        arguments:
-            component            component whose predecessor to return
-                                 must be member of the queue
+        predecessor in queue
+        
+        Parameters
+        ----------
+        component : Component
+            component whose predecessor to return |n|
+            must be member of the queue
          
-        returns the predecessor of component, if any. None otherwise
+        returns the predcessor of component, if any. None otherwise
         '''
         return component.predecessor(self)   
         
-    def contains(self,component):
-        '''
-        checks whether component is in the queue
+    def __contains__ (self,component):
+        return component._member(self)!=None
         
-        arguments:
-            component            component to check
+    def __getitem__(self,key):
+        if isinstance( key, slice) :
+            #Get the start, stop, and step from the slice
+            startval,endval,incval=key.indices(self._length)
+            if incval>0:
+                l=[]
+                targetval=startval
+                mx=self._head.successor
+                count=0
+                while mx!=self._tail:
+                    if targetval>=endval:
+                        break
+                    if targetval==count:
+                        l.append(mx.component)
+                        targetval += incval
+                    count += 1
+                    mx=mx.successor
+            else:
+                l=[]
+                targetval=startval
+                mx=self._tail.predecessor
+                count=self._length-1
+                while mx!=self._head:
+                    if targetval<=endval:
+                        break
+                    if targetval==count:
+                        l.append(mx.component)
+                        targetval += incval #incval is negative here!
+                    count -= 1
+                    mx=mx.predecessor                    
+                                
+            return list(l)
             
-        True if component is in the queue. False otherwise
-        '''
-        return component.is_in_queue(self)
+        elif isinstance( key, int ) :
+            if key < 0 : #Handle negative indices
+                key += self._length
+            if key < 0 or key >= self._length:
+                return None
+            mx=self._head.successor
+            count=0
+            while mx!=self._tail:
+                if count==key:
+                    return mx.component
+                count=count+1
+                mx=mx.successor
+
+            return None #just for safety
+                        
+        else:
+            raise TypeError('Invalid argument type.')        
         
+    def __len__(self):
+        return self._length
+        
+    def __reversed__(self):
+        self._iter_sequence += 1
+        iter_sequence = self._iter_sequence
+        self._iter_touched[iter_sequence] = False
+        iter_list = []
+        mx = self._tail.predecessor
+        while mx != self._head:
+            iter_list.append(mx)
+            mx = mx.predecessor
+        iter_index = 0
+        while len(iter_list)>iter_index:
+            if self._iter_touched[iter_sequence]:
+                iter_list=iter_list[:iter_index] #place all taken qmembers on the list
+                mx = self._tail.predecessor
+                while mx != self._head:
+                    if mx not in iter_list:
+                        iter_list.append(mx)
+                    mx = mx.precessor
+                self._iter_touched[iter_sequence]=False
+            else:
+                c = iter_list[iter_index].component
+                if c is not None: # skip deleted components
+                    yield c
+                iter_index += 1
+                                        
+        del self._iter_touched[iter_sequence]
+
+                
     def index_of(self,component):
         '''
         get the index of a component in the queue
         
-        arguments:
-            component            component to be queried
-                                 does not need to be in the queue
+        Parameters
+        ----------
+        component : Component
+            component to be queried |n|
+            does not need to be in the queue
                                  
         returns the index of component in the queue, where 0 denotes the head,
-          if in the queue.
+        if in the queue. |n|
         returns -1 if component is not in the queue
         '''
         return component.index_in_queue(self)
-        
-    def component_with_index(self,index):
-        '''
-        returns a component in the queue according to its position
-        
-        arguments:
-            index                position in the queue (0 is head)
-            
-        returns indexth (0-based) component in the queue if valid index
-        return None if index is not valid
-        '''
-        mx=self._head.successor
-        count=0
-        while mx!=self._tail:
-            count=count+1
-            if count==index:
-                return mx.component
-            mx=mx.successor
-        return None 
         
     def component_with_name(self,txt):
         '''
         returns a component in the queue according to its name
         
-        arguments:
-            txt                name of component to be retrieved
+        Parameters
+        ----------
+        txt : str
+            name of component to be retrieved
             
-        returns the first component in the queue with name txt.
+        returns the first component in the queue with name txt. |n|
         returns None if not found
         '''
         mx=self._head.successor
@@ -482,27 +602,32 @@ class Queue(object):
     def length(self):
         '''
         returns the length of a queue
+        
+        it is advised to use the builtin len function.
         '''
         return self._length
         
     @property
     def minimum_length(self):
         '''
-        returns the minimum length of a queue, since the last reset_statistics
+        returns the minimum length of a queue
+        since the last reset_statistics
         '''
         return self._minimum_length
         
     @property
     def maximum_length(self):
         '''
-        returns the maximum length of a queue, since the last reset_statistics
+        returns the maximum length of a queue
+        since the last reset_statistics
         '''
         return self._maximum_length
         
     @property
     def minimum_length_of_stay(self):
         '''
-        returns the minimum length of stay of components left the queue since the last reset_statistics
+        returns the minimum length of stay of components left the queue
+        since the last reset_statistics. |n|
         returns nan if no component has left the queue
         '''
         if self._number_passed==0:
@@ -513,7 +638,8 @@ class Queue(object):
     @property
     def maximum_length_of_stay(self):
         '''
-        returns the maximum length of stay of components left the queue since the last reset_statistics
+        returns the maximum length of stay of components left the queue
+        since the last reset_statistics. |n|
         returns nan if no component has left the queue
         '''
         if self._number_passed==0:
@@ -525,7 +651,7 @@ class Queue(object):
     def number_passed(self):
         '''
         returns the number of components that have left the queue 
-          since the last reset_statistics
+        since the last reset_statistics
         '''
         return self._number_passed
         
@@ -533,8 +659,8 @@ class Queue(object):
     def number_passed_direct(self):
         '''
         returns the number of components that have left the queue 
-          with a length of stay of zero
-          since the last reset_statistics
+        with a zero length of stay
+        since the last reset_statistics
         '''
         return self._number_passed_direct
         
@@ -542,7 +668,7 @@ class Queue(object):
     def mean_length_of_stay(self):
         '''
         returns the mean length of stay of components that have left the queue
-          since the last reset_statistics
+        since the last reset_statistics
         returns nan if no components have left the queue
         '''
         if self._number_passed==0:
@@ -553,7 +679,8 @@ class Queue(object):
     @property
     def mean_length(self):
         '''
-        returns the mean length of the queue since the last reset_statistics
+        returns the mean length of the queue
+        since the last reset_statistics
         '''
         total_time=self._total_length_of_stay
         mx=self._head.successor
@@ -565,78 +692,50 @@ class Queue(object):
             return self._length
         else:
             return total_time/duration
-                            
-    def components(self,static=False,removals_possible=True):
-        '''
-        iterates over all components in queue
-        
-        arguments:
-            static    if False (default),
-                         the generator will dynamically return all components
-                         in the queue.
-                         This allows for components entering or leaving
-                         the queue during the usage of the generator
-                      if True,
-                        the generator makes a snaphot of the queue and 
-                        successively returns the components.
-                        This may lead to unexpected results if the queue
-                        changes during the iteration.
-            removals_possible
-                      if True (default),
-                        it is allowed to remove components from the queue
-                        during the iteration.
-                      if False, removing components to the queue will lead
-                        to unexpected results.
-                        Also, only new components should only enter at the
-                        tail. Use with great care, and only to improve
-                        performance.
-                      If static=True, this argument is ignored.
-                                  
-            usually this will be used in a construction like:
-                for c in q.components():
-                    ...
-        '''
-        if static:
-            list=[]
-            mx=self._head.successor
-            while mx!=self._tail:
-                list.append(mx.component)
-                mx=mx.successor
-            for c in list:
-                yield c
-                    
-        else:
-            if removals_possible:
-                taken={}
-                mx=self._head.successor
-                while mx!=self._tail:
-                    if mx.component in taken:
-                        mx=mx.successor
-                    else:
-                        taken[mx.component]=0
-                        msucc=mx.successor
-                        yield mx.component
-                        if msucc.component is None:
-                            mx=self._head.successor
-                        else:
-                            mx=msucc
+                         
+    def __iter__(self):
+        self._iter_sequence += 1
+        iter_sequence = self._iter_sequence
+        self._iter_touched[iter_sequence] = False
+        iter_list = []
+        mx = self._head.successor
+        while mx != self._tail:
+            iter_list.append(mx)
+            mx = mx.successor
+        iter_index = 0
+        while len(iter_list)>iter_index:
+            if self._iter_touched[iter_sequence]:
+                iter_list=iter_list[:iter_index] #place all taken qmembers on the list
+                mx = self._head.successor
+                while mx != self._tail:
+                    if mx not in iter_list:
+                        iter_list.append(mx)
+                    mx = mx.successor
+                self._iter_touched[iter_sequence]=False
             else:
-                mx=self._head.successor
-                while mx!=self._tail:
-                    yield mx.component
-                    mx=mx.successor
-        
+                c = iter_list[iter_index].component
+                if c is not None: # skip deleted components
+                    yield c
+                iter_index += 1
+                                        
+        del self._iter_touched[iter_sequence]
+    
+                            
     def union(self,q,name):
         '''
         returns the union of two queues
         
-        arguments:
-            q            queue to be unioned with self
-            name         name of the  new queue
+        Parameters
+        ----------
+        q : Queue
+            queue to be unioned with self
+                
+        name :str
+            name of the  new queue
             
-        the resulting queue will contain all elements of self and q
+        the resulting queue will contain all elements of self and q |n|
         the priority will be set to 0 for all components in the
-          resulting  queue
+        resulting  queue |n|
         the order of the resulting queue is not specified
         '''
         save_trace=self.env._trace
@@ -661,14 +760,18 @@ class Queue(object):
         '''
         returns the intersect of two queues
         
-        arguments:
-            q            queue to be intersected with self
-            name         name of the  new queue
+        Parameters
+        ----------
+        q : Queue
+            queue to be intersected with self
+                
+        name :str
+            name of the  new queue
             
-        the resulting queue will contain
-          all elements of that are in self and q
-        the priority will be set to 0 for all components in the 
-          resulting queue
+        the resulting queue will contain all elements that
+        are in self and q |n|
+        the priority will be set to 0 for all components in the
+        resulting  queue |n|
         the order of the resulting queue is not specified
         '''
         save_trace=self.env._trace
@@ -691,14 +794,18 @@ class Queue(object):
         '''
         returns the difference of two queues
         
-        arguments:
-            q            queue to be 'substracted' from self
-            name         name of the  new queue
+        Parameters
+        ----------
+        q : Queue
+            queue to be 'subtracted' from self
+                
+        name :str
+            name of the  new queue
             
-        the resulting queue will contain 
-          all elements of self that are not in q
-        the priority will be copied from the original queue
-        also, the order will be maintained
+        the resulting queue will contain all elements of self that are not
+        in q |n|
+        the priority will be copied from the original queue.
+        Also, the order will be maintained.
         '''
         save_trace=self.env._trace
         self.env._trace=False
@@ -722,11 +829,14 @@ class Queue(object):
         '''
         returns a copy of two queues
         
-        arguments:
-            name         name of the  new queue
-            
-        the resulting queue will contain all elements of self
-        the priority will be copied into the resulting
+        Parameters
+        ----------
+        name : str
+            name of the new queue
+                 
+        the resulting queue will contain all elements of self |n|
+        The priority will be copied from original queue.
+        Also, the order will be maintained.
         '''
         save_trace=self.env._trace
         self.env._trace=False
@@ -742,11 +852,13 @@ class Queue(object):
         '''
         makes a copy of a queue and empties the original
         
-        arguments:
-            name         name of the  new queue
-            
+        Parameters
+        ----------
+        name : str
+            name of the new queue
+
         the resulting queue will contain all elements of self,
-          with the proper priority
+          with the proper priority |n|
         self will be emptied
         '''
         q1=self.copy(name)
@@ -756,26 +868,18 @@ class Queue(object):
     def clear(self):
         '''
         empties a queue
-        
-        arguments:
-            none
             
         removes all components from a queue
         '''
         mx=self._head.successor
         while mx!=self._tail:
-            del mx.component._qmembers[self]
+            c=mx.component
             mx=mx.successor
-        self._head.successor=self._tail
-        self._tail.predecessor=self._head
-        self._length=0
+            c._leave(self)
         
     def reset_statistics(self):
         '''
         resets the statistics of a queue
-        
-        arguments:
-            none
         '''        
     
         self._minimum_length_of_stay=inf
@@ -785,8 +889,11 @@ class Queue(object):
         self._number_passed=0
         self._number_passed_direct=0
         self._total_length_of_stay=0
-        for c in self.components(static=True):
+        mx=self._head.successor
+        while mx!=self._tail:
+            c=mx.component
             self._total_length_of_stay-(self.env._now-c.enter_time)
+            mx=mx.successor
         self._start_statistics=self.env._now
         
 
@@ -794,9 +901,16 @@ def run(*args,**kwargs):
     '''
     run for the default environment
     '''
+
     default_env.run(*args,**kwargs)
     
+def animation_parameters(*args,**kwargs):
+    '''
+    animation_parameters for the default environment
+    '''
 
+    default_env.animation_parameters(*args,**kwargs)
+    
 def step():
     '''
     step for the default environment
@@ -822,49 +936,58 @@ def _check_fail(c):
         c._pendingclaims=[]
         c._request_failed=True
         
-        
+def finish():
+    raise SalabimException('Stopped by user')    
+    if Pythonista:
+        if an_scene!=None:
+            an_scene.view.close()
+              
 class Environment(object): 
     '''
     environment object
     
-    arguments:
-        trace       defines whether to trace or not
-                    if omitted, False
-        name        name of the environment.
-                    if the name ends with a period (.), 
-                      auto serializing will be applied
-                    if omitted, the name environment (serialized)
+    Parameters
+    ----------
+    trace : bool
+        defines whether to trace or not |n|
+        if omitted, False
+        
+    name : str
+        name of the environment |n|.
+        if the name ends with a period (.), 
+        auto serializing will be applied |n|
+        if omitted, the name ``environment`` (serialized)
 
-        The trace may be switched on/off later with trace    
-        '''
+    The trace may be switched on/off later with trace     
+    '''
+        
+    _name_serialize={}
           
     def __init__(self,trace=False,name=None): 
         if name is None:
             name='environment.'
         self._name,self._base_name,self._sequence_number=\
-          _reformatname(name,_nameserializeE)
-        self._now=0
-        self._nameserializeC={}
-        self._nameserializeQ={}
-        self._nameserializeR={}
+          _reformatname(name,Environment._name_serialize)
         self.env=self 
-        self._seq=0
-        self._event_list=[]
-        self._standbylist=[]
-        self._pendingstandbylist=[]
-        self._trace=trace
-        
+        self._nameserializeComponent={} # just to allow main to be created; will be reset later
+        self._now=0 #just to allow main to be created; will be reset later    
         self._main=Component(name='main',env=self)
         self._main._status=current
         self._current_component=self._main
+        self.ui_objects=[]
+        self.reset(trace)
         self.print_trace('%10.3f' % self._now,'main','current')   
-        
+
+                               
+    def serialize(self):
+        self.serial+=1
+        return self.serial
+
+
     def __repr__(self):
         lines=[]
         lines.append('Environment '+hex(id(self)))
-        lines.append('  name='+self._name)
-        if (animation!=None) and (self==animation.env):
-            lines.append('  (animation environment')
+        lines.append('  name='+self._name+(' (animation environment)' if self==An.env else ''))
         lines.append('  now='+time_to_string(self._now))
         lines.append('  current_component='+self._current_component._name)
         lines.append('  trace='+str(self._trace))      
@@ -875,24 +998,48 @@ class Environment(object):
         '''
         resets the enviroment
         
-        arguments:
-            trace                   if True, trace is enabled
-                                    if False, trace is disabled
-                                    
+        Parameters
+        ----------
+        trace : bool
+            defines whether to trace or not |n|
+            if omitted, False
+                                                
         The trace may be switched on/off later with trace
         '''
-        
-        newenv=Environment(trace,name=self._name)
-        self.__dict__=newenv.__dict__ #keep the original location
-        self.env=self
-        self.main.__dict__=newenv.main.__dict__ #keep the original location
-        if animation!=None:
-            if self==animation.env:
-                animation.start_animation_time=self._now
-                animation.start_animation_clocktime=time.time()
-            for ao in animation.animation_objects[:]:
-                if not ao.survive_reset:
-                    animation.animation_objects.remove(ao)
+        self._main._checkcurrent()
+        self._trace=trace
+        self._now=0
+        self._nameserializeQueue={}
+        self._nameserializeComponent={}
+        self._nameserializeResource={}
+        self._seq=0
+        self._event_list=[]
+        self._standbylist=[]
+        self._pendingstandbylist=[]
+#*** this right?        
+        if not Pythonista:
+            for uio in self.ui_objects[:]:
+                uio.destroy()
+
+        self.an_objects=[]
+        self.ui_objects=[]
+        self.serial=0
+        self.speed=1
+        self.animate=False
+        self.width=1024
+        self.height=768
+        self.x0=0
+        self.y0=0
+        self.x1=1024
+        self.background_color='white'
+        self.fps=30
+        self.modelname=''
+        self.use_toplevel=False
+        self.show_fps=True
+        self.show_speed=True
+        self.show_time=True
+        self.speed=1
+        self.video=''
 
         return self
 
@@ -918,10 +1065,6 @@ class Environment(object):
                     c._status=data 
                     c._scheduled_time=inf
                     c._process=None
-                    if animation!=None:
-                        for ao in animation.animation_objects[:]:
-                            if ao.parent==c:
-                                animation.animation_objects.remove(ao)
                     return               
         if len(self.env._standbylist)>0:
             self.env._pendingstandbylist=list(self.env._standbylist)
@@ -947,10 +1090,6 @@ class Environment(object):
             c._status=data
             c._scheduled_time=inf
             c._process=None
-            if animation!=None:
-                for ao in animation.animation_objects[:]:
-                    if ao.parent==c:
-                        animation.animation_objects.remove(ao)
             return
         
     @property
@@ -969,9 +1108,7 @@ class Environment(object):
                 return inf
             else:
                 return self.env._event_list[0][0]
-        pass
             
-
     @property
     def main(self):
         '''
@@ -989,52 +1126,156 @@ class Environment(object):
     @property
     def trace(self,value=None):
         '''
-        returns and/or sets the value
+        gets or sets trace
         '''
         return self._trace
         
     @trace.setter
     def trace(self,value):
-        '''
-        returns and/or sets the value
-        '''
         self._trace=value
         
     @property
     def current_component(self):
         '''
         returns the current_component
-        
-        arguments:
-            none
         '''
         return self._current_component
+        
+    def animation_parameters(self,
+      animate=None,speed=None,width=None,height=None,
+      x0=None,y0=0,x1=None,background_color=None,
+      fps=None,modelname=None,use_toplevel=None,
+      show_fps=None,show_speed=None,show_time=None,
+      video=None):
 
+        '''
+        set animation parameters
 
-    def run(self,duration=None,till=None,animate=False,animation_speed=None):
+        Parameters:
+        -----------
+        animate : bool
+            animate indicator |n|
+            if omitted, True, i.e. animation |n|
+            Installation of PIL is required for animation.
+            
+        speed : float
+            speed |n|
+            specifies how much faster or slower than real time the animation will run. 
+            e.g. if 2, 2 simulation time units will be displayed per second.
+            
+        background_color : colorspec
+            color of the background |n|
+            if omitted, no change
+                        
+        width : int
+            width of the animation in screen coordinates (default 1024)
+            
+        height : int
+            height of the animation in screen coordinates (default 768)
+            
+        x0 : float
+            user x-coordinate of the lower left corner (default 0)
+            
+        y0 : float
+            user y_coordinate of the lower left corner (default 0)
+            
+        x1 : float
+            user x-coordinate of the upper right corner (default 1024)
+        
+        fps : float
+            number of frames per second
+            
+        modelname : str
+            name of model to be shown in upper left corner,
+            along with text 'a salabim model'
+            
+        use_toplevel : bool
+            if salabim animation is used in parallel with
+            other modules using tkinter, it might be necessary to 
+            initialize the root with tkinter.TopLevel().
+            In that case, set this parameter to True. |n|
+            if False (default), the root will be initialized with tkinter.Tk()
+    
+        show_fps : bool
+            if True, show the number of frames per second (default)|n|
+            if False, do not show the number of frames per second
+
+        show_speed: bool
+            if True, show the animation speed (default)|n|
+            if False, do not show the animation speed
+
+        show_time: bool
+            if True, show the time (default)|n|
+            if False, do not show the time
+            
+        video : str
+            if video is not omitted, a mp4 format video with the name video 
+            will be created. |n|
+            This requires installation of numpy and opencv (cv2).
+                          
+        The y-coordinate of the upper right corner is determined automatically
+        in such a way that the x and scaling are the same. |n|
+
+        Note that changing the parameters x0, x1, y0, width, height, background_color, modelname,
+        use_toplevelmand video, animate has no effect on the current animation.
+        So to avoid confusion, do not use change these parameters when an animation is running. |n|
+        On the other hand, changing speed, show_fps, show_time, show_speed and fps can be useful in
+        a running animation.
+        '''
+        
+        if speed!=None:
+            self.speed=speed
+            if An.env==self:
+                An.set_start_animation()
+                        
+        if show_fps!=None:
+            self.show_fps=show_fps
+        if show_speed!=None:
+            self.show_speed=show_speed
+        if show_time!=None:
+            self.show_time=show_time
+                                                                      
+        if animate==None:
+            self.animate=True
+        else:
+            self.animate=animate
+        if width!=None:
+            self.width=width
+        if height!=None:
+            self.height=height
+        if x0!=None:
+            self.x0=x0
+        if x1!=None:
+            self.x1=x1
+        if y0!=None:
+            self.y0=y0
+        if background_color!=None:
+            self.background_color=background_color
+        if fps!=None:
+            self.fps=fps
+        if modelname!=None:
+            self.modelname=modelname
+        if use_toplevel!=None:
+            self.use_toplevel=use_toplevel
+        if video!=None:
+            self.video==video
+
+    def run(self,duration=None,till=None):
         '''
         start execution of the simulation
 
-        arguments:
-            duration      schedule with a delay of duration
-                          if 0, now is used
-            till          schedule time
-                          if omitted, 0 is assumed
-        if neither duration nor till are specified,
-          the run will last for an infite time
-        only issue this from the main level
+        Parameters:
+        -----------
+        duration : float
+            schedule with a delay of duration |n|
+            if 0, now is used
+            
+        till : float
+            schedule time |n|
+            if omitted, 0 is assumed
+          
+        only issue run from the main level
         '''
-
-
-        if animate:        
-            if animation is None:
-                raise AssertionError('animation is not initialized')
-            if animation.env!=self:
-                raise AssertionError\
-                  ('animation is not initialized for this environment')
-            if animation_speed!=None:
-                animation.animation_speed=animation_speed
-            animation.paused=False
 
         if till is None:
             if duration is None:
@@ -1063,18 +1304,111 @@ class Environment(object):
         self._main._status=scheduled
         self._scheduled_time=scheduled_time
         self._main._push(scheduled_time,False)
-        if animate:
-            animation.start_animation_time=self._now
-            animation.start_animation_clocktime=time.time()
 
-            animation.running=True
+        if self.animate:
+            if not pil_installed:
+                raise AssertionError('PIL is required for animation')
+
+            An.font_cache={}
+            An.t=self.env._now # for the call to set_start_animation
+            An.set_start_animation()
+            An.stopped=False
+            An.running=True
+            An.paused=False
+            An.background_color=self.background_color
+            An.width=self.width
+            An.height=self.height
+            An.x0=self.x0
+            An.x1=self.x1
+            An.y0=self.y0
+            An.scale=An.width/(An.x1-An.x0)            
+            An.env=self
+                         
             if Pythonista:
-                while animation.running:
+                if An.scene==None:
+                    scene.run\
+                      (MyScene(), frame_interval=60/self.fps,
+                      show_fps=False)
+                    # this also assigns an_scene
+            else:         
+                if self.use_toplevel:
+                    self.root = tkinter.Toplevel()
+                else:
+                    self.root = tkinter.Tk()
+                An.canvas = \
+                  tkinter.Canvas(self.root, width=self.width,height = self.height)
+                An.canvas.configure\
+                  (background=colorspec_to_hex(self.background_color,False))
+                An.canvas.pack()
+                An.canvas_objects=[]
+
+            for uio in self.ui_objects:
+                if not Pythonista:
+                    uio.install()
+
+            An.system_an_objects=[]
+            An.system_ui_objects=[]
+            if self.modelname!='':
+                ao=Animate(text=self.modelname,
+                    x0=8,y0=self.height-60,
+                    anchor='w',fontsize0=30,fillcolor0='black',
+                    screen_coordinates=True,env=self )
+                An.system_an_objects.append(ao)
+                ao=Animate(text='a salabim model',
+                    x0=8,y0=self.height-78,
+                    anchor='w',fontsize0=16,fillcolor0='red',screen_coordinates=True,env=self)
+                An.system_an_objects.append(ao)                    
+    
+            uio=AnimateButton\
+              (x=48,y=self.height-21,text='Stop',\
+               action=self.env.an_stop,env=self)
+            An.system_ui_objects.append(uio)
+            uio=AnimateButton\
+              (x=48+1*90,y=self.height-21,text='Anim/2',\
+              action=self.env.an_half,env=self) 
+            An.system_ui_objects.append(uio)
+            uio=AnimateButton\
+              (x=48+2*90,y=self.height-21,text='Anim*2',\
+              action=self.env.an_double,env=self)
+            An.system_ui_objects.append(uio)
+            uio=AnimateButton\
+              (x=48+3*90,y=self.height-21,text='',\
+              action=self.env.an_pause,env=self)
+            An.system_ui_objects.append(uio)
+            uio.text=lambda :pausetext()
+            uio=AnimateButton\
+              (x=48+4*90,y=self.height-21,text='',\
+              action=self.env.an_trace,env=self)                                                                                  
+            An.system_ui_objects.append(uio)
+            uio.text=tracetext
+            ao=Animate\
+              (x0=self.width,y0=self.height-5,fillcolor0='black',\
+                text='',fontsize0=15,font='DejaVuSansMono',anchor='ne',\
+                screen_coordinates=True,env=self)
+            An.system_an_objects.append(ao)                    
+            ao.text=clocktext
+            if self.video=='':
+                An.dovideo=False
+            else:
+                An.dovideo=True
+                if not numpy_and_cv2_installed:
+                    raise AssertionError('numpy and cv2 required for video production')
+                                
+            if An.dovideo:
+                An.video_sequence=0
+                fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+                An.out = cv2.VideoWriter(self.video,fourcc, self.fps, (An.width,An.height)) 
+
+            if Pythonista:
+                while An.running:
                     pass
             else:
-                animation.root.after(0,self.simulate_and_animate_loop)
-                animation.root.mainloop()
-            
+                An.root.after(0,self.simulate_and_animate_loop)
+                An.root.mainloop()
+                if An.dovideo:
+                    An.out.release()
+            if An.stopped:
+                finish()
         else:
             self.simulate_loop()
 
@@ -1089,76 +1423,201 @@ class Environment(object):
                 return
                 
     def simulate_and_animate_loop(self):
-        global animation
-        animation.running=True
-        while animation.running:
-            
-            if animation.paused:
-                t=animation.start_animation_time
+        An.running=True
+        
+        while _running:
+            tick_start=time.time()
+            if An.dovideo:
+                An.t=An.start_animation_time+An.video_sequence*self.An._speed/self.fps
             else:
-                t=animation.start_animation_time+\
-                  ((time.time()-animation.start_animation_clocktime)*\
-                  animation.animation_speed)
-            animation.t=t
-            while self.peek<t:
+                if An.paused:
+                    An.t=An.start_animation_time
+                else:
+                    An.t=An.start_animation_time+\
+                      ((time.time()-An.start_animation_clocktime)*\
+                      self.speed)
+
+            while self.peek<An.t:
                 self.step()
-                if self.env._current_component==self._main:
+                if self._current_component==self._main:
                     self.print_trace('%10.3f' % self._now,\
                       self._main._name,'current')                            
                     self._scheduled_time=inf
                     self._status=current
-                    animation.running=False
-                    animation.root.quit()
+                    An.running=False
+                    self.an_quit()
                     return
-
-            for co in animation.canvas_objects:
-                animation.canvas.delete(co)
-            animation.canvas_objects=[]
-             
-            animation.animation_objects.sort\
-              (key=lambda obj:(-obj.layer,obj.sequence))
+            if not An.running:
+                break
             
-            for ao in animation.animation_objects:
-                if type(ao) == Component.Animate:
-                    im,x,y=ao.pil_image(t)
-                    if im!=None:
-                        ao.im = ImageTk.PhotoImage(im)
-                        r=animation.canvas.create_image(\
-                          x,animation.height-y,image=ao.im,anchor=tkinter.SW)                 
-                        animation.canvas_objects.append(r)                    
-                else:
-                    if ao.type=='button':
-                        thistext=str_or_function(ao.text)
-                        if thistext!=ao.lasttext:
-                            ao.lasttext=thistext
-                            ao.button.config(text=thistext)
-                    elif ao.type=='slider':
-                        pass
+            if An.dovideo:
+                capture_image=Image.new('RGB',(self.width,self.height),colorspec_to_tuple(self.background_color))
+                
+            if not An.paused:
+                An.frametimes.append(time.time())
+
+            self.an_objects.sort\
+              (key=lambda obj:(-obj.layer(t),obj.sequence))
+              
+            canvas_objects_iter=iter(An.canvas_objects[:])
+            co=next(canvas_objects_iter,None)
+            
+            for ao in self.an_objects:
+
+                ao.make_pil_image(An.t)
+                if ao._image_visible:
+                    if co==None:
+                        ao.im = ImageTk.PhotoImage(ao._image)
+                        co1=An.canvas.create_image(
+                          ao._image_x,self.height-ao._image_y,image=ao.im,anchor=tkinter.SW)
+                        An.canvas_objects.append(co1)
+                        ao.canvas_object=co1
+
+                    else:
+                        if ao.canvas_object==co:
+                            if ao._image_ident!=ao._image_ident_prev:
+                                ao.im = ImageTk.PhotoImage(ao._image)
+                                An.canvas.itemconfig(ao.canvas_object,image=ao.im)    
+                                          
+                            if (ao._image_x!=ao._image_x_prev) or (ao._image_y!=ao._image_y_prev):
+                                An.canvas.coords(ao.canvas_object,(ao._image_x,self.height-ao._image_y))                                            
+
+                        else:
+                            ao.im = ImageTk.PhotoImage(ao._image)
+                            ao.canvas_object=co
+                            An.canvas.itemconfig(ao.canvas_object,image=ao.im)    
+                            An.canvas.coords(ao.canvas_object,(ao._image_x,self.height-ao._image_y))
+                    co=next(canvas_objects_iter,None)
                     
-            animation.canvas.update()
-            time.sleep(1/animation.fps)
+                    if An.dovideo:
+                        capture_image.paste(im,(int(x),int(self.height-y-im.size[1])),im)
+                else:
+                    ao.canvas_object=None
+                                                    
+            for co in canvas_objects_iter:
+                An.canvas.delete(co)
+                An.canvas_objects.remove(co)
+                    
+            self.ui_install()
+            for uio in self.ui_objects:
+                if uio.type=='button':
+                    thistext=uio.text()
+                    if thistext!=uio.lasttext:
+                        uio.lasttext=thistext
+                        uio.button.config(text=thistext)       
+
+            if An.dovideo:
+                open_cv_image = numpy.array(capture_image) 
+                   # Convert RGB to BGR 
+                open_cv_image = open_cv_image[:, :, ::-1].copy() 
+                open_cv_image=cv2.cvtColor(numpy.array(capture_image), cv2.COLOR_RGB2BGR)
+                An.out.write(open_cv_image)
+                An.video_sequence += 1
+                
+            An.canvas.update()
+            if not An.dovideo:
+                tick_duration=time.time()-tick_start  
+                if tick_duration<1/self.fps:
+                    time.sleep((1/self.fps)-tick_duration)
+
+    def ui_install(self):
+        for uio in self.ui_objects:
+            if not uio.installed:
+                if uio.type=='button':
+                   
+                    uio.button = tkinter.Button\
+                      (An.root, text = uio.lasttext, command = uio.action,\
+                     anchor = tkinter.CENTER)
+                    uio.button.configure\
+                       (width = int(2.2*uio.width/uio.fontsize),\
+                       foreground=colorspec_to_hex(uio.color,False),background =colorspec_to_hex(uio.fillcolor,False), relief = tkinter.FLAT)
+                    uio.button_window = An.canvas.create_window\
+                       (uio.x+uio.width, self.height-uio.y-uio.height,\
+                      anchor=tkinter.NE,window=uio.button)            
+
+                elif uio.type=='slider':
+                    uio.slider=tkinter.Scale\
+                      (An.root, from_=uio.vmin, to=uio.vmax,\
+                      orient=tkinter.HORIZONTAL,label=uio.label,resolution=uio.resolution,
+                      command=uio.action)
+                    uio.slider.window = An.canvas.create_window\
+                      (uio.x, self.height-self.uio, anchor=tkinter.NW,\
+                      window=self.slider)
+                    uio.slider.config\
+                      (font=(self.font,int(uio.fontsize*0.8)),\
+                      background=\
+                      colorspec_to_hex(self.background_color,False),\
+                      highlightbackground=\
+                      colorspec_to_hex(self.background_color,False))
+                    uio.slider.set(uio._v)
+                uio.installed=True
+
+    def an_quit(self):
+        An.running=False
+
+        for ao in An.system_an_objects:
+            ao.remove()
+        for uio in An.system_ui_objects:
+            uio.remove()
+
+        for uio in self.ui_objects:
+            if uio.type=='slider':
+                uio._v=uio.v
+            uio.installed=False
+                
+        if not Pythonista:
+            An.root.destroy()
+        An.env=None
+
+    def an_half(self):
+        if An.paused:
+            An.paused=False
+        else:
+            self.speed /=2
+            An.set_start_animation() 
+
+    def an_double(self):
+        if An.paused:
+            An.paused=False
+        else:
+            self.speed *=2
+            An.set_start_animation()            
+    
+    def an_pause(self):
+        An.paused=not An.paused
+        An.set_start_animation()        
+         
+    def an_stop(self):
+        self.an_quit()
+        An.stopped=True
+                
+    def an_trace(self):
+        self._trace=not self._trace  
+
         
     @property
     def name(self):
         '''
         returns and/or sets the name of an environmnet
         
-        arguments:
-            txt     name of the queue
-                    if txt ends with a period, the name will be serialized
+        Parameters
+        ----------
+        txt : str
+            gets/sets name of the environment |n|
+            if txt ends with a period, the name will be serialized
         '''
         return self._name
         
     @name.setter
     def name(self,txt):
         self._name,self._base_name,self._sequence_number=\
-          self.env._reformatnameQ(txt)
+          _reformatname(txt,Environment._nameserialize)
         
     @property
     def base_name(self):
         '''
         returns the base name of an environment
-          (the name used at init or name)
+        (the name used at init or name)
         '''
         return self._base_name        
 
@@ -1166,11 +1625,11 @@ class Environment(object):
     def sequence_number(self):
         '''
         returns the sequence_number of an environment
-          (the sequence number at init or name)
+        (the sequence number at init or name)
 
         normally this will be the integer value of a serialized name,
         but also non serialized names (without a dot at the end)
-          will be numbered)
+        will be numbered)
         '''
         return self._sequence_number        
 
@@ -1179,49 +1638,1182 @@ class Environment(object):
         if self._trace:
              if not self._current_component._suppress_trace:
                  print(pad(s1,10)+' '+pad(s2,20)+' '+pad(s3,35)+' '+s4)    
-        
-    def _reformatnameC(self,name):
-        return _reformatname(name,self._nameserializeC)
-        
-    def _reformatnameQ(self,name):
-        return _reformatname(name,self._nameserializeQ)
-
-    def _reformatnameR(self,name):
-        return _reformatname(name,self._nameserializeR)        
-
-class Component(object): 
-    '''
-    component object
+class An():
+    env=None
+    scene=None
     
-    arguments:
-        name              name of the component.
-                          if the name ends with a period (.), 
-                            auto serializing will be applied
-                          if omitted, the name will be derived from the class 
-                            it is defined in lowercased)
-        at                schedule time
-                          if omitted, now is used
-        delay             schedule with a delay
-                          if omitted, no delay
-        urgent            if False (default), the component will be scheduled
-                            behind all other components scheduled
-                            for the same time
-                          if True, the component will be scheduled 
-                            in front of all components scheduled
-                            for the same time
-        auto_start        if there is a process generator defined in the
-                             component class, this will be activated 
-                             automatically, unless overridden with auto_start
-                          if there is no process generator, no activation 
-                            takes place, anyway
-        env               environment where the component is defined
-                          if omitted, default_env will be used
-                            
-    usually, a component will be defined as a subclass of Component
+    def set_start_animation():
+        An.frametimes=collections.deque(maxlen=30)
+        An.start_animation_time=An.t
+        An.start_animation_clocktime=time.time()
+
+class Animate(object):
+    '''
+    defines an animation object
+    
+    Parameters
+    ----------
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation ofject will be removed
+        automatically upon termination of the parent
+    
+    layer : int
+         layer value |n|
+         lower layer values are on top of higher layer values (default 0)
+
+    keep : bool
+        keep |n|
+        if False, animation object is hidden after t1, shown otherwise
+        (default True)
+            
+    screen_coordinates : bool
+        use screen_coordinates |n|
+        normally, the scale parameters are use for positioning and scaling
+        objects. |n|
+        if True, screen_coordinates will be used instead.
+    
+    t0 : float
+        time of start of the animation (default: now)
+    
+    x0 : float
+        x-coordinate of the origin (default 0) at time t0
+    
+    y0 : float
+        y-coordinate of the origin (default 0) at time t0
+    
+    offsetx0 : float
+        offsets the x-coordinate of the object (default 0) at time t0
+    
+    offsety0 : float
+        offsets the y-coordinate of the object (default 0) at time t0
+    
+    circle0 : tuple
+         the circle at time t0 specified as a tuple (radius,)
+    
+    line0 : tuple
+        the line(s) at time t0 (xa,ya,xb,yb,xc,yc, ...)
+            
+    polygon0 : tuple
+        the polygon at time t0 (xa,ya,xb,yb,xc,yc, ...) |n|
+        the last point will be auto connected to the start
+    
+    rectangle0 : tuple
+        the rectangle at time t0 |n| 
+        (xlowerleft,ylowerlef,xupperright,yupperright)
+    
+    image : str or PIL image
+        the image to be displayed |n|
+        This may be either a filename or a PIL image
+    
+    text : str
+        the text to be displayed
+    
+    font : str or list/tuple
+        font to be used for texts |n|
+        Either a string or a list/tuple of fontnames.
+        If not found, uses calibri or arial
+            
+    anchor : str
+        anchor position |n|
+        specifies where to put images or texts relative to the anchor
+        point |n|
+        possible values are (default: center): |n|
+        ``nw    n    ne`` |n|
+        ``w   center  e`` |n|
+        ``sw    s    se``  
+    
+    linewidth0 : float
+        linewidth of the contour at time t0 (default 0 = no contour)
+            
+    fillcolor0 : colorspec
+        color of interior/text at time t0 (default black)
+            
+    linecolor0 : colorspec
+        color of the contour at time t0 (default black)
+            
+    angle0 : float
+        angle of the polygon at time t0 (in degrees) (default 0)
+            
+    fontsize0 : float
+        fontsize of text at time t0 (default: 20)
+            
+    width0 : float
+       width of the image to be displayed at time t0 (default: no scaling)
+    
+    t1 : float
+        time of end of the animation (default: inf) |n|
+        if keep=True, the animation will continue (frozen) after t1
+    
+    x1 : float
+        x-coordinate of the origin (default x0) at time t1
+    
+    y1 : float
+        y-coordinate of the origin (default y0) at time t1
+    
+    offsetx1 : float
+        offsets the x-coordinate of the object (default offsetx0) at time t1
+    
+    offsety1 : float
+        offsets the y-coordinate of the object (default offsety0) at time t1
+    
+    circl10 : tuple
+         the circle at time t1 specified as a tuple (radius,)
+    
+    line1 : tuple
+        the line(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: line0) |n|
+        should have the same length as line0
+            
+    polygon1 : tuple
+        the polygon at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: polygon0) |n|
+        should have the same length as polygon0
+    
+    rectangle1 : tuple
+        the rectangle at time t1 (default: rectangle0) |n| 
+        (xlowerleft,ylowerlef,xupperright,yupperright)
+    
+    linewidth1 : float
+        linewidth of the contour at time t1 (default linewidth0)
+            
+    fillcolor1 : colorspec
+        color of interior/text at time t1 (default fillcolor0)
+            
+    linecolor1 : colorspec
+        color of the contour at time t1 (default linecolor0)
+            
+    angle1 : float
+        angle of the polygon at time t1 (in degrees) (default angle0)
+            
+    fontsize1 : float
+        fontsize of text at time t1 (default: fontsize0)
+            
+    width1 : float
+       width of the image to be displayed at time t1 (default: width0)
+        
+    note that one (and only one) of the following parameters is required:
+         - circle0
+         - image
+         - line0
+         - polygon0
+         - rectangle0
+         - text
+        
+    colors may be specified as a
+        - valid colorname
+        - hexname
+        - tuple (R,G,B) or (R,G,B,A)
+    colornames may contain an additional alpha, like ``red#7f``
+    hexnames may be either 3 of 4 bytes long (RGB or RGBA)
+    both colornames and hexnames may be given as a tuple with an
+      additional alpha between 0 and 255,
+      e.g. ``('red',127)`` or ``('#ff00ff',128)``
+      
+    Permitted parameters
+    
+    ======================  ========= ========= ========= ========= ========= =========
+    parameter               circle    image     line      polygon   rectangle text     
+    ======================  ========= ========= ========= ========= ========= =========
+    parent                  -         -         -         -         -         -              
+    layer                   -         -         -         -         -         -              
+    keep                    -         -         -         -         -         -              
+    scree_coordinates       -         -         -         -         -         -
+    t0,t1                   -         -         -         -         -         -              
+    x0,x1                   -         -         -         -         -         -              
+    y0,y1                   -         -         -         -         -         -              
+    offsetx0,offsetx1       -         -         -         -         -         -              
+    offsety0,offsety1       -         -         -         -         -         -              
+    circle0,circle1         -
+    image                             -
+    line0,line1                                 -
+    polygon0,polygon1                                     -
+    rectangle0,rectangle1                                           -
+    text                                                                      -
+    font
+    anchor                            -                                       -    
+    linewidth0,linewidth1    -                  -         -         -                
+    fillcolor0,fillcolor1    -                            -         -
+    linecolor0,linecolor1    -                  -         -         -
+    angle0,angle1                     -         -         -         -         -
+    font                                                                      -
+    fontsize0,fontsize1                                                       -
+    width0,width1                     -                   -                                   
+    ======================  ========= ========= ========= ========= ========= ========= 
+    '''
+
+    def make_pil_image(self,t):
+        
+        visible=self.visible(t)
+
+        if (t>=self.t0) and ((t<=self.t1) or self.keep) and visible:
+            self._image_visible=True
+            self._image_x_prev=self._image_x
+            self._image_y_prev=self._image_y
+            self._image_ident_prev=self._image_ident  
+                      
+            x=self.x(t)
+            y=self.y(t)
+            offsetx=self.offsetx(t)
+            offsety=self.offsety(t)
+            angle=self.angle(t)
+                                  
+            if (self.type=='polygon') or (self.type=='rectangle') or (self.type=='line'):
+                linewidth=self.linewidth(t)*An.scale
+                linecolor=colorspec_to_tuple(self.linecolor(t))
+                fillcolor=colorspec_to_tuple(self.fillcolor(t))
+                                        
+                cosa=math.cos(angle*math.pi/180)
+                sina=math.sin(angle*math.pi/180)                    
+
+                if self.type=='rectangle': 
+                    rectangle=self.rectangle(t)
+                    p=[
+                     rectangle[0],rectangle[1],
+                     rectangle[2],rectangle[1],
+                     rectangle[2],rectangle[3],
+                     rectangle[0],rectangle[3],
+                     rectangle[0],rectangle[1]]
+
+
+                elif self.type=='line':
+                    p=self.line(t)
+                    fillcolor=(0,0,0,0)
+
+                else:
+                    p=self.polygon(t)
+        
+                if self.screen_coordinates:
+                    qx=x
+                    qy=y
+                else:
+                    qx=(x-An.x0)*An.scale
+                    qy=(y-An.y0)*An.scale
+
+                r=[]
+                minrx=inf
+                minry=inf
+                maxrx=-inf
+                maxry=-inf
+                for i in range(0,len(p),2):
+                    px=p[i]
+                    py=p[i+1]
+                    rx=px*cosa-py*sina
+                    ry=px*sina+py*cosa
+                    if not self.screen_coordinates:
+                        rx=rx*An.scale
+                        ry=ry*An.scale
+                    minrx=min(minrx,rx)
+                    maxrx=max(maxrx,rx)
+                    minry=min(minry,ry)
+                    maxry=max(maxry,ry)
+                    r.append(rx)
+                    r.append(ry)
+                if self.type=='polygon':
+                    if (r[0]!=r[len(r)-2]) or (r[1]!=r[len(r)-1]):
+                        r.append(r[0])
+                        r.append(r[1])
+                      
+                rscaled=[]
+                for i in range(0,len(r),2):
+                    rscaled.append(r[i]-minrx+linewidth)
+                    rscaled.append(maxry-r[i+1]+linewidth)
+                rscaled=tuple(rscaled) #to make it hashable
+        
+                self._image_ident=(rscaled,minrx,maxrx,minry,maxry,
+                  fillcolor,linecolor,linewidth)
+                if self._image_ident!=self._image_ident_prev:
+                    self._image=Image.new\
+                      ('RGBA',(int(maxrx-minrx+2*linewidth),\
+                      int(maxry-minry+2*linewidth)),(0,0,0,0))
+                    draw=ImageDraw.Draw(self._image)
+                    if fillcolor[3]!=0:
+                        draw.polygon(rscaled,fill=fillcolor)
+                    if (linewidth>0) and (linecolor[3]!=0):
+                        draw.line\
+                          (rscaled,fill=linecolor,width=int(linewidth))
+       
+                self._image_x=qx+minrx-linewidth+(offsetx*cosa-offsety*sina)
+                self._image_y=qy+minry-linewidth+(offsetx*sina+offsety*cosa)
+                
+            elif self.type=='circle':
+                linewidth=self.linewidth(t)*An.scale
+                fillcolor=colorspec_to_tuple(self.fillcolor(t))
+                linecolor=colorspec_to_tuple(self.linecolor(t))
+                circle=self.circle(t)
+                radius=circle[0]                
+
+                if self.screen_coordinates:
+                    qx=x
+                    qy=y
+                else:
+                    qx=(x-An.x0)*An.scale
+                    qy=(y-An.y0)*An.scale
+                    linewidth*=An.scale
+                    radius*=An.scale
+
+                self._image_ident=(radius,linewidth,linecolor,fillcolor)
+                if self._image_ident!=self._image_ident_prev:
+                    nsteps=int(math.sqrt(radius)*6)
+                    tangle=2*math.pi/nsteps
+                    sint=math.sin(tangle)
+                    cost=math.cos(tangle)
+                    p=[]
+                    x=radius
+                    y=0
+                                        
+                    for i in range(nsteps+1):
+                        x,y=(x*cost-y*sint,x*sint+y*cost)
+                        p.append(x+radius+linewidth)
+                        p.append(y+radius+linewidth)
+                        
+
+                    self._image=Image.new\
+                      ('RGBA',(int(radius*2+2*linewidth),\
+                      int(radius*2+2*linewidth)),(0,0,0,0))
+                    draw=ImageDraw.Draw(self._image)
+                    if fillcolor[3]!=0:
+                        draw.polygon(p,fill=fillcolor)
+                    if (linewidth>0) and (linecolor[3]!=0):
+                        draw.line(p,fill=linecolor,width=int(linewidth))
+
+                dx=offsetx
+                dy=offsety
+                cosa=math.cos(angle*math.pi/180)
+                sina=math.sin(angle*math.pi/180)  
+                ex=dx*cosa-dy*sina
+                ey=dx*sina+dy*cosa
+                self._image_x=qx+ex-radius-linewidth-1
+                self._image_y=qy+ey-radius-linewidth-1
+        
+            elif self.type=='image':
+                image,image_serial=self.image(t)
+                width=self.width(t)
+                height=width*image.size[1]/image.size[0]
+                angle=self.angle(t)
+
+                anchor=self.anchor(t)
+                if self.screen_coordinates:
+                    qx=x
+                    qy=y
+                else:
+                    qx=(x-An.x0)*An.scale
+                    qy=(y-An.y0)*An.scale
+                    offsetx=offsetx*An.scale
+                    offsety=offsety*An.scale
+                
+                self._image_ident=(image_serial,width,height,angle)
+                if self._image_ident!=self._image_ident_prev:
+                    if not self.screen_coordinates:
+                        width*=An.scale
+                        height*=An.scale
+                    im1 = image.resize\
+                      ((int(width),int(height)), Image.ANTIALIAS)
+                    self.imwidth,self.imheight=im1.size
+                    
+                    self._image = im1.rotate(angle,expand=1)
+                    
+                anchor_to_dis={
+                  'ne':(-0.5,-0.5),
+                  'n':(0,-0.5),
+                  'nw':(0.5,-0.5),
+                  'e':(-0.5,0),
+                  'center':(0,0),
+                  'w':(0.5,0),\
+                  'se':(-0.5,0.5),
+                  's':(0,0.5),
+                  'sw':(0.5,0.5)}
+                dx,dy=anchor_to_dis[anchor.lower()]
+                dx=dx*self.imwidth+offsetx
+                dy=dy*self.imheight+offsety
+                cosa=math.cos(angle*math.pi/180)
+                sina=math.sin(angle*math.pi/180)  
+                ex=dx*cosa-dy*sina
+                ey=dx*sina+dy*cosa
+                imrwidth,imrheight=self._image.size
+
+                self._image_x=qx+ex-imrwidth/2
+                self._image_y=qy+ey-imrheight/2
+
+            elif self.type=='text':
+                fillcolor=colorspec_to_tuple(self.fillcolor(t))                 
+                fontsize=self.fontsize(t)
+                angle=self.angle(t)                        
+                anchor=self.anchor(t)
+
+                text=self.text(t)
+                if self.screen_coordinates:
+                    qx=x
+                    qy=y
+                else:
+                    qx=(x-An.x0)*An.scale
+                    qy=(y-An.y0)*An.scale
+                    fontsize=fontsize*An.scale
+                    offsetx=offsetx*An.scale
+                    offsety=offsety*An.scale
+                
+                self._image_ident= (text,self.font,fontsize,angle,fillcolor)
+                if self._image_ident!=self._image_ident_prev:
+                    font=getfont(self.font,fontsize)
+                        
+                    width,height=font.getsize(text)
+                    im=Image.new('RGBA',(int(width),int(height)),(0,0,0,0))
+                    imwidth,imheight=im.size
+                    draw=ImageDraw.Draw(im)
+                    draw.text(xy=(0,0),text=text,font=font,fill=fillcolor)
+                    #this code is to correct a bug in the rendering of text,
+                    #leaving a kind of shadow around the text
+                    fillcolor3=fillcolor[0:3]
+                    if fillcolor3!=(0,0,0): #black is ok
+                        for y in range(imheight):
+                            for x in range(imwidth):
+                                c=im.getpixel((x,y))
+                                if not c[0:3] in (fillcolor3,(0,0,0)):
+                                    im.putpixel((x,y),(*fillcolor3,c[3]))  
+                    #end of code to correct bug     
+          
+                    self.imwidth,self.imheight=im.size
+                    
+                    self._image = im.rotate(angle,expand=1)
+                                    
+                anchor_to_dis={
+                  'ne':(-0.5,-0.5),
+                  'n':(0,-0.5),
+                  'nw':(0.5,-0.5),
+                  'e':(-0.5,0),
+                  'center':(0,0),
+                  'w':(0.5,0),\
+                  'se':(-0.5,0.5),
+                  's':(0,0.5),
+                  'sw':(0.5,0.5)}
+
+                dx,dy=anchor_to_dis[anchor.lower()]
+                dx=dx*self.imwidth+offsetx
+                dy=dy*self.imheight+offsety
+                cosa=math.cos(angle*math.pi/180)
+                sina=math.sin(angle*math.pi/180)  
+                ex=dx*cosa-dy*sina
+                ey=dx*sina+dy*cosa
+                imrwidth,imrheight=self._image.size        
+                self._image_x=qx+ex-imrwidth/2
+                self._image_y=qy+ey-imrheight/2
+            else:
+                self._image_visible=False #should never occur
+                
+        else:
+            self._image_visible=False
+
+    def remove_background(self,im):
+        pixels=im.load()
+        background=pixels[0,0]
+        imagewidth,imageheight=im.size
+        for y in range(imageheight):
+            for x in range(imagewidth):
+                if abs(pixels[x, y][0]-background[0])<10:
+                    if abs(pixels[x, y][1]-background[1])<10:
+                        if abs(pixels[x, y][2]-background[2])<10:
+                            pixels[x, y] = (255, 255, 255, 0)  
+                    
+        
+    def settype(self,circle,line,polygon,rectangle,image,text):
+        n=0
+        t=''
+        if circle!=None:
+            t='circle'
+            n+=1
+        if line!=None:
+            t='line'
+            n+=1
+        if polygon!=None:
+            t='polygon'
+            n+=1
+        if rectangle!=None:
+            t='rectangle'
+            n+=1
+        if image!=None:
+            t='image'
+            n+=1
+        if text!=None:
+            t='text'
+            n+=1
+        if n>=2:
+            raise AssertionError('more than one object given')
+        return t                
+            
+    def __init__(self,parent=None,layer=0,keep=True,visible=True,
+            screen_coordinates=False,
+            t0=None,x0=0,y0=0,offsetx0=0,offsety0=0,
+            circle0=None,line0=None,polygon0=None,rectangle0=None,
+            image=None,text=None,
+            font='',anchor='center',
+            linewidth0=1,fillcolor0='black',linecolor0='black',
+            angle0=0,fontsize0=20,width0=None,
+            t1=None,x1=None,y1=None,offsetx1=None,offsety1=None,
+            circle1=None,line1=None,polygon1=None,rectangle1=None,
+            linewidth1=None,fillcolor1=None,linecolor1=None,
+            angle1=None,fontsize1=None,width1=None,env=None):
+                    
+        self.env=default_env if env==None else env
+        self._image_ident=None # denotes no image yet
+        self._image=None
+        self._image_x=0
+        self._image_y=0
+        self.canvas_object=None
+        
+        self.type=self.settype(circle0,line0,polygon0,rectangle0,image,text)
+        if self.type=='':
+            raise AssertionError('no object specified')
+        type1=self.settype(circle1,line1,polygon1,rectangle1,None,None)
+        if (type1!='') and (type1!=self.type):
+            raise AssertionError('incompatible types: '+self.type+' and '+ type1)
+            
+        self.layer0=layer
+        self.parent=parent
+        self.keep=keep
+        self.visible0=visible
+        self.screen_coordinates=screen_coordinates
+        self.sequence=self.env.serialize()
+
+        self.circle0=circle0
+        self.line0=line0
+        self.polygon0=polygon0
+        self.rectangle0=rectangle0            
+        self.text0=text
+        
+        if image is None:
+            self.width0=0 #just to be able to interpolate
+        else:
+            self.image0=spec_to_image(image)
+            self.image_serial0=self.env.serialize()
+            self.width0=self.image0.size[0] if width0 is None else width0
+ 
+        self.font=font
+        self.anchor0=anchor
+        
+        self.x0=x0
+        self.y0=y0
+        self.offsetx0=offsetx0
+        self.offsety0=offsety0
+
+        self.fillcolor0=fillcolor0
+        self.linecolor0=linecolor0
+        self.linewidth0=linewidth0
+        self.angle0=angle0
+        self.fontsize0=fontsize0
+
+        self.t0=self.env._now if t0 is None else t0
+
+        self.circle1=self.circle0 if circle1 is None else circle1
+        self.line1=self.line0 if line1 is None else line1
+        self.polygon1=self.polygon0 if polygon1 is None else polygon1
+        self.rectangle1=self.rectangle0 if rectangle1 is None else rectangle1
+
+        self.x1=self.x0 if x1 is None else x1
+        self.y1=self.y0 if y1 is None else y1
+        self.offsetx1=self.offsetx0 if offsetx1 is None else offsetx1
+        self.offsety1=self.offsety0 if offsety1 is None else offsety1
+        self.fillcolor1=\
+          self.fillcolor0 if fillcolor1 is None else fillcolor1
+        self.linecolor1=\
+          self.linecolor0 if linecolor1 is None else linecolor1
+        self.linewidth1=\
+          self.linewidth0 if linewidth1 is None else linewidth1
+        self.angle1=self.angle0 if angle1 is None else angle1
+        self.fontsize1=\
+          self.fontsize0 if fontsize1 is None else fontsize1
+        self.width1=self.width0 if width1 is None else width1
+        
+        self.t1=inf if t1 is None else t1
+
+        self.env.an_objects.append(self)
+
+    def update(self,layer=None,keep=None,visible=None,
+            t0=None,x0=None,y0=None,offsetx0=None,offsety0=None,
+            circle0=None,line0=None,polygon0=None,rectangle0=None,
+            image=None,text=None,font=None,anchor=None,
+            linewidth0=None,fillcolor0=None,linecolor0=None,
+            angle0=None,fontsize0=None,width0=None,
+            t1=None,x1=None,y1=None,offsetx1=None,offsety1=None,
+            circle1=None,line1=None,polygon1=None,rectangle1=None,
+            linewidth1=None,fillcolor1=None,linecolor1=None,
+            angle1=None,fontsize1=None,width1=None):
+        '''
+        updates an animation object
+    
+        Parameters
+        ----------
+        layer : int
+            layer value |n|
+            lower layer values are on top of higher layer values (default *)
+
+        keep : bool
+            keep |n|
+            if False, animation object is hidden after t1, shown otherwise
+            (default *)
+                
+        t0 : float
+            time of start of the animation (default: now)
+    
+        x0 : float
+            x-coordinate of the origin (default *) at time t0
+    
+        y0 : float
+            y-coordinate of the origin (default *) at time t0
+    
+        offsetx0 : float
+            offsets the x-coordinate of the object (default *) at time t0
+    
+        offsety0 : float
+            offsets the y-coordinate of the object (default *) at time t0
+    
+        circle0 : tuple
+            the circle at time t0 specified as a tuple (radius,) (default *)
+    
+        line0 : tuple
+            the line(s) at time t0 (xa,ya,xb,yb,xc,yc, ...) (default *)
+            
+        polygon0 : tuple
+            the polygon at time t0 (xa,ya,xb,yb,xc,yc, ...) |n|
+            the last point will be auto connected to the start (default *)
+    
+        rectangle0 : tuple
+            the rectangle at time t0 |n| 
+            (xlowerleft,ylowerlef,xupperright,yupperright) (default *)
+    
+        image : str or PIL image
+            the image to be displayed |n|
+            This may be either a filename or a PIL image (default *)
+    
+        text : str
+            the text to be displayed (default *)
+    
+        font : str or list/tuple
+            font to be used for texts |n|
+            Either a string or a list/tuple of fontnames. (default *)
+            If not found, uses calibri or arial
+            
+        anchor : str
+            anchor position |n|
+            specifies where to put images or texts relative to the anchor
+            point (default *) |n|
+            possible values are (default: center): |n|
+            ``nw    n    ne`` |n|
+            ``w   center  e`` |n|
+            ``sw    s    se``  
+    
+        linewidth0 : float
+            linewidth of the contour at time t0 (default *)
+            
+        fillcolor0 : colorspec
+            color of interior/text at time t0 (default *)
+            
+        linecolor0 : colorspec
+            color of the contour at time t0 (default *)
+            
+        angle0 : float
+            angle of the polygon at time t0 (in degrees) (default *)
+            
+        fontsize0 : float
+            fontsize of text at time t0 (default *)
+            
+        width0 : float
+            width of the image to be displayed at time t0 (default *)
+        
+        t1 : float
+            time of end of the animation (default: inf) |n|
+            if keep=True, the animation will continue (frozen) after t1
+        
+        x1 : float
+            x-coordinate of the origin (default x0) at time t1
+        
+        y1 : float
+            y-coordinate of the origin (default y0) at time t1
+        
+        offsetx1 : float
+            offsets the x-coordinate of the object (default offsetx0) at time t1
+        
+        offsety1 : float
+            offsets the y-coordinate of the object (default offsety0) at time t1
+        
+        circle1: tuple
+             the circle at time t1 specified as a tuple (radius,)
+        
+        line1 : tuple
+            the line(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: line0) |n|
+            should have the same length as line0
+                
+        polygon1 : tuple
+            the polygon at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: polygon0) |n|
+            should have the same length as polygon0
+        
+        rectangle1 : tuple
+            the rectangle at time t1 (default: rectangle0) |n| 
+            (xlowerleft,ylowerlef,xupperright,yupperright)
+        
+        linewidth1 : float
+            linewidth of the contour at time t1 (default linewidth0)
+                
+        fillcolor1 : colorspec
+            color of interior/text at time t1 (default fillcolor0)
+                
+        linecolor1 : colorspec
+            color of the contour at time t1 (default linecolor0)
+                
+        angle1 : float
+            angle of the polygon at time t1 (in degrees) (default angle0)
+                
+        fontsize1 : float
+            fontsize of text at time t1 (default: fontsize0)
+                
+        width1 : float
+           width of the image to be displayed at time t1 (default: width0)
+            
+        note that the type of the animation cannot be changed with this method.    
+           
+        default * means that the current value (at time now) is used
+        ''' 
+
+        t=self.An.env._now
+        type0=self.settype(circle0,line0,polygon0,rectangle0,image,text)
+        if (type0!='') and (type0!=self.type):
+            raise AssertionError\
+              ('incorrect type '+type0+' (should be '+self.type)
+        type1=self.settype(circle1,line1,polygon1,rectangle1,None,None)
+        if (type1!='') and (type1!=self.type):
+            raise AssertionError\
+              ('incompatible types: '+self.type+' and '+ type1)
+
+        if layer!=None:
+            self.layer0=layer
+        if keep!=None:
+            self.keep=keep
+        if visible!=None:
+            self.visible0=visible
+        self.circle0=self.circle() if circle0 is None else circle0
+        self.line0=self.line() if line0 is None else line0
+        self.polygon0=self.polygon() if polygon0 is None else polygon0
+        self.rectangle0=\
+          self.rectangle() if rectangle0 is None else rectangle0
+        if text!=None: self.text0=text
+        self.width0=self.width() if width0 is None else width0
+        if image!=None:
+            self.image0=spec_to_image(image)
+            self.image_serial0=self.env.serialize()
+            self.width0=self.image0.size[0] if width0 is None else width0
+
+        if font!=None: self.font=font
+        if anchor!=None: self.anchor0=anchor
+            
+        self.x0=self.x(t) if x0 is None else x0
+        self.y0=self.y(t) if y0 is None else y0
+        self.offsetx0=self.offsetx(t) if offsetx0 is None else offsetx0
+        self.offsety0=self.offsety(t) if offsety0 is None else offsety0
+
+        self.fillcolor0=\
+          self.fillcolor(t) if fillcolor0 is None else fillcolor0
+        self.linecolor0=self.linecolor(t) if linecolor0 is None else linecolor0
+        self.linewidth0=self.linewidth(t) if linewidth0 is None else\
+          linewidth0
+        self.angle0=self.angle(t) if angle0 is None else angle0
+        self.fontsize0=self.fontsize(t) if fontsize0 is None else fontsize0
+        self.t0=self.An.env._now if t0 is None else t0
+
+        self.circle1=self.circle0 if circle1 is None else circle1
+        self.line1=self.line0 if line1 is None else line1
+        self.polygon1=self.polygon0 if polygon1 is None else polygon1
+        self.rectangle1=\
+          self.rectangle0 if rectangle1 is None else rectangle1
+
+        self.x1=self.x0 if x1 is None else x1
+        self.y1=self.y0 if y1 is None else y1
+        self.offsetx1=self.offsetx0 if offsetx1 is None else offsetx1
+        self.offsety1=self.offsety0 if offsety1 is None else offsety1
+        self.fillcolor1=\
+          self.fillcolor0 if fillcolor1 is None else fillcolor1
+        self.linecolor1=\
+          self.linecolor0 if linecolor1 is None else linecolor1
+        self.linewidth1=\
+          self.linewidth0 if linewidth1 is None else linewidth1
+        self.angle1=self.angle0 if angle1 is None else angle1
+        self.fontsize1=\
+          self.fontsize0 if fontsize1 is None else fontsize1
+        self.width1=self.width0 if width1 is None else width1
+
+        self.t1=inf if t1 is None else t1
+        if self not in self.env.an_objects:
+            self.env.an_objects.append(self)
+
+    def remove(self):
+        '''
+        removes the animation object
+        
+        the animation object is removed from the animation queue,
+        so effectively ending this animation
+        
+        note that it might be still updated, if required
+        '''
+        if self in self.env.an_objects:
+            self.env.an_objects.remove(self)
+            
+    def x(self,t=None):
+        return interpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.x0,self.x1)
+
+    def y(self,t=None):
+        return interpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.y0,self.y1)
+
+    def offsetx(self,t=None):
+        return interpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.offsetx0,self.offsetx1)
+
+    def offsety(self,t=None):
+        return interpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.offsety0,self.offsety1)
+
+    def angle(self,t=None):
+        return interpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.angle0,self.angle1)
+
+    def linewidth(self,t=None):
+        return interpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.linewidth0,self.linewidth1)
+
+    def linecolor(self,t=None):
+        return colorinterpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.linecolor0,self.linecolor1)
+
+    def fillcolor(self,t=None):
+        return colorinterpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.fillcolor0,self.fillcolor1)
+
+    def circle(self,t=None):
+        return interpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.circle0,self.circle1)
+
+    def line(self,t=None):
+        return interpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.line0,self.line1)
+
+    def polygon(self,t=None):
+        return interpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.polygon0,self.polygon1)
+
+    def rectangle(self,t=None):
+        return interpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.rectangle0,self.rectangle1)
+
+    def width(self,t=None):
+        return interpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.width0,self.width1)
+
+    def fontsize(self,t=None):
+        return interpolate((self.An.env._now if t is None else t),\
+          self.t0,self.t1,self.fontsize0,self.fontsize1)
+    
+    def text(self,t=None):
+        return self.text0
+        
+    def anchor(self,t=None):
+        return self.anchor0
+        
+    def layer(self,t=None):
+        return self.layer0
+
+    def visible(self,t=None):
+        return self.visible0
+        
+    def image(self,t=None):
+        '''
+        returns image and a serial number at time t
+        use the function spec_to_image to change the image here
+        if there's a change in the image, a new serial numbder should be returned
+        if there'n no change, do not update the serial number
+        '''
+        return self.image0,self.image_serial0
+
+class AnimateButton(object):
+    '''
+    defines a button
+    
+    Parameters:
+    -----------
+    x : int
+        x-coordinate of centre of button in screen coordinates (default 0)
+        
+    y : int
+        y-coordinate of centre of button in screen coordinates (default 0)
+        
+    width : int
+        width of button in screen coordinates (default 80)
+        
+    height : int
+        height of button in screen coordinates (default 30)
+        
+    linewidth : int
+        width of contour in screen coordinates (default 0=no contour)
+        
+    fillcolor : colorspec
+        color of the interior (default 40%gray)  
+        
+    linecolor : colorspec
+        color of contour (default black)
+        
+    color : colorspec
+        color of the text (default white)
+    
+    text : str or function
+        text of the button (default null string) |n|
+        if text is an argumentless function, this will be called each time;
+        the button is shown/updated
+        
+    font : str
+        font of the text (default Helvetica)
+        
+    fontsize : int
+        fontsize of the text (default 15)
+        
+    action :  function 
+        action to take when button is pressed |n|
+        executed when the button is pressed (default None)
+        the function should have no arguments |n|
+        
+    On CPython platforms, the tkinter functionality is used, 
+    on Pythonista, this is emulated by salabim
+    '''
+    def __init__(self,x=0,y=0,width=80,height=30,
+                 linewidth=0,fillcolor='40%gray',
+                 linecolor='black',color='white',text='',font='',
+                 fontsize=15,action=None,env=None):
+        
+        self.env=default_env if env==None else env
+        self.type='button'
+        self.parent=None
+        self.t0=-inf
+        self.t1=inf
+        self.x0=0
+        self.y0=0
+        self.x1=0
+        self.y1=0
+        self.sequence=self.env.serialize()
+        self.x=x-width/2
+        self.y=y-height/2
+        self.width=width
+        self.height=height
+        self.fillcolor=colorspec_to_tuple(fillcolor)
+        self.linecolor=colorspec_to_tuple(linecolor)
+        self.color=colorspec_to_tuple(color)
+        self.linewidth=linewidth
+        self.font=font
+        self.fontsize=fontsize
+        self.text0=text
+        self.lasttext='*'
+        self.action=action
+        
+        self.env.ui_objects.append(self)
+        self.installed=False
+
+    def text(self):
+        return self.text0
+
+    def remove(self):
+        '''
+        removes the button object
+        
+        the ui object is removed from the ui queue,
+        so effectively ending this ui
+        '''
+        if self in self.env.ui_objects:
+            self.env.ui_objects.remove(self)
+            
+class AnimateSlider(object):
+    '''
+    defines a slider
+    
+    Parameters:
+    -----------
+    x : int
+        x-coordinate of centre of button in screen coordinates (default 0)
+        
+    y : int
+        y-coordinate of centre of button in screen coordinates (default 0)
+        
+    vmin : float
+        minimum value of the slider (default 0)
+        
+    vmax : float
+        maximum value of the slider (default 0)
+        
+    v : float
+        initial value of the slider (default 0) |n|
+        should be between vmin and vmax
+        
+    resolution : float
+        step size of value (default 1)
+        
+    width : float
+        width of slider in screen coordinates (default 100)
+        
+    height : float
+        height of slider in screen coordinates (default 20)
+        
+    linewidth : float
+        width of contour in screen coordinate (default 0 = no contour)
+        
+    fillcolor : colorspec
+        color of the interior (default 40%gray)  
+        
+    linecolor : colorspec
+        color of contour (default black)
+        
+    labelcolor : colorspec
+        color of the label (default black)
+        
+    label : str
+        label if the slider (default null string) |n|
+        if label is an argumentless function, this function
+        will be used to display as label, otherwise the
+        label plus the current value of the slider will be shown 
+        
+    font : str
+         font of the text (default Helvetica)
+         
+    fontsize : int
+         fontsize of the text (default 12)
+         
+    action ; function
+         function executed when the slider value is changed (default None) |n|
+         the function should one arguments, being the new value |n|
+         if None (default), no action
+      
+    The current value of the slider is the v attibute of the slider. |n|
+    On CPython platforms, the tkinter functionality is used, 
+    on Pythonista, this is emulated by salabim
+    '''
+    def __init__(self,layer=0,x=0,y=0,width=100,height=20,
+                 vmin=0,vmax=10,v=None,resolution=1,
+                 linecolor='black',labelcolor='black',label='',
+                 font='',fontsize=12,action=None,env=None):
+        
+        self.env=default_env if env==None else env
+        n=round((vmax-vmin)/resolution)+1
+        self.vmin=vmin
+        self.vmax=vmin+(n-1)*resolution
+        self._v=vmin if v is None else v
+        self.xdelta=width/n
+        self.resolution=resolution
+        
+        self.type='slider'
+        self.parent=None
+        self.t0=-inf
+        self.t1=inf
+        self.x0=0
+        self.y0=0
+        self.x1=0
+        self.y1=0
+        self.sequence=self.env.serialize()
+        self.x=x-width/2
+        self.y=y-height/2
+        self.width=width
+        self.height=height
+        self.linecolor=colorspec_to_tuple(linecolor)
+        self.labelcolor=colorspec_to_tuple(labelcolor)
+        self.font=font
+        self.fontsize=fontsize
+        self.label=label
+        self.action=action
+        self.installed=False
+
+        if Pythonista:
+            self.y=self.y-height*1.5
+
+        self.env.ui_objects.append(self)
+    
+    @property
+    def v(self,value=None):
+        '''
+        returns and/or sets the value
+        '''
+        if Pythonista:
+            return self._v
+        else:
+            if self.An.env == self.env:
+                return self.slider.get()
+            else:
+                return self._v
+    
+    @v.setter
+    def v(self,value):
+        if Pythonista:
+            self._v=value
+        else:
+            if self.An.env == self.env:
+                self.slider.set(value)
+            else:
+                self._v=value
+                
+    def remove(self):
+        '''
+        removes the slider object
+        
+        the ui object is removed from the ui queue,
+        so effectively ending this ui
+        '''
+        if self in self.env.ui_objects:
+            self.env.ui_objects.remove(self)
+            
+class Component(object): 
+    '''Component object
+    
+    A salabim component is used as a data component (primarily for queueing
+    or as a component with a process) |n|
+    Usually, a component will be defined as a subclass of Component.
+    
+    Parameters:
+    -----------
+    name : str
+        name of the component. |n|
+        if the name ends with a period (.),
+        auto serializing will be applied |n|
+        if omitted, the name will be derived from the class 
+        it is defined in (lowercased)
+        
+    at : float
+        schedule time |n|
+        if omitted, now is used
+        
+    delay : float
+        schedule with a delay |n|
+        if omitted, no delay
+        
+    urgent : boolean 
+        urgency indicator |n|
+        if False (default), the component will be scheduled
+        behind all other components scheduled
+        for the same time |n|
+        if True, the component will be scheduled 
+        in front of all components scheduled
+        for the same time
+        
+    mode : str preferred
+        mode |n|
+        will be used in trace and can be used in animations|n|
+        if nothing specified, the mode will be None.|n|
+        also mode_time will be set to now.
+        
+    auto_start : bool
+        auto start indicator |n|
+        if there is a generator call process defined in the
+        component class, this will be activated 
+        automatically, unless overridden with auto_start |n|
+        if there is no generator called process, no activation 
+        takes place, anyway
+        
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
     '''
     
     def __init__(self,name=None,at=None,delay=None,urgent=False,\
-      auto_start=True,suppress_trace=False,env=None): 
+      auto_start=True,suppress_trace=False,mode=None,env=None): 
         if env is None:
             self.env=default_env
         else:
@@ -1229,7 +2821,7 @@ class Component(object):
         if name is None:
             name=str(type(self)).split('.')[-1].split("'")[0].lower()+'.'
         self._name,self._base_name,\
-          self._sequence_number = self.env._reformatnameC(name)
+          self._sequence_number = _reformatname(name,self.env._nameserializeComponent)
         self._qmembers={}
         self._process=None
         self._status=data
@@ -1240,6 +2832,7 @@ class Component(object):
         self._request_failed=False
         self._creation_time=self.env._now
         self._suppress_trace=suppress_trace
+        self.mode=mode #this also sets self._mode_time
         hasprocess=True
         try:
             process=self.process()
@@ -1255,6 +2848,7 @@ class Component(object):
         lines.append('  class='+str(type(self)).split('.')[-1].split("'")[0])
         lines.append('  suppress_trace='+str(self._suppress_trace))
         lines.append('  status='+self._status)
+        lines.append('  '+_modetxt(self._mode))
         lines.append('  creation_time='+time_to_string(self._creation_time))
         lines.append('  scheduled_time='+time_to_string(self._scheduled_time))
         if len(self._qmembers)>0:
@@ -1311,34 +2905,55 @@ class Component(object):
         self._scheduled_time=scheduled_time                       
         if scheduled_time==inf:
             self._status=passive
-            self.env.print_trace('','',caller+' '+self._name,'(passivate)')
+            self.env.print_trace('','',caller+' '+self._name,'(passivate)'+_modetxt(self._mode))
         else:                     
             self._push(scheduled_time,urgent)
             self._status=scheduled
             self.env.print_trace('','',self._name+' '+caller,\
               ('scheduled for %10.3f'%scheduled_time)+\
-              _urgenttxt(urgent)+_atprocess(self._process))        
+              _urgenttxt(urgent)+_atprocess(self._process)+_modetxt(self._mode))       
            
-    def reschedule(self,process=None,at=None,delay=None,urgent=False):
+    def reschedule(self,process=None,at=None,delay=None,urgent=False,mode='*'):
         '''
         reschedule component
 
-        arguments:
-            process       process to be started
-                          if omitted, process will not be changed
-            at            schedule time
-                          if omitted, now is used
-                          if inf, this results in a passivate
-            delay         schedule with a delay
-                          if omitted, no delay
-            urgent        if False (default), the component will be scheduled
-                            behind all other components scheduled
-                            for the same time
-                          if True, the component will be scheduled 
-                            in front of all components scheduled
-                            for the same time
+        Parameters:
+        -----------
+        process : generator function
+           process to be started. |n|
+           if omitted, process will not be changed |n|
+           note that the function *must* be a generator,
+           i.e. contains at least one yield.
+                     
+        at : float
+           schedule time |n|
+           if omitted, now is used |n|
+           if inf, this results in a passivate
+           
+        delay : float
+           schedule with a delay |n|
+           if omitted, no delay
+           
+        urgent : bool
+            urgency indicator |n|
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time |n|
+            if True, the component will be scheduled 
+            in front of all components scheduled
+            for the same time
+                            
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations|n|
+            if nothing specified, the mode will be unchanged.|n|
+            also mode_time will be set to now, if mode is set.
+            
         if to be applied for the current component, use yield reschedule.
+        
         '''
+        if mode!='*':
+            self.mode=mode
   
         if at is None:
             if delay is None:
@@ -1357,28 +2972,47 @@ class Component(object):
             self._process=process
         self._reschedule(scheduled_time,urgent,'reschedule')
                       
-    def activate(self,process=None,at=None,delay=None,urgent=False):
+    def activate(self,process=None,at=None,delay=None,urgent=False,mode='*'):
         '''
         activate component
 
-        arguments:
-            process       process to be started
-                          if omitted, the process called process() will be used
-                          note that the function *must* be a generator,
-                            i.e. contains at least one yield.
-            at            schedule time
-                          if omitted, now is used
-                          if inf, this results in a passivate
-            delay         schedule with a delay
-                          if omitted, no delay
-            urgent        if False (default), the component will be scheduled
-                            behind all other components scheduled
-                            for the same time
-                          if True, the component will be scheduled 
-                            in front of all components scheduled
-                            for the same time
-        if to be applied for the current component, use yield activate.
+        Parameters:
+        -----------
+        process : generator function
+           process to be started. |n|
+           if omitted, the function called process will be used |n|
+           note that the function *must* be a generator,
+           i.e. contains at least one yield.
+                     
+        at : float
+           schedule time |n|
+           if omitted, now is used |n|
+           if inf, an error will be raised
+           
+        delay : float
+           schedule with a delay |n|
+           if omitted, no delay
+           
+        urgent : bool
+            urgency indicator |n|
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time |n|
+            if True, the component will be scheduled 
+            in front of all components scheduled
+            for the same time
+            
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations|n|
+            if nothing specified, the mode will be unchanged.|n|
+            also mode_time will be set to now, if mode is set. 
+                                                   
+        if to be applied for the current component, use ``yield activate``.
         '''
+        if mode!='*':
+            self.mode=mode
+
         if process is None:
             try:
                 self._process=self.process()
@@ -1408,27 +3042,43 @@ class Component(object):
           # the failed state
         self._reschedule(scheduled_time,urgent,'activate')
                     
-    def reactivate(self,at=None,delay=None,urgent=False):
+    def reactivate(self,at=None,delay=None,urgent=False,mode='*'):
         '''
         reactivate component
 
-        arguments:
-            at            schedule time
-                          if omitted, now is used
-                          if inf, this results in a passivate
-            delay         schedule with a delay
-                          if omitted, no delay
-            urgent        if False (default), the component will be scheduled
-                            behind all other components scheduled
-                            for the same time
-                          if True, the component will be scheduled 
-                            in front of all components scheduled
-                            for the same time
-          
-        if to be applied for the current component, use yield activate.
+        Parameters:
+        -----------
+        at : float
+           schedule time |n|
+           if omitted, now is used |n|
+           if inf, an error will be raised
+           
+        delay : float
+           schedule with a delay |n|
+           if omitted, no delay
+           
+        urgent : bool
+            urgency indicator |n|
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time |n|
+            if True, the component will be scheduled 
+            in front of all components scheduled
+            for the same time
+         
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations|n|
+            if nothing specified, the mode will be unchanged.|n|
+            also mode_time will be set to now, if mode is set.
+            
+        if to be applied for the current component, use ``yield reactivate``.
         '''
         self._checknotcurrent()
         self._checkispassive()                 
+
+        if mode!='*':
+            self.mode=mode
 
         if at is None:
             if delay is None:
@@ -1446,25 +3096,43 @@ class Component(object):
                 
         self._reschedule(scheduled_time,urgent,'reactivate')
                         
-    def hold(self,duration=None,till=None,urgent=False):
+    def hold(self,duration=None,till=None,urgent=False,mode='*'):
         '''
         hold the current component
 
-        arguments:
-            duration      schedule with a delay of duration
-                          if 0, now is used
-            till          schedule time
-                          if omitted, no delay
-            urgent        if False (default), the component will be scheduled
-                            behind all other components scheduled
-                            for the same time
-                          if True, the component will be scheduled 
-                            in front of all components scheduled
-                            for the same time
-        *always* use as yield self.hold(...)
+        Parameters:
+        -----------
+        at : float
+           schedule time |n|
+           if omitted, now is used |n|
+           if inf, an error will be raised
+           
+        delay : float
+           schedule with a delay |n|
+           if omitted, no delay
+           
+        urgent : bool
+            urgency indicator |n|
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time |n|
+            if True, the component will be scheduled 
+            in front of all components scheduled
+            for the same time
+
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations|n|
+            if nothing specified, the mode will be unchanged.|n|
+            also mode_time will be set to now, if mode is set.
+            
+        *always* use as ``yield self.hold(...)``
         '''
 
         self._checkcurrent()       
+        if mode!='*':
+            self.mode=mode
+        
         if till is None:
             if duration is None:
                 scheduled_time=self.env._now
@@ -1481,65 +3149,75 @@ class Component(object):
                 
         self._reschedule(scheduled_time,urgent,'hold')
         
-    def passivate(self,reason=''):
+    def passivate(self,mode='*'):
         '''
         passivate the current component
 
-        arguments:
-            none
-
-        *always* use as self.yield passivate()
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations|n|
+            if nothing specified, the mode will be unchanged.|n|
+            also mode_time will be set to now, if mode is set.
+            
+        *always* use as ``yield self.passivate()``
         '''
         self._checkcurrent()          
-        self.env.print_trace('','','passivate')
+        self.env.print_trace('','','passivate',_modetxt(self._mode))
         self._scheduled_time=inf
-        self._passive_reason=reason
+        if mode!='*':
+            self.mode=mode
         self._status=passive
                         
-    def cancel(self):
+    def cancel(self,mode='*'):
         '''
         cancel component (makes the component data)
-
-        arguments:
-            none
           
-        if to be applied for the current component, use yield cancel()
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations|n|
+            if nothing specified, the mode will be unchanged.|n|
+            also mode_time will be set to now, if mode is set.
+            
+        if to be applied for the current component, use ``yield self.cancel()``
         '''
-        self.env.print_trace('','','cancel '+self._name)
+        self.env.print_trace('','','cancel '+self._name+_modetxt(self._mode))
            
         _check_fail(self)
         self._process=None
         if self._scheduled_time!=inf:
             self._remove()
         self._scheduled_time=inf
+        if mode!='*':
+            self.mode=mode
         self._status=data
       
-    def standby(self):
+    def standby(self,mode='*'):
         '''
         puts the current container in standby mode
         
-        arguments:
-            none
-        
-        *always* use as yield self.standby()        
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations|n|
+            if nothing specified, the mode will be unchanged.|n|
+            also mode_time will be set to now, if mode is set.
+            
+        *always* use as ``yield self.standby()``        
         '''
         if self!=self.env._current_component:
             raise AssertionError(self._name+' is not current')            
-        self.env.print_trace('','','standby')
+        self.env.print_trace('','','standby',+_modetxt(self._mode))
         self._scheduled_time=self.env._now
         self.env._standbylist.append(self)
+        if mode!='*':
+            self.mode=mode
         self._status=standby
          
     def stop_run(self):
         '''
-        stops the simulation and gives control to the main program, immediate
-
-        arguments:
-            none
-        always use yield self.stop_run()
+        stops the simulation and gives control to the main program, as the next event
         '''
         scheduled_time=self.env._now
-        self.env.print_trace('','','run_stop ',\
+        self.env.print_trace('','','stop_run',\
           'scheduled for=%10.3f'%scheduled_time)
 
         if self.env._main._scheduled_time!=inf: # just to be sure
@@ -1548,40 +3226,64 @@ class Component(object):
         self.env._main._push(scheduled_time,urgent=True)
         self.env._main._status=scheduled
 
-    def request(self,*args,priority=None,greedy=False,fail_at=None):
+    def request(self,*args,priority=None,greedy=False,fail_at=None,mode='*'):
         '''
-        request from a resource or resources
+        request from a resource or resources 
         
-        arguments:
-            *args             a sequence of requested resources
-                              each resource can be optionally followed by a
-                              quantity and a priority 
-                              if the quantity is not specified, 1 is assumed
-                              if the priority is not specified, this request
-                              for the resources be added to the tail of
-                              the requesters queue 
-                              alternatively, the request for a resource may
-                              be specified as a list or tuple containing
-                              the resource name, the quantity and the 
-                              priority
-            greedy            if False (default), the request will be honoured
-                              at once when all requested quantities of the
-                              resources are available
-                              if True, the components puts a pending claim
-                              already when sufficient capacity is available.
-                              When the requests cannot be honoured finally,
-                              all pending requests will be released.
-            fail_at           if the request is not honoured before fail_at,
-                              the request will be cancelled and the
-                              parameter request_failed will be set.
-                              if not specified, the request will not time out. 
-                              
-        it is not allowed to claim a resource more than once
-        the rquested quantity may exceed the current capacity of a resource
+        Parameters:
+        ----------
+        args : sequence
+            a sequence of requested resources |n|
+            each resource can be optionally followed by a
+            quantity and a priority |n| 
+            if the quantity is not specified, 1 is assumed |n|
+            if the priority is not specified, this request 
+            for the resources be added to the tail of
+            the requesters queue |n|
+            alternatively, the request for a resource may
+            be specified as a list or tuple containing
+            the resource name, the quantity and the 
+            priority |n|
+            examples |n|
+            yield self.request(r1) |n|
+            --> requests 1 from r1 |n|
+            yield self.request(r1,r2) |n|
+            --> requests 1 from r1 and 1 from r2 |n|
+            yield self.request(r1,r2,2,r3,3,100) |n|
+            --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100 |n|
+            yield self.request((r1,1),(r2,2)) |n|
+            --> requests 1 from r1, 2 from r2 |n|
+                        
+        greedy : bool
+            greedy indicator |n|
+            if False (default), the request will be honoured
+            at once when all requested quantities of the
+            resources are available |n|
+            if True, the components puts a pending claim
+            already when sufficient capacity is available. |n|
+            When the requests cannot be honoured finally,
+            all pending requests will be released.
+            
+        fail_at : float
+            time out |n|
+            if the request is not honoured before fail_at,
+            the request will be cancelled and the
+            parameter request_failed will be set. |n|
+            if not specified, the request will not time out. 
+                          
+        it is not allowed to claim a resource more than once by the same component |n|
+        the requested quantity may exceed the current capacity of a resource |n|
         the parameter request_failed will be reset by calling request
-        
-        *always* use as yield self.request(...)
+            
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations|n|
+            if nothing specified, the mode will be unchanged.|n|
+            also mode_time will be set to now, if mode is set.
+            
+        always use as ``yield self.request(...)``
         '''
+        
         if fail_at is None:
             scheduled_time=inf
         else:
@@ -1592,18 +3294,20 @@ class Component(object):
 
         self._request_failed=False
         i=0
+        if mode!='*':
+            self.mode=mode
         while i<len(args):
             q=1
             priority=None
             argsi=args[i]
-            if type(argsi)==Resource:
+            if isinstance(argsi,Resource):
                 r=argsi
                 if i+1<len(args):
-                    if type(args[i+1]) not in (Resource,list,tuple):
+                    if not isinstance(args[i+1],(Resource,list,tuple)):
                         i+=1
                         q=args[i]
                 if i+1<len(args):
-                    if type(args[i+1]) not in (Resource,list,tuple):
+                    if not isinstance(args[i+1],(Resource,list,tuple)):
                         i+=1
                         priority=args[i]
                     
@@ -1629,14 +3333,16 @@ class Component(object):
                 addstring=addstring+' priority='+str(priority)
                 self._enter_sorted(r._requesters,priority)
             self.env.print_trace('','',self._name,\
-              'request for '+str(q)+' from '+r._name+addstring)
+              'request for '+str(q)+' from '+r._name+addstring+_modetxt(self._mode))
 
             i+=1
             
         for r in list(self._requests):
             r._claimtry()
+            break # no need to check for other resources
             
-        if len(self._requests)!=0:
+        if len(self._requests)!=0: 
+            self._status=scheduled            
             self._push(scheduled_time,False)
         
     def _release(self,r,q):
@@ -1650,7 +3356,7 @@ class Component(object):
         r._claimed_quantity-=q
         self._claims[r]-=q
         if self._claims[r]<1e-8:
-            self.leave(r._claimers)
+            self._leave(r._claimers)
             if r._claimers._length==0:
                 r._claimed_quantity=0 #to avoid rounding problems
             del self._claims[r]
@@ -1661,15 +3367,28 @@ class Component(object):
     def release(self,*args):
         '''
         releases a quantity from a resource or resources
-        arguments:
-            *args             a sequence of requested resources to be released
-                              each resource can be optionally followed by a
-                              quantity
-                              if the quantity is not specified, the current
-                              alternatively, the release for a resource may
-                              be specified as a list or tuple containing
-                              the resource name and a quantity
+        
+        Parameters:
+        -----------
+        args : sequence
+            a sequence of requested resources to be released |n|
+            each resource can be optionally followed by a
+            quantity |n|
+            if the quantity is not specified, the current
+            claimed quantity will be released |n|
+            alternatively, the release for a resource may
+            be specified as a list or tuple containing
+            the resource name and (optionally) a quantity
+            examples |n|
+            suppose c1 claims currently 1 from r1 and 2 from r2 and 3 from r3
+            c1.release |n|
+            --> releases 1 from r1, 2 from r2 and 3 from r3 |n|
+            c1.release(r2) |n|
+            --> releases 2 from r2 |n|
+            c1.release((r2,2),(r3,2)) |n|
+            --> releases 2 from r2,and 2 from r3
         '''
+        
         if len(args)==0:
             for r in list(self._claims.keys()):
                 self._release(r,None)                
@@ -1679,11 +3398,11 @@ class Component(object):
             while i<len(args):
                 q=None
                 argsi=args[i]
-                if type(argsi)==Resource:
+                if isinstance(argsi,Resource):
                     r=argsi
             
                     if i+1<len(args):
-                        if type(args[i+1]) not in (Resource,list,tuple):
+                        if not isinstance(args[i+1],(Resource,list,tuple)):
                             i+=1
                             q=args[i]
                 else:
@@ -1698,8 +3417,10 @@ class Component(object):
         '''
         returns the claimed quantity from a resource
         
-        arguments:
-            resource     resource to be queried
+        Parameters:
+        -----------
+            resource : Resoure
+                resource to be queried
         
         if the resource is not claimed, 0 will be returned
         '''
@@ -1713,10 +3434,7 @@ class Component(object):
         '''
         returns a list of claimed resources
         '''
-        l=[]
-        for r in self._resources:
-            l.append(r)
-        return l
+        return self._claims.keys()
 
     @property
     def request_failed(self):
@@ -1730,17 +3448,19 @@ class Component(object):
         '''
         gets and/or sets the name of a component
         
-        arguments:
-            txt      name of the component
-                     if txt ends with a period, the name will be serialized
-                     if omitted, the name will not be changed
+        Parameters:
+        -----------
+        txt : str
+            name of the component |n|
+            if txt ends with a period, the name will be serialized |n|
+            if omitted, the name will not be changed
         '''
         return self._name
         
     @name.setter
     def name(self,txt):
         self._name,self._base_name,\
-          self._sequence_number=self.env._reformatnameC(txt)
+          self._sequence_number=_reformatnameC(txt,self.env._nameserializeComponent)
         
     @property
     def base_name(self):
@@ -1753,11 +3473,9 @@ class Component(object):
     def sequence_number(self):
         '''
         returns the sequence_number of a component
-          (the sequence number at init or name)
+        (the sequence number at init or name)
 
-        normally this will be the integer value of a serialized name,
-        but also non serialized names (without a dot at the end)
-          will be numbered 
+        normally this will be the integer value of a serialized name
         '''
         return self._sequence_number
         
@@ -1769,39 +3487,51 @@ class Component(object):
     @suppress_trace.setter
     def suppress_trace(self,value):
         self._suppress_trace=value
+
+    @property
+    def mode(self):
+        '''
+        returns/sets the mode of the component
+        '''
+        return self._mode
+        
+    @mode.setter
+    def mode(self,mode):
+        self._mode_time=self.env._now
+        self._mode=mode        
         
     @property
-    def is_passive(self):
+    def ispassive(self):
         '''
-        return True if status is passive, False otherwise
+        returns True if status is passive, False otherwise
         '''
         return self.status==passive
         
     @property
-    def is_current(self):
+    def iscurrent(self):
         '''
-        return True if status is current, False otherwise
+        returns True if status is current, False otherwise
         '''
         return self.status==current
         
     @property
-    def is_scheduled(self):
+    def isscheduled(self):
         '''
-        return True if status is scheduled, False otherwise
+        returns True if status is scheduled, False otherwise
         '''
         return self.status==scheduled
         
     @property
-    def is_standby(self):
+    def isstandby(self):
         '''
-        return True if status is standby, False otherwise
+        returns True if status is standby, False otherwise
         '''
         return self.status==standby   
         
     @property
-    def is_data(self):
+    def isdata(self):
         '''
-        return True if status is data, False otherwise
+        returns True if status is data, False otherwise
         '''
         return self.status==data   
                         
@@ -1818,13 +3548,6 @@ class Component(object):
         returns the current simulation time
         '''   
         return self.env.now 
-            
-    @property
-    def current_component(self):
-        '''
-        returns the current component
-        '''   
-        return self.env.current_component
 
 
     @property
@@ -1841,6 +3564,7 @@ class Component(object):
         '''
         self.env._trace=value
         
+
     @property
     def current_component(self):
         '''
@@ -1848,26 +3572,17 @@ class Component(object):
         '''
         return self.env.current_component
 
-    
-    def is_in_queue(self,q):
-        '''
-        check to see whether component is in a queue
-        
-        argments:
-            q                       queue to be checked against
-            
-        returns True if the component is in q, False otherwise.
-        '''
-        return self._member(q)!=None
-        
+      
     def index_in_queue(self,q):
         '''
-        get indez of component in a queue
+        get index of component in a queue
         
-        argments:
-            q                       queue to be used
+        Parameters:
+        -----------
+        q : Queue
+            queue to be queried
             
-        Returns the index of component in q, if component belongs to q
+        Returns the index of component in q, if component belongs to q |n|
         Returns -1 if component does not belong to q
         '''
         m1=self._member(q)
@@ -1892,12 +3607,14 @@ class Component(object):
         '''
         enters a queue at the tail
         
-        arguments:
-            q                      queue to enter
+        Parameters:
+        -----------
+        q : Queue
+            queue to enter
             
         the priority will be set to
-          the priority of the tail of the queue, if any
-          or 0 if queue is empty
+        the priority of the tail component of the queue, if any
+        or 0 if queue is empty
         '''
         self._checknotinqueue(q)
         priority=q._tail.predecessor.priority
@@ -1907,13 +3624,16 @@ class Component(object):
         '''
         enters a queue at the head
         
-        arguments:
-            q                      queue to enter
+        Parameters:
+        -----------
+        q : Queue
+            queue to enter
             
         the priority will be set to
-          the priority of the head of the queue, if any
-          or 0 if queue is empty
+        the priority of the head component of the queue, if any
+        or 0 if queue is empty
         '''
+        
         self._checknotinqueue(q)
         priority=q._head.successor.priority
         Qmember().insert_in_front_of(q._head.successor,self,q,priority)
@@ -1922,13 +3642,17 @@ class Component(object):
         '''
         enters a queue in front of a component
         
-        arguments:
-            q                      queue to enter
-            poscomponent           component to entered in front of
-                                   must be member of q
+        Parameters:
+        -----------
+        q : Queue
+            queue to enter
             
+        poscomponent : Component
+            component to be entered in front of
+                        
         the priority will be set to the priority of poscomponent
         '''
+        
         self._checknotinqueue(q)
         m2=poscomponent._checkinqueue(q)
         priority=m2.priority
@@ -1938,13 +3662,17 @@ class Component(object):
         '''
         enters a queue behind a component
         
-        arguments:
-            q                      queue to enter
-            poscomponent           component to entered behind
-                                   must be member of q
+        Parameters:
+        -----------
+        q : Queue
+            queue to enter
             
+        poscomponent : Component
+            component to be entered behind
+                        
         the priority will be set to the priority of poscomponent
         '''
+        
         self._checknotinqueue(q)
         m1=poscomponent._checkinqueue(q)
         priority=m1.priority
@@ -1952,11 +3680,18 @@ class Component(object):
         
     def enter_sorted(self,q,priority):
         '''
-        enters a queue, according ti the priority
+        enters a queue, according to the priority
         
-        arguments:
-            q                      queue to enter
-            priority               used to sort the component in the queue
+        
+        Parameters:
+        -----------
+        q : Queue
+            queue to enter
+            
+        priority: float
+            priority in the queue
+            
+        The component is placed just before the first component with a priority > given priority 
         '''
 
         self._checknotinqueue(q)
@@ -1981,9 +3716,11 @@ class Component(object):
         '''
         leave queue
         
-        argumnents:
-            q                       queue to leave
-        
+        Parameters:
+        -----------
+        q : Queue
+            queue to leave
+            
         statistics are updated accordingly
         '''
 
@@ -1993,7 +3730,7 @@ class Component(object):
         m1.successor=m2
         m2.predecessor=m1
         mx.component=None
-          # signal for components method that memeber is not in the queue
+          # signal for components method that member is not in the queue
         q._number_passed+=1
         length_of_stay=self.env._now-mx.enter_time       
         if length_of_stay==0:
@@ -2010,9 +3747,12 @@ class Component(object):
         '''
         gets the priority of a component in a queue
         
-        arguments:
-            q                       queue where the component belongs to
+        Parameters:
+        -----------
+        q : Queue
+            queue where the component belongs to
         '''
+        
         mx=self._checkinqueue(q)
         return mx.priority
 
@@ -2021,28 +3761,53 @@ class Component(object):
         '''
         sets the priority of a component in a queue
         
-        arguments:
-            q                       queue where the component belongs to
-            priority                used to resort the component in a queue
+        Parameters:
+        -----------
+        q : Queue
+            queue where the component belongs to
+        
+        priority : float
+            priority in queue
 
         the order of the queue may be changed
         '''
+        
         mx=self._checkinqueue(q)
         if priority!=mx.priority:
-           self.leave(q)
-           self.enter_sorted(q,priority)
-           if q._resource!=None:
+            # leave.sort is not possible, because statistics will be affected
+
+            mx.predecessor.successor=mx.successor
+            mx.successor.predecessor=mx.predecessor
+            
+            m2=q._head.successor
+            while (m2!=q._tail) and (m2.priority<=priority):
+                m2=m2.successor
+    
+            m1=m2.predecessor
+            m1.successor=mx
+            m2.predecessor=mx
+            mx.predecessor=m1
+            mx.successor=m2
+            mx.priority=priority
+            for iter in q._iter_touched:
+                q._iter_touched[iter]=True
+            if q._resource!=None:
                q._resource._claimtry()
         
     def successor(self,q):
         '''
         successor of component in a queue
         
-        arguments:
-            q                       queue where conponent belongs to
-        returns the successor of the component in the queue if component is not at the tail.
-        returns None if component is at the tail
+        Parameters:
+        -----------
+        q : Queue
+            queue where the component belongs to
+            
+        returns the successor of the component in the queue
+        if component is not at the tail. |n|
+        returns None if component is at the tail.
         ''' 
+        
         mx=self._checkinqueue(q)
         return mx.successor.component
 
@@ -2050,11 +3815,16 @@ class Component(object):
         '''
         predecessor of component in a queue
         
-        arguments:
-            q                       queue where conponent belongs to
-        returns the precessor of the component in the queue if component is at not the head
-        returns None if component is at the head
+        Parameters:
+        -----------
+        q : Queue
+            queue where the component belongs to
+            
+        returns the predecessor of the component in the queue
+        if component is not at the head. |n|
+        returns None if component is at the head.
         '''
+        
         mx=self._checkinqueue(q)
         return mx.predecessor.component
         
@@ -2064,6 +3834,7 @@ class Component(object):
         
         arguments:
             q                       queue where component belongs to
+        
         returns the time the component entered the queue
         '''
         mx=self._checkinqueue(q)
@@ -2073,10 +3844,6 @@ class Component(object):
     def creation_time(self):
         '''
         returns the time the component was created
-        
-        arguments:
-            none
-        returns the time the component was created
         '''
         
         return self._creation_time
@@ -2085,756 +3852,38 @@ class Component(object):
     def scheduled_time(self):
         '''
         returns the time the component is scheduled for
-        
-        arguments:
-            none
-        returns the time the component scheduled for, if it is scheduled
+
+        returns the time the component scheduled for, if it is scheduled |n|
         returns inf otherwise
         '''
         return self._scheduled_time
-    
-    @property
-    def current_component(self):
-        '''
-        returns the current_component
         
-        arguments:
-            none
-        returns the current component
+    @property
+    def mode_time(self):
         '''
-        return self.env._current_component
-
+        returns the time the component got it's latest mode |n|
+        For a new component this is
+        the time the component was created. |n|
+        this function is particularly useful for animations.
+        '''
+        return self._mode_time
+        
     @property
     def status(self):
         '''
-        returns the status of a  component
-        
-        arguments:
-            none
         returns the status of a component
+        
         possible values are
-            data
-            passive
-            scheduled
-            current
-            standby
+        - data
+        - passive
+        - scheduled
+        - current
+        - standby
         '''
         
         return self._status
         
-    @property
-    def passive_reason(self):
-        '''
-        returns the passive_reason of a component
-         
-        arguments:
-            none
-        returns the passive_reason (as given with the passivate call, if passive
-        returns None if not passive
-        '''
-        if self._status==passive:
-            return self._passive_reason
-        else:
-            return None
-
-    class Animate(object):
-        '''
-        defines an animation object
-        
-        arguments:
-            layer         lower layer values are on top of higher layer values (default 0)
-            parent        component where this animation object belongs to (default None)
-                          if given, the animation ofject will be removed automatically upon termination of
-                          the parent component
-            keep          if False, animation object is hidden after t1, shown otherwise
-            t0            time of start of the polygon animation
-            x0            x-coordinate of the origin (default 0) at time t0
-            y0            y-coordinate of the origin (default 0) at time t0
-            offsetx0      offsets the x-coordinate of the object (default 0) at time t0
-            offsety0      offsets the y-coordinate of the object (default 0) at time t0
-
-            circle0       the circle at time t0 (radius,)
-            line0         the line(s) at time t0 (xa,ya,xb,yb,xc,yc, ...)
-            polygon0      the polygon at time t0 (xa,ya,xb,yb,xc,yc, ...) the last point will be auto connected to the start
-            rectangle0    the rectangle at time t0 (xlowerleft,ylowerlef,xupperright,yupperright)
-            image         the image to be displayed. This may be either a filename or a PIL image
-            text          the text to be displayed
-
-            font          font to be used for texts. Either a string or a list/tuple of fontnames. If not found, uses calibri or arial
-            linewidth0    linewidth of the contour at time t0 (default 0 = no contour)
-            fillcolor0    color of interior/text at time t0 (default black)
-            linecolor0    color of the contour at time t0 (default black)
-            angle0        angle of the polygon at time t0 (in degrees) (default 0)
-            fontsize0     fontsize of text at time t0 (default: 20)
-            width0        width of the image to be displayed (default: no scaling)
-
-            x1            x-coordinate of the origin (default x0) at time t0
-            y1            y-coordinate of the origin (default y0) at time t0
-            offsetx1      offsets the x-coordinate of the object (default offsetx0) at time t1
-            offsety1      offsets the y-coordinate of the object (default offsety0) at time t1
-            circle1       the circle at time t1 (radius,) (default circle0)
-            line1         the line(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default line0)
-            polygon1      the polygon at time t1 (xa,ya,xb,yb,xc,yc, ...) (default polygon01)
-            rectangle1    the rectangle at time t1 (xlowerleft,ylowerleft,xupperright,yupperright) (default rectangle0)
-
-            linewidth1    linewidth of the contour at time t1 (default linewidth0)
-            fillcolor1    color of interior/text at time t1 (default fillcolor0)
-            linecolor1    color of the contour at time t1 (default linecolor0)
-            angle1        angle of the polygon at time t1 (in degrees) (default angle0)
-            fontsize1     fontsize of text at time t1 (default: fontsize0)
-            width1        width of the image to be displayed (default: width0)
-        
-        colors may be specified as a valid colorname, a hexname, or a tuple (R,G,B) or (R,G,B,A)
-        colornames may contain an additional alpha, like red#7f
-        hexnames may be either 3 of 4 bytes long (RGB or RGBA)
-        both colornames and hexnames may be given as a tuple with an additional alpha between 0 and 255,
-          e.g. ('red',127) or ('#ff00ff',128)
-        '''
-
-        def pil_image(self,t):
-            
-            if ((t>=self.t0) and (t<=self.t1)) or self.keep:
-                x=interpolate(t,self.t0,self.t1,self.x0,self.x1)
-                y=interpolate(t,self.t0,self.t1,self.y0,self.y1)
-                offsetx=interpolate(t,self.t0,self.t1,self.offsetx0,self.offsetx1)
-                offsety=interpolate(t,self.t0,self.t1,self.offsety0,self.offsety1)
-                angle=interpolate(t,self.t0,self.t1,self.angle0,self.angle1)
-                                            
-                if (self.type=='polygon') or (self.type=='rectangle') or (self.type=='line'):
-                    linewidth=interpolate(t,self.t0,self.t1,self.linewidth0,self.linewidth1)*animation.scale
-                    linecolor=interpolate(t,self.t0,self.t1,self.linecolor0,self.linecolor1)
-                    fillcolor=interpolate(t,self.t0,self.t1,self.fillcolor0,self.fillcolor1)
-            
-                    cosa=math.cos(angle*math.pi/180)
-                    sina=math.sin(angle*math.pi/180)                    
-
-                    if self.type=='rectangle': 
-                        p0=[
-                         self.rectangle0[0],self.rectangle0[1],
-                         self.rectangle0[2],self.rectangle0[1],
-                         self.rectangle0[2],self.rectangle0[3],
-                         self.rectangle0[0],self.rectangle0[3],
-                         self.rectangle0[0],self.rectangle0[1]]
-
-                        p1=[
-                         self.rectangle1[0],self.rectangle1[1],
-                         self.rectangle1[2],self.rectangle1[1],
-                         self.rectangle1[2],self.rectangle1[3],
-                         self.rectangle1[0],self.rectangle1[3],
-                         self.rectangle1[0],self.rectangle1[1]]
-
-                    elif self.type=='line':
-                        p0=self.line0
-                        p1=self.line1
-                        fillcolor=(0,0,0,0)
-
-                    else:
-                        p0=self.polygon0
-                        p1=self.polygon1
-            
-                    if self.screen_coordinates:
-                        qx=x
-                        qy=y
-                    else:
-                        qx=(x-animation.x0)*animation.scale
-                        qy=(y-animation.y0)*animation.scale
-
-                    r=[]
-                    minrx=inf
-                    minry=inf
-                    maxrx=-inf
-                    maxry=-inf
-                    for i in range(0,len(p0),2):
-                        px=interpolate(t,self.t0,self.t1,p0[i],p1[i])+offsetx
-                        py=interpolate(t,self.t0,self.t1,p0[i+1],p1[i+1])+offsety
-                        rx=px*cosa-py*sina
-                        ry=px*sina+py*cosa
-                        if not self.screen_coordinates:
-                            rx=rx*animation.scale
-                            ry=ry*animation.scale
-                        minrx=min(minrx,rx)
-                        maxrx=max(maxrx,rx)
-                        minry=min(minry,ry)
-                        maxry=max(maxry,ry)
-                        r.append(rx)
-                        r.append(ry)
-                    if self.type=='polygon':
-                        if (r[0]!=r[len(r)-2]) or (r[1]!=r[len(r)-1]): # connect with start point
-                            r.append(r[0])
-                            r.append(r[1])
-                            
-                                                
-            
-                    rscaled=[]
-                    for i in range(0,len(r),2):
-                        rscaled.append(r[i]-minrx+linewidth)
-                        rscaled.append(maxry-r[i+1]+linewidth)
-                    rscaled=tuple(rscaled) #to make it hashable
-            
-                    if (rscaled,minrx,maxrx,minry,maxry,fillcolor,linecolor,linewidth) in self.image_cache:
-                        im1=self.image_cache[(rscaled,minrx,maxrx,minry,maxry,fillcolor,linecolor,linewidth)]
-                    else:
-                        im1=Image.new('RGBA',(int(maxrx-minrx+2*linewidth),int(maxry-minry+2*linewidth)),(0,0,0,0))
-                        draw=ImageDraw.Draw(im1)
-                        if fillcolor[3]!=0:
-                            draw.polygon(rscaled,fill=fillcolor)
-                        if (linewidth>0) and (linecolor[3]!=0):
-                            draw.line(rscaled,fill=linecolor,width=int(linewidth))
-                           
-                        self.image_cache[(rscaled,minrx,maxrx,minry,maxry,fillcolor,
-                            linecolor,linewidth)]=im1
-                    zx=qx+minrx-linewidth
-                    zy=qy+minry-linewidth
-                    return (im1,zx,zy)
-                    
-                elif self.type=='circle':
-                    linewidth=interpolate(t,self.t0,self.t1,self.linewidth0,self.linewidth1)*animation.scale
-                    fillcolor=interpolate(t,self.t0,self.t1,self.fillcolor0,self.fillcolor1)
-                    linecolor=interpolate(t,self.t0,self.t1,self.linecolor0,self.linecolor1)
-                    radius=interpolate(t,self.t0,self.t1,self.circle0[0],self.circle1[0])
-                    
-
-                    if self.screen_coordinates:
-                        qx=x
-                        qy=y
-                    else:
-                        qx=(x-animation.x0)*animation.scale
-                        qy=(y-animation.y0)*animation.scale
-                        linewidth*=animation.scale
-                        radius*=animation.scale
-
-
-                    if (radius,linewidth,linecolor,fillcolor) in self.image_cache:
-                        im1=self.image_cache[(radius,linewidth,linecolor,fillcolor)]
-                    else:
-                        nsteps=int(math.sqrt(radius)*6)
-                        tangle=2*math.pi/nsteps
-                        sint=math.sin(tangle)
-                        cost=math.cos(tangle)
-                        p=[]
-                        x=radius
-                        y=0
-                        
-                        
-                        for i in range(nsteps+1):
-                            x,y=(x*cost-y*sint,x*sint+y*cost)
-                            p.append(x+radius+linewidth)
-                            p.append(y+radius+linewidth)
-                            
-
-                        im1=Image.new('RGBA',(int(radius*2+2*linewidth),int(radius*2+2*linewidth)),(0,0,0,0))
-                        draw=ImageDraw.Draw(im1)
-                        if fillcolor[3]!=0:
-                            draw.polygon(p,fill=fillcolor)
-                        if (linewidth>0) and (linecolor[3]!=0):
-                            draw.line(p,fill=linecolor,width=int(linewidth))
-                        self.image_cache[(radius,linewidth,linecolor,fillcolor)]=im1                        
-                    dx=offsetx
-                    dy=offsety
-                    cosa=math.cos(angle*math.pi/180)
-                    sina=math.sin(angle*math.pi/180)  
-                    ex=dx*cosa-dy*sina
-                    ey=dx*sina+dy*cosa
-                    return(im1,qx+ex-radius-linewidth-1,qy+ey-radius-linewidth-1)
-            
-                elif self.type=='image':
-                    width=interpolate(t,self.t0,self.t1,self.width0,self.width1)
-                    height=width*self.image.size[1]/self.image.size[0]
-                    angle=interpolate(t,self.t0,self.t1,self.angle0,self.angle1)                        
-                    if self.screen_coordinates:
-                        qx=x
-                        qy=y
-                    else:
-                        qx=(x-animation.x0)*animation.scale
-                        qy=(y-animation.y0)*animation.scale
-                        offsetx=offsetx*animation.scale
-                        offsety=offsety*animation.scale
-                    
-                    if (width,height,angle) in self.image_cache:
-                        imr,imwidth,imheight,imrwidth,imrheight=self.image_cache[(width,height,angle)]
-                    else:
-                        if not self.screen_coordinates:
-                            width*=animation.scale
-                            height*=animation.scale
-                        im1 = self.image.resize((int(width),int(height)), Image.ANTIALIAS)
-                        imwidth,imheight=im1.size
-                        
-                        imr = im1.rotate(angle,expand=1)
-                        imrwidth,imrheight=imr.size
-                        self.image_cache[(width,height,angle)]=(imr,imwidth,imheight,imrwidth,imrheight)
-                        
-                    anchor_to_dis={'ne':(-0.5,-0.5),'n':(0,-0.5),'nw':(0.5,-0.5),'e':(-0.5,0),'center':(0,0),'w':(0.5,0),'se':(0.5,0.5),'s':(0,0.5),'sw':(0.5,0.5)}
-                    dx,dy=anchor_to_dis[self.anchor.lower()]
-                    dx=dx*imwidth+offsetx
-                    dy=dy*imheight+offsety
-                    cosa=math.cos(angle*math.pi/180)
-                    sina=math.sin(angle*math.pi/180)  
-                    ex=dx*cosa-dy*sina
-                    ey=dx*sina+dy*cosa
-                    return (imr,qx+ex-imrwidth/2,qy+ey-imrheight/2)
-            
-                elif self.type=='text':
-                    fillcolor=interpolate(t,self.t0,self.t1,self.fillcolor0,self.fillcolor1)                 
-                    fontsize=interpolate(t,self.t0,self.t1,self.fontsize0,self.fontsize1)
-                    angle=interpolate(t,self.t0,self.t1,self.angle0,self.angle1)                        
-                    text=str_or_function(self.text)
-                    if self.screen_coordinates:
-                        qx=x
-                        qy=y
-                    else:
-                        qx=(x-animation.x0)*animation.scale
-                        qy=(y-animation.y0)*animation.scale
-                        fontsize=fontsize*animation.scale
-                        offsetx=offsetx*animation.scale
-                        offsety=offsety*animation.scale
-                    
-                    if (text,self.font,fontsize,angle,fillcolor) in self.image_cache:
-                        imr,imwidth,imheight,imrwidth,imrheight=self.image_cache[(text,self.font,fontsize,angle,fillcolor)]
-                    else:
-                        font=getfont(self.font,fontsize)
-                            
-                        width,height=font.getsize(text)
-                        im=Image.new('RGBA',(int(width),int(height)),(0,0,0,0))
-                        imwidth,imheight=im.size
-                        draw=ImageDraw.Draw(im)
-                        draw.text(xy=(0,0),text=text,font=font,fill=fillcolor)
-                        
-                        imr = im.rotate(angle,expand=1)
-                        imrwidth,imrheight=imr.size
-                        self.image_cache[(text,self.font,fontsize,angle)]=(imr,imwidth,imheight,imrwidth,imrheight)
-                    
-                    anchor_to_dis={'ne':(-0.5,-0.5),'n':(0,-0.5),'nw':(0.5,-0.5),'e':(-0.5,0),'center':(0,0),'w':(0.5,0),'se':(-0.5,0.5),'s':(0,0.5),'sw':(0.5,0.5)}
-                    dx,dy=anchor_to_dis[self.anchor.lower()]
-                    dx=dx*imwidth+offsetx
-                    dy=dy*imheight+offsety
-                    cosa=math.cos(angle*math.pi/180)
-                    sina=math.sin(angle*math.pi/180)  
-                    ex=dx*cosa-dy*sina
-                    ey=dx*sina+dy*cosa
-            
-                    return(imr,qx+ex-imrwidth/2,qy+ey-imrheight/2)
-            return (None,None,None)
-    
-        def load_image(self,image):
-            if type(image)==str:
-                im = Image.open(image)
-                im = im.convert('RGBA')
-                return im
-            else:
-                return image
-
-        def remove_background(self,im):
-            pixels=im.load()
-            background=pixels[0,0]
-            imagewidth,imageheight=im.size
-            for y in range(imageheight):
-                for x in range(imagewidth):
-                    if abs(pixels[x, y][0]-background[0])<10:
-                        if abs(pixels[x, y][1]-background[1])<10:
-                            if abs(pixels[x, y][2]-background[2])<10:
-                                pixels[x, y] = (255, 255, 255, 0)  
-                        
-            
-        def settype(self,circle,line,polygon,rectangle,image,text):
-            n=0
-            t=''
-            if circle!=None:
-                t='circle'
-                n+=1
-            if line!=None:
-                t='line'
-                n+=1
-            if polygon!=None:
-                t='polygon'
-                n+=1
-            if rectangle!=None:
-                t='rectangle'
-                n+=1
-            if image!=None:
-                t='image'
-                n+=1
-            if text!=None:
-                t='text'
-                n+=1
-            if n>=2:
-                raise AssertionError('more than one object given')
-            return t                
-                
-        def __init__(self,parent=None,layer=0,keep=True,screen_coordinates=False,
-                t0=None,x0=0,y0=0,offsetx0=0,offsety0=0,
-                circle0=None,line0=None,polygon0=None,rectangle0=None,image=None,text=None,
-                font='',anchor='center',
-                linewidth0=1,fillcolor0='black',linecolor0='black',angle0=0,fontsize0=20,width0=None,
-                t1=None,x1=None,y1=None,offsetx1=None,offsety1=None,
-                circle1=None,line1=None,polygon1=None,rectangle1=None,
-                linewidth1=None,fillcolor1=None,linecolor1=None,angle1=None,fontsize1=None,width1=None):
-                        
-            self.type=self.settype(circle0,line0,polygon0,rectangle0,image,text)
-            if self.type=='':
-                raise AssertionError('no object specified')
-            type1=self.settype(circle1,line1,polygon1,rectangle1,None,None)
-            if (type1!='') and (type1!=self.type):
-                raise AssertionError('incompatible types: '+self.type+' and '+ type1)
-                
-            self.layer=layer
-            self.parent=parent
-            self.keep=keep
-            self.screen_coordinates=screen_coordinates
-            self.survive_reset=False
-            animation.sequence+=1
-            self.sequence=animation.sequence
-
-            self.circle0=circle0
-            self.line0=line0
-            self.polygon0=polygon0
-            self.rectangle0=rectangle0            
-            self.text=text
-            
-            if image is None:
-                self.width0=0 #justto be able to intepolate
-            else:
-                self.image=self.load_image(image)
-                self.width0=self.image.size[0] if width0 is None else width0
- 
-            self.image_cache={}
-                
-            self.font=font
-            self.anchor=anchor
-            
-            self.x0=x0
-            self.y0=y0
-            self.offsetx0=offsetx0
-            self.offsety0=offsety0
-
-            self.fillcolor0=colorspec_to_tuple(fillcolor0)
-            self.linecolor0=colorspec_to_tuple(linecolor0)
-            self.linewidth0=linewidth0
-            self.angle0=angle0
-            self.fontsize0=fontsize0
-
-            self.t0=animation.env._now if t0 is None else t0
-    
-            self.circle1=self.circle0 if circle1 is None else circle1
-            self.line1=self.line0 if line1 is None else line1
-            self.polygon1=self.polygon0 if polygon1 is None else polygon1
-            self.rectangle1=self.rectangle0 if rectangle1 is None else rectangle1
-
-            self.x1=self.x0 if x1 is None else x1
-            self.y1=self.y0 if y1 is None else y1
-            self.offsetx1=self.offsetx0 if offsetx1 is None else offsetx1
-            self.offsety1=self.offsety0 if offsety1 is None else offsety1
-            self.fillcolor1=self.fillcolor0 if fillcolor1 is None else colorspec_to_tuple(fillcolor1)
-            self.linecolor1=self.linecolor0 if linecolor1 is None else colorspec_to_tuple(linecolor1)
-            self.linewidth1=self.linewidth0 if linewidth1 is None else linewidth1
-            self.angle1=self.angle0 if angle1 is None else angle1
-            self.fontsize1=self.fontsize0 if fontsize1 is None else fontsize1
-            self.width1=self.width0 if width1 is None else width1
-            
-            self.t1=inf if t1 is None else t1
-    
-            animation.animation_objects.append(self)
-    
-        def update(self,layer=None,keep=None,
-                t0=None,x0=None,y0=None,offsetx0=None,offsety0=None,
-                circle0=None,line0=None,polygon0=None,rectangle0=None,image=None,text=None,font=None,anchor=None,
-                linewidth0=None,fillcolor0=None,linecolor0=None,angle0=None,fontsize0=None,width0=None,
-                t1=None,x1=None,y1=None,offsetx1=None,offsety1=None,
-                circle1=None,line1=None,polygon1=None,rectangle1=None,
-                linewidth1=None,fillcolor1=None,linecolor1=None,angle1=None,fontsize1=None,width1=None):
-            '''
-            updates an animation object
-        
-            arguments:
-                layer         lower layer values are on top of higher layer values (default 0)
-                keep          if False, animation object is hidden after t1, shown otherwise
-                t0            time of start of the polygon animation
-                x0            x-coordinate of the origin at time t0 (default *)
-                y0            y-coordinate of the origin at time t0 (default *)
-                polygon0      the polygon at time t0 (xa,ya,xb,yb,xc,yc, ...) (default *)
-                linewidth0    linewidth of the contour at time t0 (default *)
-                fillcolor0    color of interior at time t0 (default *)
-                linecolor0    color of the contour at time t0 (default *)
-                angle0        angle of the polygon at time t0 (in degrees) (*)
-                t1            time of end of the polygon animation
-                x1            x-coordinate of the origin at time t1 (default x0)
-                y1            y-coordinate of the origin at time t1 (default y0)
-                polygon1      the polygon at time t1 (xa,ya,xb,yb,xc,yc, ...) (default polygon0)
-                linewidth1    linewidth of the contour at time t1 (default linewidth0)
-                fillcolor1    color of interior at time t1 (default fillcolor0)
-                linecolor1    color of the contour at time t1 (default linecolor0)
-                angle1        angle of the polygon at time t1 (in degrees) (default angle0)
-            
-            default * means that the current value (at time now) is used
-            ''' 
-
-            type0=self.settype(circle0,line0,polygon0,rectangle0,image,text)
-            if (type0!='') and (type0!=self.type):
-                raise AssertionError('incorrect type '+type0+' (should be '+self.type)
-            type1=self.settype(circle1,line1,polygon1,rectangle1,None,None)
-            if (type1!='') and (type1!=self.type):
-                raise AssertionError('incompatible types: '+self.type+' and '+ type1)
-
-            if layer!=None:
-                self.layer=layer
-            if keep!=None:
-                self.keep=keep
-            self.circle0=self.circle() if circle0 is None else circle0
-            self.line0=self.line() if line0 is None else line0
-            self.polygon0=self.polygon() if polygon0 is None else polygon0
-            self.rectangle0=self.rectangle() if rectangle0 is None else rectangle0
-            if text!=None: self.text=text
-            self.width0=self.width() if width0 is None else width0
-            if image!=None:
-                self.image=self.load_image(image)
-                self.width0==self.image.size[0] if width0 is None else width0
-                self.image_cache={} #because the cache might refer to another image
-
-            if font!=None: self.font=font
-            if anchor!=None: self.anchor=anchor
-                
-            self.x0=self.x() if x0 is None else x0
-            self.y0=self.y() if y0 is None else y0
-            self.offsetx0=self.offsetx() if offsetx0 is None else offsetx0
-            self.offsety0=self.offsety() if offsety0 is None else offsety0
-
-            self.fillcolor0=self.fillcolor() if fillcolor0 is None else colorspec_to_tuple(fillcolor0)
-            self.linecolor0=self.linecolor() if linecolor0 is None else colorspec_to_tuple(linecolor0)
-            self.linewidth0=self.linewidth() if linewidth0 is None else linewidth0
-            self.angle0=self.angle() if angle0 is None else angle0
-            self.fontsize0=self.fontsize() if fontsize0 is None else fontsize0
-            self.t0=animation.env._now if t0 is None else t0
-    
-            self.circle1=self.circle0 if circle1 is None else circle1
-            self.line1=self.line0 if line1 is None else line1
-            self.polygon1=self.polygon0 if polygon1 is None else polygon1
-            self.rectangle1=self.rectangle0 if rectangle1 is None else rectangle1
-
-            self.x1=self.x0 if x1 is None else x1
-            self.y1=self.y0 if y1 is None else y1
-            self.offsetx1=self.offsetx0 if offsetx1 is None else offsetx1
-            self.offsety1=self.offsety0 if offsety1 is None else offsety1
-            self.fillcolor1=self.fillcolor0 if fillcolor1 is None else colorspec_to_tuple(fillcolor1)
-            self.linecolor1=self.linecolor0 if linecolor1 is None else colorspec_to_tuple(linecolor1)
-            self.linewidth1=self.linewidth0 if linewidth1 is None else linewidth1
-            self.angle1=self.angle0 if angle1 is None else angle1
-            self.fontsize1=self.fontsize0 if fontsize1 is None else fontsize1
-            self.width1=self.width0 if width1 is None else width1
-
-            self.t1=inf if t1 is None else t1
-            if self not in animation.animation_objects:
-                animation.animation_objects.append(self)
-    
-        def remove(self):
-            '''
-            removes the animation object
-            
-            the animation object is removed from the animation queue, so effectively ending this animation
-            note that it might be still updated if required
-            '''
-            if self in animation.animation_objects:
-                animation.animation_objects.remove(self)
-                
-        def x(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.x0,self.x1)
-
-        def y(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.y0,self.y1)
-
-        def offsetx(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.offsetx0,self.offsetx1)
-
-        def offsety(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.offsety0,self.offsety1)
-
-        def angle(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.angle0,self.angle1)
-
-        def linewidth(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.linewidth0,self.linewidth1)
-
-        def linecolor(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.linecolor0,self.linecolor1)
-
-        def fillcolor(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.fillcolor0,self.fillcolor1)
-
-        def circle(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.circle0,self.circle1)
-
-        def line(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.line0,self.line1)
-
-        def polygon(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.polygon0,self.polygon1)
-
-        def rectangle(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.rectangle0,self.rectangle1)
-
-        def width(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.width0,self.width1)
-
-        def fontsize(self,t=None):
-            return interpolate((animation.env._now if t is None else t),self.t0,self.t1,self.fontsize0,self.fontsize1)
-
-
-
-    class AnimateButton(object):
-        '''
-        defines a button
-        
-        arguments:
-            layer         lower layer values are on top of higher layer values (default 0)
-            x             x-coordinate of centre of button in screen coordinates
-            y             y-coordinate of centre of button in screen coordinates
-            width         width of button in screen coordinates (default 80)
-            height        height of button in screen coordinates (default 30)
-            linewidth     width of contour in screen coordinates (default 0=no contour)
-            fillcolor     color of the interior (default 40%gray)  
-            linecolor     color of contour (default black)
-            color         color of the text (default white)
-            text          text of the button (default null string)
-                          if text is an argumentless function, this will be called each time the
-                          button is shown/updated
-            font          font of the text (default Helvetica)
-            fontsize      fontsize of the text (default 15)
-            action        function executed when the button is pressed (default None)
-                          the function should have no arguments
-        '''
-        def __init__(self,layer=0,x=0,y=0,width=80,height=30,
-                     linewidth=0,fillcolor='40%gray',
-                     linecolor='black',color='white',text='',font='',fontsize=15,action=None):
-            
-            self.type='button'
-            self.parent=None
-            self.layer=layer
-            self.t0=-inf
-            self.t1=inf
-            self.x0=0
-            self.y0=0
-            self.x1=0
-            self.y1=0
-            self.survive_reset=True
-            animation.sequence+=1
-            self.sequence=animation.sequence
-            self.x=x-width/2
-            self.y=y-height/2
-            self.width=width
-            self.height=height
-            self.fillcolor=colorspec_to_tuple(fillcolor)
-            self.linecolor=colorspec_to_tuple(linecolor)
-            self.color=colorspec_to_tuple(color)
-            self.linewidth=linewidth
-            self.font=font
-            self.fontsize=fontsize
-            self.text=text
-            self.lasttext='*'
-            self.action=action
-            
-            if not Pythonista:
-                self.button = tkinter.Button(animation.root, text = self.lasttext, command = action, anchor = tkinter.CENTER)
-                self.button.configure(width = int(2.2*width/fontsize), foreground=colorspec_to_hex(self.color,False),background =colorspec_to_hex(self.fillcolor,False), relief = tkinter.FLAT)
-                self.button_window = animation.canvas.create_window(self.x+self.width, animation.height-self.y-self.height,anchor=tkinter.NE,
-                    window=self.button)            
-                
-            animation.animation_objects.append(self)
-    
-    class AnimateSlider(object):
-        '''
-        defines a slider
-        
-        arguments:
-            layer         lower layer values are on top of higher layer values (default 0)
-            x             x-coordinate of centre of slider in screen coordinates
-            y             y-coordinate of centre of slider in screen coordinates
-            vmin          minimum value (default 0)
-            vmax          maximum value (default 10)
-            v             initial value (default vmin)
-            resolution    step size of value (default 1)
-            width         width of slider in screen coordinates (default 100)
-            height        height of slider in screen coordinates (default 20)
-            linewidth     width of contour in screen coordinates (default 0=no contour)
-            fillcolor     color of the interior (default 40%gray)  
-            linecolor     color of contour (default black)
-            labelcolor    color of the label (default black)
-            label         label if the slider (default null string)
-                          if label is an argumentless function, this function will be used to display
-                          label, otherwise the label plus the current value of the slider will be shown 
-            font          font of the text (default Helvetica)
-            fontsize      fontsize of the text (default 12)
-            action        function executed when the slider value is changed (default None)
-                          the function should have no arguments
-                          if None, no action
-          
-            The current value of the slider is in the v attibute of the slider
-        '''
-        def __init__(self,layer=0,x=0,y=0,width=100,height=20,
-                     vmin=0,vmax=10,v=None,resolution=1,
-                     linecolor='black',labelcolor='black',label='',
-                     font='',fontsize=12,action=None):
-            
-            n=round((vmax-vmin)/resolution)+1
-            self.vmin=vmin
-            self.vmax=vmin+(n-1)*resolution
-            self._v=vmin if v is None else v
-            self.xdelta=width/n
-            self.resolution=resolution
-            
-            self.type='slider'
-            self.layer=layer
-            self.parent=None
-            self.t0=-inf
-            self.t1=inf
-            self.x0=0
-            self.y0=0
-            self.x1=0
-            self.y1=0
-            self.survive_reset=True
-            animation.sequence+=1
-            self.sequence=animation.sequence
-            self.x=x-width/2
-            self.y=y-height/2
-            self.width=width
-            self.height=height
-            self.linecolor=colorspec_to_tuple(linecolor)
-            self.labelcolor=colorspec_to_tuple(labelcolor)
-            self.font=font
-            self.fontsize=fontsize
-            self.label=label
-            self.action=action
-    
-            if Pythonista:
-                self.y=self.y-height*1.5
-            else:
-                self.slider=tkinter.Scale(animation.root, from_=self.vmin, to=self.vmax,orient=tkinter.HORIZONTAL,label=label,resolution=resolution)
-                self.slider.window = animation.canvas.create_window(self.x, animation.height-self.y, anchor=tkinter.NW, window=self.slider)
-                self.slider.config(font=(font,int(fontsize*0.8)),background=colorspec_to_hex(animation.background_color,False),
-                                   highlightbackground=colorspec_to_hex(animation.background_color,False))
-                self.slider.set(self._v)
-    
-            animation.animation_objects.append(self)
-        
-        
-        @property
-        def v(self,value=None):
-            '''
-            returns and/or sets the value
-            '''
-            if Pythonista:
-                return self._v
-            else:
-                return self.slider.get()
-        
-        @v.setter
-        def v(self,value):
-            '''
-            returns and/or sets the value
-            '''
-            if Pythonista:
-                self._v=value
-            else:
-                self.slider.set(value)
-
-    
+  
     def _member(self,q):
         try:
             return self._qmembers[q]
@@ -2872,140 +3921,7 @@ class Component(object):
             pass
         else:
             raise AssertionError(self._name+' is not passive')
-        
-    
-class Animation(object):
-    '''
-    Initializes the animation
-    
-    arguments:
-        width            width of the animation in screen coordinates (default 1024)
-        height           height of the animation in screen coordinates (default 768)
-        x0               user x-coordinate of the lower left corner (default 0)
-        y0               user y_coordinate of the lower left corner (default 0)
-        x1               user x-coordinate of the upper right corner (default x0+1024)
-        env              environment to animate (default default_env)
-        background_color color of the background (default 90%gray)
-        fps              number of frames per second
-        modelname        name of model to be shown in upper left corner, along this text 'a salabim model'
-        use_toplevel     if salabim animation is used in parallel with other modules using tkinter,
-                         it might be necessary to initialize the root with tkinter.TopLevel(). In that
-                         case, set this parameter to True.
-                         if False (default), the root will be initialized with tkinter.Tk()
-        
-    Animation may be called only once.
-    
-    For Pythonista, the default width and height are according to the device orientation
-    '''
 
-    def __init__(self,width=None,height=None,x0=0,y0=0,x1=None,y1=None,env=None,
-        background_color='90%gray',fps=30,modelname=''):
-        global animation
-        assert animation is None
-        if Pythonista:
-            dwidth,dheight=ui.get_screen_size()
-        else:
-            dwidth,dheight=(1024,768)
-        animation=self
-        self.env=default_env if env is None else env
-        self.background_color=colorspec_to_tuple(background_color)
-        animation.fps=fps
-        if width is None:
-            if height is None:
-                self.width=dwidth
-                self.height=dheight
-            else:
-                self.height=height
-                self.width=height*dwidth/dheight
-        else:
-            if height is None:
-                self.width=width
-                self.height=width*dheight/dwidth
-            else:
-                self.width=width
-                self.height=height
-        self.x0=x0
-        self.y0=y0
-        if x1 is None:
-            self.x1=self.x0+self.width
-        else:
-            self.x1=x1
-        self.y1=self.y0+(self.x1-self.x0)*self.height/self.width                
-
-        self.scale=self.width/(self.x1-self.x0)
-        
-        self.animation_objects=[]
-        self.animation_speed=1
-        self.running=False
-        self.sequence=0
-        self.font_cache={}
-        
-        if Pythonista:
-            scene.run(MyScene(), frame_interval=60/animation.fps, show_fps=False)
-        else:         
-            self.canvas_objects=[]
-            
-            self.root = tkinter.Toplevel()
-            self.canvas = tkinter.Canvas(self.root, width=self.width,height = self.height)
-            self.canvas.configure(background=colorspec_to_hex(self.background_color,False))
-            self.canvas.pack()
-            
-        if modelname!='':
-            h1=main.Animate(text=modelname,
-                x0=8,y0=animation.height-60,
-                anchor='w',fontsize0=30,fillcolor0='black',screen_coordinates=True )
-            h1.survive_reset=True
-            h2=main.Animate(text='a salabim model',
-                x0=8,y0=animation.height-78,
-                anchor='w',fontsize0=16,fillcolor0='red',screen_coordinates=True )            
-            h2.survive_reset=True
-
-        self.env._main.AnimateButton(x=48,y=animation.height-21,text='Quit',action=self.animquit)
-        self.env._main.AnimateButton(x=48+1*90,y=animation.height-21,text='Anim/2',action=self.animhalf) 
-        self.env._main.AnimateButton(x=48+2*90,y=animation.height-21,text='Anim*2',action=self.animdouble)
-        self.env._main.AnimateButton(x=48+3*90,y=animation.height-21,text=pausetext,action=self.animpause)
-        self.env._main.AnimateButton(x=48+4*90,y=animation.height-21,text=tracetext,action=self.animtrace)                                                                                  
-            
-        t1=self.env._main.Animate(x0=animation.width,y0=self.height-5,fillcolor0='black',text=clocktext,
-            fontsize0=15,anchor='ne',screen_coordinates=True)
-
-        t1.survive_reset=True
-
-    def exit(self):
-        self.root.destroy()
-
-    def quit(self):
-        self.running=False
-
-    def animhalf(self):
-        if animation.paused:
-            animation.paused=False
-        else:
-            animation.animation_speed=animation.animation_speed/2    
-            animation.start_animation_time=animation.t
-            animation.start_animation_clocktime=time.time()      
-
-    def animdouble(self):
-        if animation.paused:
-            animation.paused=False
-        else:
-            animation.animation_speed=animation.animation_speed*2  
-            animation.start_animation_time=animation.t
-            animation.start_animation_clocktime=time.time()
-    
-    def animpause(self):
-        animation.paused=not animation.paused
-        animation.start_animation_time=animation.t
-        animation.start_animation_clocktime=time.time()
-         
-    def animquit(self):
-        if Pythonista:
-            animation.scene.view.close()
-        else:
-            animation.root.destroy()
-        
-    def animtrace(self):
-        animation.env._trace=not animation.env._trace
         
 class _Distribution():
         
@@ -3013,8 +3929,8 @@ class _Distribution():
     def mean(self):
         '''
         returns the mean of a distribution
-        
         '''
+        
         return self._mean
         
 class Exponential(_Distribution):
@@ -3023,13 +3939,19 @@ class Exponential(_Distribution):
     
     Exponential(mean,seed)
     
-    arguments:
-        mean                mean of the distribtion
-                            must be >0
-        randomstream        randomstream
-                            if omitted, random will be used
-                            if used as random.Random(12299) it assign a new stream with the specified seed
+    Parameters:
+    -----------
+    mean :float
+        mean of the distribtion |n|
+        must be >0
+       
+    randomstream: randomstream
+        randomstream to be used |n|
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
     '''
+    
     def __init__(self,mean,randomstream=None):
         if mean<=0:
             raise AsserionError('mean<=0')
@@ -3037,7 +3959,7 @@ class Exponential(_Distribution):
         if randomstream is None:
             self.randomstream=random
         else:
-            assert type(ramdomstream)==random.Random
+            assert isinstance(randomstream,random.Random)
             self.randomstream=randomstream
             
     def __repr__(self):
@@ -3064,7 +3986,8 @@ class Normal(_Distribution):
                             must be >=0
         randomstream        randomstream
                             if omitted, random will be used
-                            if used as random.Random(12299) it assign a new stream with the specified seed
+                            if used as random.Random(12299)
+                              it assigns a new stream with the specified seed
     '''
     def __init__(self,mean,standard_deviation,randomstream=None):
         if standard_deviation<0:
@@ -3074,7 +3997,7 @@ class Normal(_Distribution):
         if randomstream is None:
             self.randomstream=random
         else:
-            assert type(ramdomstream)==random.Random
+            assert isinstance(randomstream,random.Random)
             self.randomstream=randomstream
 
     def __repr__(self):
@@ -3087,7 +4010,8 @@ class Normal(_Distribution):
 
     @property
     def sample(self):
-        return self.randomstream.normalvariate(self._mean,self._standard_deviation)
+        return self.randomstream.normalvariate\
+          (self._mean,self._standard_deviation)
 
 class Uniform(_Distribution):
     '''
@@ -3100,7 +4024,8 @@ class Uniform(_Distribution):
         upperbound          upperbound of the distribution
         randomstream        randomstream
                             if omitted, random will be used
-                            if used as random.Random(12299) it assign a new stream with the specified seed
+                            if used as random.Random(12299)
+                              it assigns a new stream with the specified seed
 
     upperbound must be >= lowerbound
     '''
@@ -3112,7 +4037,7 @@ class Uniform(_Distribution):
         if randomstream is None:
             self.randomstream=random
         else:
-            assert type(ramdomstream)==random.Random
+            assert isinstance(randomstream,random.Random)
             self.randomstream=randomstream
         self._mean=(lowerbound+upperbound)/2
         
@@ -3141,7 +4066,9 @@ class Triangular(_Distribution):
         mode                mode of the distribution
         randomstream        randomstream
                             if omitted, random will be used
-                            if used as random.Random(12299) it assign a new stream with the specified seed
+                            if used as random.Random(12299)
+                            it assigns a new stream with the specified seed
+                            
     requirement: low <= mode <= upp
     '''
     def __init__(self,low,high,mode,randomstream=None):
@@ -3153,11 +4080,11 @@ class Triangular(_Distribution):
             raise AssertionError('high<mode')
         self._low=low
         self._high=high
-        self._mode=mode
+        self.mode=mode
         if randomstream is None:
             self.randomstream=random
         else:
-            assert type(ramdomstream)==random.Random
+            assert isinstance(randomstream,random.Random)
             self.randomstream=randomstream
         self._mean=(low+mode+high)/3
 
@@ -3184,14 +4111,15 @@ class Constant(_Distribution):
         value               value to be returned in sample
         randomstream        randomstream
                             if omitted, random will be used
-                            if used as random.Random(12299) it assign a new stream with the specified seed
+                            if used as random.Random(12299)
+                              it assigns a new stream with the specified seed
     '''
     def __init__(self,value,randomstream=None):
         self._value=value
         if randomstream is None:
             self.randomstream=random
         else:
-            assert type(randomstream)==random.Random
+            assert isinstance(randomstream,random.Random)
             self.randomstream=randomstream
         self._mean=value
         
@@ -3218,7 +4146,8 @@ class Cdf(_Distribution):
                             (x1,c1,x2,c2, ...xn,cn)
         randomstream        randomstream
                             if omitted, random will be used
-                            if used as random.Random(12299) it assign a new stream with the specified seed
+                            if used as random.Random(12299)
+                              it assigns a new stream with the specified seed
     requirements:
         x1<=X2<= ...<=xn
         c1<=c2<=cn
@@ -3233,7 +4162,7 @@ class Cdf(_Distribution):
         if randomstream is None:
             self.randomstream=random
         else:
-            assert type(randomstream)==random.Random
+            assert isinstance(randomstream,random.Random)
             self.randomstream=randomstream
             
         lastcum=0
@@ -3248,10 +4177,13 @@ class Cdf(_Distribution):
             if len(spec)==0:
                 raise AssertionError('uneven number of parameters specified')
             if x<lastx:
-                raise AssertionError('x value %s is smaller than previous value %s'%(x,lastx))
+                raise AssertionError\
+                  ('x value %s is smaller than previous value %s'%(x,lastx))
             cum=spec.pop(0)
             if cum<lastcum:
-                raise AssertionError('cumulative value %s is smaller than previous value %s'%(cum,lastcum))
+                raise AssertionError\
+                  ('cumulative value %s is smaller than previous value %s'%\
+                  (cum,lastcum))
             self._x.append(x)
             self._cum.append(cum)
             lastx=x
@@ -3262,7 +4194,8 @@ class Cdf(_Distribution):
             self._cum[i]=self._cum[i]/lastcum
         self._mean=0
         for i in range(len(self._cum)-1):
-            self._mean+=((self._x[i]+self._x[i+1])/2)*(self._cum[i+1]-self._cum[i])
+            self._mean+=\
+              ((self._x[i]+self._x[i+1])/2)*(self._cum[i+1]-self._cum[i])
 
     def __repr__(self):
         lines=[]
@@ -3276,9 +4209,10 @@ class Cdf(_Distribution):
         r=self.randomstream.random()
         for i in range (len(self._cum)):
             if r<self._cum[i]:
-                return interpolate(r,self._cum[i-1],self._cum[i],self._x[i-1],self._x[i])
-        return self._x[i]        
-                
+                return interpolate\
+                  (r,self._cum[i-1],self._cum[i],self._x[i-1],self._x[i])
+        return self._x[i]          
+
 class Pdf(_Distribution):
     '''
     Probility distribution function
@@ -3290,49 +4224,67 @@ class Pdf(_Distribution):
                             (x1,p1,x2,p2, ...xn,pn)
         randomstream        randomstream
                             if omitted, random will be used
-                            if used as random.Random(12299) it assign a new stream with the specified seed
+                            if used as random.Random(12299)
+                              it assigns a new stream with the specified seed
     requirements:
         p1+p2=...+pn>0
         all densities are auto scaled according to the sum of p1 to pn,
         so no need to have p1 to pn add up to 1 or 100.
     '''
-    def __init__(self,spec,randomstream=None):
+    def __init__(self,spec1,spec2=None,randomstream=None):
         self._x=[0] # just a place holder
         self._cum=[0] 
         if randomstream is None:
             self.randomstream=random
         else:
-            assert type(ramdomstream)==random.Random                
+            assert isinstance(randomstream,random.Random)
             self.randomstream=randomstream
 
         sump=0
         sumxp=0
         lastx=-inf
-        spec=list(spec)
-        if len(spec)==0:
-            raise AssertionError('no arguments specified')
-        while len(spec)>0:
-            x=spec.pop(0)
+        hasmean=True
+        if spec2==None:
+            spec=list(spec1)
             if len(spec)==0:
-                raise AssertionError('uneven number of parameters specified')
-            p=spec.pop(0)
-            sump+=p
-            if type(x) in (list,tuple):
-                if len(x)==2:
-                    xm=(x[0]+x[1])/2
-                    x=(min(x[0],x[1]),max(x[0],x[1])) 
-                else:
-                    raise AssertionError('error in tuple ',x)
+                raise AssertionError('no arguments specified')
+            while len(spec)>0:
+                x=spec.pop(0)
+                if len(spec)==0:
+                    raise AssertionError('uneven number of parameters specified')
+                p=spec.pop(0)
+                sump+=p
+                try:
+                    sumxp += float(x)*p
+                except:
+                    hasmean=False
+                self._x.append(x)
+                self._cum.append(sump)
+        else:
+            spec=list(spec1)
+            if isinstance(spec2,(list,tuple)):
+                spec2=list(spec2)
             else:
-                xm=x
-            sumxp+=(p*xm)
-            self._x.append(x)
-            self._cum.append(sump)
+                spec2=len(spec)*[spec2]
+            while len(spec)>0:
+                x=spec.pop(0)
+                p=spec2.pop(0)
+                sump+=p
+                try:
+                    sumxp += float(x)*p
+                except:
+                    hasmean=False
+                self._x.append(x)
+                self._cum.append(sump)            
         if sump==0:
             raise AssertionError('at least one probability should be >0')
+
         for i in range (len(self._cum)):
             self._cum[i]=self._cum[i]/sump
-        self._mean=sumxp/sump
+        if hasmean:
+            self._mean=sumxp/sump            
+        else:
+            self._mean=inf
 
     def __repr__(self):
         lines=[]
@@ -3345,18 +4297,9 @@ class Pdf(_Distribution):
         r=self.randomstream.random()
         for i in range (len(self._cum)):
             if r<=self._cum[i]:
-                x=self._x[i]
-                if type(x) in (list,tuple):
-                    x=interpolate(r,self._cum[i-1],self._cum[i],self._x[i][0],self._x[i][1])
-                    if x<self._x[i][0]:
-                        x=self._x[i][0]
-                    if x>self._x[i][1]:
-                        x=self._x[i][1]
-                    return x
-                else:
-                    return self._x[i]
+                return self._x[i]
         return self._x[i]  # just for safety  
-
+        
 class Distribution(_Distribution):
     '''
     Generate a distribution from a string
@@ -3367,7 +4310,8 @@ class Distribution(_Distribution):
         spec                string containing a valid salabim distribution
         randomstream        randomstream
                             if omitted, random will be used
-                            if used as random.Random(12299) it assign a new stream with the specified seed
+                            if used as random.Random(12299)
+                              it assigns a new stream with the specified seed
                             note that the rendomstream in the string is ignored
     requirements:
         spec must evakuate to a proper salabim distribution (including proper casing).
@@ -3378,7 +4322,7 @@ class Distribution(_Distribution):
         if randomstream is None:
             self.randomstream=random
         else:
-            assert type(ramdomstream)==random.Random
+            assert isinstance(randomstream,random.Random)
             self.randomstream=randomstream
         self._distribution=d
         self._mean=d._mean
@@ -3392,7 +4336,42 @@ class Distribution(_Distribution):
         return self._distribution.sample        
 
 class Resource(object):
-    def __init__(self,name=None,capacity=1,strict_order=False,anonymous=False,env=None):
+    '''
+    Resource
+    
+    Parameters:
+    -----------
+    name : str
+        name of the resource |n|
+        if the name ends with a period (.),
+        auto serializing will be applied |n|
+        if omitted, the name resource will be used
+        
+    capacity : float
+        capacity of the resouce |n|
+        if omitted, 0
+        
+    strict_order : bool
+        strict_order specifier |n|
+        if False, requests can be honoured for components that requested 
+        from the resource later |n|
+        if True, requests can only honoured in the order of the claim request.
+        note that this may lead to deadlock when components request from more
+        than one resource, in strict order.
+        
+    anonymous : bool
+        anonymous specifier |n|
+        if True, claims are not related to any component. This is useful
+        if the resource is actually just a level. |n|
+        if False, claims belong to a component.
+        
+    env : Environment
+        environment to be used |n|
+        if omitted, default_env is used
+    '''
+    
+    def __init__(self,name=None,capacity=1,strict_order=False,\
+      anonymous=False,env=None):
         '''
         
         '''
@@ -3404,13 +4383,14 @@ class Resource(object):
         if name is None:
             name='resource.'            
         self._capacity=capacity
-        self._name,self._base_name,self._sequence_number = self.env._reformatnameR(name)
+        self._name,self._base_name,self._sequence_number = \
+          _reformatname(name,self.env._nameserializeResource)
         self._requesters=Queue(name='requesters:'+name,env=self.env)
         self._requesters._resource=self
         self._claimers=Queue(name='claimers:'+name,env=self.env)
         self._pendingclaimed_quantity=0
         self._claimed_quantity=0
-        self._anonymous=anonymous
+        self.anonymous=anonymous
         self._strict_order=strict_order
 
     def __repr__(self):
@@ -3422,20 +4402,31 @@ class Resource(object):
             lines.append('  no requests')
         else:
             lines.append('  requesting component(s):')
-            for c in self._requesters.components():
+            mx=self._requesters._head.successor
+            while mx!=self._requesters._tail:
+                c=mx.component
+                mx=mx.successor
                 if self in c._pendingclaims:
-                    lines.append('    '+pad(c._name,20)+' quantity='+str(c._requests[self])+' provisionally claimed')
+                    lines.append('    '+pad(c._name,20)+\
+                      ' quantity='+str(c._requests[self])+\
+                      ' provisionally claimed')
                 else:
-                    lines.append('    '+pad(c._name,20)+' quantity='+str(c._requests[self]))
+                    lines.append('    '+pad(c._name,20)+\
+                      ' quantity='+str(c._requests[self]))
         
         lines.append('  claimed_quantity='+str(self._claimed_quantity))
         if self._claimed_quantity>=0:
-            if self._anonymous:
-                lines.append('  not claimed by any components, because the resource is anonymous')
+            if self.anonymous:
+                lines.append('  not claimed by any components,'+\
+                ' because the resource is anonymous')
             else:
                 lines.append('  claimed by:')
-                for c in self._claimers.components():
-                    lines.append('    '+pad(c._name,20)+' quantity='+str(c._claims[self]))
+                mx=self._claimers._head.successor
+                while mx!=self._claimers._tail:
+                    c=mx.component
+                    mx=mx.successor
+                    lines.append('    '+pad(c._name,20)+\
+                      ' quantity='+str(c._claims[self]))
                  
         return '\n'.join(lines)
 
@@ -3446,13 +4437,16 @@ class Resource(object):
             mx=mx.successor
             if c._greedy:
                 if self not in c._pendingclaims:
-                    if c._requests[self]<=self._capacity-self._claimed_quantity-self._pendingclaimed_quantity+1e-8:
+                    if c._requests[self]<=\
+                      self._capacity-self._claimed_quantity-\
+                      self._pendingclaimed_quantity+1e-8:
                         c._pendingclaims.append(self)
                         self._pendingclaimed_quantity+=c._requests[self] 
             claimed=True
             for r in c._requests:
                 if r not in c._pendingclaims:
-                    if c._requests[r]>r._capacity-r._claimed_quantity-r._pendingclaimed_quantity+1e-8:
+                    if c._requests[r]>r._capacity-r._claimed_quantity-\
+                      r._pendingclaimed_quantity+1e-8:
                         claimed=False
                         break
             if claimed:
@@ -3462,7 +4456,7 @@ class Resource(object):
                     if r in c._pendingclaims:
                         r._pendingclaimed_quantity-=c._requests[r]
                         
-                    if not r._anonymous:
+                    if not r.anonymous:
                         if r in c._claims:
                             c._claims[r]+=c._requests[r]
                         else:
@@ -3480,14 +4474,17 @@ class Resource(object):
         '''
         releases all claims or a specified quantity
         
-        arguments:
-            quantity          quantity to be released
-                              if not specified, the resource will be emptied 
-                              completely
+        Parameters:
+        -----------
+        quantity : float
+            quantity to be released |n|
+            if not specified, the resource will be emptied completely |n|
+            for non-anonymous resources, all components claiming from this resource
+            will be released.
                               
         quantity may not be specified for a non-anomymous resoure
         '''
-        if self._anonymous:
+        if self.anonymous:
             if quantity is None:
                 q=self._claimed_quantity
             else:
@@ -3499,30 +4496,36 @@ class Resource(object):
             
         else:
             if quantity!=None:
-                raise AssertionError('no quantity allowed for non-anonymous resource')
+                raise AssertionError\
+                  ('no quantity allowed for non-anonymous resource')
                 
-            for c in list(self._claimers.components()):
+            mx=self._claimers._head.successor
+            while mx!=self._tail:
+                c=mx.component
+                mx=mx.successor
                 c.release(self)
                 
     @property
     def requesters(self):
         '''
-        returns the queue containing all components not yet honoured requests.
+        returns the queue containing all components with not yet honoured requests.
         '''
         return self._requesters
         
     @property
     def claimers(self):
         '''
-        returns the name of all components claiming from the resource.
-        will be an empty queue for anonymous resource
+        returns the queue with all components claiming from the resource. |n|
+        will be an empty queue for an anonymous resource
         '''
         return self._claimers
 
     @property
     def capacity(self,cap=None):
         '''
-        gets or sets the capacity of a resource
+        gets or sets the capacity of a resource.
+        
+        this may lead to honouring one or more requests.
         '''
         return self._capacity
 
@@ -3541,7 +4544,9 @@ class Resource(object):
     @property
     def strict_order(self):
         '''
-        gets of sets the strict_order property of a resource
+        gets or sets the strict_order property of a resource
+        
+        this may lead to honouring one or more requests.        
         '''
         return self._strict_order
         
@@ -3553,18 +4558,20 @@ class Resource(object):
     @property
     def name(self):
         '''
-        gets and/or sets the name of a resource
+        gets or sets the name of a resource
         
-        arguments:
-            txt                 name of the resource
-                                if txt ends with a period, the name will be serialized
-                                if omitted, the name will not be changed
+        Parameters:
+        ----------
+        txt : str
+            name of the resource |n|
+            if txt ends with a period, the name will be serialized
         '''
         return self._name
 
     @name.setter
     def name(self,txt):
-        self._name,self._base_name,self._sequence_number=self.env._reformatnameR(txt)
+        self._name,self._base_name,self._sequence_number=\
+          _reformatname(txt,self.env._nameserializeResource)
         
     @property
     def base_name(self):
@@ -3576,10 +4583,12 @@ class Resource(object):
     @property
     def sequence_number(self):
         '''
-        returns the sequence_number of a resource (the sequence number at init or name)
+        returns the sequence_number of a resource
+        (the sequence number at init or name)
 
         normally this will be the integer value of a serialized name,
-        but also non serialized names (without a dot at the end will be numbered)
+        but also non serialized names (without a dot at the end)
+        will be numbered)
         '''
         return self._sequence_number  
 
@@ -3740,7 +4749,7 @@ def colornames():
         }
 
 def colorspec_to_tuple(colorspec):
-    if type(colorspec) in (tuple,list):
+    if isinstance(colorspec,(tuple,list)):
         if len(colorspec)==2:
             c=colorspec_to_tuple(colorspec[0])
             return (c[0],c[1],c[2],colorspec[1])
@@ -3751,9 +4760,11 @@ def colorspec_to_tuple(colorspec):
     else:
         if (colorspec!='') and (colorspec[0])=='#':
             if len(colorspec)==7:
-                return (int(colorspec[1:3],16),int(colorspec[3:5],16),int(colorspec[5:7],16))
+                return (int(colorspec[1:3],16),int(colorspec[3:5],16),\
+                  int(colorspec[5:7],16))
             elif len(colorspec)==9:
-                return (int(colorspec[1:3],16),int(colorspec[3:5],16),int(colorspec[5:7],16),int(colorspec[7:9],16))
+                return (int(colorspec[1:3],16),int(colorspec[3:5],16),\
+                  int(colorspec[5:7],16),int(colorspec[7:9],16))
         else:
             s=colorspec.split('#')
             if len(s)==2:
@@ -3775,7 +4786,7 @@ def hex_to_rgb(v):
     if len(v)==6:
         return int(v[:2], 16), int(v[2:4], 16), int(v[4:6], 16)
     if len(v)==8:
-        return int(v[:2], 16), int(v[2:4], 16), int(v[4:6], 16), int(v[6:8], 16)
+        return int(v[:2],16), int(v[2:4],16), int(v[4:6],16), int(v[6:8],16)
     raise AssertionError('Incorrect value'+str(v))
 
 def colorspec_to_hex(colorspec,withalpha=True):
@@ -3785,40 +4796,51 @@ def colorspec_to_hex(colorspec,withalpha=True):
     else:
         return '#%02x%02x%02x' % (int(v[0]),int(v[1]),int(v[2]))
 
+def spec_to_image(image):
+    if isinstance(image,str):
+        im = Image.open(image)
+        im = im.convert('RGBA')
+        return im
+    else:
+        return image
+
 def getfont(fontname,fontsize): # fontsize in screen_coordinates!
-    if type(fontname)==list:
+    if isinstance(fontname,list):
         fonts=tuple(fontname)
-    elif type(fontname)==str:
+    elif isinstance(fontname,str):
         fonts=(fontname,)
     else:
         fonts=fontname
 
-    if (fonts,fontsize) in animation.font_cache:
-        font=animation.font_cache[(fonts,fontsize)]
+    if (fonts,fontsize) in An.font_cache:
+        font=An.font_cache[(fonts,fontsize)]
     else:
-        for ifont in fonts+('calibri', 'Calibri'):
+        font=None
+        for ifont in fonts+('calibri', 'Calibri','Arial'):
             try:
                 font=ImageFont.truetype(font=ifont,size=int(fontsize))
                 break
             except:
                 pass
-        animation.font_cache[(fonts,fontsize)]=font
+        if font==None:
+            raise AssertionError('no matching fonts found for ',fonts)
+        An.font_cache[(fonts,fontsize)]=font
     return font
         
 def getwidth(text,font='',fontsize=20,screen_coordinates=False):
     if not screen_coordinates:
-        fontsize=fontsize*animation.scale
+        fontsize=fontsize*An.scale
     f=getfont(font,fontsize)
     thiswidth,thisheight=f.getsize(text)
     if screen_coordinates:
         return thiswidth
     else:
-        return thiswidth/animation.scale
+        return thiswidth/An.scale
     return 
 
 def getfontsize_to_fit(text,width,font='',screen_coordinates=False):
     if not screen_coordinates:
-        width=width*animation.scale
+        width=width*An.scale
 
     lastwidth=0    
     for fontsize in range(1,300):
@@ -3827,21 +4849,31 @@ def getfontsize_to_fit(text,width,font='',screen_coordinates=False):
         if thiswidth>width:
             break
         lastwidth=thiswidth
-    print('--width,lastwidth',width,lastwidth)
     fontsize=interpolate(width,lastwidth,thiswidth,fontsize-1,fontsize)
     if screen_coordinates:
          return fontsize
     else:
-         return fontsize/animation.scale
+         return fontsize/An.scale
 
 def _i(p,v0,v1):
     if v0==v1:
-        return v0 # avoid rounding problems
-    return (1-p)*v0+p*v1
+        v=v0 # avoid rounding problems
+    v=(1-p)*v0+p*v1
+    return v
 
+def colorinterpolate(t,t0,t1,v0,v1):
+    vt0=colorspec_to_tuple(v0)
+    vt1=colorspec_to_tuple(v1)
+    return tuple(int(c) for c in interpolate(t,t0,t1,vt0,vt1))
+    
 def interpolate(t,t0,t1,v0,v1):
     if (v0 is None) or (v1 is None):
         return None
+    if t0==t1:
+        return v1
+    if t0>t1:
+        (t0,t1)=(t1,t0)
+        (v0,v1)=(v1,v0)
     if t<=t0:
         return v0
     if t>=t1:
@@ -3849,7 +4881,7 @@ def interpolate(t,t0,t1,v0,v1):
     if t1==inf:
         return v0
     p=(0.0+t-t0)/(t1-t0)
-    if type(v0) in (list,tuple):
+    if isinstance(v0,(list,tuple)):
         l=[]
         for x0,x1 in zip(v0,v1):
             l.append(_i(p,x0,x1))
@@ -3857,37 +4889,45 @@ def interpolate(t,t0,t1,v0,v1):
     else:
         return _i(p,v0,v1)
 
-def str_or_function(t):
-    if callable(t):
-        return t()
-    else:
-        return str(t)
-        
-def clocktext():
-    if (animation.paused) and (int(time.time()*2)%2==0):
-        return ' '
-    else:
-        return '%6.3f %10.3f'% (animation.animation_speed,animation.t)    
+            
+def clocktext(t):
+    s=''
+    if (not An.paused) or (int(time.time()*2)%2==0):
+
+        if (not An.paused) and An.env.show_fps:  
+            if len(An.frametimes)>=2:
+                fps=(len(An.frametimes)-1)/(An.frametimes[-1]-An.frametimes[0])
+            else:
+                fps=0
+            s=s+'fps={:.1f}'.format(fps)
+        if An.env.show_speed:
+            if s!='':
+                s=s+' '
+            s=s+'*{:.3f}'.format(An.env.speed)
+        if An.env.show_time:
+            if s!='':
+                s=s+' '
+            s=s+'t={:.3f}'.format(t)
+    return s
 
 def pausetext():
-    if animation.paused:
+    if An.paused:
         return 'Resume'  
     else:
         return 'Pause'  
         
 def tracetext():
-    if animation.env._trace:
+    if An.env._trace:
         return 'Trace off'
     else:
         return 'Trace on'
             
-        
 def _reformatname(name,_nameserialize):
     L=20
     if name in _nameserialize:
         next=_nameserialize[name]+1
     else: 
-        next=1
+        next=0
     _nameserialize[name]=next        
     if (len(name)!=0) and (name[len(name)-1]=='.'):
         nextstring='%d'%next
@@ -3921,7 +4961,13 @@ def _atprocess(process):
         return ''
     else:
         return (' @ '+process.__name__)
-
+        
+def _modetxt(mode):
+    if mode==None:
+        return ''
+    else:
+        return ' mode='+str(mode)       
+    
 def trace(value=None):
     if value!=None:
         default_env._trace=value
@@ -3932,7 +4978,7 @@ def now():
     returns now for the default environment
     '''
     return default_env._now
-    
+
 def current_component():
     '''
     returns the current component for the default environment
@@ -3945,27 +4991,20 @@ def print_trace(*args,**kwargs):
 
 def pythonistacolor(c):
     return (c[0]/255,c[1]/255,c[2]/255,c[3]/255)
-        
 
-    
 '''
 initialization of globals
 '''
-animation=None
-_nameserializeE={}
+An.env=None
+an_scene=None
 default_env=Environment(trace=False,name='default environment')
 main=default_env._main
 random=random.Random(-1)
-
+   
 if __name__ == '__main__':
     try:
         import salabim_test
-        salabim_test.test1()
     except:
-        pass
-
-
-
-
-
-
+        print ('salabim_test.py not found')
+    else:
+        salabim_test.test17()

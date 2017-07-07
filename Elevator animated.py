@@ -1,34 +1,240 @@
 import salabim as sim
-    
-class Check(sim.Component):
-    def process(self):
-        self.last_load_0_n=ui_load_0_n.v
-        self.last_load_n_0=ui_load_n_0.v
-        self.last_load_n_n=ui_load_n_n.v
-        while True:
-            yield self.hold(animation.animation_speed)
-            if ui_capacity.v!=capacity:
-                yield self.stop_run()     
-            if ui_topfloor.v!=topfloor:
-                yield self.stop_run()     
-            if ui_ncars.v!=ncars:
-                yield self.stop_run()     
-            if ui_load_0_n.v!=self.last_load_0_n:
-                vg_0_n.activate()     
-                self.last_load_0_n=ui_load_0_n.v
-            if ui_load_n_0.v!=self.last_load_n_0:
-                vg_n_0.activate()
-                self.last_load_n_0=ui_load_n_0.v
-            if ui_load_n_n.v!=self.last_load_n_n:
-                vg_n_n.activate()     
-                self.last_load_n_n=ui_load_n_n.v
+from salabim import default_env as de
 
+class AnimateLED(sim.Animate):
+    def __init__(self,x,y,floor,direction):
+        self.floor=floor
+        self.direction=direction
+        
+        b=xvisitor_dim/2
+        if direction==up:
+            polygon=(-0.5*b,0,0.5*b,0,0,1*b)
+        else:
+            polygon=(-0.5*b,b,0.5*b,b,0,0)     
+                          
+        super().__init__(x0=x,y0=y,polygon0=polygon)
+        
+    def fillcolor(self,t):
+        if (self.floor,self.direction) in requests:
+            return direction_color(self.direction)
+        else:
+            return ''
+            
+class AnimateFloorVisitor(sim.Animate):
+    def __init__(self,x,y,floor,part,index):
+        self.floor=floor
+        self.part=part
+        self.index=index
+        b=0.1*xvisitor_dim
+        if part==0:
+            super().__init__(rectangle0=(b,2,xvisitor_dim-b,yvisitor_dim-b),
+              x0=x,y0=y,linewidth0=0)
+        else:
+            super().__init__(text='',fontsize0=xvisitor_dim*0.7,
+              anchor='center',offsetx0=5*b,offsety0=2+4*b,
+              x0=x,y0=y)
+
+    def fillcolor(self,t):
+        if self.part==0:
+            visitor=self.floor.visitors[self.index]
+            if visitor!=None:
+                return direction_color(visitor.direction)
+        else:
+            return 'white'
+            
+    def text(self,t):
+        visitor=self.floor.visitors[self.index]
+        if visitor!=None:
+            return str(visitor.tofloor.n)
+        
+    def visible(self,t):
+        return self.floor.visitors[self.index]!=None
+        
+class AnimateCar(sim.Animate):
+    def __init__(self,x,car):
+        self.car=car
+        super().__init__(x0=x,
+          rectangle0=(0,0,capacity*xvisitor_dim,yvisitor_dim),
+          fillcolor0='lightblue')
+      
+    def y(self,t):
+        if self.car.mode=='Move':
+            return sim.interpolate(
+              t,self.car.mode_time,self.car.scheduled_time,
+              self.car.floor.y,self.car.nextfloor.y)
+                 
+        else:
+            return self.car.floor.y
+            
+class AnimateCarVisitor(sim.Animate):
+    def __init__(self,x,car,part,index):
+        self.car=car
+        self.part=part
+        self.index=index
+        b=0.1*xvisitor_dim
+        if part==0:
+            super().__init__(rectangle0=(b,2,xvisitor_dim-b,yvisitor_dim-b),
+              x0=x,linewidth0=0)
+        else:
+            super().__init__(text='',fontsize0=xvisitor_dim*0.7,
+              anchor='center',offsetx0=5*b,offsety0=2+4*b,
+              x0=x,linewidth0=0)              
+        
+    def fillcolor(self,t):
+        if self.part==0:
+            visitor=self.car.visitors[self.index]
+            if visitor!=None:
+                return direction_color(visitor.direction)
+        else:
+            return 'white'
+            
+    def y(self,t):
+        if self.car.mode=='Move':
+            return sim.interpolate(
+              t,self.car.mode_time,self.car.scheduled_time,
+              self.car.floor.y,self.car.nextfloor.y)
+        else:
+            return self.car.floor.y
+                             
+    def text(self,t):
+        visitor=self.car.visitors[self.index]
+        if visitor!=None:
+            return str(visitor.tofloor.n)        
+        
+    def visible(self,t):
+        return self.car.visitors[self.index]!=None
+                
+class DoAnimation(object):
+    
+    def __init__(self):
+        global xvisitor_dim
+        global yvisitor_dim
+        global capacity_last,ncars_last,topfloor_last
+        global width,height
+
+        
+        width=1024
+        height=768
+        xvisitor_dim=30
+        yvisitor_dim=xvisitor_dim
+        yfloor0=20       
+         
+        xcar={}
+        xled={}
+    
+        x=width
+        for car in cars:
+            x-=(capacity+1)*xvisitor_dim
+            xcar[car]=x
+        x-=xvisitor_dim
+        xsign=x
+        x-=xvisitor_dim/2
+        for direction in (up,down):
+            x-=xvisitor_dim/2
+            xled[direction]=x
+        x-=xvisitor_dim
+        xwait=x
+        
+        for floor in floors.values():
+            y=yfloor0+floor.n*yvisitor_dim
+            floor.y=y       
+            for direction in (up,down):
+                if (direction==up and floor.n<topfloor) or (direction==down and floor.n>0):
+                    AnimateLED(x=xled[direction],y=y+6,floor=floor,direction=direction)
+            sim.Animate\
+              (x0=0,y0=y,line0=(0,0,xwait,0),linecolor0='black')
+            sim.Animate\
+              (x0=xsign,y0=y+yvisitor_dim/2,\
+              text=str(floor.n),fontsize0=xvisitor_dim/2,anchor='center')
+            
+            x=xwait-xvisitor_dim
+            index=0
+            while x>0:
+                AnimateFloorVisitor(x=x,y=y,floor=floor,index=index,part=0)
+                AnimateFloorVisitor(x=x,y=y,floor=floor,index=index,part=1)
+                x -= xvisitor_dim     
+                index += 1
+                
+        for car in cars:
+            AnimateCar(x=xcar[car],car=car)
+            x=xcar[car]
+            for index in range(capacity):
+                AnimateCarVisitor(x=x,car=car,index=index,part=0)
+                AnimateCarVisitor(x=x,car=car,index=index,part=1)                
+                x += xvisitor_dim    
+                               
+        ncars_last=ncars
+        ui_ncars=sim.AnimateSlider\
+          (x=540,y=height,width=90,height=20,\
+          vmin=1,vmax=5,resolution=1,v=ncars,label='#elevators',action=set_ncars)
+              
+        topfloor_last=topfloor
+        ui_topfloor=sim.AnimateSlider\
+          (x=640,y=height,width=90,height=20,\
+          vmin=5,vmax=20,resolution=1,v=topfloor,label='top floor',action=set_topfloor)
+              
+        capacity_last=capacity
+        ui_capacity=sim.AnimateSlider\
+            (x=740,y=height,width=90,height=20,\
+            vmin=2,vmax=6,resolution=1,v=capacity,label='capacity',action=set_capacity)
+              
+        ui_load_0_n=sim.AnimateSlider\
+          (x=540,y=height-50,width=90,height=25,\
+          vmin=0,vmax=400,resolution=25,v= load_0_n,label='Load 0->n',action=set_load_0_n) 
+              
+        ui_load_n_n=sim.AnimateSlider\
+          (x=640,y=height-50,width=90,height=25,\
+          vmin=0,vmax=400,resolution=25,v=load_n_n,label='Load n->n',action=set_load_n_n) 
+              
+        ui_load_n_0=sim.AnimateSlider\
+          (x=740,y=height-50,width=90,height=25,\
+          vmin=0,vmax=400,resolution=25,v=load_n_0,label='Load n->0',action=set_load_n_0) 
+
+        sim.animation_parameters(
+            height=height,width=width,animate=True,modelname='Elevator',speed=32)
+                
+def set_load_0_n(val):
+    global load_0_n
+    load_0_n=float(val)   
+
+def set_load_n_n(val):
+    global load_n_n
+    load_n_n=float(val)
+        
+def set_load_n_0(val):
+    global load_n_0
+    load_n_0=float(val)   
+    
+def set_capacity(val):
+    global capacity
+    global capacity_last
+    capacity=int(val)
+    if capacity!=capacity_last:
+        capacity_last=capacity
+        sim.main.stop_run()    
+        
+def set_ncars(val):
+    global ncars
+    global ncars_last
+    ncars=int(val)
+    if ncars!=ncars_last:
+        ncars_last=ncars
+        sim.main.stop_run()    
+        
+def set_topfloor(val):
+    global topfloor
+    global topfloor_last
+    topfloor=int(val)
+    if topfloor!=topfloor_last:
+        topfloor_last=topfloor
+        sim.main.stop_run()    
+   
 class  VisitorGenerator(sim.Component):
-    def __init__(self,from_,to,ui_load,*args,**kwargs):
+    def __init__(self,from_,to,id,*args,**kwargs):
         sim.Component.__init__(self,*args,**kwargs)
         self.from_=from_
         self.to=to
-        self.ui_load=ui_load
+        self.id=id
     
     def process(self):
         while True:
@@ -39,10 +245,17 @@ class  VisitorGenerator(sim.Component):
                     break
 
             visitor=Visitor(from_,to)
-            if self.ui_load.v==0:
+            if self.id=='0_n':
+                load=load_0_n
+            elif self.id=='n_0':
+                load=load_0_n
+            else:
+                load=load_n_n                    
+                
+            if load==0:
                 yield self.passivate()
             else:
-                iat=3600/self.ui_load.v
+                iat=3600/load
                 r=sim.random.uniform(0.5,1.5)
                 yield self.hold(r*iat)
 
@@ -54,44 +267,23 @@ class Visitor(sim.Component):
         self.tofloor=floors[to]
         self.direction=getdirection(self.fromfloor,self.tofloor)
                 
-
     def process(self):
         self.enter(self.fromfloor.visitors)
-        pos=self.fromfloor.visitors.length
-        
-        b=0.15*xvisitor_dim
-        self.an1=self.Animate\
-          (x0=xwait-pos*xvisitor_dim,y0=self.fromfloor.y,\
-          rectangle0=(b,0,xvisitor_dim-b,yvisitor_dim-b),\
-          fillcolor0=direction_color(self.direction))
-        self.an2=self.Animate\
-          (x0=self.an1.x0,y0=self.fromfloor.y,\
-          text=str(self.tofloor.n),fontsize0=xvisitor_dim*0.7,\
-          anchor='center',offsetx0=3.5*b,offsety0=3*b,fillcolor0='white')
         if not (self.fromfloor,self.direction)  in requests:
-            requests[self.fromfloor,self.direction]=sim.now()
-            self.fromfloor.anled[self.direction].update\
-              (fillcolor0=direction_color(self.direction))
-            
+            requests[self.fromfloor,self.direction]=sim.now()            
         for car in cars:
-            if car.is_passive:
+            if car.ispassive:
                 car.reactivate()
         
         yield self.passivate()
-        self.an1.remove()
-        self.an2.remove()
 
 class Car(sim.Component):
-    def __init__(self,capacity,x,*args,**kwargs):
+    def __init__(self,capacity,*args,**kwargs):
         sim.Component.__init__(self,*args,**kwargs)
         self.capacity=capacity
-        self.x=x
         self.direction=still
         self.floor=floors[0]
         self.visitors=sim.Queue(name='visitors in car')
-        self.an=self.Animate(x0=x,y0=floors[0].y,
-          rectangle0=(0,0,capacity*xvisitor_dim,yvisitor_dim),\
-            fillcolor0='lightblue')
         
     def process(self):
         dooropen=False
@@ -101,40 +293,36 @@ class Car(sim.Component):
         while True:
             if self.direction==still:
                 if len(requests)==0:
-                    yield self.passivate()
+                    yield self.passivate(mode='Idle')
             if self.count_to_floor(self.floor)>0:
-                yield self.hold(dooropen_time)
+                yield self.hold(dooropen_time,mode='Door open')
                 dooropen=True
-                for visitor in self.visitors.components():
+                for visitor in self.visitors:
                     if visitor.tofloor==self.floor:
                         visitor.leave(self.visitors)
                         visitor.reactivate()
-                yield self.hold(exit_time)
-                self.show_visitors()
+                yield self.hold(exit_time,mode='Let exit')
                 
             if self.direction==still:
                 self.direction=up # just random
+
             for self.direction in (self.direction,-self.direction):
                 if (self.floor,self.direction) in requests:
                     del requests[self.floor,self.direction]
-                    self.floor.anled[self.direction].update(fillcolor0='')
 
                     if not dooropen:
-                        yield self.hold(dooropen_time)
+                        yield self.hold(dooropen_time,mode='Door open')
                         dooropen=True
-                    for visitor in self.floor.visitors.components():
+                    for visitor in self.floor.visitors:
                         if visitor.direction==self.direction:
                             if self.visitors.length<self.capacity:
                                 visitor.leave(self.floor.visitors)
                                 visitor.enter(self.visitors)
-                        yield self.hold(enter_time)
+                        yield self.hold(enter_time,mode='Let in')
                     if (self.floor.count_in_direction(self.direction)>0):
                         if not (self.floor,self.direction) in requests:
                             requests[self.floor,self.direction]=sim.now()
-                            self.floor.anled[self.direction].update\
-                              (fillcolor0=direction_color(self.direction))
 
-                    self.floor.show_visitors()
                 if self.visitors.length>0:
                     break
             else:
@@ -147,40 +335,24 @@ class Car(sim.Component):
                 else:
                     self.direction=still
             if dooropen:
-                yield self.hold(doorclose_time)
+                yield self.hold(doorclose_time,mode='Door close')
                 dooropen=False
                 
-            self.show_visitors()
             if self.direction!=still:
-                nextfloor=floors[self.floor.n+self.direction]
-                self.an.update\
-                  (y0=self.floor.y,y1=nextfloor.y,t1=sim.now()+move_time)
-                for visitor in self.visitors.components():
-                    visitor.an1.update\
-                      (y0=self.floor.y,y1=nextfloor.y,t1=sim.now()+move_time)
-                    visitor.an2.update\
-                      (y0=self.floor.y,y1=nextfloor.y,t1=sim.now()+move_time)
-                yield self.hold(move_time)
-                self.floor=nextfloor
+                self.nextfloor=floors[self.floor.n+self.direction]
+                yield self.hold(move_time,mode='Move')
+                self.floor=self.nextfloor
   
-            
-    def show_visitors(self):
-        x=self.x
-        for visitor in self.visitors.components():
-            visitor.an1.update(x0=x)
-            visitor.an2.update(x0=x)
-            x+=xvisitor_dim
-        
     def count_to_floor(self,tofloor):
         n=0
-        for visitor in self.visitors.components():
+        for visitor in self.visitors:
             if visitor.tofloor==tofloor:
                 n+=1
         return n
 
     def count_from_floor(self,fromfloor):
         n=0
-        for visitor in self.visitors.components():
+        for visitor in self.visitors:
             if visitor.fromfloor==tofloor:
                 n+=1
         return n
@@ -188,39 +360,15 @@ class Car(sim.Component):
 class Floor():
     def __init__(self,n):
         self.n=n
-        self.anled={}
-        self.y=yfloor0+n*yvisitor_dim
-
         self.visitors=sim.Queue(name='visitors '+str(n))
-        l=sim.main.Animate\
-          (x0=0,y0=self.y,line0=(0,0,xwait,0),linecolor0='black')
-        l=sim.main.Animate\
-          (x0=xsign,y0=self.y+yvisitor_dim/2,\
-          text=str(n),fontsize0=xvisitor_dim/2,anchor='center')
-        b=xvisitor_dim/2
-        if n<topfloor:
-            self.anled[up]=sim.main.Animate\
-              (x0=xled[up],y0=self.y,\
-              polygon0=(-0.5*b,0,0.5*b,0,0,1*b),fillcolor0='')
-        if n>0:
-            self.anled[down]=sim.main.Animate\
-              (x0=xled[down],y0=self.y,\
-              polygon0=(-0.5*b,b,0.5*b,b,0,0),fillcolor0='')
                 
     def count_in_direction(self,dir):
         n=0
-        for visitor in self.visitors.components():
+        for visitor in self.visitors:
             if visitor.direction==dir:
                 n+=1
         return n
-            
-    def show_visitors(self):
-        x=xwait-xvisitor_dim
-        for visitor in self.visitors.components():
-            visitor.an1.update(x0=x)
-            visitor.an2.update(x0=x)
-            x-=xvisitor_dim
-            
+                        
 def getdirection(fromfloor,tofloor):
     if fromfloor.n<tofloor.n:
         return +1
@@ -241,69 +389,10 @@ def direction_color(direction):
     if direction==-1:
         return 'green'
     return 'yellow'
-
-def experiment():
-    global xwait
-    global xled
-    global xsign
-    global floors
-    global cars
-    global requests
-    global vg_0_n
-    global vg_n_0
-    global vg_n_n
-        
-    animation_speed=animation.animation_speed
-    save_trace=sim.trace()
-    sim.default_env.reset()
-    sim.trace(save_trace)
-
-    check=Check()
-
-    xcar={}
-    xled={}
     
-    x=animation.width
-    for icar in range(ncars):
-        x-=(capacity+1)*xvisitor_dim
-        xcar[icar]=x
-    x-=xvisitor_dim
-    xsign=x
-    x-=xvisitor_dim/2
-    for direction in (up,down):
-        x-=xvisitor_dim/2
-        xled[direction]=x
-    x-=xvisitor_dim
-    xwait=x
-
-    requests={}
-       
-    vg_0_n=VisitorGenerator\
-      (from_=(0,0),to=(1,topfloor),ui_load=ui_load_0_n,name='vg_0_n')
-    vg_n_0=VisitorGenerator\
-      (from_=(1,topfloor),to=(0,0),ui_load=ui_load_n_0,name='vg_n_0')
-    vg_n_n=VisitorGenerator\
-      (from_=(1,topfloor),to=(1,topfloor),ui_load=ui_load_n_n,name='vg_n_n')
-
-    floors={}
-    for ifloor in range(topfloor+1):
-        floors[ifloor]=Floor(ifloor)
-
-
-    cars=[]
-        
-    for icar in range(ncars):
-        thiscar=Car(name='car '+str(icar),capacity=capacity,x=xcar[icar])
-        cars.append(thiscar)
-
-    sim.run(till=sim.inf,animate=True,animation_speed=animation_speed)
-
 up=1
 still=0
 down=-1
-xvisitor_dim=30
-yvisitor_dim=xvisitor_dim
-yfloor0=20
 
 move_time=10
 dooropen_time=3
@@ -311,33 +400,37 @@ doorclose_time=3
 enter_time=3
 exit_time=3
 
-sim.trace(False)
-animation=sim.Animation(modelname='Elevator')
-animation.animation_speed=32
-ui_ncars=sim.main.AnimateSlider\
-  (x=540,y=animation.height,width=90,height=20,\
-  vmin=1,vmax=5,resolution=1,v=3,label='#elevators') 
-ui_topfloor=sim.main.AnimateSlider\
-  (x=640,y=animation.height,width=90,height=20,\
-  vmin=5,vmax=20,resolution=1,v=15,label='top floor')    
-ui_capacity=sim.main.AnimateSlider\
-  (x=740,y=animation.height,width=90,height=20,\
-  vmin=2,vmax=6,resolution=1,v=4,label='capacity') 
-ui_load_0_n=sim.main.AnimateSlider\
-  (x=540,y=animation.height-50,width=90,height=25,\
-  vmin=0,vmax=400,resolution=25,v= 50,label='Load 0->n') 
-ui_load_n_n=sim.main.AnimateSlider\
-  (x=640,y=animation.height-50,width=90,height=25,\
-  vmin=0,vmax=400,resolution=25,v=100,label='Load n->n') 
-ui_load_n_0=sim.main.AnimateSlider\
-  (x=740,y=animation.height-50,width=90,height=25,\
-  vmin=0,vmax=400,resolution=25,v=100,label='Load n->0') 
+load_0_n=50
+load_n_n=100
+load_n_0=100
+capacity=4
+ncars=3
+topfloor=15
 
 while True:
-    topfloor=ui_topfloor.v
-    ncars=ui_ncars.v
-    capacity=ui_capacity.v
-    experiment()    
+    de.reset()
+       
+    VisitorGenerator(
+      from_=(0,0),to=(1,topfloor),id='0_n',name='vg_0_n')
+    VisitorGenerator(
+      from_=(1,topfloor),to=(0,0),id='n_0',name='vg_n_0')
+    VisitorGenerator(
+      from_=(1,topfloor),to=(1,topfloor),id= 'n_n',name='vg_n_n')
+      
+    requests={}
+    floors={}
+    for ifloor in range(topfloor+1):
+        floors[ifloor]=Floor(ifloor)
 
-animation.exit()
+    cars=[]
+        
+    for icar in range(ncars):
+        thiscar=Car(name='car '+str(icar),capacity=capacity)
+        cars.append(thiscar)
+        
+    DoAnimation()
 
+    sim.run()
+
+
+    
