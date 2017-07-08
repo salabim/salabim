@@ -1,6 +1,30 @@
 '''
 salabim  discrete event simulation module
+
+The MIT License (MIT)
+
+Copyright (c) 2017 Ruud van der Ham, Upward Systems
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+www.salabim.org
 '''
+
 from __future__ import print_function # compatibility with Python 2.x
 from __future__ import division # compatibility with Python 2.x
 
@@ -44,7 +68,7 @@ except:
     inf=float('inf')
     nan=float('nan')
 
-__version__='1.1.0'
+__version__='1.1.1'
 
 data='data'
 current='current'
@@ -1214,6 +1238,7 @@ class Environment(object):
         video : str
             if video is not omitted, a mp4 format video with the name video 
             will be created. |n|
+            The video has to have a .mp4 etension |n|
             This requires installation of numpy and opencv (cv2).
                           
         The y-coordinate of the upper right corner is determined automatically
@@ -1261,7 +1286,7 @@ class Environment(object):
         if use_toplevel!=None:
             self.use_toplevel=use_toplevel
         if video!=None:
-            self.video==video
+            self.video=video
 
     def run(self,duration=None,till=None):
         '''
@@ -1431,7 +1456,7 @@ class Environment(object):
         while An.running:
             tick_start=time.time()
             if An.dovideo:
-                An.t=An.start_animation_time+An.video_sequence*self.An._speed/self.fps
+                An.t=An.start_animation_time+An.video_sequence*self.speed/self.fps
             else:
                 if An.paused:
                     An.t=An.start_animation_time
@@ -1493,7 +1518,10 @@ class Environment(object):
                     co=next(canvas_objects_iter,None)
                     
                     if An.dovideo:
-                        capture_image.paste(im,(int(x),int(An.height-y-im.size[1])),im)
+                        capture_image.paste(ao._image,
+                          (int(ao._image_x),
+                          int(An.height-ao._image_y-ao._image.size[1])),
+                          ao._image)
                 else:
                     ao.canvas_object=None
                                                     
@@ -2939,7 +2967,7 @@ class Component(object):
             self._status=scheduled
             self.env.print_trace('','',self._name+' '+caller,\
               ('scheduled for %10.3f'%scheduled_time)+\
-              _urgenttxt(urgent)+_atprocess(self._process)+_modetxt(self._mode))       
+              _urgenttxt(urgent)+_atprocess(self._process)+' '+_modetxt(self._mode))       
            
     def reschedule(self,process=None,at=None,delay=None,urgent=False,mode='*'):
         '''
@@ -3208,7 +3236,7 @@ class Component(object):
             
         if to be applied for the current component, use ``yield self.cancel()``
         '''
-        self.env.print_trace('','','cancel '+self._name+_modetxt(self._mode))
+        self.env.print_trace('','','cancel '+self._name+' '+_modetxt(self._mode))
            
         _check_fail(self)
         self._process=None
@@ -3233,7 +3261,7 @@ class Component(object):
         '''
         if self!=self.env._current_component:
             raise AssertionError(self._name+' is not current')            
-        self.env.print_trace('','','standby',+_modetxt(self._mode))
+        self.env.print_trace('','','standby',_modetxt(self._mode))
         self._scheduled_time=self.env._now
         self.env._standbylist.append(self)
         if mode!='*':
@@ -3361,7 +3389,7 @@ class Component(object):
                 addstring=addstring+' priority='+str(priority)
                 self._enter_sorted(r._requesters,priority)
             self.env.print_trace('','',self._name,\
-              'request for '+str(q)+' from '+r._name+addstring+_modetxt(self._mode))
+              'request for '+str(q)+' from '+r._name+addstring+' '+_modetxt(self._mode))
 
             i+=1
             
@@ -4994,7 +5022,7 @@ def _modetxt(mode):
     if mode==None:
         return ''
     else:
-        return ' mode='+str(mode)       
+        return 'mode='+str(mode)       
     
 def trace(value=None):
     if value!=None:

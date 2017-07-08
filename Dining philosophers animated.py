@@ -110,5 +110,5 @@ while True:
     
     do_animation()
     
-    sim.run()    
+    de.run()    
     

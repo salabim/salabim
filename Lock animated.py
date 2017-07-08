@@ -260,5 +260,5 @@ lock=Lock('Lock')
 lock.side=left
 
 do_animation()
-sim.run()
-print('done')
+de.run()
+

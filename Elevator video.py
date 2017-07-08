@@ -177,7 +177,7 @@ def do_animation():
       (x=740,y=de.height-50,width=90,height=25,\
       vmin=0,vmax=400,resolution=25,v=load_n_0,label='Load n->0',action=set_load_n_0) 
 
-    sim.animation_parameters(modelname='Elevator',speed=32)
+    sim.animation_parameters(modelname='Elevator',speed=32,video='Elevator.mp4')
                 
 def set_load_0_n(val):
     global load_0_n
@@ -214,17 +214,10 @@ def set_topfloor(val):
     if topfloor!=topfloor_last:
         topfloor_last=topfloor
         sim.main.stop_run()    
-        
-def direction_color(direction):
-    if direction==1:
-        return 'red'
-    if direction==-1:
-        return 'green'
-    return 'yellow'
    
 class  VisitorGenerator(sim.Component):
     def __init__(self,from_,to,id,*args,**kwargs):
-        super().__init__(*args,**kwargs)
+        super()__init__(*args,**kwargs)
         self.from_=from_
         self.to=to
         self.id=id
@@ -369,6 +362,19 @@ def getdirection(fromfloor,tofloor):
         return -1
     return 0
         
+def direction_name(direction):
+    if direction==1:
+        return 'up'
+    if direction==-1:
+        return 'down'
+    return 'none'
+
+def direction_color(direction):
+    if direction==1:
+        return 'red'
+    if direction==-1:
+        return 'green'
+    return 'yellow'
     
 up=1
 still=0
@@ -386,31 +392,28 @@ load_n_0=100
 capacity=4
 ncars=3
 topfloor=15
-
-while True:
-    de.reset()
        
-    VisitorGenerator(
-      from_=(0,0),to=(1,topfloor),id='0_n',name='vg_0_n')
-    VisitorGenerator(
-      from_=(1,topfloor),to=(0,0),id='n_0',name='vg_n_0')
-    VisitorGenerator(
-      from_=(1,topfloor),to=(1,topfloor),id= 'n_n',name='vg_n_n')
-      
-    requests={}
-    floors={}
-    for ifloor in range(topfloor+1):
-        floors[ifloor]=Floor(ifloor)
+VisitorGenerator(
+  from_=(0,0),to=(1,topfloor),id='0_n',name='vg_0_n')
+VisitorGenerator(
+  from_=(1,topfloor),to=(0,0),id='n_0',name='vg_n_0')
+VisitorGenerator(
+  from_=(1,topfloor),to=(1,topfloor),id= 'n_n',name='vg_n_n')
+  
+requests={}
+floors={}
+for ifloor in range(topfloor+1):
+    floors[ifloor]=Floor(ifloor)
 
-    cars=[]
-        
-    for icar in range(ncars):
-        thiscar=Car(name='car '+str(icar),capacity=capacity)
-        cars.append(thiscar)
-        
-    do_animation()
+cars=[]
+    
+for icar in range(ncars):
+    thiscar=Car(name='car '+str(icar),capacity=capacity)
+    cars.append(thiscar)
+    
+do_animation()
 
-    sim.run()
+de.run(500)
 
 
     
