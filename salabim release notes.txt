@@ -1,0 +1,625 @@
+Salabim release notes
+
+version 1.1.0  2017-07-08
+=========================
+The animation of all sample models is completely restructured in order to separate the simulation model
+code from the animation code. This leads to much easier to read and debug models. Also the same code can now
+be used for animation and production (non animated) applications.
+
+Introduced an attribute 'mode' for components, which can be set either with an assignment or as a parameter of: 
+    initialization of a component
+    passivate
+    activate 
+    reactivate
+    hold
+    activate
+    standby
+    request
+    cancel
+This attribute can be very useful for animations which run more or less separate from the simulation code.
+The mode parameter may be any type, although str is possibly the most useful.
+Also, the mode is now shown in a trace.
+
+The attribute passive_reason has been phased out, as mode offers similar functionality for passive components. Be aware that mode is not reset automatically!
+
+When the mode is set, either by an assignment or one of the above methods, the property mode_time is
+set to now. This is particularly useful for hold, in order to assess when the component started the 
+hold, like in
+  fraction=sim.interpolate(sim.now,comp.mode_time,comp.scheduled_time,0,1)
+This technique is used in the sample models 'Lock animated' and 'Elevator animated'.
+
+A bug in PIL caused non black texts to have a kind of outline around the characters in Animate(text=...).
+This was especially visible with white texts on a dark background.
+Code has been added to correct this behaviour.
+
+Introduced a parameter visible for Animate and Animate.update. The method visible of animation
+objects can be overridden. This is especially useful in dashboard like animations.
+
+AnimateButton and AnimateSlider no longer have a layer parameter, as these UI elements are now always
+on top of the Animate objects.
+
+The animation parameters of run() are all removed. Now, a new animation_parameters method (in class Environment)
+is used to set all parameters.
+The function animation_speed has been phased out. It is now in animation_parameters.
+
+Pythonista animation performance is increased by building up the image completely with PIL,
+before putting it into a scene. This also results in higher quality images
+(essentially the same as under tkinter).
+
+On Pythonista, the animation size is now automatically set to the dimension of the screen.
+This can be overridden with a call to animation_parameters.
+
+In the animation, the Quit button has been renamed to Stop.
+
+The color of the text in Animate(text=) is now set with textcolor0 and textcolor1 instead of fillcolor0 and
+fillcolor1.
+
+If a specified font in Animate cannot be found, the system now searches for calibri and next for arial fonts.
+
+Bug fix: after a yield self.request call, the status of the component was still current, instead of scheduled.
+
+version 1.0.6  2017-06-16
+=========================
+Animation on CPython platform is now slightly smoother, because there was a bug in the timing routine, which
+caused that the animation was doomed to be slower than 30 fps.
+
+The upper right hand corner now shows, optionally, the number of frames per second fps).
+The run command has three new parameters, which control what is shown in the upper right hand corner, in case of animation:
+        show_fps : bool
+            if True, show the number of frames per second (default)|n|
+            if False, do not show the number of frames per second
+
+        show_animation_speed: bool
+            if True, show the animation speed (default)|n|
+            if False, do not show the animation speed
+
+        show_time: bool
+            if True, show the time (default)|n|
+            if False, do not show the time
+
+The text of an AnimateButton is now set via function text(), which can be overridden.
+
+The function str_or_function had been phased out, as this can be achieved now by overriding methods.
+
+version 1.0.5  2017-06-14
+=========================
+Complete overhaul of the tkinter way objects are shown. Instead of deleting all canvas objects
+for each animation tick, salabim now tries to minimize the number of create_image calls, 
+by using itemconfig and coords and reusing canvas elements, if possible and necessary.
+The result is a much smoother animation, particularly at higher animation speeds.
+The above is doesn't, unfortunately, apply to Pythonista.
+
+Now all of the following methods of the class Animate may be overridden:
+    def x(self,t=None)
+    def y(self,t=None)
+    def offsetx(self,t=None)
+    def offsety(self,t=None)
+    def angle(self,t=None)
+    def linewidth(self,t=None)
+    def linecolor(self,t=None)
+    def fillcolor(self,t=None)
+    def circle(self,t=None)
+    def line(self,t=None)
+    def polygon(self,t=None)
+    def rectangle(self,t=None)
+    def width(self,t=None)
+    def fontsize(self,t=None)
+    def text(self,t=None)
+    def anchor(self,t=None)
+    def image(self,t=None)
+    def layer(self,t=None)
+, thus giving the possibility to use non linear movement, special effects, etc.
+ 
+The distribution now also contains a script called salabim_install, which will install salabim
+in the appropriate site-packages folder. Once installed, salabim can be used from whatever location!
+ 
+version 1.0.4  
+=========================
+Animation interpolation can now be overridden (monkey patched) to allow for
+non linear interpolation or advanced animation techniques.
+For this make a new class based on Animation and redefine the necessary functions,
+like x,y, angle.
+
+As illustration of the possibilities, have a look at demo_override.py
+
+Duck typing implemented for more Pythonic behaviour.
+
+
+version 1.0.3  2017-05-26
+=========================
+Minor bug with stop_run in animation mode fixed.
+
+
+version 1.0.2  2017-05-07
+=========================
+The animation part of salabim has been redesigned, to make it more
+reliable and easier to access.
+Animation is not initialized with Animation() any more. Instead, the animation
+(and creation of a tkinter canvas in case of CPython) is now started by the
+run function.
+Therefore, the run function has now a number of additional parameters to set
+the size of the canvas, define scaling and transformation, etc.
+
+An animation object is now a class. One of the attributes is the environment
+where it belongs to. There are three classes defined:
+  Animate()
+  Animate_button()
+  Animate_slider()
+If you don't need animation, PIL does not need to be imported any more.
+  
+Also, the run function now supports the creation of an .mp4 video.
+For video production, numpy and cv2 (opencv) are required.
+This feature is not supported on Pythonista.
+
+The animation_speed can now be get/set by calling animation_speed().
+
+A number of function have been renamed to be more in line with Python naming
+(like isinstance):
+  is_passive    -> ispassive
+  is_current    -> iscurrent
+  is_scheduled  -> isscheduled
+  is_standby    -> isstandby
+  is_data       -> isdata
+  
+Bug when in a call to Animate() t0 was specified fixed.
+
+version 1.0.1  2017-03-13
+=========================
+Iteration of components in a queue is completely reimplemented.
+Instead of the function components, iteration is now done the Pythonic way, like
+  for comp in myqueue:
+Also, the algorithm now allows for very fast iteration even if components are leaving the queue 
+during the iteration. If there is a change (enter or leave or change of order) during the iteration, the iteration is guaranteed to deliver all components in the queue after the change correctly.
+Therefore, there is no need for specification of static and/or removals_possible as in the out phased
+components function.
+
+It is also possible to traverse a queue from tail to head, by using reversed as in:
+    for comp in reversed(myqueue):
+This is also a generator where updates are possible during the iteration.
+
+If you want to get a specific element in a queue, this can be now achieved with
+    comp=myqueue[1] to access the second element in the queue.
+So, therefore
+    myqueue[0] is equivalent to q.head
+    myqueue[-1] is equivalent to q.tail
+Nevertheless head and tail are still supported, to be more in line with Tomas/Must terminology.
+The function Queue.component_with_index has been phased-out.    
+
+Slicing of queues is now supported. So
+  for c in myqueue[1:3]:
+      print(c.name)
+will print the names of the second and third element of the queue (provided they are available).
+Also,
+  for c in myqueue[::-1]:
+      print(c.name)
+will list the contents of myqueue, in reverse order. In contrast with the above mentioned reversed() this
+is just a static snapshot.
+ 	  
+If a static snapshot of the queue contents is required, use 
+  myqueue[:]
+now. In contrast to previous versions of salabim, this is not faster than the standard iteration.
+
+The functions Queue.contains(c) and Component.is_in_queue(q) have been phased out. Instead salabim 
+now support the much more legible and Pythonic in construction, for example
+  if comp in myqueue:
+or 
+  if comp not in queue:
+  
+The length of a queue can be found with len(q). The old style Queue.length is still available.
+
+Automatic numbering of components, queues, resources and environments now starts with 0 (in contrast to 1 in previous versions). This is done to be more in line with Python.
+
+All sample models are updated to accommodate the above changes.
+
+Bug fixed: Changing a priority with set_priority, did affect the queue statistics. Now works as intended.
+
+Bug fixed: The parameter use_toplevel in Animation() works as intended.
+
+version 1.0.0  2017-03-01
+=========================
+The following names have been changed:
+SalabimComponent          Component
+SalabimQueue              Queue
+SalabimEnvironment        Environment
+SalabimResource           Resource
+salabim_random            random
+reset_env (method)        reset
+Distribution_from_string  Distribution
+
+The global function reset_env() (not the method of Environment) has been
+phased out. Use default_env.reset() instead.
+
+The default process to be executed when creating a component is now called
+process, instead of action.
+The proc argument of activate has been changed to process.
+The proc argument of reschedule has been changed to process.
+
+It is highly recommended to use the pythonistic
+  import salabim
+or
+  import salabim as sim
+instead of 
+  from salabim import *
+In all examples, we now use
+  import salabim as sim
+If you use the latter form, all salabim items have to be preceeded by sim. ,
+like sim.Component, sim.Resource, sim.main, sim.passive, sim.now(), sim.inf.
+If you want to use a salabim item without prefixing, use something like
+  from salabim import inf,main
+along with
+  import salabim as sim
+  
+In order to avoid having to specifiy sim.passive, sim.scheduled, etc.
+when importing as recommended, a number of new properties are introduced:
+  is_passive (equivalent to status=sim.passive)
+  is_current (eqivalent to status==sim.current)
+  is_scheduled (equivalent to status==sim.scheduled)
+  is_standby (equivalent to status==sim.standby)
+  is_data (equivalent to status==sim.data)
+  
+Technical note: The test routines, which were present in the salabim source,
+are now in a separate module, called salabim_test.py.
+
+Style note: the name salabim is now all lowercase, to be more Pythonistic.
+
+The utility program salabim0to1.py translates existing version 0 models into
+the new version 1 style.
+The program translates *ALL* version 0 programs in the current directory,
+adding a 1 to the name, e.g. Lock.py will be translated to Lock1.py
+Please note, that the translation is not guaranteed to be 100% accurate,
+and some fine tuning might be necessary.
+
+All sample models are updated accordingly.
+
+version 0.9.17 (not released)
+=============================
+Salabim animations can now work in parallel with other modules using tkinter,
+like graphics.py. If so, set the parameter use_toplevel to True.
+If a user would like to start its own tkinter window(s) next to salabim's
+window (initialized with tkiniter.Tk(), just use root=tkinter.Toplevel()
+instead of root=tkinter.Tk()
+ 
+version 0.9.16 2017-02-15
+=========================
+Bug when using Salabim without animation fixed.
+
+version 0.9.15 2017-01-14 
+=========================
+Improved way of animating circles. Also, now support for offset (most useful in combination with angle).
+Better support for transparency(alpha blending) for fill and line colors.
+
+Bugs fixed.
+
+version 0.9.14 2017-02-02
+=========================
+The classes AnimateCircle, AnimateLine, AnimatePolygon, AnimateRectangle, AnimateImage and AnimateText are now all combined in one class: Animate.
+All animations, including images now support scaling and rotation. Also, under Pythonista, convave polygons are now available.
+All animation objects support semi-transparency (also called alpha blending or opacity).
+Salabim now requires PIL (Pillow) for animations.
+
+Bugs fixed.
+
+version 0.9.13 2017-01-14
+=========================
+Animation on iPad / Pythonista now supported.
+Button and slider animation objects now available without the need to use tkinter functions.
+Button and slider animation objects are now also available under Pythonista.
+All functions are now documented as docstrings.
+
+
+version 0.9.12 2016-12-16
+=========================
+SalabimQueue, SalabimComponent, SalabimResource and SalabimEnvironment as well as distribution now feature __repr__, in order to print the contents of the object.
+Thus,e.g., print(q1) now print information of the contents of q1
+
+Now any environment may be reset to initial condition, with reset_env().
+The function salabim_reset is renamed into reset_env, which is equivalent to default_env.reset_env()
+Environments now have a (optionally serialized) name.
+
+In order to make the usage of the default environment, a number of functions have been changed into global variables:
+  default_env
+  main
+
+Please observe that these variables should *NEVER* be set by the user.
+Tracing of the default environment is still controlled via the trace function or the setter/getter default_env.trace.
+Also, now() and current_component() are still to be used to access now and current_component for the default_env.
+Alternatively, now, current_component and trace can be accessed directly via the setter/getter of any SalabimComponent.
+
+The function show() of a SalabimQueue has been renamed to print_statistics() and will no longer show the contents of a queue. In order to print the contents of a queue just use print(q).
+
+Introduced a parameter 'reason' for passivate(). A program can now check why a component is passive by means of the property passive_reason. If a component is not passive, passive_reason is None.
+
+Extensive support for animation with tkinter.
+
+Bugs fixed.
+
+
+version 0.9.11 2016-11-29
+=========================
+Bug in standby fixed.
+
+When the name of a component is derived from the class name, the name is now serialized, e.g.
+  s=Ship()
+  print(s.name)
+will print
+  Ship...............1
+
+
+version 0.9.10 2016-11-28
+=========================
+Overhaul of the way randomstreams are used with the Salabim distributions.
+Now, instead of a seed, all distibutions can be given a randomstream. If this parameter is omitted, the default randomstream called salabim_random will be used.
+This salabim_randomstream will be automatically started with a reproducable seed, i.e. -1.
+The user may reseed this distribution with salabim_random.seed(seed) or salabim_random.seed() for a system time dependent (not reproducable) stream.
+If the user does not want to use the salabim_random stream, all distributions may be called with something like randomstream=random.Random(11000) or randomstream=mystream.
+Please note that the randomstream salabim_random may be (and is recommended to be) used by the native Random sampling routines, like random, shuffle, gauss and sample.
+
+ 
+This version contains an extensive animation engine, that is not yet fully tested nor documented. This functionality will be soon available, along with several examples. The animation engine will be fully  available on CPython and Pythonista platforms with tkinter and PIL (Pillow) installed and and with limited functionality when PIL (Pillow) is not available like in PyPy.
+
+
+version 0.9.8  2016-11-13  
+=========================
+Introduced property base_name and sequence_number for components, queues and resources
+
+sorting_parameter renamed priority to be compatible with resource terminology.
+
+SalabimComponents, SalabimQueue and SalabimResource now have a seqence_number and a base_name attribute (property). The base_name is the string given at initialization time. Even for components, queues and resources whose base name does not end with a period, the sequence_number is available.
+When assigning a new name to a component, queue or resource, base_name and sequence_number will be set according to the new name.
+
+Bug fix for method release.
+
+version 0.9.7  2016-11-10  
+=========================
+The queue requests has been renamed to requesters.
+
+Properties that do not return a value, are now functions (again):
+  yield passivate  ==> yield passivate()
+  yield cancel     ==> yield cancel()
+  yield standby    ==> yield standby()
+  step             ==> step()
+  clear            ==> clear()
+  reset_statistics ==> reset_statistics()
+  run_stop         ==> run_stop()
+
+Please be sure to update older applications, particularly with respect to
+passivate and stop_run, as the old syntax is still valid Python code, but the
+functions calls without parenthesis will have no action!
+
+Added comments to resource functionality.
+
+
+version 0.9.6  2016-11-06
+=========================
+Specification of a pdf now allows the x value to be a pair in the form of a list or tuple.
+If so, uniform sampling between these will be used if 'selected'.
+Example
+d=Pdf((10,(5,10),80,(10,50),10,(50,100))
+In this case 10% will be 5-10, 80% between 10 and 50 and 10% from 50 to 100.
+There is not any restriction on the value pairs, so they may be overlapping or be completely separate. Also, scalars may be
+used in the same pdf specification. So the following is allowed, although not very likely to be useful:
+d=Pdf((10,0, 20,(-5,50), 30,(100,500), 1,2000)
+
+The method mean() is now available for all distributions.
+
+If no name is specified when initializing a SalabimComponent, the name is now derived from the
+class name (lowercased), e.g.
+  mycar=Car()
+makes car the name of mycar.
+
+Queue methods union, intersect and difference optimized for performance.
+
+Introduced support for resources requesting/releasing resources. The functionality is similar to resources and levels in SimPy and semaphores in Tomas.
+This is a concept, with which a component can claim a quantity from a resource. A component is able to request from more than one resource at a time ('and' clause).
+Once all the requested quantities are available, the program continues with the next statement.
+The requested quantities are then claimed.
+Anyone (but most of the time it will be the requesting component) can then release (part of) the claimed quantities.
+The resource can be also anonymous, which means that the claimed quantities are not connected to a component, but just treated as one heap. This is similar to levels in SimPy.
+*to be described in more detail*
+
+The following methods are now properties and are to be used without ():
+SalabimQueue
+  name *)
+  head
+  tail
+  pop
+  length
+  minimum_length
+  maximum_length
+  minimum length_of_stay
+  maximum_length_of_stay
+  number_passed
+  number_passed_direct
+  mean_length_of_stay
+  mean_length
+  clear
+  reset_statistics
+
+SalabimEnvironment
+  step
+  peek
+  main
+  now
+  trace *)
+  current_component
+
+SalabimComponent
+  passivate
+  cancel
+  standby
+  stop_run
+  granted_resources
+  request_failed
+  name *)
+  main
+  now
+  trace *)
+  creation_time
+  scheduled_time
+  current_component
+  status
+
+Distributions_from_string
+  mean
+  sample
+
+SalabimResource
+  requests
+  claimers
+  claimed_quantity
+  strict_order *)
+  name *)
+
+*) means that these are also setters, so for instance c.name='box'.
+
+Finally, the following functions, which are not part of a class still require ():
+  main()
+  now()
+  trace() or trace(val)
+  step()
+  peek()
+
+version 0.9.5  2016-10-27
+=========================
+It is now possible to use a default environment.
+In most cases there will be no need to use the concept of environments at all, which results in an
+easier to understand and read program.
+Therefore, upon startup, Salabim automatically creates an environment, which is available via
+default_env() if required.
+The default environment is an excellent placeholder for pseudo global variables.
+A new default environment (e.g. for a new run or experiment), can be set via salabim_reset(). Note that
+also the pseudo globals will be 'lost' then.
+
+For the (few) methods/properties that required an environment as parameter, the following alternatives
+are available:
+  env.run()                                run()
+  env.peek()                               peek()
+  env.step()                               step()
+  env.now()                                now()
+  env.main()                               main()
+Furthermore tracing control is implemented differently and may be set/retrieved now via
+  env.trace()                              trace()
+Both with SalabimEnvironent.__init__ as well as salabim_reset the trace parameter can be set (it is False
+by default).
+ 
+It is now possible to schedule a component from the initialization by including an action() method in
+the class for this component. If so, it will be auto started, optionally at a later moment, specified by the at, delay and urgent parameters as in activate.
+
+All properties have been removed to be more consistent (reversing the changes of one of the previous
+versions). Therefore, now all values to be retrieved, like q.length() and c.name() need a pair of parentheses.
+
+Retrieving and setting of the sorting_parameter of a component in a queue is now done with *one* function: sorting_parameter.
+
+The trace now also shows the name of the action generator, in case it's not action()?
+
+Distributions are now documented. Please observe that Table is renamed to Cdf and Discrete if renamed to Pdf.
+
+version 0.9.4  2016-10-25
+=========================
+The method components to iterate over all components in a queue now has an additional parameter
+  'removals_possible'.
+  If it is guaranteed that no components will leave the queue during the iteration, this parameter
+  may be set to False.
+  Also in that case, components that do not enter the queue *at the tail*, might be excluded
+  from the iteration. The result is a speed increase (particularly with large queues).
+
+Internal:
+Optimalisations for several queue methods, by using the result of the check for membership of a queue in
+subsequent actions.
+
+version 0.9.3  2016-10-24
+=========================
+The method stop_run has been added.
+
+version 0.9.2  2016-10-23
+=========================
+Major bug in the activate, hold, reactivate and reschedule fixed
+
+Now supports also older versions of Python, where NumPy does not feature nan and inf.
+
+Now Python 2.7 compatible (not fully tested yet).
+
+Optimized the method components, which is particularly useful if the queues is large. The method was O(n^2) and is now O(n).
+
+Beautified the trace output.
+
+
+version 0.9.0  2016-10-23
+=========================
+This version has a number of changes compared to previous versions.
+
+Salabim does not rely on SimPy anymore.
+
+The statuses now comply more with Must and Prosim than with Tomas, in order to achieve a more consistent interface.
+
+State transition diagram
+
+  
+from\to  |        data|   current|       scheduled|        passive|      standby|
+---------+------------+----------+----------------+---------------+-------------+		
+data     |      -     |  activate|        activate|              -|            -|
+         |            |        1)|                |               |             |
+---------+------------+----------+----------------+---------------+-------------+
+current  |  action end|         -|      yield hold|yield passivate|yield standby|
+         |yield cancel|          |yield reschedule|               |             |
+---------+------------+----------+----------------+---------------+-------------+
+scheduled|      cancel|next event|      reschedule|      passivate|            -|
+         |            |          |                |               |             |
+---------+------------+----------+----------------+---------------+-------------+
+passive  |      cancel|reactivate|      reactivate|              -|            -|
+         |            |        1)|      reschedule|               |             |
+---------+------------+----------+----------------+---------------+-------------+
+standby  |      cancel|next event|      reschedule|              -|            -|
+         |            |          |                |               |             |
+---------+------------+----------+----------------+---------------+-------------+
+1) via scheduled
+
+The method activate now has an optional parameter for the action. If omitted, action will be assumed. So if the action of the component
+description is just called action, then the component can be started with component.activate(), which is functionally the
+equivalent to component.activate(component.action()).
+
+The method hold now supports 'duration' as well as 'till' parameters (even both are permitted)
+activate, reactivate and reschedule now support 'at' as well 'delay' (even both are permitted)
+All transitions to current are via scheduled now.
+
+It is now possible to issue a new action in activate, reactivate and reschedule, even for the current component via reschedule. 
+
+The methods reactivate, activate, reschedule and hold now have an 'urgent' parameter, which, if True, will schedule
+this component before each component with the same scheduled time. When urgent=False (default), component are scheduled after all
+components with the same scheduled time.
+
+The method run now supports 'duration' as well as 'till' parameters (even both are permitted).
+
+The scheduled time is now accessible for all component via scheduled_time. If the component is data or passive, inf will be returned.
+The creation time is now available via creation_time.
+
+
+Many functions without parameters are now a property.
+
+New naming:
+    q.components (was q.iterate)
+    q.mean_length (was q.average_length)
+    q.mean_length_of_stay (was q.average_length_of_stay)
+    q.add_in_front_of (was q.add_before)
+    q.add_behind (was q.add_after)
+    c.enter_in_front_of (was c.enter_before)
+    c.enter_behind (was c.enter_after)
+
+Names for queues and components are serialized separately now, if the name end with a period.
+
+Introduced statistical distribution sampling.
+    Exponential
+    Normal
+    Uniform
+    Triangular
+    Constant
+    Table
+    Discrete
+    Distribution_from_string
+
+Note that these distributions are not yet fully documented.
+
+Improved trace functionality.
+
+
+All functions and classes are now fully documented in the source code. Use help(...) to obtain information.
