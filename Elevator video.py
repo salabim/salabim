@@ -1,5 +1,5 @@
 import salabim as sim
-from salabim import default_env as de
+import random
 
 class AnimateLED(sim.Animate):
     def __init__(self,x,y,floor,direction):
@@ -224,9 +224,9 @@ class  VisitorGenerator(sim.Component):
     
     def process(self):
         while True:
-            from_=sim.random.randint(self.from_[0],self.from_[1])
+            from_=random.randint(self.from_[0],self.from_[1])
             while True:
-                to=sim.random.randint(self.to[0],self.to[1])
+                to=random.randint(self.to[0],self.to[1])
                 if from_!=to:
                     break
 
@@ -242,7 +242,7 @@ class  VisitorGenerator(sim.Component):
                 yield self.passivate()
             else:
                 iat=3600/load
-                r=sim.random.uniform(0.5,1.5)
+                r=random.uniform(0.5,1.5)
                 yield self.hold(r*iat)
 
 
@@ -376,6 +376,8 @@ def direction_color(direction):
         return 'green'
     return 'yellow'
     
+de=sim.Environment(random_seed=1234567)
+
 up=1
 still=0
 down=-1

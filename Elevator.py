@@ -1,5 +1,4 @@
 import salabim as sim
-from salabim import default_env as de
 
 class  VisitorGenerator(sim.Component):
     def __init__(self,from_,to,id,*args,**kwargs):
@@ -148,6 +147,7 @@ def getdirection(fromfloor,tofloor):
         return -1
     return 0
     
+de=sim.Environment(random_seed=1234567)
 up=1
 still=0
 down=-1

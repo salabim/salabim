@@ -1,5 +1,4 @@
 import salabim as sim
-from salabim import default_env as de
 
 from math import sin,cos,pi,radians
 
@@ -16,6 +15,7 @@ class Philosopher(sim.Component):
             yield self.hold(eatingtime,mode='eating')
             self.release()   
             
+de=sim.Environment(random_seed=1234567)
 eatingtime_mean=20
 thinkingtime_mean=20
 nphilosophers=8

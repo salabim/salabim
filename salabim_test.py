@@ -1,5 +1,6 @@
 import salabim as sim
 import math
+import random
 
 def test1():
     print('test1')
@@ -639,23 +640,38 @@ def test17():
         bb.remove()
         sl.remove()        
     def actionb():
-        ba.remove()        
+        ba.remove()   
+        
+    de=sim.Environment()     
 
-    
     for x in range(10):
         for y in range(10):
             a=sim.Animate(rectangle0=(0,0,95,65),x0=5+x*100,y0=5+y*70,fillcolor0='blue',linewidth0=0)
     ba=sim.AnimateButton(x=100,y=700,text='A',action=actiona)
     bb=sim.AnimateButton(x=200,y=700,text='B',action=actionb)
-    sl=sim.AnimateSlider(x=300,y=700,width=300)
-    
-            
-    sim.default_env.animation_parameters(animate=True)
-    sim.run(10)
+    sl=sim.AnimateSlider(x=300,y=700,width=300)  
+    sim.Animate(text='Text',x0=700,y0=750,font='Times NEWRomian Italic',fontsize0=30)    
+    de.animation_parameters(animate=True)
+    sim.run(5)
     sim.animation_parameters(animate=False)
     sim.run(100)
     sim.animation_parameters(animate=True,background_color='yellow')
     sim.run(10)
     
+def test18():
+    for j in range(2):
+        print('---')
+        r=random.Random(-1)
+        r1=random.Random(-1)
+        d=sim.Exponential(3,r1)
+        sim.Environment(random_seed=-1)
+        for i in range(3):
+            print(sim.Exponential(3,r).sample)
+            print(sim.Exponential(3).sample)
+            print(d.sample)
+    
+def test19():
+    sim.show_fonts()    
+    
 if __name__ == '__main__':
-    test17()
+    test19()

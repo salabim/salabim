@@ -1,5 +1,4 @@
 import salabim as sim
-from salabim import default_env as de
 
 left=-1
 right=+1
@@ -238,6 +237,8 @@ class Lock(sim.Component):
             for ship in lockqueue:
                 ship.reactivate()
                 yield self.passivate('Wait for sail out')
+
+de=sim.Environment(random_seed=1234567)
 
 locklength=60
 switchtime=10

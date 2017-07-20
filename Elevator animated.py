@@ -1,5 +1,5 @@
 import salabim as sim
-from salabim import default_env as de
+import random
 
 class AnimateLED(sim.Animate):
     def __init__(self,x,y,floor,direction):
@@ -181,23 +181,29 @@ def do_animation():
                 
 def set_load_0_n(val):
     global load_0_n
-    load_0_n=float(val)   
+    load_0_n=float(val)
+    if vg_0_n.ispassive:
+        vg_0_n.reactivate()
 
 def set_load_n_n(val):
     global load_n_n
     load_n_n=float(val)
-        
+    if vg_n_n.ispassive:
+        vg_n_n.reactivate()
+                
 def set_load_n_0(val):
     global load_n_0
     load_n_0=float(val)   
-    
+    if vg_n_0.ispassive:
+        vg_n_0.reactivate()
+            
 def set_capacity(val):
     global capacity
     global capacity_last
     capacity=int(val)
     if capacity!=capacity_last:
         capacity_last=capacity
-        sim.main.stop_run()    
+        de.stop_run()    
         
 def set_ncars(val):
     global ncars
@@ -205,7 +211,7 @@ def set_ncars(val):
     ncars=int(val)
     if ncars!=ncars_last:
         ncars_last=ncars
-        sim.main.stop_run()    
+        de.stop_run()    
         
 def set_topfloor(val):
     global topfloor
@@ -213,7 +219,7 @@ def set_topfloor(val):
     topfloor=int(val)
     if topfloor!=topfloor_last:
         topfloor_last=topfloor
-        sim.main.stop_run()    
+        de.stop_run()    
         
 def direction_color(direction):
     if direction==1:
@@ -231,9 +237,9 @@ class  VisitorGenerator(sim.Component):
     
     def process(self):
         while True:
-            from_=sim.random.randint(self.from_[0],self.from_[1])
+            from_=random.randint(self.from_[0],self.from_[1])
             while True:
-                to=sim.random.randint(self.to[0],self.to[1])
+                to=random.randint(self.to[0],self.to[1])
                 if from_!=to:
                     break
 
@@ -241,7 +247,7 @@ class  VisitorGenerator(sim.Component):
             if self.id=='0_n':
                 load=load_0_n
             elif self.id=='n_0':
-                load=load_0_n
+                load=load_n_0
             else:
                 load=load_n_n                    
                 
@@ -249,7 +255,7 @@ class  VisitorGenerator(sim.Component):
                 yield self.passivate()
             else:
                 iat=3600/load
-                r=sim.random.uniform(0.5,1.5)
+                r=random.uniform(0.5,1.5)
                 yield self.hold(r*iat)
 
 
@@ -368,8 +374,7 @@ def getdirection(fromfloor,tofloor):
     if fromfloor.n>tofloor.n:
         return -1
     return 0
-        
-    
+
 up=1
 still=0
 down=-1
@@ -386,15 +391,16 @@ load_n_0=100
 capacity=4
 ncars=3
 topfloor=15
+sim.random_seed(1234567)
 
 while True:
-    de.reset()
-       
-    VisitorGenerator(
+    de=sim.Environment()
+        
+    vg_0_n=VisitorGenerator(
       from_=(0,0),to=(1,topfloor),id='0_n',name='vg_0_n')
-    VisitorGenerator(
+    vg_n_0=VisitorGenerator(
       from_=(1,topfloor),to=(0,0),id='n_0',name='vg_n_0')
-    VisitorGenerator(
+    vg_n_n=VisitorGenerator(
       from_=(1,topfloor),to=(1,topfloor),id= 'n_n',name='vg_n_n')
       
     requests={}
@@ -410,7 +416,8 @@ while True:
         
     do_animation()
 
-    sim.run()
+    de.run()
+
 
 
     

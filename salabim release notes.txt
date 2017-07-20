@@ -1,9 +1,53 @@
 Salabim release notes
 
+version 1.1.2
+=========================
+Under the hood restructuring of classes, thus enabling overriding.
+
+In order to support packaging (i.e make salabim a site_package), the simulation 
+environment is no longer automatically defined.
+It is now necessary to make an environment in the application, by:
+    Environment()
+The Environment class has now an extra argument, is_default_env, which is True by 
+default.
+Also, the global variable random has been phased out. Instead, salabim uses now
+the random class directly in all statistical sampling functions.
+It is possible to set the seed of the random stream by means of
+- random_seed()
+- random.seed(), provided random is imported
+- Environment(random_seed=...)
+The standard random stream is now used in all distribution definitions, unless 
+a randomstream is explicitly specified.
+
+Other than in previous versions, reproducibility is only available if 
+a random seed value is specified, usually when defining an Environment.
+
+All sample programs are defined in such a way that they give reproducible results.
+
+main is not longer a global variable. You can use either the main
+property in Component or Environment classes or just main() from the
+salabim module, e.g. with sim.main()
+
+The default environment can be queried with the function default_env(),
+e.g. de=sim.default_env().
+
+All sample filea are updated according to the new interface.
+
+Font handling has been improved. It is now allowed to specify a font by the
+file name or the descriptor, e.g.
+'timesi' or 'Times New Roman Italic'.
+The case is not important any more.
+The function show_fonts() can be used to retrieve all currently available
+font names (on this machine).
+
+The salabim_install script now installs salabim in a more Pythonic way
+in the site-packages folder.
+
+Bug in slider function under Pythonista fixed.
+
 version 1.1.1  2017-07-08
 =========================
 Bug in video production fixed.
-
 Minor changes in the sample programs.
 
 version 1.1.0  2017-07-08

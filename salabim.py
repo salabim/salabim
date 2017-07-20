@@ -7,7 +7,7 @@ Copyright (c) 2017 Ruud van der Ham, Upward Systems
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
+theSoftwarewithout restriction, including without limitation the rights to
 use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
 the Software, and to permit persons to whom the Software is furnished to do so,
 subject to the following conditions:
@@ -22,7 +22,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-www.salabim.org
+see www.salabim.org for more information, the manual and updates.
 '''
 
 from __future__ import print_function # compatibility with Python 2.x
@@ -31,13 +31,16 @@ from __future__ import division # compatibility with Python 2.x
 import platform
 Pythonista=(platform.system()=='Darwin')
 
-
 import heapq
 import random
 import time
 import math
 import copy
 import collections
+import itertools
+import functools
+import glob
+import os
 
 try:
     import numpy
@@ -58,6 +61,7 @@ if Pythonista:
     import scene
     import sys
     import ui
+    import objc_util
 else:
     import tkinter
     from PIL import ImageTk    
@@ -68,7 +72,7 @@ except:
     inf=float('inf')
     nan=float('nan')
 
-__version__='1.1.1'
+__version__='1.1.2'
 
 data='data'
 current='current'
@@ -87,15 +91,16 @@ if Pythonista:
         
     class MyScene(scene.Scene):
         ''' internal class for Pythonista animation '''
+
         def __init__(self,*args,**kwargs):
             scene.Scene.__init__(self,*args,**kwargs)
-            An.scene=self
+            MyScene.this_scene=self
 
         def setup(self):
             pass
         
         def touch_ended(self,touch):
-            for uio in An.env.ui_objects:            
+            for uio in an_env.ui_objects:            
                 if uio.type=='button':
                     if touch.location in \
                       scene.Rect(uio.x-2,uio.y-2,uio.width+2,uio.height+2):
@@ -105,54 +110,55 @@ if Pythonista:
                       scene.Rect(uio.x-2,uio.y-2,uio.width+4,uio.height+4):
                         xsel=touch.location[0]-uio.x
                         uio._v=uio.vmin+round(-0.5+xsel/uio.xdelta)*uio.resolution
+                        uio._v=max(min(uio._v,uio.vmax),uio.vmin)
                         if uio.action!=None:
                             uio.action(uio._v)                        
                                   
         def draw(self):   
             
-            if An.env!=None:
-                scene.background(pythonistacolor(colorspec_to_tuple(An.background_color)))
-                if An.paused:
-                    An.t = An.start_animation_time
+            if an_env!=None:
+                scene.background(pythonistacolor(colorspec_to_tuple(an_env.background_color)))
+                if an_env.paused:
+                    an_env.t = an_env.start_animation_time
                 else:
-                    An.t = \
-                      An.start_animation_time+\
+                    an_env.t = \
+                      an_env.start_animation_time+\
                       ((time.time()-\
-                      An.start_animation_clocktime)*An.env.speed)                
+                      an_env.start_animation_clocktime)*an_env.speed)                
 
-                while An.env.peek<An.t:
-                    An.env.step()
-                    if An.env._current_component==An.env._main:
-                        An.env.print_trace(\
-                          '%10.3f' % An.env._now,\
-                          An.env._main._name,'current')                            
-                        An.env._main._scheduled_time=inf
-                        An.env._main._status=current
-                        An.env.an_quit()
+                while an_env.peek<an_env.t:
+                    an_env.step()
+                    if an_env._current_component==an_env._main:
+                        an_env.print_trace(\
+                          '{:10.3f}'.format(an_env._now),\
+                          an_env._main._name,'current')                            
+                        an_env._main._scheduled_time=inf
+                        an_env._main._status=current
+                        an_env.an_quit()
                         return
 
-                if not An.paused:
-                    An.frametimes.append(time.time())
+                if not an_env.paused:
+                    an_env.frametimes.append(time.time())
                     
-                An.env.an_objects.sort\
-                  (key=lambda obj:(-obj.layer(An.t),obj.sequence))
+                an_env.an_objects.sort\
+                  (key=lambda obj:(-obj.layer(an_env.t),obj.sequence))
                 touchvalues=self.touches.values()
                 
                 capture_image=Image.new('RGB',
-                  (An.width,An.height),colorspec_to_tuple(An.background_color))
+                  (an_env.width,an_env.height),colorspec_to_tuple(an_env.background_color))
                                 
-                for ao in An.env.an_objects:
-                    ao.make_pil_image(An.t)
+                for ao in an_env.an_objects:
+                    ao.make_pil_image(an_env.t)
                     if ao._image_visible:
                         capture_image.paste(ao._image,
                           (int(ao._image_x),
-                          int(An.height-ao._image_y-ao._image.size[1])),
+                          int(an_env.height-ao._image_y-ao._image.size[1])),
                           ao._image)
                               
                 ims=scene.load_pil_image(capture_image)
                 scene.image(ims,0,0,*capture_image.size)                
                    
-                for uio in An.env.ui_objects:
+                for uio in an_env.ui_objects:
                                                                           
                     if uio.type=='button':
                         linewidth=uio.linewidth
@@ -250,12 +256,12 @@ class Queue(object):
         if omitted, the name queue (serialized)
     env : Environment
         environment where the queue is defined |n|
-        if omitted, default_env will be used
+        if omitted, _default_env will be used
     '''
    
     def __init__(self,name=None,env=None):
         if env is None:
-            self.env=default_env
+            self.env=_default_env
         else:
             self.env = env
         if name is None:
@@ -924,27 +930,33 @@ def run(*args,**kwargs):
     '''
     run for the default environment
     '''
-
-    default_env.run(*args,**kwargs)
+    _default_env.run(*args,**kwargs)
     
 def animation_parameters(*args,**kwargs):
     '''
     animation_parameters for the default environment
     '''
 
-    default_env.animation_parameters(*args,**kwargs)
+    _default_env.animation_parameters(*args,**kwargs)
+    
+def stop_run(*args,**kwargs):
+    '''
+    stop_run for the default environment
+    '''
+
+    _default_env.stop_run(*args,**kwargs)
     
 def step():
     '''
     step for the default environment
     '''
-    default_env.step
+    _default_env.step
     
 def peek():
     '''
     peek for the default environment
     '''
-    return default_env.peek
+    return _default_env.peek
     
 def _check_fail(c):
     if len(c._requests)!=0:
@@ -962,8 +974,8 @@ def _check_fail(c):
 def finish():
     raise SalabimException('Stopped by user')    
     if Pythonista:
-        if An.scene!=None:
-            An.scene.view.close()
+        if MyScene.this_scene!=None:
+            MyScene.this_scene.view.close()
               
 class Environment(object): 
     '''
@@ -975,6 +987,10 @@ class Environment(object):
         defines whether to trace or not |n|
         if omitted, False
         
+    random_seed : int
+        the seed for random, equivalent to random.seed() |n|
+        of omitted, the no action on random is taken
+        
     name : str
         name of the environment |n|.
         if the name ends with a period (.), 
@@ -983,55 +999,34 @@ class Environment(object):
 
     The trace may be switched on/off later with trace     
     '''
-        
+    global an_env
+    
     _name_serialize={}
+    an_env=None
           
-    def __init__(self,trace=False,name=None): 
+    def __init__(self,trace=False,random_seed=None,name=None,is__default_env=True): 
+        global _default_env
+        if is__default_env:
+            _default_env=self
         if name is None:
-            name='environment.'
+            if is__default_env:
+                name='Default environment'
+            else:
+                name='environment.'
+        self._trace=trace
+        if random_seed is not None:
+            random.seed(random_seed)
         self._name,self._base_name,self._sequence_number=\
           _reformatname(name,Environment._name_serialize)
         self.env=self 
         self._nameserializeComponent={} # just to allow main to be created; will be reset later
-        self._now=0 #just to allow main to be created; will be reset later    
+        self._now=0 
         self._main=Component(name='main',env=self)
         self._main._status=current
         self._current_component=self._main
         self.ui_objects=[]
-        self.reset(trace)
-        self.print_trace('%10.3f' % self._now,'main','current')   
-
-                               
-    def serialize(self):
-        self.serial+=1
-        return self.serial
-
-
-    def __repr__(self):
-        lines=[]
-        lines.append('Environment '+hex(id(self)))
-        lines.append('  name='+self._name+(' (animation environment)' if self==An.env else ''))
-        lines.append('  now='+time_to_string(self._now))
-        lines.append('  current_component='+self._current_component._name)
-        lines.append('  trace='+str(self._trace))      
-        return '\n'.join(lines)
-        
-        
-    def reset(self,trace=False):
-        '''
-        resets the enviroment
-        
-        Parameters
-        ----------
-        trace : bool
-            defines whether to trace or not |n|
-            if omitted, False
-                                                
-        The trace may be switched on/off later with trace
-        '''
-        self._main._checkcurrent()
-        self._trace=trace
-        self._now=0
+        self.print_trace('{:10.3f}'.format(self._now),'main','current')   
+        self.font_cache={}
         self._nameserializeQueue={}
         self._nameserializeComponent={}
         self._nameserializeResource={}
@@ -1040,10 +1035,6 @@ class Environment(object):
         self._standbylist=[]
         self._pendingstandbylist=[]
         
-        if An.env==self:
-            for uio in self.ui_objects[:]:
-               uio.remove()
-
         self.an_objects=[]
         self.ui_objects=[]
         self.serial=0
@@ -1067,9 +1058,20 @@ class Environment(object):
         self.show_speed=True
         self.show_time=True
         self.video=''
+                                       
+    def serialize(self):
+        self.serial+=1
+        return self.serial
 
-        return self
-
+    def __repr__(self):
+        lines=[]
+        lines.append('Environment '+hex(id(self)))
+        lines.append('  name='+self._name+(' (animation environment)' if self==an_env else ''))
+        lines.append('  now='+time_to_string(self._now))
+        lines.append('  current_component='+self._current_component._name)
+        lines.append('  trace='+str(self._trace))      
+        return '\n'.join(lines)        
+        
     def step(self):
         '''
         executes the next step of the future event list
@@ -1082,13 +1084,13 @@ class Environment(object):
                 c._status=current
                 c._scheduled_time=inf
                 self.env._current_component=c
-                self.print_trace('%10.3f' % self._now,c._name,\
+                self.print_trace('{:10.3f}'.format(self._now),c._name,\
                   'current (standby) @ '+_atprocess(c._process))  
                 try:
                     next(c._process)
                     return
                 except StopIteration:
-                    self.print_trace('%10.3f' % self._now,c._name,'ended')
+                    self.print_trace('{:10.3f}'.format(self._now),c._name,'ended')
                     c._status=data 
                     c._scheduled_time=inf
                     c._process=None
@@ -1106,67 +1108,18 @@ class Environment(object):
                 return
                    
             c._status=current
-            self.print_trace('%10.3f' % self._now,c._name,\
+            self.print_trace('{:10.3f}'.format(self._now),c._name,\
               'current'+_atprocess(c._process)) 
             _check_fail(c)
             c._scheduled_time=inf
             next(c._process)
             return
         except StopIteration:
-            self.print_trace('%10.3f' % self._now,c._name,'ended')
+            self.print_trace('{:10.3f}'.format(self._now),c._name,'ended')
             c._status=data
             c._scheduled_time=inf
             c._process=None
             return
-        
-    @property
-    def peek(self):
-        '''
-        returns the time of the next component to become current
-        
-        if there are no more events, peek will return inf
-        
-        for advance use with animation / GUI event loops
-        '''
-        if len(self.env._pendingstandbylist)>0:
-            return self.env._now
-        else:
-            if len(self.env._event_list)==0:
-                return inf
-            else:
-                return self.env._event_list[0][0]
-            
-    @property
-    def main(self):
-        '''
-        returns the main component
-        '''
-        return self._main
-        
-    @property
-    def now(self):
-        '''
-        returns the current simulation time
-        '''   
-        return self._now 
-            
-    @property
-    def trace(self,value=None):
-        '''
-        gets or sets trace
-        '''
-        return self._trace
-        
-    @trace.setter
-    def trace(self,value):
-        self._trace=value
-        
-    @property
-    def current_component(self):
-        '''
-        returns the current_component
-        '''
-        return self._current_component
         
     def animation_parameters(self,
       animate=None,speed=None,width=None,height=None,
@@ -1253,8 +1206,8 @@ class Environment(object):
         
         if speed!=None:
             self.speed=speed
-            if An.env==self:
-                An.set_start_animation()
+            if an_env==self:
+                an_env.set_start_animation()
                         
         if show_fps!=None:
             self.show_fps=show_fps
@@ -1287,6 +1240,70 @@ class Environment(object):
             self.use_toplevel=use_toplevel
         if video!=None:
             self.video=video
+            
+    @property
+    def peek(self):
+        '''
+        returns the time of the next component to become current
+        
+        if there are no more events, peek will return inf
+        
+        for advance use with animation / GUI event loops
+        '''
+        if len(self.env._pendingstandbylist)>0:
+            return self.env._now
+        else:
+            if len(self.env._event_list)==0:
+                return inf
+            else:
+                return self.env._event_list[0][0]
+            
+    def stop_run(self):
+        '''
+        stops the simulation and gives control to the main program, at the next event
+        '''
+        scheduled_time=self._now
+        self.print_trace('','','stop_run',
+          'scheduled for={:10.3f}'.format(scheduled_time))
+
+        if self._main._scheduled_time!=inf: # just to be sure
+            self._main._remove()
+        self._main._scheduled_time=scheduled_time
+        self._main._push(scheduled_time,urgent=True)
+        self._main._status=scheduled
+        
+    @property
+    def main(self):
+        '''
+        returns the main component
+        '''
+        return self._main
+        
+    @property
+    def now(self):
+        '''
+        returns the current simulation time
+        '''   
+        return self._now 
+            
+    @property
+    def trace(self,value=None):
+        '''
+        gets or sets trace
+        '''
+        return self._trace
+        
+    @trace.setter
+    def trace(self,value):
+        self._trace=value
+        
+    @property
+    def current_component(self):
+        '''
+        returns the current_component
+        '''
+        return self._current_component
+        
 
     def run(self,duration=None,till=None):
         '''
@@ -1304,7 +1321,7 @@ class Environment(object):
           
         only issue run from the main level
         '''
-
+        global an_env
         if till is None:
             if duration is None:
                 scheduled_time=inf
@@ -1320,14 +1337,15 @@ class Environment(object):
                 raise AssertionError('both duration and till specified')
                 
         if scheduled_time<self.env._now:
-            raise AssertionError(\
-              'scheduled time (%0.3f) before now'%scheduled_time)                           
+            raise AssertionError(
+              'scheduled time ({:0.3f}) before now ({:0.3f})'.
+              format(scheduled_time,self.env._now))                           
                 
         if scheduled_time==inf:
             self.print_trace('','','main','scheduled for        inf') 
         else:
-            self.print_trace('','','main',\
-              'scheduled for %10.3f'%scheduled_time) 
+            self.print_trace('','','main',
+              'scheduled for {:10.3f}'.format(scheduled_time)) 
                         
         self._main._status=scheduled
         self._scheduled_time=scheduled_time
@@ -1337,105 +1355,65 @@ class Environment(object):
             if not pil_installed:
                 raise AssertionError('PIL is required for animation')
 
-            An.font_cache={}
-            An.t=self.env._now # for the call to set_start_animation
-            An.set_start_animation()
-            An.stopped=False
-            An.running=True
-            An.paused=False
-            An.background_color=self.background_color
-            An.width=self.width
-            An.height=self.height
-            An.x0=self.x0
-            An.x1=self.x1
-            An.y0=self.y0
-            An.scale=An.width/(An.x1-An.x0)            
-            An.env=self
+            self.t=self._now # for the call to set_start_animation
+            self.set_start_animation()
+            self.stopped=False
+            self.running=True
+            self.paused=False
+            self.scale=self.width/(self.x1-self.x0)            
+            an_env=self
                          
             if Pythonista:
-                if An.scene==None:
+                try:
                     scene.run\
                       (MyScene(), frame_interval=60/self.fps,
                       show_fps=False)
-                    # this also assigns an_scene
+                except:
+                    pass
             else:         
                 if self.use_toplevel:
-                    An.root = tkinter.Toplevel()
+                    self.root = tkinter.Toplevel()
                 else:
-                    An.root = tkinter.Tk()
-                An.canvas = \
-                  tkinter.Canvas(An.root, width=An.width,height = An.height)
-                An.canvas.configure\
+                    self.root = tkinter.Tk()
+                self.canvas = \
+                  tkinter.Canvas(self.root, width=self.width,height = self.height)
+                self.canvas.configure\
                   (background=colorspec_to_hex(self.background_color,False))
-                An.canvas.pack()
-                An.canvas_objects=[]
+                self.canvas.pack()
+                self.canvas_objects=[]
 
             for uio in self.ui_objects:
                 if not Pythonista:
                     uio.install()
 
-            An.system_an_objects=[]
-            An.system_ui_objects=[]
-            if self.modelname!='':
-                ao=Animate(text=self.modelname,
-                    x0=8,y0=self.height-60,
-                    anchor='w',fontsize0=30,textcolor0='black',
-                    screen_coordinates=True,env=self )
-                An.system_an_objects.append(ao)
-                ao=Animate(text='a salabim model',
-                    x0=8,y0=self.height-78,
-                    anchor='w',fontsize0=16,textcolor0='red',screen_coordinates=True,env=self)
-                An.system_an_objects.append(ao)                    
-    
-            uio=AnimateButton\
-              (x=48,y=self.height-21,text='Stop',\
-               action=self.env.an_stop,env=self)
-            An.system_ui_objects.append(uio)
-            uio=AnimateButton\
-              (x=48+1*90,y=self.height-21,text='Anim/2',\
-              action=self.env.an_half,env=self) 
-            An.system_ui_objects.append(uio)
-            uio=AnimateButton\
-              (x=48+2*90,y=self.height-21,text='Anim*2',\
-              action=self.env.an_double,env=self)
-            An.system_ui_objects.append(uio)
-            uio=AnimateButton\
-              (x=48+3*90,y=self.height-21,text='',\
-              action=self.env.an_pause,env=self)
-            An.system_ui_objects.append(uio)
-            uio.text=lambda :pausetext()
-            uio=AnimateButton\
-              (x=48+4*90,y=self.height-21,text='',\
-              action=self.env.an_trace,env=self)                                                                                  
-            An.system_ui_objects.append(uio)
-            uio.text=tracetext
-            ao=Animate\
-              (x0=An.width,y0=An.height-5,fillcolor0='black',\
-                text='',fontsize0=15,font='DejaVuSansMono',anchor='ne',\
-                screen_coordinates=True,env=self)
-            An.system_an_objects.append(ao)                    
-            ao.text=clocktext
+            self.system_an_objects=[]
+            self.system_ui_objects=[]
+            
+            self.an_system_modelname()
+            self.an_system_buttons()
+            self.an_system_clocktext()
+            
             if self.video=='':
-                An.dovideo=False
+                self.dovideo=False
             else:
-                An.dovideo=True
+                self.dovideo=True
                 if not numpy_and_cv2_installed:
                     raise AssertionError('numpy and cv2 required for video production')
                                 
-            if An.dovideo:
-                An.video_sequence=0
+            if self.dovideo:
+                self.video_sequence=0
                 fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-                An.out = cv2.VideoWriter(self.video,fourcc, self.fps, (An.width,An.height)) 
+                self.out = cv2.VideoWriter(self.video,fourcc, self.fps, (self.width,self.height)) 
 
             if Pythonista:
-                while An.running:
+                while self.running:
                     pass
             else:
-                An.root.after(0,self.simulate_and_animate_loop)
-                An.root.mainloop()
-                if An.dovideo:
-                    An.out.release()
-            if An.stopped:
+                self.root.after(0,self.simulate_and_animate_loop)
+                self.root.mainloop()
+                if self.dovideo:
+                    self.out.release()
+            if self.stopped:
                 finish()
         else:
             self.simulate_loop()
@@ -1445,89 +1423,89 @@ class Environment(object):
             self.env.step()
             if self.env._current_component==self._main:
                 self.print_trace\
-                  ('%10.3f' % self._now,self._main._name,'current')                            
+                  ('{:10.3f}'.format(self._now),self._main._name,'current')                            
                 self._scheduled_time=inf
                 self._status=current
                 return
                 
     def simulate_and_animate_loop(self):
-        An.running=True
+        self.running=True
         
-        while An.running:
+        while self.running:
             tick_start=time.time()
-            if An.dovideo:
-                An.t=An.start_animation_time+An.video_sequence*self.speed/self.fps
+            if self.dovideo:
+                self.t=self.start_animation_time+self.video_sequence*self.speed/self.fps
             else:
-                if An.paused:
-                    An.t=An.start_animation_time
+                if self.paused:
+                    self.t=self.start_animation_time
                 else:
-                    An.t=An.start_animation_time+\
-                      ((time.time()-An.start_animation_clocktime)*\
+                    self.t=self.start_animation_time+\
+                      ((time.time()-self.start_animation_clocktime)*\
                       self.speed)
 
-            while self.peek<An.t:
+            while self.peek<self.t:
                 self.step()
                 if self._current_component==self._main:
-                    self.print_trace('%10.3f' % self._now,\
+                    self.print_trace('{:10.3f}'.format(self._now),
                       self._main._name,'current')                            
                     self._scheduled_time=inf
                     self._status=current
-                    An.running=False
+                    self.running=False
                     self.an_quit()
                     return
-            if not An.running:
+            if not self.running:
                 break
             
-            if An.dovideo:
-                capture_image=Image.new('RGB',(An.width,An.height),colorspec_to_tuple(An.background_color))
+            if self.dovideo:
+                capture_image=Image.new('RGB',(self.width,self.height),colorspec_to_tuple(self.background_color))
                 
-            if not An.paused:
-                An.frametimes.append(time.time())
+            if not self.paused:
+                self.frametimes.append(time.time())
 
             self.an_objects.sort\
-              (key=lambda obj:(-obj.layer(An.t),obj.sequence))
+              (key=lambda obj:(-obj.layer(self.t),obj.sequence))
               
-            canvas_objects_iter=iter(An.canvas_objects[:])
+            canvas_objects_iter=iter(self.canvas_objects[:])
             co=next(canvas_objects_iter,None)
             
             for ao in self.an_objects:
 
-                ao.make_pil_image(An.t)
+                ao.make_pil_image(self.t)
                 if ao._image_visible:
                     if co==None:
                         ao.im = ImageTk.PhotoImage(ao._image)
-                        co1=An.canvas.create_image(
+                        co1=self.canvas.create_image(
                           ao._image_x,self.height-ao._image_y,image=ao.im,anchor=tkinter.SW)
-                        An.canvas_objects.append(co1)
+                        self.canvas_objects.append(co1)
                         ao.canvas_object=co1
 
                     else:
                         if ao.canvas_object==co:
                             if ao._image_ident!=ao._image_ident_prev:
                                 ao.im = ImageTk.PhotoImage(ao._image)
-                                An.canvas.itemconfig(ao.canvas_object,image=ao.im)    
+                                self.canvas.itemconfig(ao.canvas_object,image=ao.im)    
                                           
                             if (ao._image_x!=ao._image_x_prev) or (ao._image_y!=ao._image_y_prev):
-                                An.canvas.coords(ao.canvas_object,(ao._image_x,self.height-ao._image_y))                                            
+                                self.canvas.coords(ao.canvas_object,(ao._image_x,self.height-ao._image_y))                                            
 
                         else:
                             ao.im = ImageTk.PhotoImage(ao._image)
                             ao.canvas_object=co
-                            An.canvas.itemconfig(ao.canvas_object,image=ao.im)    
-                            An.canvas.coords(ao.canvas_object,(ao._image_x,An.height-ao._image_y))
+                            self.canvas.itemconfig(ao.canvas_object,image=ao.im)    
+                            self.canvas.coords(ao.canvas_object,(ao._image_x,self.height-ao._image_y))
                     co=next(canvas_objects_iter,None)
                     
-                    if An.dovideo:
+                    if self.dovideo:
                         capture_image.paste(ao._image,
                           (int(ao._image_x),
-                          int(An.height-ao._image_y-ao._image.size[1])),
+                          int(self.height-ao._image_y-ao._image.size[1])),
                           ao._image)
                 else:
                     ao.canvas_object=None
                                                     
             for co in canvas_objects_iter:
-                An.canvas.delete(co)
-                An.canvas_objects.remove(co)
+                self.canvas.delete(co)
+                self.canvas_objects.remove(co)
                     
             for uio in self.ui_objects:
                 if not uio.installed:
@@ -1540,26 +1518,87 @@ class Environment(object):
                         uio.lasttext=thistext
                         uio.button.config(text=thistext)       
 
-            if An.dovideo:
+            if self.dovideo:
                 open_cv_image = numpy.array(capture_image) 
                    # Convert RGB to BGR 
                 open_cv_image = open_cv_image[:, :, ::-1].copy() 
                 open_cv_image=cv2.cvtColor(numpy.array(capture_image), cv2.COLOR_RGB2BGR)
-                An.out.write(open_cv_image)
-                An.video_sequence += 1
+                self.out.write(open_cv_image)
+                self.video_sequence += 1
                 
-            An.canvas.update()
-            if not An.dovideo:
+            self.canvas.update()
+            if not self.dovideo:
                 tick_duration=time.time()-tick_start  
                 if tick_duration<1/self.fps:
                     time.sleep((1/self.fps)-tick_duration)
 
-    def an_quit(self):
-        An.running=False
+    def an_system_modelname(self):
+        '''
+        function to show the modelname |n|
+        called by run(), if animation is True. |n|
+        may be overridden to change the standard behaviour.
+        '''
+        if self.modelname!='':
+            ao=Animate(text=self.modelname,
+              x0=8,y0=self.height-60,
+              anchor='w',fontsize0=30,textcolor0='black',
+              screen_coordinates=True,env=self )
+            self.system_an_objects.append(ao)
+            ao=Animate(text='a salabim model',
+              x0=8,y0=self.height-78,
+              anchor='w',fontsize0=16,textcolor0='red',
+              screen_coordinates=True,env=self)
+            self.system_an_objects.append(ao)                    
 
-        for ao in An.system_an_objects:
+    def an_system_buttons(self):
+        '''
+        function to initialize the system animation buttons |n|
+        called by run(), if animation is True. |n|
+        may be overridden to change the standard behaviour.
+        '''
+        uio=AnimateButton\
+          (x=48,y=self.height-21,text='Stop',\
+           action=self.env.an_stop,env=self)
+        self.system_ui_objects.append(uio)
+        uio=AnimateButton\
+          (x=48+1*90,y=self.height-21,text='Anim/2',\
+          action=self.env.an_half,env=self) 
+        self.system_ui_objects.append(uio)
+        uio=AnimateButton\
+          (x=48+2*90,y=self.height-21,text='Anim*2',\
+          action=self.env.an_double,env=self)
+        self.system_ui_objects.append(uio)
+        uio=AnimateButton\
+          (x=48+3*90,y=self.height-21,text='',\
+          action=self.env.an_pause,env=self)
+        self.system_ui_objects.append(uio)
+        uio.text=lambda :pausetext()
+        uio=AnimateButton\
+          (x=48+4*90,y=self.height-21,text='',\
+          action=self.env.an_trace,env=self)                                                                                  
+        self.system_ui_objects.append(uio)
+        uio.text=tracetext
+        
+    def an_system_clocktext(self):
+        '''
+        function to initialize the system clocktext |n|
+        called by run(), if animation is True. |n|
+        may be overridden to change the standard behaviour.
+        '''
+        ao=Animate\
+          (x0=self.width,y0=self.height-5,fillcolor0='black',\
+            text='',fontsize0=15,font='DejaVuSansMono',anchor='ne',\
+            screen_coordinates=True,env=self)
+        self.system_an_objects.append(ao)  
+        ao.text=clocktext
+            
+    def an_quit(self):
+        global an_env
+        self.running=False
+
+        for ao in self.system_an_objects:
             ao.remove()
-        for uio in An.system_ui_objects:
+        for uio in self.system_ui_objects:
             uio.remove()
 
         for uio in self.ui_objects:
@@ -1568,35 +1607,99 @@ class Environment(object):
             uio.installed=False
                 
         if not Pythonista:
-            An.root.destroy()
-        An.env=None
+            self.root.destroy()          
+        an_env=None
 
     def an_half(self):
-        if An.paused:
-            An.paused=False
+        if self.paused:
+            self.paused=False
         else:
             self.speed /=2
-            An.set_start_animation() 
+            self.set_start_animation() 
 
     def an_double(self):
-        if An.paused:
-            An.paused=False
+        if self.paused:
+            self.paused=False
         else:
             self.speed *=2
-            An.set_start_animation()            
+            self.set_start_animation()            
     
     def an_pause(self):
-        An.paused=not An.paused
-        An.set_start_animation()        
+        self.paused=not self.paused
+        self.set_start_animation()        
          
     def an_stop(self):
         self.an_quit()
-        An.stopped=True
+        self.stopped=True
                 
     def an_trace(self):
         self._trace=not self._trace  
-
         
+    def set_start_animation(self):
+        self.frametimes=collections.deque(maxlen=30)
+        self.start_animation_time=self.t
+        self.start_animation_clocktime=time.time()
+
+    @functools.lru_cache()
+    def fonts(self):
+        return _fonts()
+        
+    @functools.lru_cache()
+    def getfont(self,fontname,fontsize): # fontsize in screen_coordinates!
+        '''
+        internal funtion to get and cache fonts
+        '''
+        if isinstance(fontname,str):
+            fontlist=(fontname,)
+        else:
+            fontlist=fontname
+
+        font=None
+        for ifont in itertools.chain(fontlist,('calibri', 'arial')):
+            try:
+                font=ImageFont.truetype(font=ifont,size=int(fontsize))
+                break
+            except:
+                pass
+            ifont=self.fonts().get(upperalpha(ifont))
+            if ifont!=None:
+                try:
+                    font=ImageFont.truetype(font=ifont,size=int(fontsize))
+                    break
+                except:
+                    pass
+  
+        if font==None:
+            raise AssertionError('no matching fonts found for ',fontname)
+        return font
+        
+    def getwidth(self,text,font='',fontsize=20,screen_coordinates=False):
+        if not screen_coordinates:
+            fontsize=fontsize*self.scale
+        f=self.getfont(font,fontsize)
+        thiswidth,thisheight=f.getsize(text)
+        if screen_coordinates:
+            return thiswidth
+        else:
+            return thiswidth/self.scale
+
+    def getfontsize_to_fit(self,text,width,font='',screen_coordinates=False):
+        if not screen_coordinates:
+            width=width*self.scale
+
+        lastwidth=0    
+        for fontsize in range(1,300):
+            f=self.getfont(font,fontsize)
+            thiswidth,thisheight=f.getsize(text)
+            if thiswidth>width:
+                break
+            lastwidth=thiswidth
+        fontsize=interpolate(width,lastwidth,thiswidth,fontsize-1,fontsize)
+        if screen_coordinates:
+            return fontsize
+        else:
+            return fontsize/self.scale  
+                  
     @property
     def name(self):
         '''
@@ -1640,15 +1743,7 @@ class Environment(object):
         if self._trace:
              if not self._current_component._suppress_trace:
                  print(pad(s1,10)+' '+pad(s2,20)+' '+pad(s3,35)+' '+s4)    
-class An():
-    env=None
-    scene=None
     
-    def set_start_animation():
-        An.frametimes=collections.deque(maxlen=30)
-        An.start_animation_time=An.t
-        An.start_animation_clocktime=time.time()
-
 class Animate(object):
     '''
     defines an animation object
@@ -1851,6 +1946,96 @@ class Animate(object):
     ======================  ========= ========= ========= ========= ========= ========= 
     '''
 
+    def __init__(self,parent=None,layer=0,keep=True,visible=True,
+            screen_coordinates=False,
+            t0=None,x0=0,y0=0,offsetx0=0,offsety0=0,
+            circle0=None,line0=None,polygon0=None,rectangle0=None,
+            image=None,text=None,
+            font='',anchor='center',
+            linewidth0=1,fillcolor0='black',linecolor0='black',textcolor0='black',
+            angle0=0,fontsize0=20,width0=None,
+            t1=None,x1=None,y1=None,offsetx1=None,offsety1=None,
+            circle1=None,line1=None,polygon1=None,rectangle1=None,
+            linewidth1=None,fillcolor1=None,linecolor1=None,textcolor1=None,
+            angle1=None,fontsize1=None,width1=None,env=None):
+                    
+        self.env=_default_env if env==None else env
+        self._image_ident=None # denotes no image yet
+        self._image=None
+        self._image_x=0
+        self._image_y=0
+        self.canvas_object=None
+        
+        self.type=self.settype(circle0,line0,polygon0,rectangle0,image,text)
+        if self.type=='':
+            raise AssertionError('no object specified')
+        type1=self.settype(circle1,line1,polygon1,rectangle1,None,None)
+        if (type1!='') and (type1!=self.type):
+            raise AssertionError('incompatible types: '+self.type+' and '+ type1)
+            
+        self.layer0=layer
+        self.parent=parent
+        self.keep=keep
+        self.visible0=visible
+        self.screen_coordinates=screen_coordinates
+        self.sequence=self.env.serialize()
+
+        self.circle0=circle0
+        self.line0=line0
+        self.polygon0=polygon0
+        self.rectangle0=rectangle0            
+        self.text0=text
+        
+        if image is None:
+            self.width0=0 #just to be able to interpolate
+        else:
+            self.image0=spec_to_image(image)
+            self.image_serial0=self.env.serialize()
+            self.width0=self.image0.size[0] if width0 is None else width0
+ 
+        self.font=font
+        self.anchor0=anchor
+        
+        self.x0=x0
+        self.y0=y0
+        self.offsetx0=offsetx0
+        self.offsety0=offsety0
+
+        self.fillcolor0=fillcolor0
+        self.linecolor0=linecolor0
+        self.textcolor0=textcolor0        
+        self.linewidth0=linewidth0
+        self.angle0=angle0
+        self.fontsize0=fontsize0
+
+        self.t0=self.env._now if t0 is None else t0
+
+        self.circle1=self.circle0 if circle1 is None else circle1
+        self.line1=self.line0 if line1 is None else line1
+        self.polygon1=self.polygon0 if polygon1 is None else polygon1
+        self.rectangle1=self.rectangle0 if rectangle1 is None else rectangle1
+
+        self.x1=self.x0 if x1 is None else x1
+        self.y1=self.y0 if y1 is None else y1
+        self.offsetx1=self.offsetx0 if offsetx1 is None else offsetx1
+        self.offsety1=self.offsety0 if offsety1 is None else offsety1
+        self.fillcolor1=\
+          self.fillcolor0 if fillcolor1 is None else fillcolor1
+        self.linecolor1=\
+          self.linecolor0 if linecolor1 is None else linecolor1
+        self.textcolor1=\
+          self.textcolor0 if textcolor1 is None else textcolor1
+        self.linewidth1=\
+          self.linewidth0 if linewidth1 is None else linewidth1
+        self.angle1=self.angle0 if angle1 is None else angle1
+        self.fontsize1=\
+          self.fontsize0 if fontsize1 is None else fontsize1
+        self.width1=self.width0 if width1 is None else width1
+        
+        self.t1=inf if t1 is None else t1
+
+        self.env.an_objects.append(self)
+
     def make_pil_image(self,t):
         
         visible=self.visible(t)
@@ -1868,7 +2053,7 @@ class Animate(object):
             angle=self.angle(t)
                                   
             if (self.type=='polygon') or (self.type=='rectangle') or (self.type=='line'):
-                linewidth=self.linewidth(t)*An.scale
+                linewidth=self.linewidth(t)*self.env.scale
                 linecolor=colorspec_to_tuple(self.linecolor(t))
                 fillcolor=colorspec_to_tuple(self.fillcolor(t))
                                         
@@ -1896,8 +2081,8 @@ class Animate(object):
                     qx=x
                     qy=y
                 else:
-                    qx=(x-An.x0)*An.scale
-                    qy=(y-An.y0)*An.scale
+                    qx=(x-self.env.x0)*self.env.scale
+                    qy=(y-self.env.y0)*self.env.scale
 
                 r=[]
                 minrx=inf
@@ -1910,8 +2095,8 @@ class Animate(object):
                     rx=px*cosa-py*sina
                     ry=px*sina+py*cosa
                     if not self.screen_coordinates:
-                        rx=rx*An.scale
-                        ry=ry*An.scale
+                        rx=rx*self.env.scale
+                        ry=ry*self.env.scale
                     minrx=min(minrx,rx)
                     maxrx=max(maxrx,rx)
                     minry=min(minry,ry)
@@ -1946,7 +2131,7 @@ class Animate(object):
                 self._image_y=qy+minry-linewidth+(offsetx*sina+offsety*cosa)
                 
             elif self.type=='circle':
-                linewidth=self.linewidth(t)*An.scale
+                linewidth=self.linewidth(t)*self.env.scale
                 fillcolor=colorspec_to_tuple(self.fillcolor(t))
                 linecolor=colorspec_to_tuple(self.linecolor(t))
                 circle=self.circle(t)
@@ -1956,10 +2141,10 @@ class Animate(object):
                     qx=x
                     qy=y
                 else:
-                    qx=(x-An.x0)*An.scale
-                    qy=(y-An.y0)*An.scale
-                    linewidth*=An.scale
-                    radius*=An.scale
+                    qx=(x-self.env.x0)*self.env.scale
+                    qy=(y-self.env.y0)*self.env.scale
+                    linewidth*=self.env.scale
+                    radius*=self.env.scale
 
                 self._image_ident=(radius,linewidth,linecolor,fillcolor)
                 if self._image_ident!=self._image_ident_prev:
@@ -2006,16 +2191,16 @@ class Animate(object):
                     qx=x
                     qy=y
                 else:
-                    qx=(x-An.x0)*An.scale
-                    qy=(y-An.y0)*An.scale
-                    offsetx=offsetx*An.scale
-                    offsety=offsety*An.scale
+                    qx=(x-self.env.x0)*self.env.scale
+                    qy=(y-self.env.y0)*self.env.scale
+                    offsetx=offsetx*self.env.scale
+                    offsety=offsety*self.env.scale
                 
                 self._image_ident=(image_serial,width,height,angle)
                 if self._image_ident!=self._image_ident_prev:
                     if not self.screen_coordinates:
-                        width*=An.scale
-                        height*=An.scale
+                        width*=self.env.scale
+                        height*=self.env.scale
                     im1 = image.resize\
                       ((int(width),int(height)), Image.ANTIALIAS)
                     self.imwidth,self.imheight=im1.size
@@ -2055,15 +2240,15 @@ class Animate(object):
                     qx=x
                     qy=y
                 else:
-                    qx=(x-An.x0)*An.scale
-                    qy=(y-An.y0)*An.scale
-                    fontsize=fontsize*An.scale
-                    offsetx=offsetx*An.scale
-                    offsety=offsety*An.scale
+                    qx=(x-self.env.x0)*self.env.scale
+                    qy=(y-self.env.y0)*self.env.scale
+                    fontsize=fontsize*self.env.scale
+                    offsetx=offsetx*self.env.scale
+                    offsety=offsety*self.env.scale
                 
                 self._image_ident= (text,self.font,fontsize,angle,textcolor)
                 if self._image_ident!=self._image_ident_prev:
-                    font=getfont(self.font,fontsize)
+                    font=self.env.getfont(self.font,fontsize)
                         
                     width,height=font.getsize(text)
                     im=Image.new('RGBA',(int(width),int(height)),(0,0,0,0))
@@ -2149,96 +2334,6 @@ class Animate(object):
             raise AssertionError('more than one object given')
         return t                
             
-    def __init__(self,parent=None,layer=0,keep=True,visible=True,
-            screen_coordinates=False,
-            t0=None,x0=0,y0=0,offsetx0=0,offsety0=0,
-            circle0=None,line0=None,polygon0=None,rectangle0=None,
-            image=None,text=None,
-            font='',anchor='center',
-            linewidth0=1,fillcolor0='black',linecolor0='black',textcolor0='black',
-            angle0=0,fontsize0=20,width0=None,
-            t1=None,x1=None,y1=None,offsetx1=None,offsety1=None,
-            circle1=None,line1=None,polygon1=None,rectangle1=None,
-            linewidth1=None,fillcolor1=None,linecolor1=None,textcolor1=None,
-            angle1=None,fontsize1=None,width1=None,env=None):
-                    
-        self.env=default_env if env==None else env
-        self._image_ident=None # denotes no image yet
-        self._image=None
-        self._image_x=0
-        self._image_y=0
-        self.canvas_object=None
-        
-        self.type=self.settype(circle0,line0,polygon0,rectangle0,image,text)
-        if self.type=='':
-            raise AssertionError('no object specified')
-        type1=self.settype(circle1,line1,polygon1,rectangle1,None,None)
-        if (type1!='') and (type1!=self.type):
-            raise AssertionError('incompatible types: '+self.type+' and '+ type1)
-            
-        self.layer0=layer
-        self.parent=parent
-        self.keep=keep
-        self.visible0=visible
-        self.screen_coordinates=screen_coordinates
-        self.sequence=self.env.serialize()
-
-        self.circle0=circle0
-        self.line0=line0
-        self.polygon0=polygon0
-        self.rectangle0=rectangle0            
-        self.text0=text
-        
-        if image is None:
-            self.width0=0 #just to be able to interpolate
-        else:
-            self.image0=spec_to_image(image)
-            self.image_serial0=self.env.serialize()
-            self.width0=self.image0.size[0] if width0 is None else width0
- 
-        self.font=font
-        self.anchor0=anchor
-        
-        self.x0=x0
-        self.y0=y0
-        self.offsetx0=offsetx0
-        self.offsety0=offsety0
-
-        self.fillcolor0=fillcolor0
-        self.linecolor0=linecolor0
-        self.textcolor0=textcolor0        
-        self.linewidth0=linewidth0
-        self.angle0=angle0
-        self.fontsize0=fontsize0
-
-        self.t0=self.env._now if t0 is None else t0
-
-        self.circle1=self.circle0 if circle1 is None else circle1
-        self.line1=self.line0 if line1 is None else line1
-        self.polygon1=self.polygon0 if polygon1 is None else polygon1
-        self.rectangle1=self.rectangle0 if rectangle1 is None else rectangle1
-
-        self.x1=self.x0 if x1 is None else x1
-        self.y1=self.y0 if y1 is None else y1
-        self.offsetx1=self.offsetx0 if offsetx1 is None else offsetx1
-        self.offsety1=self.offsety0 if offsety1 is None else offsety1
-        self.fillcolor1=\
-          self.fillcolor0 if fillcolor1 is None else fillcolor1
-        self.linecolor1=\
-          self.linecolor0 if linecolor1 is None else linecolor1
-        self.textcolor1=\
-          self.textcolor0 if textcolor1 is None else textcolor1
-        self.linewidth1=\
-          self.linewidth0 if linewidth1 is None else linewidth1
-        self.angle1=self.angle0 if angle1 is None else angle1
-        self.fontsize1=\
-          self.fontsize0 if fontsize1 is None else fontsize1
-        self.width1=self.width0 if width1 is None else width1
-        
-        self.t1=inf if t1 is None else t1
-
-        self.env.an_objects.append(self)
-
     def update(self,layer=None,keep=None,visible=None,
             t0=None,x0=None,y0=None,offsetx0=None,offsety0=None,
             circle0=None,line0=None,polygon0=None,rectangle0=None,
@@ -2386,7 +2481,7 @@ class Animate(object):
         default * means that the current value (at time now) is used
         ''' 
 
-        t=self.An.env._now
+        t=self.env._now
         type0=self.settype(circle0,line0,polygon0,rectangle0,image,text)
         if (type0!='') and (type0!=self.type):
             raise AssertionError\
@@ -2431,7 +2526,7 @@ class Animate(object):
           self.textcolor(t) if textcolor0 is None else textcolor0
         self.angle0=self.angle(t) if angle0 is None else angle0
         self.fontsize0=self.fontsize(t) if fontsize0 is None else fontsize0
-        self.t0=self.An.env._now if t0 is None else t0
+        self.t0=self.env._now if t0 is None else t0
 
         self.circle1=self.circle0 if circle1 is None else circle1
         self.line1=self.line0 if line1 is None else line1
@@ -2473,63 +2568,63 @@ class Animate(object):
             self.env.an_objects.remove(self)
             
     def x(self,t=None):
-        return interpolate((self.An.env._now if t is None else t),\
+        return interpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.x0,self.x1)
 
     def y(self,t=None):
-        return interpolate((self.An.env._now if t is None else t),\
+        return interpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.y0,self.y1)
 
     def offsetx(self,t=None):
-        return interpolate((self.An.env._now if t is None else t),\
+        return interpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.offsetx0,self.offsetx1)
 
     def offsety(self,t=None):
-        return interpolate((self.An.env._now if t is None else t),\
+        return interpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.offsety0,self.offsety1)
 
     def angle(self,t=None):
-        return interpolate((self.An.env._now if t is None else t),\
+        return interpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.angle0,self.angle1)
 
     def linewidth(self,t=None):
-        return interpolate((self.An.env._now if t is None else t),\
+        return interpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.linewidth0,self.linewidth1)
 
     def linecolor(self,t=None):
-        return colorinterpolate((self.An.env._now if t is None else t),\
+        return colorinterpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.linecolor0,self.linecolor1)
 
     def fillcolor(self,t=None):
-        return colorinterpolate((self.An.env._now if t is None else t),\
+        return colorinterpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.fillcolor0,self.fillcolor1)
 
     def circle(self,t=None):
-        return interpolate((self.An.env._now if t is None else t),\
+        return interpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.circle0,self.circle1)
           
     def textcolor(self,t=None):
-        return colorinterpolate((self.An.env._now if t is None else t),\
+        return colorinterpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.textcolor0,self.textcolor1)
           
     def line(self,t=None):
-        return interpolate((self.An.env._now if t is None else t),\
+        return interpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.line0,self.line1)
 
     def polygon(self,t=None):
-        return interpolate((self.An.env._now if t is None else t),\
+        return interpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.polygon0,self.polygon1)
 
     def rectangle(self,t=None):
-        return interpolate((self.An.env._now if t is None else t),\
+        return interpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.rectangle0,self.rectangle1)
 
     def width(self,t=None):
-        return interpolate((self.An.env._now if t is None else t),\
+        return interpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.width0,self.width1)
 
     def fontsize(self,t=None):
-        return interpolate((self.An.env._now if t is None else t),\
+        return interpolate((self.env._now if t is None else t),\
           self.t0,self.t1,self.fontsize0,self.fontsize1)
     
     def text(self,t=None):
@@ -2607,7 +2702,7 @@ class AnimateButton(object):
                  linecolor='black',color='white',text='',font='',
                  fontsize=15,action=None,env=None):
         
-        self.env=default_env if env==None else env
+        self.env=_default_env if env==None else env
         self.type='button'
         self.parent=None
         self.t0=-inf
@@ -2639,13 +2734,13 @@ class AnimateButton(object):
         
     def install(self):
         self.button = tkinter.Button\
-          (An.root, text = self.lasttext, command = self.action,
+          (self.env.root, text = self.lasttext, command = self.action,
           anchor = tkinter.CENTER)
         self.button.configure\
           (width = int(2.2*self.width/self.fontsize),\
           foreground=colorspec_to_hex(self.color,False),background =colorspec_to_hex(self.fillcolor,False), relief = tkinter.FLAT)
-        self.button_window = An.canvas.create_window\
-          (self.x+self.width, An.height-self.y-self.height,\
+        self.button_window = self.env.canvas.create_window\
+          (self.x+self.width, self.env.height-self.y-self.height,\
           anchor=tkinter.NE,window=self.button)            
         self.installed=True
     
@@ -2731,7 +2826,7 @@ class AnimateSlider(object):
                  linecolor='black',labelcolor='black',label='',
                  font='',fontsize=12,action=None,env=None):
         
-        self.env=default_env if env==None else env
+        self.env=_default_env if env==None else env
         n=round((vmax-vmin)/resolution)+1
         self.vmin=vmin
         self.vmax=vmin+(n-1)*resolution
@@ -2773,7 +2868,7 @@ class AnimateSlider(object):
         if Pythonista:
             return self._v
         else:
-            if An.env == self.env:
+            if an_env == self.env:
                 return self.slider.get()
             else:
                 return self._v
@@ -2783,24 +2878,24 @@ class AnimateSlider(object):
         if Pythonista:
             self._v=value
         else:
-            if self.An.env == self.env:
+            if self.an_env == self.env:
                 self.slider.set(value)
             else:
                 self._v=value
                 
     def install(self):    
         self.slider=tkinter.Scale\
-          (An.root, from_=self.vmin, to=self.vmax,\
+          (self.env.root, from_=self.vmin, to=self.vmax,\
           orient=tkinter.HORIZONTAL,label=self.label,resolution=self.resolution,command=self.action)
-        self.slider.window = An.canvas.create_window\
-          (self.x, An.height-self.y, anchor=tkinter.NW,\
+        self.slider.window = self.env.canvas.create_window\
+          (self.x, self.env.height-self.y, anchor=tkinter.NW,\
           window=self.slider)
         self.slider.config\
           (font=(self.font,int(self.fontsize*0.8)),\
           background=\
-          colorspec_to_hex(An.background_color,False),\
+          colorspec_to_hex(self.env.background_color,False),\
           highlightbackground=\
-          colorspec_to_hex(An.background_color,False))
+          colorspec_to_hex(self.env.background_color,False))
         self.slider.set(self._v)
         self.installed=True
         
@@ -2865,13 +2960,13 @@ class Component(object):
         
     env : Environment
         environment where the component is defined |n|
-        if omitted, default_env will be used
+        if omitted, _default_env will be used
     '''
     
     def __init__(self,name=None,at=None,delay=None,urgent=False,\
       auto_start=True,suppress_trace=False,mode=None,env=None): 
         if env is None:
-            self.env=default_env
+            self.env=_default_env
         else:
             self.env=env
         if name is None:
@@ -2954,8 +3049,9 @@ class Component(object):
      
     def _reschedule(self,scheduled_time,urgent,caller):
         if scheduled_time<self.env._now:
-            raise AssertionError(\
-              'scheduled time (%0.3f) before now'%scheduled_time)                           
+            raise AssertionError(
+              'scheduled time ({:0.3f}) before now ({:0.3f})'.
+              format(scheduled_time,self.env._now))                                                 
         if self._scheduled_time!=inf:
             self._remove() 
         self._scheduled_time=scheduled_time                       
@@ -2965,8 +3061,8 @@ class Component(object):
         else:                     
             self._push(scheduled_time,urgent)
             self._status=scheduled
-            self.env.print_trace('','',self._name+' '+caller,\
-              ('scheduled for %10.3f'%scheduled_time)+\
+            self.env.print_trace('','',self._name+' '+caller,
+              'scheduled for {:10.3f}'.format(scheduled_time)+
               _urgenttxt(urgent)+_atprocess(self._process)+' '+_modetxt(self._mode))       
            
     def reschedule(self,process=None,at=None,delay=None,urgent=False,mode='*'):
@@ -3268,20 +3364,6 @@ class Component(object):
             self.mode=mode
         self._status=standby
          
-    def stop_run(self):
-        '''
-        stops the simulation and gives control to the main program, as the next event
-        '''
-        scheduled_time=self.env._now
-        self.env.print_trace('','','stop_run',\
-          'scheduled for=%10.3f'%scheduled_time)
-
-        if self.env._main._scheduled_time!=inf: # just to be sure
-            self.env._main._remove()
-        self.env._main._scheduled_time=scheduled_time
-        self.env._main._push(scheduled_time,urgent=True)
-        self.env._main._status=scheduled
-
     def request(self,*args,priority=None,greedy=False,fail_at=None,mode='*'):
         '''
         request from a resource or resources 
@@ -3977,7 +4059,6 @@ class Component(object):
             pass
         else:
             raise AssertionError(self._name+' is not passive')
-
         
 class _Distribution():
         
@@ -3993,7 +4074,7 @@ class Exponential(_Distribution):
     '''
     exponential distribution
     
-    Exponential(mean,seed)
+    Exponential(mean,randomstream)
     
     Parameters:
     -----------
@@ -4234,12 +4315,12 @@ class Cdf(_Distribution):
                 raise AssertionError('uneven number of parameters specified')
             if x<lastx:
                 raise AssertionError\
-                  ('x value %s is smaller than previous value %s'%(x,lastx))
+                  ('x value {} is smaller than previous value {}'.format(x,lastx))
             cum=spec.pop(0)
             if cum<lastcum:
                 raise AssertionError\
-                  ('cumulative value %s is smaller than previous value %s'%\
-                  (cum,lastcum))
+                  ('cumulative value {} is smaller than previous value {}'\
+                  .format(cum,lastcum))
             self._x.append(x)
             self._cum.append(cum)
             lastx=x
@@ -4390,7 +4471,7 @@ class Distribution(_Distribution):
     def sample(self):
         self._distribution.randomstream=self.randomstream
         return self._distribution.sample        
-
+                            
 class Resource(object):
     '''
     Resource
@@ -4423,7 +4504,7 @@ class Resource(object):
         
     env : Environment
         environment to be used |n|
-        if omitted, default_env is used
+        if omitted, _default_env is used
     '''
     
     def __init__(self,name=None,capacity=1,strict_order=False,\
@@ -4433,7 +4514,7 @@ class Resource(object):
         '''
         
         if (env is None):
-            self.env=default_env
+            self.env=_default_env
         else:
             self.env=env
         if name is None:
@@ -4649,160 +4730,40 @@ class Resource(object):
         return self._sequence_number  
 
 def colornames():
-    return {  
-        'aliceblue':            '#F0F8FF',
-        'antiquewhite':         '#FAEBD7',
-        'aqua':                 '#00FFFF',
-        'aquamarine':           '#7FFFD4',
-        'azure':                '#F0FFFF',
-        'beige':                '#F5F5DC',
-        'bisque':               '#FFE4C4',
-        'black':                '#000000',
-        'blanchedalmond':       '#FFEBCD',
-        'blue':                 '#0000FF',
-        'blueviolet':           '#8A2BE2',
-        'brown':                '#A52A2A',
-        'burlywood':            '#DEB887',
-        'cadetblue':            '#5F9EA0',
-        'chartreuse':           '#7FFF00',
-        'chocolate':            '#D2691E',
-        'coral':                '#FF7F50',
-        'cornflowerblue':       '#6495ED',
-        'cornsilk':             '#FFF8DC',
-        'crimson':              '#DC143C',
-        'cyan':                 '#00FFFF',
-        'darkblue':             '#00008B',
-        'darkcyan':             '#008B8B',
-        'darkgoldenrod':        '#B8860B',
-        'darkgray':             '#A9A9A9',
-        'darkgreen':            '#006400',
-        'darkkhaki':            '#BDB76B',
-        'darkmagenta':          '#8B008B',
-        'darkolivegreen':       '#556B2F',
-        'darkorange':           '#FF8C00',
-        'darkorchid':           '#9932CC',
-        'darkred':              '#8B0000',
-        'darksalmon':           '#E9967A',
-        'darkseagreen':         '#8FBC8F',
-        'darkslateblue':        '#483D8B',
-        'darkslategray':        '#2F4F4F',
-        'darkturquoise':        '#00CED1',
-        'darkviolet':           '#9400D3',
-        'deeppink':             '#FF1493',
-        'deepskyblue':          '#00BFFF',
-        'dimgray':              '#696969',
-        'dodgerblue':           '#1E90FF',
-        'firebrick':            '#B22222',
-        'floralwhite':          '#FFFAF0',
-        'forestgreen':          '#228B22',
-        'fuchsia':              '#FF00FF',
-        'gainsboro':            '#DCDCDC',
-        'ghostwhite':           '#F8F8FF',
-        'gold':                 '#FFD700',
-        'goldenrod':            '#DAA520',
-        'gray':                 '#808080',
-        'green':                '#008000',
-        'greenyellow':          '#ADFF2F',
-        'honeydew':             '#F0FFF0',
-        'hotpink':              '#FF69B4',
-        'indianred':            '#CD5C5C',
-        'indigo':               '#4B0082',
-        'ivory':                '#FFFFF0',
-        'khaki':                '#F0E68C',
-        'lavender':             '#E6E6FA',
-        'lavenderblush':        '#FFF0F5',
-        'lawngreen':            '#7CFC00',
-        'lemonchiffon':         '#FFFACD',
-        'lightblue':            '#ADD8E6',
-        'lightcoral':           '#F08080',
-        'lightcyan':            '#E0FFFF',
-        'lightgoldenrodyellow': '#FAFAD2',
-        'lightgreen':           '#90EE90',
-        'lightgray':            '#D3D3D3',
-        'lightpink':            '#FFB6C1',
-        'lightsalmon':          '#FFA07A',
-        'lightseagreen':        '#20B2AA',
-        'lightskyblue':         '#87CEFA',
-        'lightslategray':       '#778899',
-        'lightsteelblue':       '#B0C4DE',
-        'lightyellow':          '#FFFFE0',
-        'lime':                 '#00FF00',
-        'limegreen':            '#32CD32',
-        'linen':                '#FAF0E6',
-        'magenta':              '#FF00FF',
-        'maroon':               '#800000',
-        'mediumaquamarine':     '#66CDAA',
-        'mediumblue':           '#0000CD',
-        'mediumorchid':         '#BA55D3',
-        'mediumpurple':         '#9370DB',
-        'mediumseagreen':       '#3CB371',
-        'mediumslateblue':      '#7B68EE',
-        'mediumspringgreen':    '#00FA9A',
-        'mediumturquoise':      '#48D1CC',
-        'mediumvioletred':      '#C71585',
-        'midnightblue':         '#191970',
-        'mintcream':            '#F5FFFA',
-        'mistyrose':            '#FFE4E1',
-        'moccasin':             '#FFE4B5',
-        'navajowhite':          '#FFDEAD',
-        'navy':                 '#000080',
-        'oldlace':              '#FDF5E6',
-        'olive':                '#808000',
-        'olivedrab':            '#6B8E23',
-        'orange':               '#FFA500',
-        'orangered':            '#FF4500',
-        'orchid':               '#DA70D6',
-        'palegoldenrod':        '#EEE8AA',
-        'palegreen':            '#98FB98',
-        'paleturquoise':        '#AFEEEE',
-        'palevioletred':        '#DB7093',
-        'papayawhip':           '#FFEFD5',
-        'peachpuff':            '#FFDAB9',
-        'peru':                 '#CD853F',
-        'pink':                 '#FFC0CB',
-        'plum':                 '#DDA0DD',
-        'powderblue':           '#B0E0E6',
-        'purple':               '#800080',
-        'red':                  '#FF0000',
-        'rosybrown':            '#BC8F8F',
-        'royalblue':            '#4169E1',
-        'saddlebrown':          '#8B4513',
-        'salmon':               '#FA8072',
-        'sandybrown':           '#FAA460',
-        'seagreen':             '#2E8B57',
-        'seashell':             '#FFF5EE',
-        'sienna':               '#A0522D',
-        'silver':               '#C0C0C0',
-        'skyblue':              '#87CEEB',
-        'slateblue':            '#6A5ACD',
-        'slategray':            '#708090',
-        'snow':                 '#FFFAFA',
-        'springgreen':          '#00FF7F',
-        'steelblue':            '#4682B4',
-        'tan':                  '#D2B48C',
-        'teal':                 '#008080',
-        'thistle':              '#D8BFD8',
-        'tomato':               '#FF6347',
-        'turquoise':            '#40E0D0',
-        'violet':               '#EE82EE',
-        'wheat':                '#F5DEB3',
-        'white':                '#FFFFFF',
-        'whitesmoke':           '#F5F5F5',
-        'yellow':               '#FFFF00',
-        'yellowgreen':          '#9ACD32',
-        '10%gray':              '#191919',
-        '20%gray':              '#333333',
-        '30%gray':              '#464646',
-        '40%gray':              '#666666',
-        '50%gray':              '#7F7F7F',
-        '60%gray':              '#999999',
-        '70%gray':              '#B2B2B2',
-        '80%gray':              '#CCCCCC',
-        '90%gray':              '#E6E6E6',
-        'transparent':          '#00000000',
-        'none':                 '#00000000',
-        '':                     '#00000000'
-        }
+    return {'fuchsia': '#FF00FF', '': '#00000000', 'transparent': '#00000000', 'palevioletred': '#DB7093',
+    'skyblue': '#87CEEB', 'paleturquoise': '#AFEEEE', 'cadetblue': '#5F9EA0', 'orangered': '#FF4500', 
+    'steelblue': '#4682B4', 'dimgray': '#696969', 'darkseagreen': '#8FBC8F', '60%gray': '#999999', 
+    'royalblue': '#4169E1', 'mediumblue': '#0000CD', 'goldenrod': '#DAA520', 'mediumvioletred': '#C71585',
+    'blueviolet': '#8A2BE2', 'gainsboro': '#DCDCDC', 'darkred': '#8B0000', 'rosybrown': '#BC8F8F',
+    'gold': '#FFD700', 'coral': '#FF7F50', 'white': '#FFFFFF', 'darkcyan': '#008B8B', 'black': '#000000', 
+    'orchid': '#DA70D6', 'mediumturquoise': '#48D1CC', 'lightgreen': '#90EE90', 'lime': '#00FF00', 
+    'papayawhip': '#FFEFD5', 'chocolate': '#D2691E', '40%gray': '#666666', 'oldlace': '#FDF5E6', 
+    'darkblue': '#00008B', 'silver': '#C0C0C0', 'aquamarine': '#7FFFD4', 'lightcoral': '#F08080', 'cyan': '#00FFFF', 
+    'dodgerblue': '#1E90FF', '10%gray': '#191919', 'midnightblue': '#191970', 'green': '#008000', 
+    'lightsalmon': '#FFA07A', 'azure': '#F0FFFF', 'red': '#FF0000', 'lightpink': '#FFB6C1', 'whitesmoke': '#F5F5F5',
+    'yellow': '#FFFF00', 'lawngreen': '#7CFC00', 'magenta': '#FF00FF', 'lightsteelblue': '#B0C4DE', 
+    'olivedrab': '#6B8E23', 'lightslategray': '#778899', 'slategray': '#708090', 'lightblue': '#ADD8E6', 
+    'moccasin': '#FFE4B5', 'mediumspringgreen': '#00FA9A', 'lightgray': '#D3D3D3', 'seashell': '#FFF5EE',
+    'darkkhaki': '#BDB76B', 'slateblue': '#6A5ACD', 'aqua': '#00FFFF', 'palegoldenrod': '#EEE8AA', 
+    'deeppink': '#FF1493', 'darkgreen': '#006400', 'blanchedalmond': '#FFEBCD', 'turquoise': '#40E0D0', 
+    'navy': '#000080', 'tomato': '#FF6347', 'yellowgreen': '#9ACD32', 'peachpuff': '#FFDAB9', '30%gray': '#464646', 
+    'pink': '#FFC0CB', 'palegreen': '#98FB98', 'lightskyblue': '#87CEFA', 'chartreuse': '#7FFF00', 
+    'mediumorchid': '#BA55D3', 'olive': '#808000', 'darkorange': '#FF8C00', 'beige': '#F5F5DC', 
+    'forestgreen': '#228B22', 'mediumpurple': '#9370DB', 'mintcream': '#F5FFFA', 'hotpink': '#FF69B4', 
+    'darkgoldenrod': '#B8860B', 'powderblue': '#B0E0E6', 'honeydew': '#F0FFF0', 'salmon': '#FA8072', 
+    'snow': '#FFFAFA', 'mistyrose': '#FFE4E1', 'khaki': '#F0E68C', 'mediumaquamarine': '#66CDAA', 
+    'darksalmon': '#E9967A', 'aliceblue': '#F0F8FF', 'darkturquoise': '#00CED1', 'lightyellow': '#FFFFE0', 
+    'wheat': '#F5DEB3', 'lightseagreen': '#20B2AA', 'lightcyan': '#E0FFFF', 'antiquewhite': '#FAEBD7', 
+    'saddlebrown': '#8B4513', 'mediumseagreen': '#3CB371', '70%gray': '#B2B2B2', 'sienna': '#A0522D', 
+    'cornflowerblue': '#6495ED', 'seagreen': '#2E8B57', 'floralwhite': '#FFFAF0', 'ivory': '#FFFFF0', 'cornsilk': '#FFF8DC', 'indianred': '#CD5C5C', 'plum': '#DDA0DD', '90%gray': '#E6E6E6', 'greenyellow': '#ADFF2F', 
+    'teal': '#008080', 'brown': '#A52A2A', 'darkslategray': '#2F4F4F', 'purple': '#800080', 'violet': '#EE82EE', 
+    'deepskyblue': '#00BFFF', 'ghostwhite': '#F8F8FF', 'burlywood': '#DEB887', 'blue': '#0000FF', 'crimson': '#DC143C', 'indigo': '#4B0082', '20%gray': '#333333', 'darkmagenta': '#8B008B', '80%gray': '#CCCCCC', 
+    'lightgoldenrodyellow': '#FAFAD2', 'tan': '#D2B48C', 'limegreen': '#32CD32', 'lemonchiffon': '#FFFACD', 
+    'bisque': '#FFE4C4', 'firebrick': '#B22222', 'navajowhite': '#FFDEAD', 'none': '#00000000', 'maroon': '#800000', 
+    '50%gray': '#7F7F7F', 'darkgray': '#A9A9A9', 'orange': '#FFA500', 'lavenderblush': '#FFF0F5', 
+    'darkorchid': '#9932CC', 'lavender': '#E6E6FA', 'springgreen': '#00FF7F', 'thistle': '#D8BFD8', 
+    'linen': '#FAF0E6', 'darkolivegreen': '#556B2F', 'darkslateblue': '#483D8B', 'gray': '#808080', 
+    'darkviolet': '#9400D3', 'peru': '#CD853F', 'sandybrown': '#FAA460', 'mediumslateblue': '#7B68EE'}
 
 def colorspec_to_tuple(colorspec):
     if isinstance(colorspec,(tuple,list)):
@@ -4848,9 +4809,11 @@ def hex_to_rgb(v):
 def colorspec_to_hex(colorspec,withalpha=True):
     v=colorspec_to_tuple(colorspec)
     if withalpha:
-        return '#%02x%02x%02x%02x' % (int(v[0]),int(v[1]),int(v[2]),int(v[3]))
+        return '#{:02x}{:02x}{:02x}{:02x}'.\
+          format(int(v[0]),int(v[1]),int(v[2]),int(v[3]))
     else:
-        return '#%02x%02x%02x' % (int(v[0]),int(v[1]),int(v[2]))
+        return '#{:02x}{:02x}{:02x}'.\
+          format(int(v[0]),int(v[1]),int(v[2]))
 
 def spec_to_image(image):
     if isinstance(image,str):
@@ -4860,56 +4823,6 @@ def spec_to_image(image):
     else:
         return image
 
-def getfont(fontname,fontsize): # fontsize in screen_coordinates!
-    if isinstance(fontname,list):
-        fonts=tuple(fontname)
-    elif isinstance(fontname,str):
-        fonts=(fontname,)
-    else:
-        fonts=fontname
-
-    if (fonts,fontsize) in An.font_cache:
-        font=An.font_cache[(fonts,fontsize)]
-    else:
-        font=None
-        for ifont in fonts+('calibri', 'Calibri','arial','Arial'):
-            try:
-                font=ImageFont.truetype(font=ifont,size=int(fontsize))
-                break
-            except:
-                pass
-        if font==None:
-            raise AssertionError('no matching fonts found for ',fonts)
-        An.font_cache[(fonts,fontsize)]=font
-    return font
-        
-def getwidth(text,font='',fontsize=20,screen_coordinates=False):
-    if not screen_coordinates:
-        fontsize=fontsize*An.scale
-    f=getfont(font,fontsize)
-    thiswidth,thisheight=f.getsize(text)
-    if screen_coordinates:
-        return thiswidth
-    else:
-        return thiswidth/An.scale
-    return 
-
-def getfontsize_to_fit(text,width,font='',screen_coordinates=False):
-    if not screen_coordinates:
-        width=width*An.scale
-
-    lastwidth=0    
-    for fontsize in range(1,300):
-        f=getfont(font,fontsize)
-        thiswidth,thisheight=f.getsize(text)
-        if thiswidth>width:
-            break
-        lastwidth=thiswidth
-    fontsize=interpolate(width,lastwidth,thiswidth,fontsize-1,fontsize)
-    if screen_coordinates:
-         return fontsize
-    else:
-         return fontsize/An.scale
 
 def _i(p,v0,v1):
     if v0==v1:
@@ -4948,32 +4861,32 @@ def interpolate(t,t0,t1,v0,v1):
             
 def clocktext(t):
     s=''
-    if (not An.paused) or (int(time.time()*2)%2==0):
+    if (not an_env.paused) or (int(time.time()*2)%2==0):
 
-        if (not An.paused) and An.env.show_fps:  
-            if len(An.frametimes)>=2:
-                fps=(len(An.frametimes)-1)/(An.frametimes[-1]-An.frametimes[0])
+        if (not an_env.paused) and an_env.show_fps:  
+            if len(an_env.frametimes)>=2:
+                fps=(len(an_env.frametimes)-1)/(an_env.frametimes[-1]-an_env.frametimes[0])
             else:
                 fps=0
             s=s+'fps={:.1f}'.format(fps)
-        if An.env.show_speed:
+        if an_env.show_speed:
             if s!='':
                 s=s+' '
-            s=s+'*{:.3f}'.format(An.env.speed)
-        if An.env.show_time:
+            s=s+'*{:.3f}'.format(an_env.speed)
+        if an_env.show_time:
             if s!='':
                 s=s+' '
             s=s+'t={:.3f}'.format(t)
     return s
 
-def pausetext():
-    if An.paused:
+def pausetext( ):
+    if an_env.paused:
         return 'Resume'  
     else:
         return 'Pause'  
         
 def tracetext():
-    if An.env._trace:
+    if an_env._trace:
         return 'Trace off'
     else:
         return 'Trace on'
@@ -4986,7 +4899,7 @@ def _reformatname(name,_nameserialize):
         next=0
     _nameserialize[name]=next        
     if (len(name)!=0) and (name[len(name)-1]=='.'):
-        nextstring='%d'%next
+        nextstring='{:d}'.format(next)
         if len(name)+len(nextstring)>L:
             name=name[0:L-len(nextstring)]
         return name+(L-len(name)-len(nextstring))*'.'+nextstring,name,next
@@ -4998,12 +4911,19 @@ def pad(txt,n):
     
 def rpad(txt,n):
     return txt.rjust(n)[:n]
-
+    
+def upperalpha(s):
+    res=''
+    for c in s.upper():
+        if c.isalpha():
+            res=res+c
+    return res
+                
 def time_to_string(t):
     if t==inf:
         s='inf'
     else:
-        s='%10.3f'%t
+        s='{:10.3f}'.format(t)
     return rpad(s,10)
     
 def _urgenttxt(urgent):
@@ -5026,35 +4946,126 @@ def _modetxt(mode):
     
 def trace(value=None):
     if value!=None:
-        default_env._trace=value
-    return default_env._trace
+        _default_env._trace=value
+    return _default_env._trace
+    
+def random_seed(seed,randomstream=None):
+    '''
+    sets the seed for random
+    
+    '''
+    if randomstream==None:
+        randomstream=random
+    randomstream.seed(seed)
+        
     
 def now():
     '''
     returns now for the default environment
     '''
-    return default_env._now
+    return _default_env._now
 
 def current_component():
     '''
     returns the current component for the default environment
     '''
-    return default_env.current_component
+    return _default_env.current_component
     
-def print_trace(*args,**kwargs):
-    default_env.trace.print_trace(*args,**kwargs)
-
-
 def pythonistacolor(c):
     return (c[0]/255,c[1]/255,c[2]/255,c[3]/255)
 
-'''
-initialization of globals
-'''
-default_env=Environment(trace=False,name='default environment')
-main=default_env._main
-random=random.Random(-1)
-   
+def _std_fonts():
+# the names of the standard fonts are generated by ttf fontdict.py onn the standard development machine
+    return {'BOOKOSB': 'Bookman Old Style Bold', 'Martina_': 'Martina', 'gdt_____': 'GDT', 'ENGR': 'Engravers MT', 'GOTHICB': 'Century Gothic Bold', 'ostrich-black': 'Ostrich Sans Black', 'ERASDEMI': 'Eras Demi ITC', 'cour': 'Courier New', 'greeks__': 'GreekS', 'Rowdyhe_': 'RowdyHeavy', 'georgiai': 'Georgia Italic', 'Blackout-2am': 'Blackout 2 AM', 'Steppes': 'Steppes TT', 'calibrib': 'Calibri Bold', 'Russrite': 'Russel Write TT', 'sf movie poster2': 'SF Movie Poster', 'techl___': 'TechnicLite', 'ANTQUAI': 'Book Antiqua Italic', 'GLECB': 'Gloucester MT Extra Condensed', 'RAVIE': 'Ravie', 'marlett': 'Marlett', 'Candaraz': 'Candara Bold Italic', 'LeelaUIb': 'Leelawadee UI Bold', 'arialbd': 'Arial Bold', 'TCCM____': 'Tw Cen MT Condensed', 'palabi': 'Palatino Linotype Bold Italic', 'CreteRound-Regular': 'Crete Round', 'verdana': 'Verdana', 'LBRITEI': 'Lucida Bright Italic', 'Hansen__': 'Hansen', 'georgiab': 'Georgia Bold', 'Vollkorn-Bold': 'Vollkorn Bold', 'Comfortaa-Bold': 'Comfortaa Bold', 'AGENCYR': 'Agency FB', 'Novem___': 'November', 'ERASMD': 'Eras Medium ITC', 'xfiles': 'X-Files', 'JosefinSlab-SemiBoldItalic': 'Josefin Slab SemiBold Italic', 'FRSCRIPT': 'French Script MT', 'Colbert_': 'Colbert', 'CENTURY': 'Century', 'ebrima': 'Ebrima', 'timesi': 'Times New Roman Italic', 'DOMIN___': 'Dominican', 'GILLUBCD': 'Gill Sans Ultra Bold Condensed', 'CALISTI': 'Calisto MT Italic', 'CALISTBI': 'Calisto MT Bold Italic', 'PRISTINA': 'Pristina', 'Bruss___': 'Brussels', 'Brand___': 'Brandish', 'pala': 'Palatino Linotype', 'LeelUIsl': 'Leelawadee UI Semilight', 'GIL_____': 'Gill Sans MT', 'simplex_': 'Simplex', 'isoct3__': 'ISOCT3', 'digifit': 'Digifit Normal', 'cambriab': 'Cambria Bold', 'Cools___': 'Coolsville', 'BOD_PSTC': 'Bodoni MT Poster Compressed', 'Alfredo_': 'Alfredo', 'mtproxy5': 'Proxy 5', 'isocpeur': 'ISOCPEUR', 'swisscki': 'Swis721 BlkCn BT Black Italic', 'isoct2__': 'ISOCT2', 'Vollkorn-BoldItalic': 'Vollkorn Bold Italic', 'mvboli': 'MV Boli', 'COLONNA': 'Colonna MT', 'BRLNSR': 'Berlin Sans FB', 'yearsupplyoffairycakes': 'Year supply of fairy cakes', 'GARAIT': 'Garamond Italic', 'STENCIL': 'Stencil', 'cracj___': 'Cracked Johnnie', 'DejaVuSansMono-Oblique': 'DejaVu Sans Mono Oblique', 'calibri': 'Calibri', 'timesbd': 'Times New Roman Bold', 'symeteo_': 'Symeteo', 'Vollkorn-Italic': 'Vollkorn Italic', 'HARVEIT_': 'HarvestItal', 'syastro_': 'Syastro', 'candles_': 'Candles', 'Glock___': 'Glockenspiel', 'himalaya': 'Microsoft Himalaya', 'ALGER': 'Algerian', 'WINGDNG2': 'Wingdings 2', 'SCHLBKBI': 'Century Schoolbook Bold Italic', 'TCMI____': 'Tw Cen MT Italic', 'BRADHITC': 'Bradley Hand ITC', 'LTYPE': 'Lucida Sans Typewriter', 'arial': 'Arial', 'JosefinSlab-Thin': 'Josefin Slab Thin', 'nobile_bold': 'Nobile Bold', 'ebrimabd': 'Ebrima Bold', 'LSANSDI': 'Lucida Sans Demibold Italic', 'tahoma': 'Tahoma', 'courbd': 'Courier New Bold', 'BELLI': 'Bell MT Italic', 'SNAP____': 'Snap ITC', 'phagspab': 'Microsoft PhagsPa Bold', 'segoeui': 'Segoe UI', 'swissb': 'Swis721 BT Bold', 'Autumn__': 'Autumn', 'ostrich-regular': 'Ostrich Sans Medium', 'Emmett__': 'Emmett', 'Salina__': 'Salina', 'ANTQUAB': 'Book Antiqua Bold', 'Opinehe_': 'OpineHeavy', 'Manorly_': 'Manorly', 'LeelawUI': 'Leelawadee UI', 'NirmalaB': 'Nirmala UI Bold', 'JUICE___': 'Juice ITC', 'seguisym': 'Segoe UI Symbol', 'ROCCB___': 'Rockwell Condensed Bold', 'Greek_i': 'Greek Diner Inline TT', 'HARLOWSI': 'Harlow Solid Italic Italic', 'LSANSI': 'Lucida Sans Italic', 'seguibli': 'Segoe UI Black Italic', 'BOD_I': 'Bodoni MT Italic', 'ariali': 'Arial Italic', 'calibrii': 'Calibri Italic', 'seguihis': 'Segoe UI Historic', 'constan': 'Constantia', 'SCHLBKI': 'Century Schoolbook Italic', 'JosefinSlab-Light': 'Josefin Slab Light', 'segoeuil': 'Segoe UI Light', 'Lato-Hairline': 'Lato Hairline', 'Lato-LightItalic': 'Lato Light Italic', 'CALIFR': 'Californian FB', 'Lato-Italic': 'Lato Italic', 'Pirate__': 'Pirate', 'LATINWD': 'Wide Latin', 'LTYPEB': 'Lucida Sans Typewriter Bold', 'ONYX': 'Onyx', 'SCHLBKB': 'Century Schoolbook Bold', 'Borea___': 'Borealis', 'eurr____': 'EuroRoman', 'MATURASC': 'Matura MT Script Capitals', 'monbaiti': 'Mongolian Baiti', 'PERBI___': 'Perpetua Bold Italic', 'monotxt_': 'Monotxt', 'seguibl': 'Segoe UI Black', 'OLDENGL': 'Old English Text MT', 'QUIVEIT_': 'QuiverItal', 'asimov': 'Asimov', 'TCB_____': 'Tw Cen MT Bold', 'DAYTON__': 'Dayton', 'TCBI____': 'Tw Cen MT Bold Italic', 'BSSYM7': 'Bookshelf Symbol 7', 'Limou___': 'Limousine', 'malgunsl': 'Malgun Gothic Semilight', 'ERASLGHT': 'Eras Light ITC', 'gothicg_': 'GothicG', 'monos': 'Monospac821 BT Roman', 'TEMPSITC': 'Tempus Sans ITC', 'panroman': 'PanRoman', 'Frnkvent': 'Frankfurter Venetian TT', 'ethnocen': 'Ethnocentric', 'bobcat': 'Bobcat Normal', 'TCCB____': 'Tw Cen MT Condensed Bold', 'neon2': 'Neon Lights', 'SPLASH__': 'Splash', 'Vollkorn-Regular': 'Vollkorn', 'BALTH___': 'Balthazar', 'umath': 'UniversalMath1 BT', 'handmeds': 'Hand Me Down S (BRK)', 'GLSNECB': 'Gill Sans MT Ext Condensed Bold', 'LFAXDI': 'Lucida Fax Demibold Italic', 'ITCEDSCR': 'Edwardian Script ITC', 'monosbi': 'Monospac821 BT Bold Italic', 'Huxley_Titling': 'Huxley Titling', 'babyk___': 'Baby Kruffy', 'BRLNSDB': 'Berlin Sans FB Demi Bold', 'FRABK': 'Franklin Gothic Book', 'BASKVILL': 'Baskerville Old Face', 'Stephen_': 'Stephen', 'mmrtextb': 'Myanmar Text Bold', 'romab___': 'Romantic Bold', 'LSANS': 'Lucida Sans', 'dutchi': 'Dutch801 Rm BT Italic', 'Enliven_': 'Enliven', 'comici': 'Comic Sans MS Italic', 'hollh___': 'Hollywood Hills', 'Lato-Regular': 'Lato', 'CALIST': 'Calisto MT', 'mtproxy9': 'Proxy 9', 'MTEXTRA': 'MT Extra', 'swissci': 'Swis721 Cn BT Italic', 'MAIAN': 'Maiandra GD', 'monosi': 'Monospac821 BT Italic', 'GOTHIC': 'Century Gothic', 'aliee13': 'Alien Encounters', 'scriptc_': 'ScriptC', 'isocteur': 'ISOCTEUR', 'swisscl': 'Swis721 LtCn BT Light', 'constanb': 'Constantia Bold', 'Minerva_': 'Minerva', 'times': 'Times New Roman', 'trebuc': 'Trebuchet MS', 'supef___': 'SuperFrench', 'GOUDYSTO': 'Goudy Stout', 'segoepr': 'Segoe Print', 'PERI____': 'Perpetua Italic', 'bgothm': 'BankGothic Md BT Medium', 'Candara': 'Candara', 'swisscbi': 'Swis721 Cn BT Bold Italic', 'GOTHICI': 'Century Gothic Italic', 'technic_': 'Technic', 'HARVEST_': 'Harvest', 'almosnow': 'Almonte Snow', 'JOKERMAN': 'Jokerman', 'GILB____': 'Gill Sans MT Bold', 'symbol': 'Symbol', 'NirmalaS': 'Nirmala UI Semilight', 'FRAHV': 'Franklin Gothic Heavy', 'VINERITC': 'Viner Hand ITC', 'goodtime': 'Good Times', 'trebucbi': 'Trebuchet MS Bold Italic', 'gazzarelli': 'Gazzarelli', 'framd': 'Franklin Gothic Medium', 'GILBI___': 'Gill Sans MT Bold Italic', 'romantic': 'Romantic', 'nobile_italic': 'Nobile Italic', 'swissko': 'Swis721 BlkOul BT Black', 'segoeuiz': 'Segoe UI Bold Italic', 'Itali___': 'Italianate', 'segoesc': 'Segoe Script', 'JosefinSlab-ThinItalic': 'Josefin Slab Thin Italic', 'SHOWG': 'Showcard Gothic', 'BOD_BI': 'Bodoni MT Bold Italic', 'italic__': 'Italic', 'BRITANIC': 'Britannic Bold', 'Comfortaa-Light': 'Comfortaa Light', 'REFSAN': 'MS Reference Sans Serif', 'PENLIIT_': 'PenultimateLightItal', 'trebucit': 'Trebuchet MS Italic', 'heavyhea2': 'Heavy Heap', 'scripts_': 'ScriptS', 'Bolstbo_': 'BolsterBold Bold', 'mtproxy2': 'Proxy 2', 'constani': 'Constantia Italic', 'Melodbo_': 'MelodBold Bold', '18cents': '18thCentury', 'ROCKI': 'Rockwell Italic', 'ROCK': 'Rockwell', 'HTOWERT': 'High Tower Text', 'cambriaz': 'Cambria Bold Italic', 'ANTIC___': 'AnticFont', 'palai': 'Palatino Linotype Italic', 'BELLB': 'Bell MT Bold', 'JosefinSlab-Bold': 'Josefin Slab Bold', 'swisseb': 'Swis721 Ex BT Bold', 'swissk': 'Swis721 Blk BT Black', 'LFAX': 'Lucida Fax', 'swissek': 'Swis721 BlkEx BT Black', 'mael____': 'Mael', 'Lato-Black': 'Lato Black', 'NIAGENG': 'Niagara Engraved', 'l_10646': 'Lucida Sans Unicode', 'FRADMIT': 'Franklin Gothic Demi Italic', 'Geotype': 'Geotype TT', 'corbelz': 'Corbel Bold Italic', 'tahomabd': 'Tahoma Bold', 'Phrasme_': 'PhrasticMedium', 'swisse': 'Swis721 Ex BT Roman', 'mtproxy1': 'Proxy 1', 'corbelb': 'Corbel Bold', 'narrow': 'PR Celtic Narrow Normal', 'ROCKEB': 'Rockwell Extra Bold', 'LCALLIG': 'Lucida Calligraphy Italic', 'HARNGTON': 'Harrington', 'arialbi': 'Arial Bold Italic', 'snowdrft': 'Snowdrift', 'ITCBLKAD': 'Blackadder ITC', 'ostrich-rounded': 'Ostrich Sans Rounded Medium', 'LFAXD': 'Lucida Fax Demibold', 'COOPBL': 'Cooper Black', 'gothice_': 'GothicE', 'BOD_B': 'Bodoni MT Bold', 'PENUL___': 'Penultimate', 'framdit': 'Franklin Gothic Medium Italic', 'Toledo__': 'Toledo', 'seguili': 'Segoe UI Light Italic', 'GOTHICBI': 'Century Gothic Bold Italic', 'BASTION_': 'Bastion', 'CALISTB': 'Calisto MT Bold', 'swisscli': 'Swis721 LtCn BT Light Italic', 'corbel': 'Corbel', 'ostrich-dashed': 'Ostrich Sans Dashed Medium', 'mtproxy3': 'Proxy 3', 'VALKEN__': 'Valken', 'MISTRAL': 'Mistral', 'nasaliza': 'Nasalization Medium', 'LBRITED': 'Lucida Bright Demibold', 'BOD_CI': 'Bodoni MT Condensed Italic', 'PERTILI': 'Perpetua Titling MT Light', 'ostrich-light': 'Ostrich Sans Condensed Light', 'sanssb__': 'SansSerif Bold', 'INFROMAN': 'Informal Roman', 'consolaz': 'Consolas Bold Italic', 'eurro___': 'EuroRoman Oblique', 'ArchitectsDaughter': 'Architects Daughter', 'couri': 'Courier New Italic', 'VIVALDII': 'Vivaldi Italic', 'symath__': 'Symath', 'BOD_CBI': 'Bodoni MT Condensed Bold Italic', 'CabinSketch-Bold': 'CabinSketch Bold', 'BOOKOS': 'Bookman Old Style', 'GOUDOSB': 'Goudy Old Style Bold', 'JosefinSlab-BoldItalic': 'Josefin Slab Bold Italic', 'phagspa': 'Microsoft PhagsPa', 'sanssbo_': 'SansSerif BoldOblique', 'GARA': 'Garamond', 'BELL': 'Bell MT', 'PermanentMarker': 'Permanent Marker', 'Candarab': 'Candara Bold', 'swiss': 'Swis721 BT Roman', 'OCRAEXT': 'OCR A Extended', 'FTLTLT': 'Footlight MT Light', 'GIGI': 'Gigi', 'swissck': 'Swis721 BlkCn BT Black', 'WINGDNG3': 'Wingdings 3', 'malgun': 'Malgun Gothic', 'isocp___': 'ISOCP', 'COMMONS_': 'Commons', 'Swkeys1': 'SWGamekeys MT', 'JosefinSlab-Regular': 'Josefin Slab', 'dutch': 'Dutch801 Rm BT Roman', 'Haxton': 'Haxton Logos TT', 'CLARE___': 'Clarendon', 'BKANT': 'Book Antiqua', 'ELEPHNTI': 'Elephant Italic', 'ARIALNB': 'Arial Narrow Bold', 'swissel': 'Swis721 LtEx BT Light', 'SamsungIF_Rg': 'Samsung InterFace', 'CALLI___': 'Calligraphic', 'calibrili': 'Calibri Light Italic', 'verdanai': 'Verdana Italic', 'segoescb': 'Segoe Script Bold', 'georgia': 'Georgia', 'lucon': 'Lucida Console', 'Comfortaa-Regular': 'Comfortaa', 'symusic_': 'Symusic', 'seguisb': 'Segoe UI Semibold', 'dutchb': 'Dutch801 Rm BT Bold', 'chinyen': 'Chinyen Normal', 'Tangerine_Regular': 'Tangerine', 'RAGE': 'Rage Italic', 'Lato-BlackItalic': 'Lato Black Italic', 'BOUTON_International_symbols': 'BOUTON International Symbols', 'creerg__': 'Creepygirl', 'swisski': 'Swis721 Blk BT Black Italic', 'SCRIPTBL': 'Script MT Bold', 'LSANSD': 'Lucida Sans Demibold Roman', 'BOD_R': 'Bodoni MT', 'Lato-HairlineItalic': 'Lato Hairline Italic', 'GOUDOS': 'Goudy Old Style', 'PER_____': 'Perpetua', 'courbi': 'Courier New Bold Italic', 'timesbi': 'Times New Roman Bold Italic', 'POORICH': 'Poor Richard', 'consolab': 'Consolas Bold', 'gadugi': 'Gadugi', 'palab': 'Palatino Linotype Bold', 'calibril': 'Calibri Light', 'Nirmala': 'Nirmala UI', 'Roland__': 'Roland', 'swisscbo': 'Swis721 BdCnOul BT Bold Outline', 'sanss___': 'SansSerif', 'ARLRDBD': 'Arial Rounded MT Bold', 'CENSCBK': 'Century Schoolbook', 'CALIFI': 'Californian FB Italic', 'Nunito-Regular': 'Nunito', 'MOONB___': 'Moonbeam', 'isocteui': 'ISOCTEUR Italic', 'compi': 'CommercialPi BT', 'taileb': 'Microsoft Tai Le Bold', 'swissli': 'Swis721 Lt BT Light Italic', 'PENULLI_': 'PenultimateLight', 'Lato-Bold': 'Lato Bold', 'PLAYBILL': 'Playbill', 'LHANDW': 'Lucida Handwriting Italic', 'txt_____': 'Txt', 'swissbi': 'Swis721 BT Bold Italic', 'corbeli': 'Corbel Italic', 'FRAHVIT': 'Franklin Gothic Heavy Italic', 'JosefinSlab-LightItalic': 'Josefin Slab Light Italic', 'SamsungIF_Md': 'Samsung InterFace Medium', 'mtproxy4': 'Proxy 4', 'cityb___': 'CityBlueprint', 'mmrtext': 'Myanmar Text', 'KUNSTLER': 'Kunstler Script', 'isocp2__': 'ISOCP2', 'JosefinSlab-Italic': 'Josefin Slab Italic', 'seguiemj': 'Segoe UI Emoji', 'FRABKIT': 'Franklin Gothic Book Italic', 'constanz': 'Constantia Bold Italic', 'OUTLOOK': 'MS Outlook', 'inductio': 'Induction Normal', 'DejaVuSansMono-BoldOblique': 'DejaVu Sans Mono Bold Oblique', 'Vivian__': 'Vivian', 'ROCKBI': 'Rockwell Bold Italic', 'Candarai': 'Candara Italic', 'littlelo': 'LittleLordFontleroy', 'VLADIMIR': 'Vladimir Script', 'BRLNSB': 'Berlin Sans FB Bold', 'REFSPCL': 'MS Reference Specialty', 'distant galaxy 2': 'Distant Galaxy', 'segoeuii': 'Segoe UI Italic', 'FORTE': 'Forte', 'parryhotter': 'Parry Hotter', 'bnjinx': 'BN Jinx', 'holomdl2': 'HoloLens MDL2 Assets', 'gadugib': 'Gadugi Bold', 'Ameth___': 'Amethyst', 'sansso__': 'SansSerif Oblique', 'MTCORSVA': 'Monotype Corsiva', 'woodcut': 'Woodcut', 'trebucbd': 'Trebuchet MS Bold', 'segoeuib': 'Segoe UI Bold', 'segoeuisl': 'Segoe UI Semilight', 'Corpo___': 'Corporate', 'BOD_BLAR': 'Bodoni MT Black', 'sylfaen': 'Sylfaen', 'FRADMCN': 'Franklin Gothic Demi Cond', 'dutcheb': 'Dutch801 XBd BT Extra Bold', 'NIAGSOL': 'Niagara Solid', 'CreteRound-Italic': 'Crete Round Italic', 'BOD_CR': 'Bodoni MT Condensed', 'CENTAUR': 'Centaur', 'mtproxy8': 'Proxy 8', 'ARIALN': 'Arial Narrow', 'Lato-Light': 'Lato Light', 'LBRITEDI': 'Lucida Bright Demibold Italic', 'stylu': 'Stylus BT Roman', 'micross': 'Microsoft Sans Serif', 'swisscb': 'Swis721 Cn BT Bold', 'PAPYRUS': 'Papyrus', 'symap___': 'Symap', 'taile': 'Microsoft Tai Le', 'greekc__': 'GreekC', 'comic': 'Comic Sans MS', 'ITCKRIST': 'Kristen ITC', 'isocpeui': 'ISOCPEUR Italic', 'malgunbd': 'Malgun Gothic Bold', 'ARIALNI': 'Arial Narrow Italic', 'DejaVuSansMono-Bold': 'DejaVu Sans Mono Bold', 'consola': 'Consolas', 'JosefinSlab-SemiBold': 'Josefin Slab SemiBold', 'Deneane_': 'Deneane', 'Skinny__': 'Skinny', 'italict_': 'ItalicT', 'italicc_': 'ItalicC', 'vinet': 'Vineta BT', 'ntailub': 'Microsoft New Tai Lue Bold', 'techb___': 'TechnicBold', 'webdings': 'Webdings', 'counb___': 'CountryBlueprint', 'georgiaz': 'Georgia Bold Italic', 'BOD_CB': 'Bodoni MT Condensed Bold', 'segoeprb': 'Segoe Print Bold', 'Acme____': 'AcmeFont', 'Lato-BoldItalic': 'Lato Bold Italic', 'Detente_': 'Detente', 'GILC____': 'Gill Sans MT Condensed', 'Whimsy': 'Whimsy TT', 'CURLZ___': 'Curlz MT', 'swissl': 'Swis721 Lt BT Light', 'Tangerine_Bold': 'Tangerine Bold', 'Tarzan__': 'Tarzan', 'GILSANUB': 'Gill Sans Ultra Bold', 'RONDALO_': 'Rondalo', 'ntailu': 'Microsoft New Tai Lue', 'isoct___': 'ISOCT', 'isocp3__': 'ISOCP3', 'GILI____': 'Gill Sans MT Italic', 'msyi': 'Microsoft Yi Baiti', 'LTYPEBO': 'Lucida Sans Typewriter Bold Oblique', 'AGENCYB': 'Agency FB Bold', 'comsc': 'CommercialScript BT', 'BOOKOSI': 'Bookman Old Style Italic', 'complex_': 'Complex', 'bnmachine': 'BN Machine', 'verdanab': 'Verdana Bold', 'FRAMDCN': 'Franklin Gothic Medium Cond', 'MOD20': 'Modern No. 20', 'Nunito-Light': 'Nunito Light', 'ARIALNBI': 'Arial Narrow Bold Italic', 'nobile_bold_italic': 'Nobile Bold Italic', 'FRADM': 'Franklin Gothic Demi', 'comicz': 'Comic Sans MS Bold Italic', 'ltromatic': 'LetterOMatic!', 'swissc': 'Swis721 Cn BT Roman', 'ARIALUNI': 'Arial Unicode MS', 'GOUDOSI': 'Goudy Old Style Italic', 'CALVIN__': 'Calvin', 'wingding': 'Wingdings', 'DejaVuSansMono': 'DejaVu Sans Mono Book', 'PALSCRI': 'Palace Script MT', 'romanc__': 'RomanC', 'ROCKB': 'Rockwell Bold', 'TCM_____': 'Tw Cen MT', 'PERTIBD': 'Perpetua Titling MT Bold', 'ELEPHNT': 'Elephant', 'Gabriola': 'Gabriola', 'IMPRISHA': 'Imprint MT Shadow', 'FREESCPT': 'Freestyle Script', 'Hombre__': 'Hombre', 'ERASBD': 'Eras Bold ITC', 'Pacifico': 'Pacifico', 'gothici_': 'GothicI', 'fingerpop2': 'Fingerpop', 'FELIXTI': 'Felix Titling', 'COPRGTL': 'Copperplate Gothic Light', 'calibriz': 'Calibri Bold Italic', 'romai___': 'Romantic Italic', 'javatext': 'Javanese Text', 'BRUSHSCI': 'Brush Script MT Italic', 'HTOWERTI': 'High Tower Text Italic', 'nobile': 'Nobile', 'ROCC____': 'Rockwell Condensed', 'BROADW': 'Broadway', 'PERB____': 'Perpetua Bold', 'seguisbi': 'Segoe UI Semibold Italic', 'consolai': 'Consolas Italic', 'ANTQUABI': 'Book Antiqua Bold Italic', 'BOD_BLAI': 'Bodoni MT Black Italic', 'HATTEN': 'Haettenschweiler', 'LBRITE': 'Lucida Bright', 'romand__': 'RomanD', 'impact': 'Impact', 'Waverly_': 'Waverly', 'swissi': 'Swis721 BT Italic', 'CHILLER': 'Chiller', 'BOOKOSBI': 'Bookman Old Style Bold Italic', 'TCCEB': 'Tw Cen MT Condensed Extra Bold', 'ostrich-bold': 'Ostrich Sans Bold', 'romant__': 'RomanT', 'seguisli': 'Segoe UI Semilight Italic', 'Notram__': 'Notram', 'comicbd': 'Comic Sans MS Bold', 'LFAXI': 'Lucida Fax Italic', 'terminat': 'Terminator Two', 'CASTELAR': 'Castellar', 'romans__': 'RomanS', 'cambriai': 'Cambria Italic', 'verdanaz': 'Verdana Bold Italic', 'BAUHS93': 'Bauhaus 93', 'CALIFB': 'Californian FB Bold', 'swissbo': 'Swis721 BdOul BT Bold', 'dutchbi': 'Dutch801 Rm BT Bold Italic', 'monosb': 'Monospac821 BT Bold', 'PARCHM': 'Parchment', 'Mycalc__': 'Mycalc', 'simsunb': 'SimSun-ExtB', 'mtproxy7': 'Proxy 7', 'flubber': 'Flubber', 'segmdl2': 'Segoe MDL2 Assets', 'bgothl': 'BankGothic Lt BT Light', 'ariblk': 'Arial Black', 'BERNHC': 'Bernard MT Condensed', 'COPRGTB': 'Copperplate Gothic Bold', 'LTYPEO': 'Lucida Sans Typewriter Oblique', 'MAGNETOB': 'Magneto Bold', 'GARABD': 'Garamond Bold', 'mtproxy6': 'Proxy 6'}
+    
+def _ttf_fonts():
+# in order to gain speed and avoid problems with calling ImgeFont.truetype too often, first we look in _std_fonts().
+# if not found there, the information from the font file is used.
+# this function returns a dictionary with references from the upperalpha'd filename and the upperalpha'd  description 
+    
+    font_dict={}
+    for file in glob.glob(r'c:\windows\fonts\*.ttf'):
+        fn=os.path.basename(file).split('.')[0]
+        if fn in _std_fonts():
+            font_dict[upperalpha(fn)]=fn
+            font_dict[upperalpha(_std_fonts()[fn])]=fn
+        else:
+            f = ImageFont.truetype(file, 12)
+            if f is not None:
+                if str(f.font.style).lower()=='regular':
+                    fullname=str(f.font.family)
+                else:
+                    fullname=str(f.font.family)+' '+str(f.font.style)     
+                font_dict[upperalpha(fn)]=fn
+                font_dict[upperalpha(fullname)]=fn
+    return font_dict
+        
+def _pythonista_fonts():
+# this function returns a dictionary with references from the upperalpha'd font name     
+    UIFont = objc_util.ObjCClass('UIFont')
+    
+    font_dict={}
+    for family in UIFont.familyNames():
+        family=str(family)
+        try:
+            PIL.ImageFont.truetype(family)
+            font_dict[upperalpha(family)]=family
+        except:
+            pass
+
+        for name in UIFont.fontNamesForFamilyName_(family):
+            name=str(name)
+            font_dict[upperalpha(name)]=name
+    return font_dict
+     
+def _fonts():
+    if Pythonista:
+        return _pythonista_fonts()
+    else:
+        return _ttf_fonts()
+             
+def _show_pythonista_fonts():
+    fontnames=sorted(_pythonista_fonts().values(),key=str.lower)
+    for font in fontnames:
+        print(font)
+
+def _show_ttf_fonts():
+    for file in glob.glob(r'c:\windows\fonts\*.ttf'):
+        fn=os.path.basename(file).split('.')[0]
+        if fn in _std_fonts():
+            print('{:35s}{}'.format(_std_fonts()[fn],fn))
+        else:
+            f = ImageFont.truetype(file, 12)
+            if f is not None:
+                fullname=str(f.font.family)+' '+str(f.font.style)    
+                print('{:35s}{}'.format(fullname,fn))
+
+def show_fonts():
+    '''
+    show all available fonts on this machine
+    '''
+    
+    if Pythonista:
+        _show_pythonista_fonts()
+    else:
+        _show_ttf_fonts()
+
+def show_colornames():
+    '''
+    show all available colours
+    '''
+
+    names=sorted(colornames().keys())
+    for name in names:
+        print('{:22s}{}'.format(name,colornames()[name]))
+ 
+def default_env():
+    return _default_env
+       
+def main():
+    return _default_env._main
+
+ 
 if __name__ == '__main__':
     try:
         import salabim_test
