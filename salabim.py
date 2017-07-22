@@ -348,7 +348,7 @@ class Queue(object):
         print('  minimum_length        ',self.minimum_length)
         print('  maximum_length        ',self.maximum_length)
         print('  mean_length_of_stay   ',self.mean_length_of_stay)                
-        print('  maximum_length_of_stay',self.minimum_length_of_stay)                
+        print('  minimum_length_of_stay',self.minimum_length_of_stay)                
         print('  maximum_length_of_stay',self.maximum_length_of_stay)                        
         print('  number_passed         ',self.number_passed)                                    
         print('  number_passed_direct  ',self.number_passed_direct)                                        
@@ -4223,7 +4223,7 @@ class Triangular(_Distribution):
             raise AssertionError('high<mode')
         self._low=low
         self._high=high
-        self.mode=mode
+        self._mode=mode
         if randomstream is None:
             self.randomstream=random
         else:
