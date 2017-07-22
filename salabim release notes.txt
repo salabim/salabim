@@ -1,6 +1,13 @@
 Salabim release notes
 
-version 1.1.2
+version 1.1.3  2017-07-22
+=========================
+Pythonista could not handle the long one line statement defining the std_fonts.
+Therefore the definition of the dictionary is now in several lines of maximal 80
+characters. The table is now also sorted (only for cosmetic reasons).
+The colornames dictionary is now sorted (only for cosmetic reasons).
+
+version 1.1.2  2017-07-20
 =========================
 Under the hood restructuring of classes, thus enabling overriding.
 
@@ -24,7 +31,7 @@ a random seed value is specified, usually when defining an Environment.
 
 All sample programs are defined in such a way that they give reproducible results.
 
-main is not longer a global variable. You can use either the main
+main is no longer a global variable. You can use either the main
 property in Component or Environment classes or just main() from the
 salabim module, e.g. with sim.main()
 

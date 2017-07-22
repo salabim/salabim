@@ -72,7 +72,7 @@ except:
     inf=float('inf')
     nan=float('nan')
 
-__version__='1.1.2'
+__version__='1.1.3'
 
 data='data'
 current='current'
@@ -1661,7 +1661,7 @@ class Environment(object):
                 break
             except:
                 pass
-            ifont=self.fonts().get(upperalpha(ifont))
+            ifont=self.fonts().get(normalize(ifont))
             if ifont!=None:
                 try:
                     font=ImageFont.truetype(font=ifont,size=int(fontsize))
@@ -4117,14 +4117,20 @@ class Normal(_Distribution):
     
     Normal(mean,standard_deviation,randomstream)
     
-    arguments:
-        mean                mean of the distribution
-        standard_deviation  standard deviation of the distribution
-                            must be >=0
-        randomstream        randomstream
-                            if omitted, random will be used
-                            if used as random.Random(12299)
-                              it assigns a new stream with the specified seed
+    Parameters:
+    -----------
+    mean : float
+        mean of the distribution
+        
+    standard_deviation : float
+        standard deviation of the distribution |n|
+        must be >=0
+
+    randomstream: randomstream
+        randomstream to be used |n|
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
     '''
     def __init__(self,mean,standard_deviation,randomstream=None):
         if standard_deviation<0:
@@ -4730,41 +4736,59 @@ class Resource(object):
         return self._sequence_number  
 
 def colornames():
-    return {'fuchsia': '#FF00FF', '': '#00000000', 'transparent': '#00000000', 'palevioletred': '#DB7093',
-    'skyblue': '#87CEEB', 'paleturquoise': '#AFEEEE', 'cadetblue': '#5F9EA0', 'orangered': '#FF4500', 
-    'steelblue': '#4682B4', 'dimgray': '#696969', 'darkseagreen': '#8FBC8F', '60%gray': '#999999', 
-    'royalblue': '#4169E1', 'mediumblue': '#0000CD', 'goldenrod': '#DAA520', 'mediumvioletred': '#C71585',
-    'blueviolet': '#8A2BE2', 'gainsboro': '#DCDCDC', 'darkred': '#8B0000', 'rosybrown': '#BC8F8F',
-    'gold': '#FFD700', 'coral': '#FF7F50', 'white': '#FFFFFF', 'darkcyan': '#008B8B', 'black': '#000000', 
-    'orchid': '#DA70D6', 'mediumturquoise': '#48D1CC', 'lightgreen': '#90EE90', 'lime': '#00FF00', 
-    'papayawhip': '#FFEFD5', 'chocolate': '#D2691E', '40%gray': '#666666', 'oldlace': '#FDF5E6', 
-    'darkblue': '#00008B', 'silver': '#C0C0C0', 'aquamarine': '#7FFFD4', 'lightcoral': '#F08080', 'cyan': '#00FFFF', 
-    'dodgerblue': '#1E90FF', '10%gray': '#191919', 'midnightblue': '#191970', 'green': '#008000', 
-    'lightsalmon': '#FFA07A', 'azure': '#F0FFFF', 'red': '#FF0000', 'lightpink': '#FFB6C1', 'whitesmoke': '#F5F5F5',
-    'yellow': '#FFFF00', 'lawngreen': '#7CFC00', 'magenta': '#FF00FF', 'lightsteelblue': '#B0C4DE', 
-    'olivedrab': '#6B8E23', 'lightslategray': '#778899', 'slategray': '#708090', 'lightblue': '#ADD8E6', 
-    'moccasin': '#FFE4B5', 'mediumspringgreen': '#00FA9A', 'lightgray': '#D3D3D3', 'seashell': '#FFF5EE',
-    'darkkhaki': '#BDB76B', 'slateblue': '#6A5ACD', 'aqua': '#00FFFF', 'palegoldenrod': '#EEE8AA', 
-    'deeppink': '#FF1493', 'darkgreen': '#006400', 'blanchedalmond': '#FFEBCD', 'turquoise': '#40E0D0', 
-    'navy': '#000080', 'tomato': '#FF6347', 'yellowgreen': '#9ACD32', 'peachpuff': '#FFDAB9', '30%gray': '#464646', 
-    'pink': '#FFC0CB', 'palegreen': '#98FB98', 'lightskyblue': '#87CEFA', 'chartreuse': '#7FFF00', 
-    'mediumorchid': '#BA55D3', 'olive': '#808000', 'darkorange': '#FF8C00', 'beige': '#F5F5DC', 
-    'forestgreen': '#228B22', 'mediumpurple': '#9370DB', 'mintcream': '#F5FFFA', 'hotpink': '#FF69B4', 
-    'darkgoldenrod': '#B8860B', 'powderblue': '#B0E0E6', 'honeydew': '#F0FFF0', 'salmon': '#FA8072', 
-    'snow': '#FFFAFA', 'mistyrose': '#FFE4E1', 'khaki': '#F0E68C', 'mediumaquamarine': '#66CDAA', 
-    'darksalmon': '#E9967A', 'aliceblue': '#F0F8FF', 'darkturquoise': '#00CED1', 'lightyellow': '#FFFFE0', 
-    'wheat': '#F5DEB3', 'lightseagreen': '#20B2AA', 'lightcyan': '#E0FFFF', 'antiquewhite': '#FAEBD7', 
-    'saddlebrown': '#8B4513', 'mediumseagreen': '#3CB371', '70%gray': '#B2B2B2', 'sienna': '#A0522D', 
-    'cornflowerblue': '#6495ED', 'seagreen': '#2E8B57', 'floralwhite': '#FFFAF0', 'ivory': '#FFFFF0', 'cornsilk': '#FFF8DC', 'indianred': '#CD5C5C', 'plum': '#DDA0DD', '90%gray': '#E6E6E6', 'greenyellow': '#ADFF2F', 
-    'teal': '#008080', 'brown': '#A52A2A', 'darkslategray': '#2F4F4F', 'purple': '#800080', 'violet': '#EE82EE', 
-    'deepskyblue': '#00BFFF', 'ghostwhite': '#F8F8FF', 'burlywood': '#DEB887', 'blue': '#0000FF', 'crimson': '#DC143C', 'indigo': '#4B0082', '20%gray': '#333333', 'darkmagenta': '#8B008B', '80%gray': '#CCCCCC', 
-    'lightgoldenrodyellow': '#FAFAD2', 'tan': '#D2B48C', 'limegreen': '#32CD32', 'lemonchiffon': '#FFFACD', 
-    'bisque': '#FFE4C4', 'firebrick': '#B22222', 'navajowhite': '#FFDEAD', 'none': '#00000000', 'maroon': '#800000', 
-    '50%gray': '#7F7F7F', 'darkgray': '#A9A9A9', 'orange': '#FFA500', 'lavenderblush': '#FFF0F5', 
-    'darkorchid': '#9932CC', 'lavender': '#E6E6FA', 'springgreen': '#00FF7F', 'thistle': '#D8BFD8', 
-    'linen': '#FAF0E6', 'darkolivegreen': '#556B2F', 'darkslateblue': '#483D8B', 'gray': '#808080', 
-    'darkviolet': '#9400D3', 'peru': '#CD853F', 'sandybrown': '#FAA460', 'mediumslateblue': '#7B68EE'}
-
+    return {'':'#00000000','10%gray':'#191919','20%gray':'#333333',
+    '30%gray':'#464646','40%gray':'#666666','50%gray':'#7F7F7F',
+    '60%gray':'#999999','70%gray':'#B2B2B2','80%gray':'#CCCCCC',
+    '90%gray':'#E6E6E6','aliceblue':'#F0F8FF','antiquewhite':'#FAEBD7',
+    'aqua':'#00FFFF','aquamarine':'#7FFFD4','azure':'#F0FFFF',
+    'beige':'#F5F5DC','bisque':'#FFE4C4','black':'#000000',
+    'blanchedalmond':'#FFEBCD','blue':'#0000FF','blueviolet':'#8A2BE2',
+    'brown':'#A52A2A','burlywood':'#DEB887','cadetblue':'#5F9EA0',
+    'chartreuse':'#7FFF00','chocolate':'#D2691E','coral':'#FF7F50',
+    'cornflowerblue':'#6495ED','cornsilk':'#FFF8DC','crimson':'#DC143C',
+    'cyan':'#00FFFF','darkblue':'#00008B','darkcyan':'#008B8B',
+    'darkgoldenrod':'#B8860B','darkgray':'#A9A9A9','darkgreen':'#006400',
+    'darkkhaki':'#BDB76B','darkmagenta':'#8B008B','darkolivegreen':'#556B2F',
+    'darkorange':'#FF8C00','darkorchid':'#9932CC','darkred':'#8B0000',
+    'darksalmon':'#E9967A','darkseagreen':'#8FBC8F','darkslateblue':'#483D8B',
+    'darkslategray':'#2F4F4F','darkturquoise':'#00CED1','darkviolet':'#9400D3',
+    'deeppink':'#FF1493','deepskyblue':'#00BFFF','dimgray':'#696969',
+    'dodgerblue':'#1E90FF','firebrick':'#B22222','floralwhite':'#FFFAF0',
+    'forestgreen':'#228B22','fuchsia':'#FF00FF','gainsboro':'#DCDCDC',
+    'ghostwhite':'#F8F8FF','gold':'#FFD700','goldenrod':'#DAA520',
+    'gray':'#808080','green':'#008000','greenyellow':'#ADFF2F',
+    'honeydew':'#F0FFF0','hotpink':'#FF69B4','indianred':'#CD5C5C',
+    'indigo':'#4B0082','ivory':'#FFFFF0','khaki':'#F0E68C',
+    'lavender':'#E6E6FA','lavenderblush':'#FFF0F5','lawngreen':'#7CFC00',
+    'lemonchiffon':'#FFFACD','lightblue':'#ADD8E6','lightcoral':'#F08080',
+    'lightcyan':'#E0FFFF','lightgoldenrodyellow':'#FAFAD2',
+    'lightgray':'#D3D3D3','lightgreen':'#90EE90','lightpink':'#FFB6C1',
+    'lightsalmon':'#FFA07A','lightseagreen':'#20B2AA','lightskyblue':'#87CEFA',
+    'lightslategray':'#778899','lightsteelblue':'#B0C4DE',
+    'lightyellow':'#FFFFE0','lime':'#00FF00','limegreen':'#32CD32',
+    'linen':'#FAF0E6','magenta':'#FF00FF','maroon':'#800000',
+    'mediumaquamarine':'#66CDAA','mediumblue':'#0000CD',
+    'mediumorchid':'#BA55D3','mediumpurple':'#9370DB',
+    'mediumseagreen':'#3CB371','mediumslateblue':'#7B68EE',
+    'mediumspringgreen':'#00FA9A','mediumturquoise':'#48D1CC',
+    'mediumvioletred':'#C71585','midnightblue':'#191970','mintcream':'#F5FFFA',
+    'mistyrose':'#FFE4E1','moccasin':'#FFE4B5','navajowhite':'#FFDEAD',
+    'navy':'#000080','none':'#00000000','oldlace':'#FDF5E6','olive':'#808000',
+    'olivedrab':'#6B8E23','orange':'#FFA500','orangered':'#FF4500',
+    'orchid':'#DA70D6','palegoldenrod':'#EEE8AA','palegreen':'#98FB98',
+    'paleturquoise':'#AFEEEE','palevioletred':'#DB7093','papayawhip':'#FFEFD5',
+    'peachpuff':'#FFDAB9','peru':'#CD853F','pink':'#FFC0CB','plum':'#DDA0DD',
+    'powderblue':'#B0E0E6','purple':'#800080','red':'#FF0000',
+    'rosybrown':'#BC8F8F','royalblue':'#4169E1','saddlebrown':'#8B4513',
+    'salmon':'#FA8072','sandybrown':'#FAA460','seagreen':'#2E8B57',
+    'seashell':'#FFF5EE','sienna':'#A0522D','silver':'#C0C0C0',
+    'skyblue':'#87CEEB','slateblue':'#6A5ACD','slategray':'#708090',
+    'snow':'#FFFAFA','springgreen':'#00FF7F','steelblue':'#4682B4',
+    'tan':'#D2B48C','teal':'#008080','thistle':'#D8BFD8','tomato':'#FF6347',
+    'transparent':'#00000000','turquoise':'#40E0D0','violet':'#EE82EE',
+    'wheat':'#F5DEB3','white':'#FFFFFF','whitesmoke':'#F5F5F5',
+    'yellow':'#FFFF00','yellowgreen':'#9ACD32'}
+    
 def colorspec_to_tuple(colorspec):
     if isinstance(colorspec,(tuple,list)):
         if len(colorspec)==2:
@@ -4912,10 +4936,10 @@ def pad(txt,n):
 def rpad(txt,n):
     return txt.rjust(n)[:n]
     
-def upperalpha(s):
+def normalize(s):
     res=''
     for c in s.upper():
-        if c.isalpha():
+        if (c.isalpha() or c.isdigit()):
             res=res+c
     return res
                 
@@ -4975,20 +4999,287 @@ def pythonistacolor(c):
     return (c[0]/255,c[1]/255,c[2]/255,c[3]/255)
 
 def _std_fonts():
-# the names of the standard fonts are generated by ttf fontdict.py onn the standard development machine
-    return {'BOOKOSB': 'Bookman Old Style Bold', 'Martina_': 'Martina', 'gdt_____': 'GDT', 'ENGR': 'Engravers MT', 'GOTHICB': 'Century Gothic Bold', 'ostrich-black': 'Ostrich Sans Black', 'ERASDEMI': 'Eras Demi ITC', 'cour': 'Courier New', 'greeks__': 'GreekS', 'Rowdyhe_': 'RowdyHeavy', 'georgiai': 'Georgia Italic', 'Blackout-2am': 'Blackout 2 AM', 'Steppes': 'Steppes TT', 'calibrib': 'Calibri Bold', 'Russrite': 'Russel Write TT', 'sf movie poster2': 'SF Movie Poster', 'techl___': 'TechnicLite', 'ANTQUAI': 'Book Antiqua Italic', 'GLECB': 'Gloucester MT Extra Condensed', 'RAVIE': 'Ravie', 'marlett': 'Marlett', 'Candaraz': 'Candara Bold Italic', 'LeelaUIb': 'Leelawadee UI Bold', 'arialbd': 'Arial Bold', 'TCCM____': 'Tw Cen MT Condensed', 'palabi': 'Palatino Linotype Bold Italic', 'CreteRound-Regular': 'Crete Round', 'verdana': 'Verdana', 'LBRITEI': 'Lucida Bright Italic', 'Hansen__': 'Hansen', 'georgiab': 'Georgia Bold', 'Vollkorn-Bold': 'Vollkorn Bold', 'Comfortaa-Bold': 'Comfortaa Bold', 'AGENCYR': 'Agency FB', 'Novem___': 'November', 'ERASMD': 'Eras Medium ITC', 'xfiles': 'X-Files', 'JosefinSlab-SemiBoldItalic': 'Josefin Slab SemiBold Italic', 'FRSCRIPT': 'French Script MT', 'Colbert_': 'Colbert', 'CENTURY': 'Century', 'ebrima': 'Ebrima', 'timesi': 'Times New Roman Italic', 'DOMIN___': 'Dominican', 'GILLUBCD': 'Gill Sans Ultra Bold Condensed', 'CALISTI': 'Calisto MT Italic', 'CALISTBI': 'Calisto MT Bold Italic', 'PRISTINA': 'Pristina', 'Bruss___': 'Brussels', 'Brand___': 'Brandish', 'pala': 'Palatino Linotype', 'LeelUIsl': 'Leelawadee UI Semilight', 'GIL_____': 'Gill Sans MT', 'simplex_': 'Simplex', 'isoct3__': 'ISOCT3', 'digifit': 'Digifit Normal', 'cambriab': 'Cambria Bold', 'Cools___': 'Coolsville', 'BOD_PSTC': 'Bodoni MT Poster Compressed', 'Alfredo_': 'Alfredo', 'mtproxy5': 'Proxy 5', 'isocpeur': 'ISOCPEUR', 'swisscki': 'Swis721 BlkCn BT Black Italic', 'isoct2__': 'ISOCT2', 'Vollkorn-BoldItalic': 'Vollkorn Bold Italic', 'mvboli': 'MV Boli', 'COLONNA': 'Colonna MT', 'BRLNSR': 'Berlin Sans FB', 'yearsupplyoffairycakes': 'Year supply of fairy cakes', 'GARAIT': 'Garamond Italic', 'STENCIL': 'Stencil', 'cracj___': 'Cracked Johnnie', 'DejaVuSansMono-Oblique': 'DejaVu Sans Mono Oblique', 'calibri': 'Calibri', 'timesbd': 'Times New Roman Bold', 'symeteo_': 'Symeteo', 'Vollkorn-Italic': 'Vollkorn Italic', 'HARVEIT_': 'HarvestItal', 'syastro_': 'Syastro', 'candles_': 'Candles', 'Glock___': 'Glockenspiel', 'himalaya': 'Microsoft Himalaya', 'ALGER': 'Algerian', 'WINGDNG2': 'Wingdings 2', 'SCHLBKBI': 'Century Schoolbook Bold Italic', 'TCMI____': 'Tw Cen MT Italic', 'BRADHITC': 'Bradley Hand ITC', 'LTYPE': 'Lucida Sans Typewriter', 'arial': 'Arial', 'JosefinSlab-Thin': 'Josefin Slab Thin', 'nobile_bold': 'Nobile Bold', 'ebrimabd': 'Ebrima Bold', 'LSANSDI': 'Lucida Sans Demibold Italic', 'tahoma': 'Tahoma', 'courbd': 'Courier New Bold', 'BELLI': 'Bell MT Italic', 'SNAP____': 'Snap ITC', 'phagspab': 'Microsoft PhagsPa Bold', 'segoeui': 'Segoe UI', 'swissb': 'Swis721 BT Bold', 'Autumn__': 'Autumn', 'ostrich-regular': 'Ostrich Sans Medium', 'Emmett__': 'Emmett', 'Salina__': 'Salina', 'ANTQUAB': 'Book Antiqua Bold', 'Opinehe_': 'OpineHeavy', 'Manorly_': 'Manorly', 'LeelawUI': 'Leelawadee UI', 'NirmalaB': 'Nirmala UI Bold', 'JUICE___': 'Juice ITC', 'seguisym': 'Segoe UI Symbol', 'ROCCB___': 'Rockwell Condensed Bold', 'Greek_i': 'Greek Diner Inline TT', 'HARLOWSI': 'Harlow Solid Italic Italic', 'LSANSI': 'Lucida Sans Italic', 'seguibli': 'Segoe UI Black Italic', 'BOD_I': 'Bodoni MT Italic', 'ariali': 'Arial Italic', 'calibrii': 'Calibri Italic', 'seguihis': 'Segoe UI Historic', 'constan': 'Constantia', 'SCHLBKI': 'Century Schoolbook Italic', 'JosefinSlab-Light': 'Josefin Slab Light', 'segoeuil': 'Segoe UI Light', 'Lato-Hairline': 'Lato Hairline', 'Lato-LightItalic': 'Lato Light Italic', 'CALIFR': 'Californian FB', 'Lato-Italic': 'Lato Italic', 'Pirate__': 'Pirate', 'LATINWD': 'Wide Latin', 'LTYPEB': 'Lucida Sans Typewriter Bold', 'ONYX': 'Onyx', 'SCHLBKB': 'Century Schoolbook Bold', 'Borea___': 'Borealis', 'eurr____': 'EuroRoman', 'MATURASC': 'Matura MT Script Capitals', 'monbaiti': 'Mongolian Baiti', 'PERBI___': 'Perpetua Bold Italic', 'monotxt_': 'Monotxt', 'seguibl': 'Segoe UI Black', 'OLDENGL': 'Old English Text MT', 'QUIVEIT_': 'QuiverItal', 'asimov': 'Asimov', 'TCB_____': 'Tw Cen MT Bold', 'DAYTON__': 'Dayton', 'TCBI____': 'Tw Cen MT Bold Italic', 'BSSYM7': 'Bookshelf Symbol 7', 'Limou___': 'Limousine', 'malgunsl': 'Malgun Gothic Semilight', 'ERASLGHT': 'Eras Light ITC', 'gothicg_': 'GothicG', 'monos': 'Monospac821 BT Roman', 'TEMPSITC': 'Tempus Sans ITC', 'panroman': 'PanRoman', 'Frnkvent': 'Frankfurter Venetian TT', 'ethnocen': 'Ethnocentric', 'bobcat': 'Bobcat Normal', 'TCCB____': 'Tw Cen MT Condensed Bold', 'neon2': 'Neon Lights', 'SPLASH__': 'Splash', 'Vollkorn-Regular': 'Vollkorn', 'BALTH___': 'Balthazar', 'umath': 'UniversalMath1 BT', 'handmeds': 'Hand Me Down S (BRK)', 'GLSNECB': 'Gill Sans MT Ext Condensed Bold', 'LFAXDI': 'Lucida Fax Demibold Italic', 'ITCEDSCR': 'Edwardian Script ITC', 'monosbi': 'Monospac821 BT Bold Italic', 'Huxley_Titling': 'Huxley Titling', 'babyk___': 'Baby Kruffy', 'BRLNSDB': 'Berlin Sans FB Demi Bold', 'FRABK': 'Franklin Gothic Book', 'BASKVILL': 'Baskerville Old Face', 'Stephen_': 'Stephen', 'mmrtextb': 'Myanmar Text Bold', 'romab___': 'Romantic Bold', 'LSANS': 'Lucida Sans', 'dutchi': 'Dutch801 Rm BT Italic', 'Enliven_': 'Enliven', 'comici': 'Comic Sans MS Italic', 'hollh___': 'Hollywood Hills', 'Lato-Regular': 'Lato', 'CALIST': 'Calisto MT', 'mtproxy9': 'Proxy 9', 'MTEXTRA': 'MT Extra', 'swissci': 'Swis721 Cn BT Italic', 'MAIAN': 'Maiandra GD', 'monosi': 'Monospac821 BT Italic', 'GOTHIC': 'Century Gothic', 'aliee13': 'Alien Encounters', 'scriptc_': 'ScriptC', 'isocteur': 'ISOCTEUR', 'swisscl': 'Swis721 LtCn BT Light', 'constanb': 'Constantia Bold', 'Minerva_': 'Minerva', 'times': 'Times New Roman', 'trebuc': 'Trebuchet MS', 'supef___': 'SuperFrench', 'GOUDYSTO': 'Goudy Stout', 'segoepr': 'Segoe Print', 'PERI____': 'Perpetua Italic', 'bgothm': 'BankGothic Md BT Medium', 'Candara': 'Candara', 'swisscbi': 'Swis721 Cn BT Bold Italic', 'GOTHICI': 'Century Gothic Italic', 'technic_': 'Technic', 'HARVEST_': 'Harvest', 'almosnow': 'Almonte Snow', 'JOKERMAN': 'Jokerman', 'GILB____': 'Gill Sans MT Bold', 'symbol': 'Symbol', 'NirmalaS': 'Nirmala UI Semilight', 'FRAHV': 'Franklin Gothic Heavy', 'VINERITC': 'Viner Hand ITC', 'goodtime': 'Good Times', 'trebucbi': 'Trebuchet MS Bold Italic', 'gazzarelli': 'Gazzarelli', 'framd': 'Franklin Gothic Medium', 'GILBI___': 'Gill Sans MT Bold Italic', 'romantic': 'Romantic', 'nobile_italic': 'Nobile Italic', 'swissko': 'Swis721 BlkOul BT Black', 'segoeuiz': 'Segoe UI Bold Italic', 'Itali___': 'Italianate', 'segoesc': 'Segoe Script', 'JosefinSlab-ThinItalic': 'Josefin Slab Thin Italic', 'SHOWG': 'Showcard Gothic', 'BOD_BI': 'Bodoni MT Bold Italic', 'italic__': 'Italic', 'BRITANIC': 'Britannic Bold', 'Comfortaa-Light': 'Comfortaa Light', 'REFSAN': 'MS Reference Sans Serif', 'PENLIIT_': 'PenultimateLightItal', 'trebucit': 'Trebuchet MS Italic', 'heavyhea2': 'Heavy Heap', 'scripts_': 'ScriptS', 'Bolstbo_': 'BolsterBold Bold', 'mtproxy2': 'Proxy 2', 'constani': 'Constantia Italic', 'Melodbo_': 'MelodBold Bold', '18cents': '18thCentury', 'ROCKI': 'Rockwell Italic', 'ROCK': 'Rockwell', 'HTOWERT': 'High Tower Text', 'cambriaz': 'Cambria Bold Italic', 'ANTIC___': 'AnticFont', 'palai': 'Palatino Linotype Italic', 'BELLB': 'Bell MT Bold', 'JosefinSlab-Bold': 'Josefin Slab Bold', 'swisseb': 'Swis721 Ex BT Bold', 'swissk': 'Swis721 Blk BT Black', 'LFAX': 'Lucida Fax', 'swissek': 'Swis721 BlkEx BT Black', 'mael____': 'Mael', 'Lato-Black': 'Lato Black', 'NIAGENG': 'Niagara Engraved', 'l_10646': 'Lucida Sans Unicode', 'FRADMIT': 'Franklin Gothic Demi Italic', 'Geotype': 'Geotype TT', 'corbelz': 'Corbel Bold Italic', 'tahomabd': 'Tahoma Bold', 'Phrasme_': 'PhrasticMedium', 'swisse': 'Swis721 Ex BT Roman', 'mtproxy1': 'Proxy 1', 'corbelb': 'Corbel Bold', 'narrow': 'PR Celtic Narrow Normal', 'ROCKEB': 'Rockwell Extra Bold', 'LCALLIG': 'Lucida Calligraphy Italic', 'HARNGTON': 'Harrington', 'arialbi': 'Arial Bold Italic', 'snowdrft': 'Snowdrift', 'ITCBLKAD': 'Blackadder ITC', 'ostrich-rounded': 'Ostrich Sans Rounded Medium', 'LFAXD': 'Lucida Fax Demibold', 'COOPBL': 'Cooper Black', 'gothice_': 'GothicE', 'BOD_B': 'Bodoni MT Bold', 'PENUL___': 'Penultimate', 'framdit': 'Franklin Gothic Medium Italic', 'Toledo__': 'Toledo', 'seguili': 'Segoe UI Light Italic', 'GOTHICBI': 'Century Gothic Bold Italic', 'BASTION_': 'Bastion', 'CALISTB': 'Calisto MT Bold', 'swisscli': 'Swis721 LtCn BT Light Italic', 'corbel': 'Corbel', 'ostrich-dashed': 'Ostrich Sans Dashed Medium', 'mtproxy3': 'Proxy 3', 'VALKEN__': 'Valken', 'MISTRAL': 'Mistral', 'nasaliza': 'Nasalization Medium', 'LBRITED': 'Lucida Bright Demibold', 'BOD_CI': 'Bodoni MT Condensed Italic', 'PERTILI': 'Perpetua Titling MT Light', 'ostrich-light': 'Ostrich Sans Condensed Light', 'sanssb__': 'SansSerif Bold', 'INFROMAN': 'Informal Roman', 'consolaz': 'Consolas Bold Italic', 'eurro___': 'EuroRoman Oblique', 'ArchitectsDaughter': 'Architects Daughter', 'couri': 'Courier New Italic', 'VIVALDII': 'Vivaldi Italic', 'symath__': 'Symath', 'BOD_CBI': 'Bodoni MT Condensed Bold Italic', 'CabinSketch-Bold': 'CabinSketch Bold', 'BOOKOS': 'Bookman Old Style', 'GOUDOSB': 'Goudy Old Style Bold', 'JosefinSlab-BoldItalic': 'Josefin Slab Bold Italic', 'phagspa': 'Microsoft PhagsPa', 'sanssbo_': 'SansSerif BoldOblique', 'GARA': 'Garamond', 'BELL': 'Bell MT', 'PermanentMarker': 'Permanent Marker', 'Candarab': 'Candara Bold', 'swiss': 'Swis721 BT Roman', 'OCRAEXT': 'OCR A Extended', 'FTLTLT': 'Footlight MT Light', 'GIGI': 'Gigi', 'swissck': 'Swis721 BlkCn BT Black', 'WINGDNG3': 'Wingdings 3', 'malgun': 'Malgun Gothic', 'isocp___': 'ISOCP', 'COMMONS_': 'Commons', 'Swkeys1': 'SWGamekeys MT', 'JosefinSlab-Regular': 'Josefin Slab', 'dutch': 'Dutch801 Rm BT Roman', 'Haxton': 'Haxton Logos TT', 'CLARE___': 'Clarendon', 'BKANT': 'Book Antiqua', 'ELEPHNTI': 'Elephant Italic', 'ARIALNB': 'Arial Narrow Bold', 'swissel': 'Swis721 LtEx BT Light', 'SamsungIF_Rg': 'Samsung InterFace', 'CALLI___': 'Calligraphic', 'calibrili': 'Calibri Light Italic', 'verdanai': 'Verdana Italic', 'segoescb': 'Segoe Script Bold', 'georgia': 'Georgia', 'lucon': 'Lucida Console', 'Comfortaa-Regular': 'Comfortaa', 'symusic_': 'Symusic', 'seguisb': 'Segoe UI Semibold', 'dutchb': 'Dutch801 Rm BT Bold', 'chinyen': 'Chinyen Normal', 'Tangerine_Regular': 'Tangerine', 'RAGE': 'Rage Italic', 'Lato-BlackItalic': 'Lato Black Italic', 'BOUTON_International_symbols': 'BOUTON International Symbols', 'creerg__': 'Creepygirl', 'swisski': 'Swis721 Blk BT Black Italic', 'SCRIPTBL': 'Script MT Bold', 'LSANSD': 'Lucida Sans Demibold Roman', 'BOD_R': 'Bodoni MT', 'Lato-HairlineItalic': 'Lato Hairline Italic', 'GOUDOS': 'Goudy Old Style', 'PER_____': 'Perpetua', 'courbi': 'Courier New Bold Italic', 'timesbi': 'Times New Roman Bold Italic', 'POORICH': 'Poor Richard', 'consolab': 'Consolas Bold', 'gadugi': 'Gadugi', 'palab': 'Palatino Linotype Bold', 'calibril': 'Calibri Light', 'Nirmala': 'Nirmala UI', 'Roland__': 'Roland', 'swisscbo': 'Swis721 BdCnOul BT Bold Outline', 'sanss___': 'SansSerif', 'ARLRDBD': 'Arial Rounded MT Bold', 'CENSCBK': 'Century Schoolbook', 'CALIFI': 'Californian FB Italic', 'Nunito-Regular': 'Nunito', 'MOONB___': 'Moonbeam', 'isocteui': 'ISOCTEUR Italic', 'compi': 'CommercialPi BT', 'taileb': 'Microsoft Tai Le Bold', 'swissli': 'Swis721 Lt BT Light Italic', 'PENULLI_': 'PenultimateLight', 'Lato-Bold': 'Lato Bold', 'PLAYBILL': 'Playbill', 'LHANDW': 'Lucida Handwriting Italic', 'txt_____': 'Txt', 'swissbi': 'Swis721 BT Bold Italic', 'corbeli': 'Corbel Italic', 'FRAHVIT': 'Franklin Gothic Heavy Italic', 'JosefinSlab-LightItalic': 'Josefin Slab Light Italic', 'SamsungIF_Md': 'Samsung InterFace Medium', 'mtproxy4': 'Proxy 4', 'cityb___': 'CityBlueprint', 'mmrtext': 'Myanmar Text', 'KUNSTLER': 'Kunstler Script', 'isocp2__': 'ISOCP2', 'JosefinSlab-Italic': 'Josefin Slab Italic', 'seguiemj': 'Segoe UI Emoji', 'FRABKIT': 'Franklin Gothic Book Italic', 'constanz': 'Constantia Bold Italic', 'OUTLOOK': 'MS Outlook', 'inductio': 'Induction Normal', 'DejaVuSansMono-BoldOblique': 'DejaVu Sans Mono Bold Oblique', 'Vivian__': 'Vivian', 'ROCKBI': 'Rockwell Bold Italic', 'Candarai': 'Candara Italic', 'littlelo': 'LittleLordFontleroy', 'VLADIMIR': 'Vladimir Script', 'BRLNSB': 'Berlin Sans FB Bold', 'REFSPCL': 'MS Reference Specialty', 'distant galaxy 2': 'Distant Galaxy', 'segoeuii': 'Segoe UI Italic', 'FORTE': 'Forte', 'parryhotter': 'Parry Hotter', 'bnjinx': 'BN Jinx', 'holomdl2': 'HoloLens MDL2 Assets', 'gadugib': 'Gadugi Bold', 'Ameth___': 'Amethyst', 'sansso__': 'SansSerif Oblique', 'MTCORSVA': 'Monotype Corsiva', 'woodcut': 'Woodcut', 'trebucbd': 'Trebuchet MS Bold', 'segoeuib': 'Segoe UI Bold', 'segoeuisl': 'Segoe UI Semilight', 'Corpo___': 'Corporate', 'BOD_BLAR': 'Bodoni MT Black', 'sylfaen': 'Sylfaen', 'FRADMCN': 'Franklin Gothic Demi Cond', 'dutcheb': 'Dutch801 XBd BT Extra Bold', 'NIAGSOL': 'Niagara Solid', 'CreteRound-Italic': 'Crete Round Italic', 'BOD_CR': 'Bodoni MT Condensed', 'CENTAUR': 'Centaur', 'mtproxy8': 'Proxy 8', 'ARIALN': 'Arial Narrow', 'Lato-Light': 'Lato Light', 'LBRITEDI': 'Lucida Bright Demibold Italic', 'stylu': 'Stylus BT Roman', 'micross': 'Microsoft Sans Serif', 'swisscb': 'Swis721 Cn BT Bold', 'PAPYRUS': 'Papyrus', 'symap___': 'Symap', 'taile': 'Microsoft Tai Le', 'greekc__': 'GreekC', 'comic': 'Comic Sans MS', 'ITCKRIST': 'Kristen ITC', 'isocpeui': 'ISOCPEUR Italic', 'malgunbd': 'Malgun Gothic Bold', 'ARIALNI': 'Arial Narrow Italic', 'DejaVuSansMono-Bold': 'DejaVu Sans Mono Bold', 'consola': 'Consolas', 'JosefinSlab-SemiBold': 'Josefin Slab SemiBold', 'Deneane_': 'Deneane', 'Skinny__': 'Skinny', 'italict_': 'ItalicT', 'italicc_': 'ItalicC', 'vinet': 'Vineta BT', 'ntailub': 'Microsoft New Tai Lue Bold', 'techb___': 'TechnicBold', 'webdings': 'Webdings', 'counb___': 'CountryBlueprint', 'georgiaz': 'Georgia Bold Italic', 'BOD_CB': 'Bodoni MT Condensed Bold', 'segoeprb': 'Segoe Print Bold', 'Acme____': 'AcmeFont', 'Lato-BoldItalic': 'Lato Bold Italic', 'Detente_': 'Detente', 'GILC____': 'Gill Sans MT Condensed', 'Whimsy': 'Whimsy TT', 'CURLZ___': 'Curlz MT', 'swissl': 'Swis721 Lt BT Light', 'Tangerine_Bold': 'Tangerine Bold', 'Tarzan__': 'Tarzan', 'GILSANUB': 'Gill Sans Ultra Bold', 'RONDALO_': 'Rondalo', 'ntailu': 'Microsoft New Tai Lue', 'isoct___': 'ISOCT', 'isocp3__': 'ISOCP3', 'GILI____': 'Gill Sans MT Italic', 'msyi': 'Microsoft Yi Baiti', 'LTYPEBO': 'Lucida Sans Typewriter Bold Oblique', 'AGENCYB': 'Agency FB Bold', 'comsc': 'CommercialScript BT', 'BOOKOSI': 'Bookman Old Style Italic', 'complex_': 'Complex', 'bnmachine': 'BN Machine', 'verdanab': 'Verdana Bold', 'FRAMDCN': 'Franklin Gothic Medium Cond', 'MOD20': 'Modern No. 20', 'Nunito-Light': 'Nunito Light', 'ARIALNBI': 'Arial Narrow Bold Italic', 'nobile_bold_italic': 'Nobile Bold Italic', 'FRADM': 'Franklin Gothic Demi', 'comicz': 'Comic Sans MS Bold Italic', 'ltromatic': 'LetterOMatic!', 'swissc': 'Swis721 Cn BT Roman', 'ARIALUNI': 'Arial Unicode MS', 'GOUDOSI': 'Goudy Old Style Italic', 'CALVIN__': 'Calvin', 'wingding': 'Wingdings', 'DejaVuSansMono': 'DejaVu Sans Mono Book', 'PALSCRI': 'Palace Script MT', 'romanc__': 'RomanC', 'ROCKB': 'Rockwell Bold', 'TCM_____': 'Tw Cen MT', 'PERTIBD': 'Perpetua Titling MT Bold', 'ELEPHNT': 'Elephant', 'Gabriola': 'Gabriola', 'IMPRISHA': 'Imprint MT Shadow', 'FREESCPT': 'Freestyle Script', 'Hombre__': 'Hombre', 'ERASBD': 'Eras Bold ITC', 'Pacifico': 'Pacifico', 'gothici_': 'GothicI', 'fingerpop2': 'Fingerpop', 'FELIXTI': 'Felix Titling', 'COPRGTL': 'Copperplate Gothic Light', 'calibriz': 'Calibri Bold Italic', 'romai___': 'Romantic Italic', 'javatext': 'Javanese Text', 'BRUSHSCI': 'Brush Script MT Italic', 'HTOWERTI': 'High Tower Text Italic', 'nobile': 'Nobile', 'ROCC____': 'Rockwell Condensed', 'BROADW': 'Broadway', 'PERB____': 'Perpetua Bold', 'seguisbi': 'Segoe UI Semibold Italic', 'consolai': 'Consolas Italic', 'ANTQUABI': 'Book Antiqua Bold Italic', 'BOD_BLAI': 'Bodoni MT Black Italic', 'HATTEN': 'Haettenschweiler', 'LBRITE': 'Lucida Bright', 'romand__': 'RomanD', 'impact': 'Impact', 'Waverly_': 'Waverly', 'swissi': 'Swis721 BT Italic', 'CHILLER': 'Chiller', 'BOOKOSBI': 'Bookman Old Style Bold Italic', 'TCCEB': 'Tw Cen MT Condensed Extra Bold', 'ostrich-bold': 'Ostrich Sans Bold', 'romant__': 'RomanT', 'seguisli': 'Segoe UI Semilight Italic', 'Notram__': 'Notram', 'comicbd': 'Comic Sans MS Bold', 'LFAXI': 'Lucida Fax Italic', 'terminat': 'Terminator Two', 'CASTELAR': 'Castellar', 'romans__': 'RomanS', 'cambriai': 'Cambria Italic', 'verdanaz': 'Verdana Bold Italic', 'BAUHS93': 'Bauhaus 93', 'CALIFB': 'Californian FB Bold', 'swissbo': 'Swis721 BdOul BT Bold', 'dutchbi': 'Dutch801 Rm BT Bold Italic', 'monosb': 'Monospac821 BT Bold', 'PARCHM': 'Parchment', 'Mycalc__': 'Mycalc', 'simsunb': 'SimSun-ExtB', 'mtproxy7': 'Proxy 7', 'flubber': 'Flubber', 'segmdl2': 'Segoe MDL2 Assets', 'bgothl': 'BankGothic Lt BT Light', 'ariblk': 'Arial Black', 'BERNHC': 'Bernard MT Condensed', 'COPRGTB': 'Copperplate Gothic Bold', 'LTYPEO': 'Lucida Sans Typewriter Oblique', 'MAGNETOB': 'Magneto Bold', 'GARABD': 'Garamond Bold', 'mtproxy6': 'Proxy 6'}
-    
+# the names of the standard fonts are generated by ttf fontdict.py on the standard development machine
+    return {'18cents':'18thCentury','Acme____':'AcmeFont',
+    'AGENCYB':'Agency FB Bold','AGENCYR':'Agency FB','Alfredo_':'Alfredo',
+    'ALGER':'Algerian','aliee13':'Alien Encounters','almosnow':'Almonte Snow',
+    'Ameth___':'Amethyst','ANTIC___':'AnticFont','ANTQUAB':'Book Antiqua Bold',
+    'ANTQUABI':'Book Antiqua Bold Italic','ANTQUAI':'Book Antiqua Italic',
+    'ArchitectsDaughter':'Architects Daughter','arial':'Arial',
+    'arialbd':'Arial Bold','arialbi':'Arial Bold Italic',
+    'ariali':'Arial Italic','ARIALN':'Arial Narrow',
+    'ARIALNB':'Arial Narrow Bold','ARIALNBI':'Arial Narrow Bold Italic',
+    'ARIALNI':'Arial Narrow Italic','ARIALUNI':'Arial Unicode MS',
+    'ariblk':'Arial Black','ARLRDBD':'Arial Rounded MT Bold','asimov':'Asimov',
+    'Autumn__':'Autumn','babyk___':'Baby Kruffy','BALTH___':'Balthazar',
+    'BASKVILL':'Baskerville Old Face','BASTION_':'Bastion',
+    'BAUHS93':'Bauhaus 93','BELL':'Bell MT','BELLB':'Bell MT Bold',
+    'BELLI':'Bell MT Italic','BERNHC':'Bernard MT Condensed',
+    'bgothl':'BankGothic Lt BT Light','bgothm':'BankGothic Md BT Medium',
+    'BKANT':'Book Antiqua','Blackout-2am':'Blackout 2 AM','bnjinx':'BN Jinx',
+    'bnmachine':'BN Machine','bobcat':'Bobcat Normal','BOD_B':'Bodoni MT Bold',
+    'BOD_BI':'Bodoni MT Bold Italic','BOD_BLAI':'Bodoni MT Black Italic',
+    'BOD_BLAR':'Bodoni MT Black','BOD_CB':'Bodoni MT Condensed Bold',
+    'BOD_CBI':'Bodoni MT Condensed Bold Italic',
+    'BOD_CI':'Bodoni MT Condensed Italic','BOD_CR':'Bodoni MT Condensed',
+    'BOD_I':'Bodoni MT Italic','BOD_PSTC':'Bodoni MT Poster Compressed',
+    'BOD_R':'Bodoni MT','Bolstbo_':'BolsterBold Bold',
+    'BOOKOS':'Bookman Old Style','BOOKOSB':'Bookman Old Style Bold',
+    'BOOKOSBI':'Bookman Old Style Bold Italic',
+    'BOOKOSI':'Bookman Old Style Italic','Borea___':'Borealis',
+    'BOUTON_International_symbols':'BOUTON International Symbols',
+    'BRADHITC':'Bradley Hand ITC','Brand___':'Brandish',
+    'BRITANIC':'Britannic Bold','BRLNSB':'Berlin Sans FB Bold',
+    'BRLNSDB':'Berlin Sans FB Demi Bold','BRLNSR':'Berlin Sans FB',
+    'BROADW':'Broadway','BRUSHSCI':'Brush Script MT Italic',
+    'Bruss___':'Brussels','BSSYM7':'Bookshelf Symbol 7',
+    'CabinSketch-Bold':'CabinSketch Bold','calibri':'Calibri',
+    'calibrib':'Calibri Bold','calibrii':'Calibri Italic',
+    'calibril':'Calibri Light','calibrili':'Calibri Light Italic',
+    'calibriz':'Calibri Bold Italic','CALIFB':'Californian FB Bold',
+    'CALIFI':'Californian FB Italic','CALIFR':'Californian FB',
+    'CALIST':'Calisto MT','CALISTB':'Calisto MT Bold',
+    'CALISTBI':'Calisto MT Bold Italic','CALISTI':'Calisto MT Italic',
+    'CALLI___':'Calligraphic','CALVIN__':'Calvin','cambriab':'Cambria Bold',
+    'cambriai':'Cambria Italic','cambriaz':'Cambria Bold Italic',
+    'Candara':'Candara','Candarab':'Candara Bold','Candarai':'Candara Italic',
+    'Candaraz':'Candara Bold Italic','candles_':'Candles',
+    'CASTELAR':'Castellar','CENSCBK':'Century Schoolbook','CENTAUR':'Centaur',
+    'CENTURY':'Century','CHILLER':'Chiller','chinyen':'Chinyen Normal',
+    'cityb___':'CityBlueprint','CLARE___':'Clarendon','Colbert_':'Colbert',
+    'COLONNA':'Colonna MT','Comfortaa-Bold':'Comfortaa Bold',
+    'Comfortaa-Light':'Comfortaa Light','Comfortaa-Regular':'Comfortaa',
+    'comic':'Comic Sans MS','comicbd':'Comic Sans MS Bold',
+    'comici':'Comic Sans MS Italic','comicz':'Comic Sans MS Bold Italic',
+    'COMMONS_':'Commons','compi':'CommercialPi BT','complex_':'Complex',
+    'comsc':'CommercialScript BT','consola':'Consolas',
+    'consolab':'Consolas Bold','consolai':'Consolas Italic',
+    'consolaz':'Consolas Bold Italic','constan':'Constantia',
+    'constanb':'Constantia Bold','constani':'Constantia Italic',
+    'constanz':'Constantia Bold Italic','Cools___':'Coolsville',
+    'COOPBL':'Cooper Black','COPRGTB':'Copperplate Gothic Bold',
+    'COPRGTL':'Copperplate Gothic Light','corbel':'Corbel',
+    'corbelb':'Corbel Bold','corbeli':'Corbel Italic',
+    'corbelz':'Corbel Bold Italic','Corpo___':'Corporate',
+    'counb___':'CountryBlueprint','cour':'Courier New',
+    'courbd':'Courier New Bold','courbi':'Courier New Bold Italic',
+    'couri':'Courier New Italic','cracj___':'Cracked Johnnie',
+    'creerg__':'Creepygirl','CreteRound-Italic':'Crete Round Italic',
+    'CreteRound-Regular':'Crete Round','CURLZ___':'Curlz MT',
+    'DAYTON__':'Dayton','DejaVuSansMono':'DejaVu Sans Mono Book',
+    'DejaVuSansMono-Bold':'DejaVu Sans Mono Bold',
+    'DejaVuSansMono-BoldOblique':'DejaVu Sans Mono Bold Oblique',
+    'DejaVuSansMono-Oblique':'DejaVu Sans Mono Oblique','Deneane_':'Deneane',
+    'Detente_':'Detente','digifit':'Digifit Normal',
+    'distant galaxy 2':'Distant Galaxy','DOMIN___':'Dominican',
+    'dutch':'Dutch801 Rm BT Roman','dutchb':'Dutch801 Rm BT Bold',
+    'dutchbi':'Dutch801 Rm BT Bold Italic',
+    'dutcheb':'Dutch801 XBd BT Extra Bold','dutchi':'Dutch801 Rm BT Italic',
+    'ebrima':'Ebrima','ebrimabd':'Ebrima Bold','ELEPHNT':'Elephant',
+    'ELEPHNTI':'Elephant Italic','Emmett__':'Emmett','ENGR':'Engravers MT',
+    'Enliven_':'Enliven','ERASBD':'Eras Bold ITC','ERASDEMI':'Eras Demi ITC',
+    'ERASLGHT':'Eras Light ITC','ERASMD':'Eras Medium ITC',
+    'ethnocen':'Ethnocentric','eurro___':'EuroRoman Oblique',
+    'eurr____':'EuroRoman','FELIXTI':'Felix Titling','fingerpop2':'Fingerpop',
+    'flubber':'Flubber','FORTE':'Forte','FRABK':'Franklin Gothic Book',
+    'FRABKIT':'Franklin Gothic Book Italic','FRADM':'Franklin Gothic Demi',
+    'FRADMCN':'Franklin Gothic Demi Cond',
+    'FRADMIT':'Franklin Gothic Demi Italic','FRAHV':'Franklin Gothic Heavy',
+    'FRAHVIT':'Franklin Gothic Heavy Italic','framd':'Franklin Gothic Medium',
+    'FRAMDCN':'Franklin Gothic Medium Cond',
+    'framdit':'Franklin Gothic Medium Italic','FREESCPT':'Freestyle Script',
+    'Frnkvent':'Frankfurter Venetian TT','FRSCRIPT':'French Script MT',
+    'FTLTLT':'Footlight MT Light','Gabriola':'Gabriola','gadugi':'Gadugi',
+    'gadugib':'Gadugi Bold','GARA':'Garamond','GARABD':'Garamond Bold',
+    'GARAIT':'Garamond Italic','gazzarelli':'Gazzarelli','gdt_____':'GDT',
+    'georgia':'Georgia','georgiab':'Georgia Bold','georgiai':'Georgia Italic',
+    'georgiaz':'Georgia Bold Italic','Geotype':'Geotype TT','GIGI':'Gigi',
+    'GILBI___':'Gill Sans MT Bold Italic','GILB____':'Gill Sans MT Bold',
+    'GILC____':'Gill Sans MT Condensed','GILI____':'Gill Sans MT Italic',
+    'GILLUBCD':'Gill Sans Ultra Bold Condensed',
+    'GILSANUB':'Gill Sans Ultra Bold','GIL_____':'Gill Sans MT',
+    'GLECB':'Gloucester MT Extra Condensed','Glock___':'Glockenspiel',
+    'GLSNECB':'Gill Sans MT Ext Condensed Bold','goodtime':'Good Times',
+    'GOTHIC':'Century Gothic','GOTHICB':'Century Gothic Bold',
+    'GOTHICBI':'Century Gothic Bold Italic','gothice_':'GothicE',
+    'gothicg_':'GothicG','GOTHICI':'Century Gothic Italic',
+    'gothici_':'GothicI','GOUDOS':'Goudy Old Style',
+    'GOUDOSB':'Goudy Old Style Bold','GOUDOSI':'Goudy Old Style Italic',
+    'GOUDYSTO':'Goudy Stout','greekc__':'GreekC','greeks__':'GreekS',
+    'Greek_i':'Greek Diner Inline TT','handmeds':'Hand Me Down S (BRK)',
+    'Hansen__':'Hansen','HARLOWSI':'Harlow Solid Italic Italic',
+    'HARNGTON':'Harrington','HARVEIT_':'HarvestItal','HARVEST_':'Harvest',
+    'HATTEN':'Haettenschweiler','Haxton':'Haxton Logos TT',
+    'heavyhea2':'Heavy Heap','himalaya':'Microsoft Himalaya',
+    'hollh___':'Hollywood Hills','holomdl2':'HoloLens MDL2 Assets',
+    'Hombre__':'Hombre','HTOWERT':'High Tower Text',
+    'HTOWERTI':'High Tower Text Italic','Huxley_Titling':'Huxley Titling',
+    'impact':'Impact','IMPRISHA':'Imprint MT Shadow',
+    'inductio':'Induction Normal','INFROMAN':'Informal Roman',
+    'isocp2__':'ISOCP2','isocp3__':'ISOCP3','isocpeui':'ISOCPEUR Italic',
+    'isocpeur':'ISOCPEUR','isocp___':'ISOCP','isoct2__':'ISOCT2',
+    'isoct3__':'ISOCT3','isocteui':'ISOCTEUR Italic','isocteur':'ISOCTEUR',
+    'isoct___':'ISOCT','italicc_':'ItalicC','italict_':'ItalicT',
+    'italic__':'Italic','Itali___':'Italianate','ITCBLKAD':'Blackadder ITC',
+    'ITCEDSCR':'Edwardian Script ITC','ITCKRIST':'Kristen ITC',
+    'javatext':'Javanese Text','JOKERMAN':'Jokerman',
+    'JosefinSlab-Bold':'Josefin Slab Bold',
+    'JosefinSlab-BoldItalic':'Josefin Slab Bold Italic',
+    'JosefinSlab-Italic':'Josefin Slab Italic',
+    'JosefinSlab-Light':'Josefin Slab Light',
+    'JosefinSlab-LightItalic':'Josefin Slab Light Italic',
+    'JosefinSlab-Regular':'Josefin Slab',
+    'JosefinSlab-SemiBold':'Josefin Slab SemiBold',
+    'JosefinSlab-SemiBoldItalic':'Josefin Slab SemiBold Italic',
+    'JosefinSlab-Thin':'Josefin Slab Thin',
+    'JosefinSlab-ThinItalic':'Josefin Slab Thin Italic','JUICE___':'Juice ITC',
+    'KUNSTLER':'Kunstler Script','LATINWD':'Wide Latin',
+    'Lato-Black':'Lato Black','Lato-BlackItalic':'Lato Black Italic',
+    'Lato-Bold':'Lato Bold','Lato-BoldItalic':'Lato Bold Italic',
+    'Lato-Hairline':'Lato Hairline',
+    'Lato-HairlineItalic':'Lato Hairline Italic','Lato-Italic':'Lato Italic',
+    'Lato-Light':'Lato Light','Lato-LightItalic':'Lato Light Italic',
+    'Lato-Regular':'Lato','LBRITE':'Lucida Bright',
+    'LBRITED':'Lucida Bright Demibold',
+    'LBRITEDI':'Lucida Bright Demibold Italic',
+    'LBRITEI':'Lucida Bright Italic','LCALLIG':'Lucida Calligraphy Italic',
+    'LeelaUIb':'Leelawadee UI Bold','LeelawUI':'Leelawadee UI',
+    'LeelUIsl':'Leelawadee UI Semilight','LFAX':'Lucida Fax',
+    'LFAXD':'Lucida Fax Demibold','LFAXDI':'Lucida Fax Demibold Italic',
+    'LFAXI':'Lucida Fax Italic','LHANDW':'Lucida Handwriting Italic',
+    'Limou___':'Limousine','littlelo':'LittleLordFontleroy',
+    'LSANS':'Lucida Sans','LSANSD':'Lucida Sans Demibold Roman',
+    'LSANSDI':'Lucida Sans Demibold Italic','LSANSI':'Lucida Sans Italic',
+    'ltromatic':'LetterOMatic!','LTYPE':'Lucida Sans Typewriter',
+    'LTYPEB':'Lucida Sans Typewriter Bold',
+    'LTYPEBO':'Lucida Sans Typewriter Bold Oblique',
+    'LTYPEO':'Lucida Sans Typewriter Oblique','lucon':'Lucida Console',
+    'l_10646':'Lucida Sans Unicode','mael____':'Mael',
+    'MAGNETOB':'Magneto Bold','MAIAN':'Maiandra GD','malgun':'Malgun Gothic',
+    'malgunbd':'Malgun Gothic Bold','malgunsl':'Malgun Gothic Semilight',
+    'Manorly_':'Manorly','marlett':'Marlett','Martina_':'Martina',
+    'MATURASC':'Matura MT Script Capitals','Melodbo_':'MelodBold Bold',
+    'micross':'Microsoft Sans Serif','Minerva_':'Minerva','MISTRAL':'Mistral',
+    'mmrtext':'Myanmar Text','mmrtextb':'Myanmar Text Bold',
+    'MOD20':'Modern No. 20','monbaiti':'Mongolian Baiti',
+    'monos':'Monospac821 BT Roman','monosb':'Monospac821 BT Bold',
+    'monosbi':'Monospac821 BT Bold Italic','monosi':'Monospac821 BT Italic',
+    'monotxt_':'Monotxt','MOONB___':'Moonbeam','msyi':'Microsoft Yi Baiti',
+    'MTCORSVA':'Monotype Corsiva','MTEXTRA':'MT Extra','mtproxy1':'Proxy 1',
+    'mtproxy2':'Proxy 2','mtproxy3':'Proxy 3','mtproxy4':'Proxy 4',
+    'mtproxy5':'Proxy 5','mtproxy6':'Proxy 6','mtproxy7':'Proxy 7',
+    'mtproxy8':'Proxy 8','mtproxy9':'Proxy 9','mvboli':'MV Boli',
+    'Mycalc__':'Mycalc','narrow':'PR Celtic Narrow Normal',
+    'nasaliza':'Nasalization Medium','neon2':'Neon Lights',
+    'NIAGENG':'Niagara Engraved','NIAGSOL':'Niagara Solid',
+    'Nirmala':'Nirmala UI','NirmalaB':'Nirmala UI Bold',
+    'NirmalaS':'Nirmala UI Semilight','nobile':'Nobile',
+    'nobile_bold':'Nobile Bold','nobile_bold_italic':'Nobile Bold Italic',
+    'nobile_italic':'Nobile Italic','Notram__':'Notram','Novem___':'November',
+    'ntailu':'Microsoft New Tai Lue','ntailub':'Microsoft New Tai Lue Bold',
+    'Nunito-Light':'Nunito Light','Nunito-Regular':'Nunito',
+    'OCRAEXT':'OCR A Extended','OLDENGL':'Old English Text MT','ONYX':'Onyx',
+    'Opinehe_':'OpineHeavy','ostrich-black':'Ostrich Sans Black',
+    'ostrich-bold':'Ostrich Sans Bold',
+    'ostrich-dashed':'Ostrich Sans Dashed Medium',
+    'ostrich-light':'Ostrich Sans Condensed Light',
+    'ostrich-regular':'Ostrich Sans Medium',
+    'ostrich-rounded':'Ostrich Sans Rounded Medium','OUTLOOK':'MS Outlook',
+    'Pacifico':'Pacifico','pala':'Palatino Linotype',
+    'palab':'Palatino Linotype Bold','palabi':'Palatino Linotype Bold Italic',
+    'palai':'Palatino Linotype Italic','PALSCRI':'Palace Script MT',
+    'panroman':'PanRoman','PAPYRUS':'Papyrus','PARCHM':'Parchment',
+    'parryhotter':'Parry Hotter','PENLIIT_':'PenultimateLightItal',
+    'PENULLI_':'PenultimateLight','PENUL___':'Penultimate',
+    'PERBI___':'Perpetua Bold Italic','PERB____':'Perpetua Bold',
+    'PERI____':'Perpetua Italic','PermanentMarker':'Permanent Marker',
+    'PERTIBD':'Perpetua Titling MT Bold','PERTILI':'Perpetua Titling MT Light',
+    'PER_____':'Perpetua','phagspa':'Microsoft PhagsPa',
+    'phagspab':'Microsoft PhagsPa Bold','Phrasme_':'PhrasticMedium',
+    'Pirate__':'Pirate','PLAYBILL':'Playbill','POORICH':'Poor Richard',
+    'PRISTINA':'Pristina','QUIVEIT_':'QuiverItal','RAGE':'Rage Italic',
+    'RAVIE':'Ravie','REFSAN':'MS Reference Sans Serif',
+    'REFSPCL':'MS Reference Specialty','ROCCB___':'Rockwell Condensed Bold',
+    'ROCC____':'Rockwell Condensed','ROCK':'Rockwell','ROCKB':'Rockwell Bold',
+    'ROCKBI':'Rockwell Bold Italic','ROCKEB':'Rockwell Extra Bold',
+    'ROCKI':'Rockwell Italic','Roland__':'Roland','romab___':'Romantic Bold',
+    'romai___':'Romantic Italic','romanc__':'RomanC','romand__':'RomanD',
+    'romans__':'RomanS','romantic':'Romantic','romant__':'RomanT',
+    'RONDALO_':'Rondalo','Rowdyhe_':'RowdyHeavy','Russrite':'Russel Write TT',
+    'Salina__':'Salina','SamsungIF_Md':'Samsung InterFace Medium',
+    'SamsungIF_Rg':'Samsung InterFace','sanssbo_':'SansSerif BoldOblique',
+    'sanssb__':'SansSerif Bold','sansso__':'SansSerif Oblique',
+    'sanss___':'SansSerif','SCHLBKB':'Century Schoolbook Bold',
+    'SCHLBKBI':'Century Schoolbook Bold Italic',
+    'SCHLBKI':'Century Schoolbook Italic','SCRIPTBL':'Script MT Bold',
+    'scriptc_':'ScriptC','scripts_':'ScriptS','segmdl2':'Segoe MDL2 Assets',
+    'segoepr':'Segoe Print','segoeprb':'Segoe Print Bold',
+    'segoesc':'Segoe Script','segoescb':'Segoe Script Bold',
+    'segoeui':'Segoe UI','segoeuib':'Segoe UI Bold',
+    'segoeuii':'Segoe UI Italic','segoeuil':'Segoe UI Light',
+    'segoeuisl':'Segoe UI Semilight','segoeuiz':'Segoe UI Bold Italic',
+    'seguibl':'Segoe UI Black','seguibli':'Segoe UI Black Italic',
+    'seguiemj':'Segoe UI Emoji','seguihis':'Segoe UI Historic',
+    'seguili':'Segoe UI Light Italic','seguisb':'Segoe UI Semibold',
+    'seguisbi':'Segoe UI Semibold Italic',
+    'seguisli':'Segoe UI Semilight Italic','seguisym':'Segoe UI Symbol',
+    'sf movie poster2':'SF Movie Poster','SHOWG':'Showcard Gothic',
+    'simplex_':'Simplex','simsunb':'SimSun-ExtB','Skinny__':'Skinny',
+    'SNAP____':'Snap ITC','snowdrft':'Snowdrift','SPLASH__':'Splash',
+    'STENCIL':'Stencil','Stephen_':'Stephen','Steppes':'Steppes TT',
+    'stylu':'Stylus BT Roman','supef___':'SuperFrench',
+    'swiss':'Swis721 BT Roman','swissb':'Swis721 BT Bold',
+    'swissbi':'Swis721 BT Bold Italic','swissbo':'Swis721 BdOul BT Bold',
+    'swissc':'Swis721 Cn BT Roman','swisscb':'Swis721 Cn BT Bold',
+    'swisscbi':'Swis721 Cn BT Bold Italic',
+    'swisscbo':'Swis721 BdCnOul BT Bold Outline',
+    'swissci':'Swis721 Cn BT Italic','swissck':'Swis721 BlkCn BT Black',
+    'swisscki':'Swis721 BlkCn BT Black Italic',
+    'swisscl':'Swis721 LtCn BT Light',
+    'swisscli':'Swis721 LtCn BT Light Italic','swisse':'Swis721 Ex BT Roman',
+    'swisseb':'Swis721 Ex BT Bold','swissek':'Swis721 BlkEx BT Black',
+    'swissel':'Swis721 LtEx BT Light','swissi':'Swis721 BT Italic',
+    'swissk':'Swis721 Blk BT Black','swisski':'Swis721 Blk BT Black Italic',
+    'swissko':'Swis721 BlkOul BT Black','swissl':'Swis721 Lt BT Light',
+    'swissli':'Swis721 Lt BT Light Italic','Swkeys1':'SWGamekeys MT',
+    'syastro_':'Syastro','sylfaen':'Sylfaen','symap___':'Symap',
+    'symath__':'Symath','symbol':'Symbol','symeteo_':'Symeteo',
+    'symusic_':'Symusic','tahoma':'Tahoma','tahomabd':'Tahoma Bold',
+    'taile':'Microsoft Tai Le','taileb':'Microsoft Tai Le Bold',
+    'Tangerine_Bold':'Tangerine Bold','Tangerine_Regular':'Tangerine',
+    'Tarzan__':'Tarzan','TCBI____':'Tw Cen MT Bold Italic',
+    'TCB_____':'Tw Cen MT Bold','TCCB____':'Tw Cen MT Condensed Bold',
+    'TCCEB':'Tw Cen MT Condensed Extra Bold','TCCM____':'Tw Cen MT Condensed',
+    'TCMI____':'Tw Cen MT Italic','TCM_____':'Tw Cen MT',
+    'techb___':'TechnicBold','techl___':'TechnicLite','technic_':'Technic',
+    'TEMPSITC':'Tempus Sans ITC','terminat':'Terminator Two',
+    'times':'Times New Roman','timesbd':'Times New Roman Bold',
+    'timesbi':'Times New Roman Bold Italic','timesi':'Times New Roman Italic',
+    'Toledo__':'Toledo','trebuc':'Trebuchet MS','trebucbd':'Trebuchet MS Bold',
+    'trebucbi':'Trebuchet MS Bold Italic','trebucit':'Trebuchet MS Italic',
+    'txt_____':'Txt','umath':'UniversalMath1 BT','VALKEN__':'Valken',
+    'verdana':'Verdana','verdanab':'Verdana Bold','verdanai':'Verdana Italic',
+    'verdanaz':'Verdana Bold Italic','VINERITC':'Viner Hand ITC',
+    'vinet':'Vineta BT','VIVALDII':'Vivaldi Italic','Vivian__':'Vivian',
+    'VLADIMIR':'Vladimir Script','Vollkorn-Bold':'Vollkorn Bold',
+    'Vollkorn-BoldItalic':'Vollkorn Bold Italic',
+    'Vollkorn-Italic':'Vollkorn Italic','Vollkorn-Regular':'Vollkorn',
+    'Waverly_':'Waverly','webdings':'Webdings','Whimsy':'Whimsy TT',
+    'wingding':'Wingdings','WINGDNG2':'Wingdings 2','WINGDNG3':'Wingdings 3',
+    'woodcut':'Woodcut','xfiles':'X-Files',
+    'yearsupplyoffairycakes':'Year supply of fairy cakes'}
+        
 def _ttf_fonts():
 # in order to gain speed and avoid problems with calling ImgeFont.truetype too often, first we look in _std_fonts().
 # if not found there, the information from the font file is used.
-# this function returns a dictionary with references from the upperalpha'd filename and the upperalpha'd  description 
+# this function returns a dictionary with references from the normalized filename and the normalized description 
     
     font_dict={}
     for file in glob.glob(r'c:\windows\fonts\*.ttf'):
         fn=os.path.basename(file).split('.')[0]
         if fn in _std_fonts():
-            font_dict[upperalpha(fn)]=fn
-            font_dict[upperalpha(_std_fonts()[fn])]=fn
+            font_dict[normalize(fn)]=fn
+            font_dict[normalize(_std_fonts()[fn])]=fn
         else:
             f = ImageFont.truetype(file, 12)
             if f is not None:
@@ -4996,12 +5287,12 @@ def _ttf_fonts():
                     fullname=str(f.font.family)
                 else:
                     fullname=str(f.font.family)+' '+str(f.font.style)     
-                font_dict[upperalpha(fn)]=fn
-                font_dict[upperalpha(fullname)]=fn
+                font_dict[normalize(fn)]=fn
+                font_dict[normalize(fullname)]=fn
     return font_dict
         
 def _pythonista_fonts():
-# this function returns a dictionary with references from the upperalpha'd font name     
+# this function returns a dictionary with references from the normalized font name     
     UIFont = objc_util.ObjCClass('UIFont')
     
     font_dict={}
@@ -5009,13 +5300,13 @@ def _pythonista_fonts():
         family=str(family)
         try:
             PIL.ImageFont.truetype(family)
-            font_dict[upperalpha(family)]=family
+            font_dict[normalize(family)]=family
         except:
             pass
 
         for name in UIFont.fontNamesForFamilyName_(family):
             name=str(name)
-            font_dict[upperalpha(name)]=name
+            font_dict[normalize(name)]=name
     return font_dict
      
 def _fonts():
