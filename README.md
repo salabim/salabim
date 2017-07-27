@@ -1,5 +1,5 @@
 # salabim
-salabim is a discrete event simulation package in Ptyhon.
+salabim is a discrete event simulation package in Python.
 
 Fully object oriented simulation, similar to must and Tomas.
 
