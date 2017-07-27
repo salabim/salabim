@@ -14,9 +14,9 @@ class AnimatePhilosopher(sim.Animate):
         self.i=i
         
     def fillcolor(self,t):
-        if philosopher[self.i].mode=='eating':
+        if philosopher[self.i].mode()=='eating':
             return 'green'
-        if philosopher[self.i].mode=='thinking':
+        if philosopher[self.i].mode()=='thinking':
             return 'black'
         return 'red'
             
@@ -34,7 +34,7 @@ class AnimateFork(sim.Animate):
         self.angle_right=angle+0.2*alpha
         
     def angle(self,t):
-        claimer=fork[self.i].claimers.head
+        claimer=fork[self.i].claimers().head()
         if claimer==None:
             return self.angle_mid
         if claimer==philosopher[self.i]:

@@ -36,14 +36,14 @@ class AnimateWaitShip(sim.Animate):
         self.side=side
     
     def polygon(self,t):
-        ship=wait[self.side][self.index]
+        ship=lockmeters[self.side].requesters()[self.index]
         if ship!=None:
             return ship_polygon(ship) 
         else:
              return((0,0,0,0))     
              
     def text(self,t):
-        ship=wait[self.side][self.index]
+        ship=lockmeters[self.side].requesters()[self.index]
         if ship!=None:
             return shortname(ship)   
         else:
@@ -170,14 +170,14 @@ def do_animation():
     
     a=sim.Animate(text='',x0=300,y0=650,screen_coordinates=True,fontsize0=15,font='DejaVuSansMono',anchor='w')
     a.text=lambda t:'mean waiting left : {:5.1f} (n={})'.\
-      format(wait[left].mean_length_of_stay(),wait[left].number_passed())
+      format(key_in[left].requesters().mean_length_of_stay(),key_in[left].requesters().number_passed())
     a=sim.Animate(text='',x0=300,y0=630,screen_coordinates=True,fontsize0=15,font='DejaVuSansMono',anchor='w')
     a.text=lambda t:'mean waiting right: {:5.1f} (n={})'.\
-      format(wait[right].mean_length_of_stay(),wait[right].number_passed())
+      format(key_in[right].requesters().mean_length_of_stay(),key_in[right].requesters().number_passed())
     a=sim.Animate(text='xx=12.34',x0=300,y0=610,screen_coordinates=True,fontsize0=15,font='DejaVuSansMono',anchor='w')
-    a.text=lambda t:'  nr waiting left : {:3d}'.format(wait[left].length())
+    a.text=lambda t:'  nr waiting left : {:3d}'.format(key_in[left].requesters().length())
     a=sim.Animate(text='xx=12.34',x0=300,y0=590,screen_coordinates=True,fontsize0=15,font='DejaVuSansMono',anchor='w')
-    a.text=lambda t:'  nr waiting right: {:3d}'.format(wait[right].length())   
+    a.text=lambda t:'  nr waiting right: {:3d}'.format(key_in[right].requesters().length())   
     
     sim.AnimateSlider\
       (x=520,y=de.height,width=100,height=20,\
@@ -207,37 +207,36 @@ class Shipgenerator(sim.Component):
             
 class Ship(sim.Component):
     def process(self):
-        self.enter(wait[self.side])
-        yield self.passivate(mode='Wait')
-        yield self.hold(intime,mode='Sail in')
-        self.leave(wait[self.side])
+        if lock.ispassive():
+            lock.reactivate()
+        yield self.request((lockmeters[self.side],self.length),key_in[self.side])
         self.enter(lockqueue)
-        lock.reactivate()
-        yield self.passivate(mode='In lock')
-        yield self.hold(outtime,mode='Sail out')
+        yield self.hold(intime)
+        self.release(key_in[self.side])
+        yield self.request(key_out)
+        yield self.hold(outtime)
         self.leave(lockqueue)
-        lock.reactivate()
-        
+        self.release(key_out)        
+                
 class Lock(sim.Component):
 
     def process(self):
+        yield self.request(key_in[left])
+        yield self.request(key_in[right])
+        yield self.request(key_out)
+        
         while True:
-            if len(wait[left])+len(wait[right])==0:
-                yield self.passivate(mode='Idle')
-
-            usedlength=0
-
-            for ship in wait[self.side]:
-                if usedlength+ship.length<=locklength:
-                    usedlength += ship.length
-                    ship.reactivate()
-                    yield self.passivate('Wait for sail in')
+            if len(key_in[self.side].requesters())==0:
+                if len(key_in[-self.side].requesters())==0:
+                    yield self.passivate()
+            self.release(key_in[self.side])
+            yield self.request((key_in[self.side],1,1000))
+            lockmeters[self.side].release()
             yield self.hold(switchtime,mode='Switch')
             self.side=-self.side
-            for ship in lockqueue:
-                ship.reactivate()
-                yield self.passivate('Wait for sail out')
-
+            self.release(key_out)
+            yield self.request((key_out,1,1000),mode=None)
+            
 de=sim.Environment(random_seed=1234567)
 
 locklength=60
@@ -247,12 +246,14 @@ outtime=2
 meanlength=30
 iat=30
 
-lockqueue=sim.Queue('lockqueue')
+lockmeters={}
+key_in={}
+lockqueue=sim.Queue('lockqueue')    
+key_out=sim.Resource(name=' key_out')
 
-wait={}
-    
 for side in (left,right):
-    wait[side]=sim.Queue(name=sidename(side)+'Wait')
+    lockmeters[side]=sim.Resource(capacity=locklength,name=sidename(side)+' lock meters',anonymous=True)
+    key_in[side]=sim.Resource(name=sidename(side)+' key in')    
     shipgenerator=Shipgenerator(name=sidename(side)+'Shipgenerator')
     shipgenerator.side=side
 

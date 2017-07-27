@@ -1,5 +1,142 @@
 Salabim release notes
 
+version 2.0.0  2017-07-24
+=========================
+Major reorganization of the interface.
+
+All properties has been phased out and made place for a method. This is
+done in order to be more Pythonic and consistent. Also, overriding is now easier.
+
+Version 2.0.0                       Version 2.0.0                  
+---------------------------------------------------------------------------------------
+Environment.peek                    Environment.peek()
+Environment.main                    Environment.main()
+Environment.now                     Environment.now()
+Environment.trace                   Environment.trace(value)
+Environment.current_component       Environment.current_component()
+Environment.name                    Environment.name(txt)
+Environment.base_name               Environment.base_name()
+Environment.sequence_number         Environment.sequence_number()
+
+Component.claimed_resources         Component.claimed_resources()
+Component.request_failed            Component.request_failed()
+Component.name                      Component.name(txt)
+Component.base_name                 Component.base_name()
+Component.sequence_number           Componnt.sequence_number()
+Component.suppress_trace            Component.suppress_trace(value)   
+Component.mode                      Component.mode(value)
+Component.ispassive                 Component.ispassive()
+Component.iscurrent                 Component.iscurrent()
+Component.isscheduled               Component.isscheduled()
+Component.isstandby                 Component.isstandby()
+Component.isdata                    Component.isdate()
+Component.creation_time             Component.creation_time()
+Component.scheduled_time            Component.scheduled_time()
+Component.mode_time                 Component.mode_time()
+Component.status                    Component.status()
+Component.now                       phased out, use Component.env.now() 
+Component.main                      phased out, use Component.env.main()
+Component.trace                     phased out, use Component.env.trace(value)
+Component.current_component         phased out, use Component.env.current_component()
+
+Resource.requesters                 Resource.requesters()
+Resource.claimers                   Resource.claimers()
+Resource.capacity                   Resource.capacity(cap)
+Resource.claimed_quantity           Resource.claimed_quantity()
+Resource.strict_order               Resource.strict_order(value)
+
+Queue.name                          Queue.name(txt)
+Queue.base_name                     Queue.base_name()
+Queue.sequence_number               Queue.sequence_number()
+Queue.head                          Queue.head()
+Queue.tail                          Queue.tail()
+Queue.pop                           Queue.pop()
+Queue.length                        Queue.length(), len() recommended
+Queue.minimum_length                Queue.minimum_length()
+Queue.maximum_length                Queue.maximum_length()
+Queue.minimum_length_of_stay        Queue.minimum_length_of_stay()
+Queue.maximum_length_of_stay        Queue.maximum_length_of_stay()
+Queue.number_passed                 Queue.number_passed()
+Queue.mean_length_of_stay           Queue.mean_length_of_stay()
+Queue.mean_length                   Queue.mean_length()
+  
+Uniform.mean                        Uniform.mean()
+Triangular.mean                     Triangular.mean()
+Constant.mean                       Constant.mean()
+Exponential.mean                    Exponential.mean()
+Normal.mean                         Normal.mean()
+Cdf.mean                            Cdf.mean()
+Pdf.mean                            Pdf.mean()
+Distribution.mean                   Distribution.mean()
+
+Uniform.sample                      Uniform.sample()
+Triangular.sample                   Triangular.sample()
+Constant.sample                     Constant.sample()
+Exponential.sample                  Exponential.sample()
+Normal.sample                       Normal.sample()
+Cdf.sample                          Cdf.sample()
+Pdf.sample                          Pdf.sample()
+Distribution.sample                 Distribution.sample()
+
+AnimateSlider.v                     AnimateSlider.v(value)
+---------------------------------------------------------------------------------------
+***ATTENTION***
+Be very careful with adding the parentheses, particularly when using in
+logical tests, like:
+    if c.ispassive: #always True ! 
+    if c.status==passive #always False !
+    if trace: #always True 
+and never assign to one of these methods,like 
+    env.trace=True #overrides the trace method of env
+    c.name='Machine' # overrides the name method of the component c
+    
+Nearly all existing models will need be updated. All sample files are now version 2 compatible.    
+
+Nearly only internal change: the possible values of the status of a component were up to version 2.0.0
+global variables, containing the name of the status. From this version the values of status are actually
+references to methods that return the name of the status. This affects passive, data, current, standby,
+scheduled and suspended. From an application point of view this does not change anything.
+Testing of the status is still done with (e.g.)
+    if c.status()=sim.passive:
+or, better yet,
+    if c.ispassive():    
+Only when the status has to be printed, be sure to *call* the status() method, thus
+print('current status of c=', c.status()())
+
+If the distribution Pdf gets now a distribution as an x-value, not the 
+distribution, but a sample of that this distribution will be returned.
+Example:
+  d=sim.Pdf((Uniform(10,20),10,Uniform(20,30),80,Uniform(30,40),10))
+  d.sample() # 10% between 10 and 20, 80% between 20 and 30 and 10% between 30 and 40.
+  d.mean() # is 25.
+
+The argument list if Component.request() is redefined. See the manual or docstring
+for details.
+The argument list if Component.release() is redefined. See the manual or docstring
+for details.
+
+The method Queue.index_of() has been renamed Queue.index() to be more in line
+with Python standards.
+
+The script to install salalabim in site-packages is now called setup.py
+(instead of salabim_install.py), again more in line with Python conventions.
+
+There are two new sample models, 'Lock with resources' and 'Lock with resources animated',
+showing a different approach of the Lock model, involving resources.
+
+Major improvements of the docstrings and manual (at www.salabim.org/manual).
+Just a reminder: you can get help on all methods
+of salabim (pages and pages of information) with
+    import salabim as sim
+    help(sim)
+or just one method or class by (e.g.)
+    import salabim as sim
+    help(Animate)
+    help(Component.enter)
+    help(sim.now)
+    
+Bug fixes.
+        
 version 1.1.3  2017-07-22
 =========================
 Pythonista could not handle the long one line statement defining the std_fonts.

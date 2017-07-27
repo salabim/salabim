@@ -54,9 +54,9 @@ class AnimateCar(sim.Animate):
           fillcolor0='lightblue')
       
     def y(self,t):
-        if self.car.mode=='Move':
+        if self.car.mode()=='Move':
             return sim.interpolate(
-              t,self.car.mode_time,self.car.scheduled_time,
+              t,self.car.mode_time(),self.car.scheduled_time(),
               self.car.floor.y,self.car.nextfloor.y)
                  
         else:
@@ -81,9 +81,9 @@ class AnimateCarVisitor(sim.Animate):
             return direction_color(visitor.direction)
             
     def y(self,t):
-        if self.car.mode=='Move':
+        if self.car.mode()=='Move':
             return sim.interpolate(
-              t,self.car.mode_time,self.car.scheduled_time,
+              t,self.car.mode_time(),self.car.scheduled_time(),
               self.car.floor.y,self.car.nextfloor.y)
         else:
             return self.car.floor.y
@@ -182,19 +182,19 @@ def do_animation():
 def set_load_0_n(val):
     global load_0_n
     load_0_n=float(val)
-    if vg_0_n.ispassive:
+    if vg_0_n.ispassive():
         vg_0_n.reactivate()
 
 def set_load_n_n(val):
     global load_n_n
     load_n_n=float(val)
-    if vg_n_n.ispassive:
+    if vg_n_n.ispassive():
         vg_n_n.reactivate()
                 
 def set_load_n_0(val):
     global load_n_0
     load_n_0=float(val)   
-    if vg_n_0.ispassive:
+    if vg_n_0.ispassive():
         vg_n_0.reactivate()
             
 def set_capacity(val):
@@ -269,9 +269,9 @@ class Visitor(sim.Component):
     def process(self):
         self.enter(self.fromfloor.visitors)
         if not (self.fromfloor,self.direction)  in requests:
-            requests[self.fromfloor,self.direction]=sim.now()            
+            requests[self.fromfloor,self.direction]=self.env.now()            
         for car in cars:
-            if car.ispassive:
+            if car.ispassive():
                 car.reactivate()
         
         yield self.passivate()
@@ -314,15 +314,15 @@ class Car(sim.Component):
                         dooropen=True
                     for visitor in self.floor.visitors:
                         if visitor.direction==self.direction:
-                            if self.visitors.length<self.capacity:
+                            if len(self.visitors)<self.capacity:
                                 visitor.leave(self.floor.visitors)
                                 visitor.enter(self.visitors)
                         yield self.hold(enter_time,mode='Let in')
                     if (self.floor.count_in_direction(self.direction)>0):
                         if not (self.floor,self.direction) in requests:
-                            requests[self.floor,self.direction]=sim.now()
+                            requests[self.floor,self.direction]=self.env.now()
 
-                if self.visitors.length>0:
+                if len(self.visitors)>0:
                     break
             else:
                 if len(requests)>0:

@@ -2,6 +2,9 @@ import salabim as sim
 import math
 import random
 
+import platform
+Pythonista=(platform.system()=='Darwin')
+
 def test1():
     print('test1')
 
@@ -41,10 +44,10 @@ def test1():
             
     class Monitor(sim.Component):
         def process(self):
-            while sim.now<30:
+            while sim.now()<30:
                 yield self.standby()
                         
-    sim.default_env.reset(True)
+    sim.Environment()
     q=sim.Queue()
 
     x=[0]
@@ -53,7 +56,7 @@ def test1():
 #        x[i+1].activate(at=i*5,proc=x[i+1].action())
         x[i+1].enter(q)
         
-    x[6].suppress_trace=True
+    x[6].suppress_trace(True)
     i=0
     for c in q:
         print (c._name)
@@ -70,9 +73,8 @@ def test1():
 #    env.run(4)
     
 def test2():
+    de=sim.Environment()
     print('test2')
-
-    sim.default_env.reset(True)
     x=[None]
     q=[None]
     for i in range(5):
@@ -93,32 +95,33 @@ def test2():
     q[1].difference(q[2],'my difference').print_statistics()
     q[1].intersect(q[2],'my intersect').print_statistics()
     q[1].copy('my copy').print_statistics()    
-    q[1].move('my move').print_statistics()
+#    q[1].move('my move').print_statistics()
     q[1].print_statistics()
 
     print (q[1])
     
     yy=q[1].component_with_name('y')
-    ii=q[1].index_of(y)
+    ii=q[1].index(y)
+    print(yy,ii)
     
     
 def sample_and_print(dist,n):
     s=[]
     
     for i in range(n):
-        s.append(dist.sample)
-    print ('mean=',dist.mean,'samples', s)
+        s.append(dist.sample())
+    print ('mean=',dist.mean(),'samples', s)
     
 def test3():
     print('test3')
     
-    sim.default_env.reset(True)
+    sim.Environment(random_seed=1234567)
     print('string')
     d=sim.Distribution('Exponential (1000)')
     sample_and_print(d,5)
-    sim.random.seed()
+    sim.random_seed(1234567)
     sample_and_print(d,5)
-    sim.random.seed(-1)
+    sim.random_seed(None)
     sample_and_print(d,5)
     
     print('triangular')
@@ -143,9 +146,20 @@ def test3():
     sample_and_print(cdf,5)
 
     print('pdf')
-    pdf=sim.Pdf(((1,2),100))
+    pdf=sim.Pdf((1,2),1)
     sample_and_print(pdf,5)
-    sample_and_print(pdf,5)
+
+    print('pdf 1')
+    pdf=sim.Pdf((sim.Uniform(10,20),10,sim.Uniform(20,30),80,sim.Uniform(30,40),10))
+    sample_and_print(pdf,5)  
+    
+    print('pdf 2')
+    pdf=sim.Pdf((sim.Uniform(10,20),sim.Uniform(20,30),sim.Uniform(30,40)),(10,80,10)) 
+    sample_and_print(pdf,5)  
+
+    print('pdf 3')
+    pdf=sim.Pdf(('red','green',1000),(10,1,10))
+    sample_and_print(pdf,5)  
 
 def test4():
     print('test4')
@@ -154,8 +168,8 @@ def test4():
             yield self.hold(10)
             yield self.request(res,4)
             yield self.hold(20)
-            res.requesters.print_statistics()
-            res.claimers.print_statistics()
+            res.requesters().print_statistics()
+            res.claimers().print_statistics()
             for i in range(1):
                 self.release(res,4)
     
@@ -163,7 +177,7 @@ def test4():
         def process(self):
             yield self.hold(11)
             yield self.request(res,1,priority=1-self.i)
-            if self.request_failed:
+            if self.request_failed():
                 pass
             else:
                 yield self.hold(1)
@@ -173,9 +187,9 @@ def test4():
         def process(self):
             yield self.hold(20)
             y[4].reschedule()
-            res.capacity=2
+            res.capacity(2)
             
-    sim.default_env.reset(True)
+    de=sim.Environment()
     res=sim.Resource(name='res.',capacity=4)
     res.x=0
     x=X(name='x')
@@ -196,8 +210,8 @@ def test5():
         def process(self):
             while True:
                 while True:
-                    yield self.request(r1,2,5,r2,greedy=True,fail_at=self.now+6)
-                    if not self.request_failed():
+                    yield self.request(r1,2,5,r2,greedy=True,fail_at=de.now()+6)
+                    if not self.request_failed()():
                         break
                 yield self.hold(1)
                 self.release(r1,r2)
@@ -228,12 +242,12 @@ def test5():
             yield self.hold(3)
             x1.cancel()
             yield self.hold(10)
-            r2.capacity=1
+            r2.capacity(1)
             pass
 
             
                         
-    sim.default_env.reset(True)
+    de=sim.Environment(trace=True)
     q=sim.Queue(name='q')
     r1=sim.Resource(name='r1',capacity=3)
     r2=sim.Resource(name='r2',capacity=0)    
@@ -254,12 +268,12 @@ def test6():
             yield self.passivate()
             yield self.hold(1)
             
-    sim.trace(True)
+    de=sim.Environment(trace=True)
     x=X()
-    print (x.status)
+    print (x.status()())
     q=sim.Queue(name='Queue.')
-    q.name='Rij.'
-    print (q.name)
+    q.name('Rij.')
+    print (q.name())
     q.clear()
     sim.run(till=10)
     x.reactivate()
@@ -285,12 +299,7 @@ def test7():
             yield self.passivate()
     
 
-    sim.trace(True)
-    x=sim.default_env
-    print(sim.default_env)
-    sim.default_env.reset(True)
-    print(x==sim.default_env)
-    print(sim.default_env)
+    de=sim.Environment(trace=True)
     
     x1=X1()
     x2=X2()
@@ -316,7 +325,7 @@ def test7():
     
         
     sim.run(10)
-    r2.capacity=2
+    r2.capacity(2)
     sim.run(20)
 
     print(sim.default_env)
@@ -450,7 +459,7 @@ def test8():
             
     import os
 
-    sim.trace(True)
+    de=sim.Environment(trace=True)
     x=X()
 #    s='abcdefghijk' 
     
@@ -462,9 +471,9 @@ def test8():
 #    assert False
 
     height=768
-    sim.animation_speed(1)
-    sim.run(15,animate=True,modelname='Salabim test') 
-    sim.run(till=30,animate=True)
+    sim.animation_parameters(modelname='Salabim test')
+    sim.run(15) 
+    sim.run(till=30)
     print('THE END')
 
 
@@ -472,22 +481,22 @@ def test9():
     print('test9')
     class X(sim.Component):
         def process(self):
-            yield self.passivate('One')
-            yield self.passivate('Two')
+            yield self.passivate(mode='One')
+            yield self.passivate(mode='Two')
             yield self.passivate()
             yield self.hold(1)
         
     class Y(sim.Component):
         def process(self):
             while True:
-                print('sim.now=',sim.now())
+                print('de.now()=',de.now())
                 yield self.hold(1)
-                print(x.passive_reason)
-                if self.is_passive:
+                print(x.mode())
+                if self.ispassive():
                     x.reactivate()
                 
                 
-    sim.trace(True)
+    de=sim.Environment(trace=True)
     x=X()
     y=Y()
     sim.run(till=6)
@@ -503,36 +512,37 @@ def test11():
     class Do1(sim.Component):
         def process(self):
             while True:
-                if q1.length==0:
+                if q1.length()==0:
                     yield self.passivate()
                 print('------')
                 for cc in q1:
-                    print(now(),cc.name)
+                    print(de.now(),cc.name())
                     yield self.hold(1)
             
     class Do2(sim.Component):
         def process(self):
-            c[0].enter(q1)
+
             c[1].enter(q1)
             c[2].enter(q1)
-            if d1.is_passive:
+            if d1.ispassive():
                 d1.reactivate()
             yield self.hold(till=1.5)
 
             c[3].enter(q1)
             c[4].enter_at_head(q1)
-            if d1.is_passive:
+            if d1.ispassive():
                 d1.reactivate()
                 
             yield self.hold(till=20.5)
             for cc in q1:
                 cc.leave(q1)
-            if d1.is_passive:
+            if d1.ispassive():
                 d1.reactivate()
                 
     class X(sim.Component):
         pass
         
+    de=sim.Environment(trace=True)
     d2=Do2()
     d1=Do1()
     
@@ -542,6 +552,22 @@ def test11():
     for i in range(10):
         c[i]=sim.Component(name='c'+str(i))
         c[i].enter(q2)
+    x=q2.pop()
+    print('x=',x)
+    print('head of q1',q1.head())
+    print('q1[0]',q1[0])
+    print('tail of q1',q1.tail())
+    print('q1[-1]',q1[-1])
+
+    print('head of q2',q2.head())
+    print('q2[0]',q2[0])
+    print('tail of q2',q2.tail())
+    print('q2[-1]',q2[-1])
+
+
+
+    
+    print('**c[0]=',c[0])
     c[0].enter(q1)
     c[0].set_priority(q1,10)
     print(q1)
@@ -550,37 +576,32 @@ def test11():
 
     c[1].set_priority(q2,-1)
     c[5].set_priority(q2,10)    
-    for c in q2:
-        print(c.name)
-    for c in reversed(q2):
-        print(c.name,c in q1)
+    for cx in q2:
+        print(cx.name())
+    for cx in reversed(q2):
+        print(cx.name(),cx in q1)
 
-    assert False
     print ('--')
     print(q2[-1])
     print('---')
-    run(till=100)
-    print (q1._iter_touched)     
-    
-    
-    
+
+
+    sim.run(till=100)
 
 def test12():
-    def give_now():
-        return 'Now={0:5.2f}'.format(Animation.t)
         
-    class X(Component):
+    class X(sim.Component):
         def process(self):
-            Animate(text=give_now,x0=100,y0=100,x1=500,y1=500,t1=10)
+            sim.Animate(text='Piet' ,x0=100,y0=100,x1=500,y1=500,t1=10)
             while True:
-                print(default_env)
+                print(sim.default_env())
                 yield self.hold(1)
            
-    trace(True)
-    animation_speed(1)
-    a=Environment(name='piet.')
-    b=Environment(name='piet.')
-    c=Environment(name='piet.')
+    de=sim.Environment(trace=True)
+    sim.animation_parameters(speed=1)
+    a=sim.Environment(name='piet.')
+    b=sim.Environment(name='piet.')
+    c=sim.Environment(name='piet.')
     print(a)
     print(b)
     print(c)    
@@ -589,13 +610,14 @@ def test12():
     X(auto_start=False)
     X(auto_start=False)
     X()       
-    animation_speed(0.1)
-    run(4,animate=True,video='x.mp4')
-    run(2)
-    run(4,animate=True)
-    finish()
+    sim.animation_parameters(speed=0.1,video='x.mp4')
+    sim.run(4)
+    sim.run(2)
+    sim.run(4)
+
 
 def test13():
+    de=sim.Environment()
     q=sim.Queue()
     for i in range(10):
         c=sim.Component(name='c.')
@@ -603,36 +625,40 @@ def test13():
         
     print(q)
     for c in q:
-        print (c.name)
+        print (c.name())
         
     for i in range(20):
-        print(i,q[i].name)
+        print(i,q[i].name())
+
         
 def test14():
-    class X(Component):
+    class X(sim.Component):
         def process(self):
             yield self.request(*r)
-            print(self.claimed_resources)
+            print(self.claimed_resources())
             
+    de=sim.Environment()
     X()
-    r=[Resource() for i in range(10)]
-    run(till=10)
+    r=[sim.Resource() for i in range(10)]
+    de.run(till=10)
     
 def test15():
-    d=Pdf(('r',1,'c',1))
-    d=Pdf((1,2,3,4) ,1) 
-    print(d.mean)
+    d=sim.Pdf(('r',1,'c',1))
+    d=sim.Pdf((1,2,3,4) ,1) 
+    print(d.mean())
     s=''
     for i in range(100):
-        x=d.sample
+        x=d.sample()
         s=s+str(x)
     print(s)    
         
         
 def test16():
+    de=sim.Environment()
+    sim.animation_parameters()
     a=sim.Animate(text='Test',x0=100,y0=100,fontsize0=30,fillcolor0='red')
     a=sim.Animate(line0=(0,0,500,500),linecolor0='white',linewidth0=6)
-    sim.run(animate=True)
+    sim.run()
     
     
 def test17():
@@ -666,12 +692,55 @@ def test18():
         d=sim.Exponential(3,r1)
         sim.Environment(random_seed=-1)
         for i in range(3):
-            print(sim.Exponential(3,r).sample)
-            print(sim.Exponential(3).sample)
-            print(d.sample)
+            print(sim.Exponential(3,r).sample())
+            print(sim.Exponential(3).sample())
+            print(d.sample())
     
 def test19():
     sim.show_fonts()    
     
+def test20():
+    de=sim.Environment()     
+    y=650
+    if Pythonista:
+        for t in ('TimesNewRomanPSItalic-MT','Times.NewRoman. PSItalic-MT',
+          'TimesNewRomanPSITALIC-MT','TimesNoRomanPSItalic-MT'):
+            sim.Animate(text=t,x0=100,y0=y,font=t,fontsize0=30,anchor='w')
+            y=y-50
+    else:
+        for t in ('Times New Roman Italic','TimesNEWRoman   Italic','Times No Roman Italic','timesi','TIMESI'):
+            sim.Animate(text=t,x0=100,y0=y,font=t,fontsize0=30,anchor='w')
+            y=y-50
+        
+    de.animation_parameters(animate=True)
+    sim.run()
+    
+    
+def test21():
+#    d=sim.Pdf((sim.Uniform(10,20),10,sim.Uniform(20,30),80,sim.Uniform(30,40),10))
+    d=sim.Pdf((sim.Uniform(10,20),sim.Uniform(20,30),sim.Uniform(30,40)),(10,80,10))
+
+
+    for i in range(20):
+        print (d.sample())
+
+def test22():
+    
+    class X(sim.Component):
+        def process(self):
+            yield self.hold(10)
+
+    class Y(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(1)
+                print('status of x=',sim.now(),x.status()())
+        
+    de=sim.Environment()
+    x=X()
+    Y()
+
+    sim.run(12)
+    
 if __name__ == '__main__':
-    test19()
+    test2()

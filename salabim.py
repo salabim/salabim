@@ -24,7 +24,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 see www.salabim.org for more information, the manual and updates.
 '''
-
 from __future__ import print_function # compatibility with Python 2.x
 from __future__ import division # compatibility with Python 2.x
 
@@ -72,13 +71,7 @@ except:
     inf=float('inf')
     nan=float('nan')
 
-__version__='1.1.3'
-
-data='data'
-current='current'
-standby='standby'
-passive='passive'
-scheduled='scheduled'
+__version__='2.0.0'
 
 class SalabimException(Exception):
     def __init__(self,value):
@@ -126,7 +119,7 @@ if Pythonista:
                       ((time.time()-\
                       an_env.start_animation_clocktime)*an_env.speed)                
 
-                while an_env.peek<an_env.t:
+                while an_env.peek()<an_env.t:
                     an_env.step()
                     if an_env._current_component==an_env._main:
                         an_env.print_trace(\
@@ -183,7 +176,7 @@ if Pythonista:
                         mindist=inf
                         v=uio.vmin
                         while v<=uio.vmax:
-                            if abs(v-uio.v)<mindist:
+                            if abs(v-uio._v)<mindist:
                                 mindist=abs(v-uio._v)
                                 vsel=v
                             v+=uio.resolution
@@ -221,8 +214,6 @@ if Pythonista:
                         scene.pop_matrix() 
                                                                                
 class Qmember():
-    ''' internal class '''
-    
     def __init__(self):
         pass
         
@@ -256,7 +247,7 @@ class Queue(object):
         if omitted, the name queue (serialized)
     env : Environment
         environment where the queue is defined |n|
-        if omitted, _default_env will be used
+        if omitted, default_env will be used
     '''
    
     def __init__(self,name=None,env=None):
@@ -287,7 +278,7 @@ class Queue(object):
     def __repr__(self):
         lines=[]
         lines.append('Queue '+hex(id(self)))
-        lines.append('  name='+self.name)
+        lines.append('  name='+self._name)
         if self._length==0:
             lines.append('  no components')
         else:
@@ -300,40 +291,44 @@ class Queue(object):
                 mx=mx.successor
         return '\n'.join(lines)
             
-    @property
-    def name(self):
+    def name(self,txt=None):
         '''
-        returns and/or sets the name of a queue
+        name of the queue
         
         Parameters
         ----------
         txt : str
             name of the queue |n|
-            if txt ends with a period, the name will be serialized
+            if txt ends with a period, the name will be serialized |n|
+            if omittted, no change
+            
+        Returns
+        -------
+        Name of the queue : str
         '''
+        
+        if txt is not None:
+            self._name,self._base_name,self._sequence_number=\
+              _reformatname(txt,self.env._nameserializeQueue)
         return self._name
-        
-    @name.setter
-    def name(self,txt):
-        self._name,self._base_name,self._sequence_number=\
-          _reformatname(txt,self.env._nameserializeQueue)
-        
-    @property
+
     def base_name(self):
         '''
-        returns the base name of a queue (the name used at init or name)
+        Returns
+        -------
+        base name of the queue (the name used at init or name): str
         '''
         return self._base_name        
 
-    @property
     def sequence_number(self):
         '''
-        returns the sequence_number of a queue 
-          (the sequence number at init or name)
-
-        normally this will be the integer value of a serialized name,
-        but also non serialized names (without a dot at the end)
-        will be numbered)
+        Returns
+        -------
+        sequence_number of the queue : int
+            (the sequence number at init or name) |n|
+            normally this will be the integer value of a serialized name,
+            but also non serialized names (without a dot at the end)
+            will be numbered)
         '''
         return self._sequence_number        
 
@@ -344,14 +339,14 @@ class Queue(object):
         
         print('Info on',self._name,'@',self.env._now)
         print('  length                ',self._length)
-        print('  mean_length           ',self.mean_length)
-        print('  minimum_length        ',self.minimum_length)
-        print('  maximum_length        ',self.maximum_length)
-        print('  mean_length_of_stay   ',self.mean_length_of_stay)                
-        print('  minimum_length_of_stay',self.minimum_length_of_stay)                
-        print('  maximum_length_of_stay',self.maximum_length_of_stay)                        
-        print('  number_passed         ',self.number_passed)                                    
-        print('  number_passed_direct  ',self.number_passed_direct)                                        
+        print('  mean_length           ',self.mean_length())
+        print('  minimum_length        ',self.minimum_length())
+        print('  maximum_length        ',self.maximum_length())
+        print('  mean_length_of_stay   ',self.mean_length_of_stay())                
+        print('  minimum_length_of_stay',self.minimum_length_of_stay())                
+        print('  maximum_length_of_stay',self.maximum_length_of_stay())                        
+        print('  number_passed         ',self.number_passed())                                    
+        print('  number_passed_direct  ',self.number_passed_direct())                                        
       
                 
     def add(self,component):
@@ -364,6 +359,8 @@ class Queue(object):
             component to be added to the tail of the queue |n|
             may not be member of the queue yet
                                  
+        Notes
+        -----
         the priority will be set to
         the priority of the tail of the queue, if any
         or 0 if queue is empty
@@ -380,7 +377,9 @@ class Queue(object):
         component : Component
             component to be added to the head of the queue |n|
             may not be member of the queue yet
-                                 
+            
+        Notes
+        -----
         the priority will be set to 
         the priority of the head of the queue, if any
         or 0 if queue is empty
@@ -400,7 +399,9 @@ class Queue(object):
         poscomponent : Component
             component in front of which component will be inserted |n|
             must be member of the queue
-        
+            
+        Notes
+        -----
         the priority of component will be set to the priority of poscomponent 
         '''
         component.enter_in_front_off(self,poscomponent)
@@ -419,6 +420,8 @@ class Queue(object):
             component behind which component will be inserted |n|
             must be member of the queue
         
+        Notes
+        -----
         the priority of component will be set to the priority of poscomponent 
         '''
         component.enter_behind(self,poscomponent) 
@@ -436,6 +439,8 @@ class Queue(object):
         priority : float
             priority of the component|n|
             
+        Notes
+        -----
         component will be placed just after the last component with
         a priority <= priority
         '''
@@ -448,32 +453,45 @@ class Queue(object):
         Parameters
         ----------
         component : Component
-           component to be removed |n|
-           must be member of the queue
+            component to be removed |n|
+            must be member of the queue
         '''
         component.leave(self)
         
-    @property
     def head(self):
         '''
-        returns the head component of a queue, if any. None otherwise
+        Returns
+        -------
+        the head component of the queue, if any. None otherwise : Component
+        
+        Notes
+        -----
+        q[0] is a more Pythonic way to access the head of the queue
         '''
         return self._head.successor.component
     
-    @property
     def tail(self):
         '''
-        returns the tail component of a queue, if any. None otherwise
+        Returns
+        -------
+        the tail component of the queue, if any. None otherwise : Component
+        
+        Notes
+        -----
+        q[-1] is a more Pythonic way to access the tail of the queue
         '''
         return self._tail.predecessor.component
         
-    @property
     def pop(self):
         '''
-        removes the head component and returns it, if any. |n|
-        Otherwise return None
+        removes the head component, if any. |n|
+        
+        Returns
+        -------
+        The head component : Component
+            None if the queue is empty
         '''
-        c=self.head
+        c=self._head.successor.component
         if c!=None:
             c.leave(self)
         return c
@@ -488,7 +506,10 @@ class Queue(object):
             component whose successor to return |n|
             must be member of the queue
          
-        returns the successor of component, if any. None otherwise
+        Returns
+        -------
+        successor of component, if any : Component
+            None otherwise
         '''
         return component.successor(self)                
 
@@ -502,7 +523,10 @@ class Queue(object):
             component whose predecessor to return |n|
             must be member of the queue
          
-        returns the predcessor of component, if any. None otherwise
+        Returns
+        -------
+        predecessor of component, if any : Component |n|
+            None otherwise.
         '''
         return component.predecessor(self)   
         
@@ -591,7 +615,7 @@ class Queue(object):
         del self._iter_touched[iter_sequence]
 
                 
-    def index_of(self,component):
+    def index(self,component):
         '''
         get the index of a component in the queue
         
@@ -601,9 +625,11 @@ class Queue(object):
             component to be queried |n|
             does not need to be in the queue
                                  
-        returns the index of component in the queue, where 0 denotes the head,
-        if in the queue. |n|
-        returns -1 if component is not in the queue
+        Returns
+        -------
+        index of component in the queue : int
+            0 denotes the head, |n|
+            returns -1 if component is not in the queue
         '''
         return component.index_in_queue(self)
         
@@ -616,8 +642,10 @@ class Queue(object):
         txt : str
             name of component to be retrieved
             
-        returns the first component in the queue with name txt. |n|
-        returns None if not found
+        Returns
+        -------
+        the first component in the queue with name txt : Component |n|
+            returns None if not found
         '''
         mx=self._head.successor
         while mx!=self._tail:
@@ -627,89 +655,97 @@ class Queue(object):
             mx=mx.successor
         return None 
         
-    @property
     def length(self):
         '''
-        returns the length of a queue
+        the length of a queue
         
+        Returns
+        -------
+        length of the queue : int
+        
+        Notes
+        -----
         it is advised to use the builtin len function.
         '''
         return self._length
         
-    @property
     def minimum_length(self):
         '''
-        returns the minimum length of a queue
-        since the last reset_statistics
+        Returns
+        -------
+        the minimum length of the queue since the last reset_statistics : int
         '''
         return self._minimum_length
         
-    @property
     def maximum_length(self):
         '''
-        returns the maximum length of a queue
-        since the last reset_statistics
+        Returns
+        -------
+        the maximum length of the queue since the last reset_statistics : int
         '''
         return self._maximum_length
         
-    @property
     def minimum_length_of_stay(self):
         '''
-        returns the minimum length of stay of components left the queue
-        since the last reset_statistics. |n|
-        returns nan if no component has left the queue
+        Returns
+        -------
+        the minimum length of stay of components that left the queue : int
+            since the last reset_statistics |n|
+            returns nan if no component has left the queue
         '''
         if self._number_passed==0:
             return nan
         else:
             return self._minimum_length_of_stay
         
-    @property
     def maximum_length_of_stay(self):
         '''
-        returns the maximum length of stay of components left the queue
-        since the last reset_statistics. |n|
-        returns nan if no component has left the queue
+        Returns
+        -------
+        the maximum length of stay of components that left the queue : int
+            since the last reset_statistics |n|
+            returns nan if no component has left the queue
         '''
         if self._number_passed==0:
             return nan
         else:
             return self._maximum_length_of_stay
                 
-    @property
     def number_passed(self):
         '''
-        returns the number of components that have left the queue 
-        since the last reset_statistics
+        Returns
+        -------
+        the number of components that have left the queue since the last reset_statistics : int
         '''
         return self._number_passed
         
-    @property
     def number_passed_direct(self):
         '''
-        returns the number of components that have left the queue 
-        with a zero length of stay
-        since the last reset_statistics
+        Returns
+        -------
+        the number of components that have left the queue with zero length of stay since the last reset_statistics : int
         '''
         return self._number_passed_direct
         
-    @property
     def mean_length_of_stay(self):
         '''
-        returns the mean length of stay of components that have left the queue
-        since the last reset_statistics
-        returns nan if no components have left the queue
+        Returns
+        -------
+        the mean length of stay of components that left the queue : float
+            since the last reset_statistics |n|
+            returns nan if no component has left the queue
         '''
         if self._number_passed==0:
             return nan
         else:
             return self._total_length_of_stay/self._number_passed
     
-    @property
     def mean_length(self):
         '''
-        returns the mean length of the queue
-        since the last reset_statistics
+        Returns
+        -------
+        the mean length of the queue : float
+            since the last reset_statistics
         '''
         total_time=self._total_length_of_stay
         mx=self._head.successor
@@ -752,8 +788,6 @@ class Queue(object):
                             
     def union(self,q,name):
         '''
-        returns the union of two queues
-        
         Parameters
         ----------
         q : Queue
@@ -762,7 +796,12 @@ class Queue(object):
         name :str
             name of the  new queue
             
-        the resulting queue will contain all elements of self and q |n|
+        Returns
+        -------
+        queue containing all elements of self and q : Queue
+        
+        Notes
+        -----
         the priority will be set to 0 for all components in the
         resulting  queue |n|
         the order of the resulting queue is not specified
@@ -887,7 +926,7 @@ class Queue(object):
             name of the new queue
 
         the resulting queue will contain all elements of self,
-          with the proper priority |n|
+        with the proper priority |n|
         self will be emptied
         '''
         q1=self.copy(name)
@@ -908,7 +947,7 @@ class Queue(object):
         
     def reset_statistics(self):
         '''
-        resets the statistics of a queue
+        resets the statistics of the queue
         '''        
     
         self._minimum_length_of_stay=inf
@@ -924,39 +963,6 @@ class Queue(object):
             self._total_length_of_stay-(self.env._now-c.enter_time)
             mx=mx.successor
         self._start_statistics=self.env._now
-        
-
-def run(*args,**kwargs):
-    '''
-    run for the default environment
-    '''
-    _default_env.run(*args,**kwargs)
-    
-def animation_parameters(*args,**kwargs):
-    '''
-    animation_parameters for the default environment
-    '''
-
-    _default_env.animation_parameters(*args,**kwargs)
-    
-def stop_run(*args,**kwargs):
-    '''
-    stop_run for the default environment
-    '''
-
-    _default_env.stop_run(*args,**kwargs)
-    
-def step():
-    '''
-    step for the default environment
-    '''
-    _default_env.step
-    
-def peek():
-    '''
-    peek for the default environment
-    '''
-    return _default_env.peek
     
 def _check_fail(c):
     if len(c._requests)!=0:
@@ -989,32 +995,42 @@ class Environment(object):
         
     random_seed : int
         the seed for random, equivalent to random.seed() |n|
-        of omitted, the no action on random is taken
+        if None, a purely random value (based on the current time) will be used
+        (not reproducable) |n|
+        if omitted, the no action on random is taken
         
     name : str
-        name of the environment |n|.
+        name of the environment |n|
         if the name ends with a period (.), 
         auto serializing will be applied |n|
         if omitted, the name ``environment`` (serialized)
+        
+    is_default_env : bool
+        if True, this environment becomes the default environment |n|
+        if False, no change |n|
+        if omitted, this environment becomes the default environment |n|
 
-    The trace may be switched on/off later with trace     
+    Notes
+    -----
+    The trace may be switched on/off later with trace
+    The seed may be later set with random_seed()     
     '''
     global an_env
     
     _name_serialize={}
     an_env=None
           
-    def __init__(self,trace=False,random_seed=None,name=None,is__default_env=True): 
+    def __init__(self,trace=False,random_seed='',name=None,is_default_env=True): 
         global _default_env
-        if is__default_env:
+        if is_default_env:
             _default_env=self
         if name is None:
-            if is__default_env:
+            if is_default_env:
                 name='Default environment'
             else:
                 name='environment.'
         self._trace=trace
-        if random_seed is not None:
+        if random_seed != '':
             random.seed(random_seed)
         self._name,self._base_name,self._sequence_number=\
           _reformatname(name,Environment._name_serialize)
@@ -1131,8 +1147,8 @@ class Environment(object):
         '''
         set animation parameters
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         animate : bool
             animate indicator |n|
             if omitted, True, i.e. animation |n|
@@ -1143,32 +1159,42 @@ class Environment(object):
             specifies how much faster or slower than real time the animation will run. 
             e.g. if 2, 2 simulation time units will be displayed per second.
             
-        background_color : colorspec
-            color of the background |n|
-            if omitted, no change
-                        
         width : int
-            width of the animation in screen coordinates (default 1024)
+            width of the animation in screen coordinates |n|
+            if omitted, no change. At init of the environment, the width will be
+            set to 1024 for CPython and the current screen width for Pythonista.
             
         height : int
-            height of the animation in screen coordinates (default 768)
+            height of the animation in screen coordinates |n|
+            if omitted, no change. At init of the environment, the height will be
+            set to 768 for CPython and the current screen height for Pythonista.        
             
         x0 : float
-            user x-coordinate of the lower left corner (default 0)
-            
+            user x-coordinate of the lower left corner |n|
+            if omitted, no change. At init of the environment, x0 will be set to 0.        
+                        
         y0 : float
-            user y_coordinate of the lower left corner (default 0)
-            
+            user y_coordinate of the lower left corner |n|
+            if omitted, no change. At init of the environment, y0 will be set to 0.        
+                        
         x1 : float
-            user x-coordinate of the upper right corner (default 1024)
+            user x-coordinate of the lower right corner |n|
+            if omitted, no change. At init of the environment, x1 will be set to 1024
+            for CPython and the current screen width for Pythonista.
         
+        background_color : colorspec
+            color of the background |n|
+            if omitted, no change. At init of the environment, this will be set to white.
+            
         fps : float
             number of frames per second
             
         modelname : str
             name of model to be shown in upper left corner,
-            along with text 'a salabim model'
-            
+            along with text 'a salabim model' |n|
+            if omitted, no change. At init of the environment, this will be set
+            to the null string, which implies suppression of this feature.
+                   
         use_toplevel : bool
             if salabim animation is used in parallel with
             other modules using tkinter, it might be necessary to 
@@ -1194,6 +1220,8 @@ class Environment(object):
             The video has to have a .mp4 etension |n|
             This requires installation of numpy and opencv (cv2).
                           
+        Notes
+        -----
         The y-coordinate of the upper right corner is determined automatically
         in such a way that the x and scaling are the same. |n|
 
@@ -1203,7 +1231,6 @@ class Environment(object):
         On the other hand, changing speed, show_fps, show_time, show_speed and fps can be useful in
         a running animation.
         '''
-        
         if speed!=None:
             self.speed=speed
             if an_env==self:
@@ -1241,13 +1268,10 @@ class Environment(object):
         if video!=None:
             self.video=video
             
-    @property
     def peek(self):
         '''
-        returns the time of the next component to become current
-        
-        if there are no more events, peek will return inf
-        
+        returns the time of the next component to become current |n|
+        if there are no more events, peek will return inf |n|
         for advance use with animation / GUI event loops
         '''
         if len(self.env._pendingstandbylist)>0:
@@ -1272,35 +1296,50 @@ class Environment(object):
         self._main._push(scheduled_time,urgent=True)
         self._main._status=scheduled
         
-    @property
     def main(self):
         '''
-        returns the main component
+        Returns
+        -------
+        the main component : Component
         '''
         return self._main
         
-    @property
     def now(self):
         '''
-        returns the current simulation time
+        Returns
+        -------
+        the current simulation time : float
         '''   
         return self._now 
             
-    @property
     def trace(self,value=None):
         '''
-        gets or sets trace
+        trace status
+        
+        Parameters
+        ----------
+        value : bool
+            new trace status |n|
+            if omitted, no change
+            
+        Returns
+        _______
+        trace status : bool
+        
+        Note
+        ----
+        If you want to test the status, always include parentheses, like |n|
+            if de.trace():
         '''
+        if value is not None:
+            self._trace=value
         return self._trace
         
-    @trace.setter
-    def trace(self,value):
-        self._trace=value
-        
-    @property
     def current_component(self):
         '''
-        returns the current_component
+        Returns
+        -------
+        the current_component : Component
         '''
         return self._current_component
         
@@ -1309,8 +1348,8 @@ class Environment(object):
         '''
         start execution of the simulation
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         duration : float
             schedule with a delay of duration |n|
             if 0, now is used
@@ -1319,7 +1358,9 @@ class Environment(object):
             schedule time |n|
             if omitted, 0 is assumed
           
-        only issue run from the main level
+        Note
+        ----
+        only issue run() from the main level
         '''
         global an_env
         if till is None:
@@ -1443,7 +1484,7 @@ class Environment(object):
                       ((time.time()-self.start_animation_clocktime)*\
                       self.speed)
 
-            while self.peek<self.t:
+            while self.peek()<self.t:
                 self.step()
                 if self._current_component==self._main:
                     self.print_trace('{:10.3f}'.format(self._now),
@@ -1700,38 +1741,35 @@ class Environment(object):
         else:
             return fontsize/self.scale  
                   
-    @property
-    def name(self):
+    def name(self,txt=None):
         '''
-        returns and/or sets the name of an environmnet
+        the name of the environment
         
         Parameters
         ----------
         txt : str
-            gets/sets name of the environment |n|
-            if txt ends with a period, the name will be serialized
+            name of the queue |n|
+            if txt ends with a period, the name will be serialized |n|
+            if omittted, no change
+            
+            
         '''
+        
+        if txt is not None:
+            self._name,self._base_name,self._sequence_number=\
+              _reformatname(txt,Environment._nameserialize)
         return self._name
-        
-    @name.setter
-    def name(self,txt):
-        self._name,self._base_name,self._sequence_number=\
-          _reformatname(txt,Environment._nameserialize)
-        
-    @property
+
     def base_name(self):
         '''
-        returns the base name of an environment
-        (the name used at init or name)
+        returns the base name of the environmnet (the name used at init or name)
         '''
         return self._base_name        
 
-    @property
     def sequence_number(self):
         '''
-        returns the sequence_number of an environment
-        (the sequence number at init or name)
-
+        returns the sequence_number of the environment 
+        (the sequence number at init or name) |n|
         normally this will be the integer value of a serialized name,
         but also non serialized names (without a dot at the end)
         will be numbered)
@@ -1740,6 +1778,27 @@ class Environment(object):
 
 
     def print_trace(self,s1='',s2='',s3='',s4=''):
+        '''
+        prints a trace line
+        
+        Parameters
+        ----------
+        s1 : str
+            part 1 (usually formatted  now), padded to 10 characters
+            
+        s2 : str
+            part 2 (usually formatted  now), padded to 20 characters
+            
+        s3 : str
+            part 3 (usually formatted  now), padded to 35 characters
+            
+        s4 : str
+            part 4 (usually formatted  now)
+            
+        Notes
+        -----
+        if suppress_srace is True, nothing is printed                                   
+        '''
         if self._trace:
              if not self._current_component._suppress_trace:
                  print(pad(s1,10)+' '+pad(s2,20)+' '+pad(s3,35)+' '+s4)    
@@ -1893,9 +1952,9 @@ class Animate(object):
     width1 : float
        width of the image to be displayed at time t1 (default: width0) |n|
        
-       
-        
-    note that one (and only one) of the following parameters is required:
+    Notes
+    -----  
+    one (and only one) of the following parameters is required:
          - circle0
          - image
          - line0
@@ -1907,6 +1966,7 @@ class Animate(object):
         - valid colorname
         - hexname
         - tuple (R,G,B) or (R,G,B,A)
+        
     colornames may contain an additional alpha, like ``red#7f``
     hexnames may be either 3 of 4 bytes long (RGB or RGBA)
     both colornames and hexnames may be given as a tuple with an
@@ -2035,6 +2095,347 @@ class Animate(object):
         self.t1=inf if t1 is None else t1
 
         self.env.an_objects.append(self)
+
+    def update(self,layer=None,keep=None,visible=None,
+            t0=None,x0=None,y0=None,offsetx0=None,offsety0=None,
+            circle0=None,line0=None,polygon0=None,rectangle0=None,
+            image=None,text=None,font=None,anchor=None,
+            linewidth0=None,fillcolor0=None,linecolor0=None,textcolor0=None,
+            angle0=None,fontsize0=None,width0=None,
+            t1=None,x1=None,y1=None,offsetx1=None,offsety1=None,
+            circle1=None,line1=None,polygon1=None,rectangle1=None,
+            linewidth1=None,fillcolor1=None,linecolor1=None,textcolor1=None,
+            angle1=None,fontsize1=None,width1=None):
+        
+        '''
+        updates an animation object
+    
+        Parameters
+        ----------
+        layer : int
+            layer value |n|
+            lower layer values are on top of higher layer values (default see below)
+
+        keep : bool
+            keep |n|
+            if False, animation object is hidden after t1, shown otherwise
+            (default see below)
+                
+        t0 : float
+            time of start of the animation (default: now)
+    
+        x0 : float
+            x-coordinate of the origin (default see below) at time t0
+    
+        y0 : float
+            y-coordinate of the origin (default see below) at time t0
+    
+        offsetx0 : float
+            offsets the x-coordinate of the object (default see below) at time t0
+    
+        offsety0 : float
+            offsets the y-coordinate of the object (default see below) at time t0
+    
+        circle0 : tuple
+            the circle at time t0 specified as a tuple (radius,) (default see below)
+    
+        line0 : tuple
+            the line(s) at time t0 (xa,ya,xb,yb,xc,yc, ...) (default see below)
+            
+        polygon0 : tuple
+            the polygon at time t0 (xa,ya,xb,yb,xc,yc, ...) |n|
+            the last point will be auto connected to the start (default see below)
+    
+        rectangle0 : tuple
+            the rectangle at time t0 |n| 
+            (xlowerleft,ylowerlef,xupperright,yupperright) (default see below)
+    
+        image : str or PIL image
+            the image to be displayed |n|
+            This may be either a filename or a PIL image (default see below)
+    
+        text : str
+            the text to be displayed (default see below)
+    
+        font : str or list/tuple
+            font to be used for texts |n|
+            Either a string or a list/tuple of fontnames. (default see below)
+            If not found, uses calibri or arial
+            
+        anchor : str
+            anchor position |n|
+            specifies where to put images or texts relative to the anchor
+            point (default see below) |n|
+            possible values are (default: center): |n|
+            ``nw    n    ne`` |n|
+            ``w   center  e`` |n|
+            ``sw    s    se``  
+    
+        linewidth0 : float
+            linewidth of the contour at time t0 (default see below)
+            
+        fillcolor0 : colorspec
+            color of interior/text at time t0 (default see below)
+            
+        linecolor0 : colorspec
+            color of the contour at time t0 (default see below)
+            
+        angle0 : float
+            angle of the polygon at time t0 (in degrees) (default see below)
+            
+        fontsize0 : float
+            fontsize of text at time t0 (default see below)
+            
+        width0 : float
+            width of the image to be displayed at time t0 (default see below)
+        
+        t1 : float
+            time of end of the animation (default: inf) |n|
+            if keep=True, the animation will continue (frozen) after t1
+        
+        x1 : float
+            x-coordinate of the origin (default x0) at time t1
+        
+        y1 : float
+            y-coordinate of the origin (default y0) at time t1
+        
+        offsetx1 : float
+            offsets the x-coordinate of the object (default offsetx0) at time t1
+        
+        offsety1 : float
+            offsets the y-coordinate of the object (default offsety0) at time t1
+        
+        circle1: tuple
+             the circle at time t1 specified as a tuple (radius,)
+        
+        line1 : tuple
+            the line(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: line0) |n|
+            should have the same length as line0
+                
+        polygon1 : tuple
+            the polygon at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: polygon0) |n|
+            should have the same length as polygon0
+        
+        rectangle1 : tuple
+            the rectangle at time t1 (default: rectangle0) |n| 
+            (xlowerleft,ylowerlef,xupperright,yupperright)
+        
+        linewidth1 : float
+            linewidth of the contour at time t1 (default linewidth0)
+                
+        fillcolor1 : colorspec
+            color of interior/text at time t1 (default fillcolor0)
+                
+        linecolor1 : colorspec
+            color of the contour at time t1 (default linecolor0)
+                
+        angle1 : float
+            angle of the polygon at time t1 (in degrees) (default angle0)
+                
+        fontsize1 : float
+            fontsize of text at time t1 (default: fontsize0)
+                
+        width1 : float
+           width of the image to be displayed at time t1 (default: width0) |n|
+            
+        Notes
+        -----
+        the type of the animation cannot be changed with this method.    
+           
+        the default value of most of the paramaters is the current value (at time now)
+        ''' 
+
+        t=self.env._now
+        type0=self.settype(circle0,line0,polygon0,rectangle0,image,text)
+        if (type0!='') and (type0!=self.type):
+            raise AssertionError\
+              ('incorrect type '+type0+' (should be '+self.type)
+        type1=self.settype(circle1,line1,polygon1,rectangle1,None,None)
+        if (type1!='') and (type1!=self.type):
+            raise AssertionError\
+              ('incompatible types: '+self.type+' and '+ type1)
+
+        if layer!=None:
+            self.layer0=layer
+        if keep!=None:
+            self.keep=keep
+        if visible!=None:
+            self.visible0=visible
+        self.circle0=self.circle() if circle0 is None else circle0
+        self.line0=self.line() if line0 is None else line0
+        self.polygon0=self.polygon() if polygon0 is None else polygon0
+        self.rectangle0=\
+          self.rectangle() if rectangle0 is None else rectangle0
+        if text!=None: self.text0=text
+        self.width0=self.width() if width0 is None else width0
+        if image!=None:
+            self.image0=spec_to_image(image)
+            self.image_serial0=self.env.serialize()
+            self.width0=self.image0.size[0] if width0 is None else width0
+
+        if font!=None: self.font=font
+        if anchor!=None: self.anchor0=anchor
+            
+        self.x0=self.x(t) if x0 is None else x0
+        self.y0=self.y(t) if y0 is None else y0
+        self.offsetx0=self.offsetx(t) if offsetx0 is None else offsetx0
+        self.offsety0=self.offsety(t) if offsety0 is None else offsety0
+
+        self.fillcolor0=\
+          self.fillcolor(t) if fillcolor0 is None else fillcolor0
+        self.linecolor0=self.linecolor(t) if linecolor0 is None else linecolor0
+        self.linewidth0=self.linewidth(t) if linewidth0 is None else\
+          linewidth0
+        self.textcolor0=\
+          self.textcolor(t) if textcolor0 is None else textcolor0
+        self.angle0=self.angle(t) if angle0 is None else angle0
+        self.fontsize0=self.fontsize(t) if fontsize0 is None else fontsize0
+        self.t0=self.env._now if t0 is None else t0
+
+        self.circle1=self.circle0 if circle1 is None else circle1
+        self.line1=self.line0 if line1 is None else line1
+        self.polygon1=self.polygon0 if polygon1 is None else polygon1
+        self.rectangle1=\
+          self.rectangle0 if rectangle1 is None else rectangle1
+
+        self.x1=self.x0 if x1 is None else x1
+        self.y1=self.y0 if y1 is None else y1
+        self.offsetx1=self.offsetx0 if offsetx1 is None else offsetx1
+        self.offsety1=self.offsety0 if offsety1 is None else offsety1
+        self.fillcolor1=\
+          self.fillcolor0 if fillcolor1 is None else fillcolor1
+        self.linecolor1=\
+          self.linecolor0 if linecolor1 is None else linecolor1
+        self.textcolor1=\
+          self.textcolor0 if textcolor1 is None else textcolor1
+        self.linewidth1=\
+          self.linewidth0 if linewidth1 is None else linewidth1
+        self.angle1=self.angle0 if angle1 is None else angle1
+        self.fontsize1=\
+          self.fontsize0 if fontsize1 is None else fontsize1
+        self.width1=self.width0 if width1 is None else width1
+
+        self.t1=inf if t1 is None else t1
+        if self not in self.env.an_objects:
+            self.env.an_objects.append(self)
+
+    def remove(self):
+        '''
+        removes the animation object
+        
+        the animation object is removed from the animation queue,
+        so effectively ending this animation
+        
+        note that it might be still updated, if required
+        '''
+        if self in self.env.an_objects:
+            self.env.an_objects.remove(self)
+            
+    def x(self,t=None):
+        return interpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.x0,self.x1)
+
+    def y(self,t=None):
+        return interpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.y0,self.y1)
+
+    def offsetx(self,t=None):
+        return interpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.offsetx0,self.offsetx1)
+
+    def offsety(self,t=None):
+        return interpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.offsety0,self.offsety1)
+
+    def angle(self,t=None):
+        return interpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.angle0,self.angle1)
+
+    def linewidth(self,t=None):
+        return interpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.linewidth0,self.linewidth1)
+
+    def linecolor(self,t=None):
+        return colorinterpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.linecolor0,self.linecolor1)
+
+    def fillcolor(self,t=None):
+        return colorinterpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.fillcolor0,self.fillcolor1)
+
+    def circle(self,t=None):
+        return interpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.circle0,self.circle1)
+          
+    def textcolor(self,t=None):
+        return colorinterpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.textcolor0,self.textcolor1)
+          
+    def line(self,t=None):
+        return interpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.line0,self.line1)
+
+    def polygon(self,t=None):
+        return interpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.polygon0,self.polygon1)
+
+    def rectangle(self,t=None):
+        return interpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.rectangle0,self.rectangle1)
+
+    def width(self,t=None):
+        return interpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.width0,self.width1)
+
+    def fontsize(self,t=None):
+        return interpolate((self.env._now if t is None else t),\
+          self.t0,self.t1,self.fontsize0,self.fontsize1)
+    
+    def text(self,t=None):
+        return self.text0
+        
+    def anchor(self,t=None):
+        return self.anchor0
+        
+    def layer(self,t=None):
+        return self.layer0
+
+    def visible(self,t=None):
+        return self.visible0
+        
+    def image(self,t=None):
+        '''
+        returns image and a serial number at time t
+        use the function spec_to_image to change the image here |n|
+        if there's a change in the image, a new serial numbder should be returned
+        if there's no change, do not update the serial number
+        '''
+        return self.image0,self.image_serial0
+
+    def settype(self,circle,line,polygon,rectangle,image,text):
+        n=0
+        t=''
+        if circle!=None:
+            t='circle'
+            n+=1
+        if line!=None:
+            t='line'
+            n+=1
+        if polygon!=None:
+            t='polygon'
+            n+=1
+        if rectangle!=None:
+            t='rectangle'
+            n+=1
+        if image!=None:
+            t='image'
+            n+=1
+        if text!=None:
+            t='text'
+            n+=1
+        if n>=2:
+            raise AssertionError('more than one object given')
+        return t                
 
     def make_pil_image(self,t):
         
@@ -2307,353 +2708,13 @@ class Animate(object):
                     if abs(pixels[x, y][1]-background[1])<10:
                         if abs(pixels[x, y][2]-background[2])<10:
                             pixels[x, y] = (255, 255, 255, 0)  
-                    
-        
-    def settype(self,circle,line,polygon,rectangle,image,text):
-        n=0
-        t=''
-        if circle!=None:
-            t='circle'
-            n+=1
-        if line!=None:
-            t='line'
-            n+=1
-        if polygon!=None:
-            t='polygon'
-            n+=1
-        if rectangle!=None:
-            t='rectangle'
-            n+=1
-        if image!=None:
-            t='image'
-            n+=1
-        if text!=None:
-            t='text'
-            n+=1
-        if n>=2:
-            raise AssertionError('more than one object given')
-        return t                
-            
-    def update(self,layer=None,keep=None,visible=None,
-            t0=None,x0=None,y0=None,offsetx0=None,offsety0=None,
-            circle0=None,line0=None,polygon0=None,rectangle0=None,
-            image=None,text=None,font=None,anchor=None,
-            linewidth0=None,fillcolor0=None,linecolor0=None,textcolor0=None,
-            angle0=None,fontsize0=None,width0=None,
-            t1=None,x1=None,y1=None,offsetx1=None,offsety1=None,
-            circle1=None,line1=None,polygon1=None,rectangle1=None,
-            linewidth1=None,fillcolor1=None,linecolor1=None,textcolor1=None,
-            angle1=None,fontsize1=None,width1=None):
-        '''
-        updates an animation object
-    
-        Parameters
-        ----------
-        layer : int
-            layer value |n|
-            lower layer values are on top of higher layer values (default *)
-
-        keep : bool
-            keep |n|
-            if False, animation object is hidden after t1, shown otherwise
-            (default *)
-                
-        t0 : float
-            time of start of the animation (default: now)
-    
-        x0 : float
-            x-coordinate of the origin (default *) at time t0
-    
-        y0 : float
-            y-coordinate of the origin (default *) at time t0
-    
-        offsetx0 : float
-            offsets the x-coordinate of the object (default *) at time t0
-    
-        offsety0 : float
-            offsets the y-coordinate of the object (default *) at time t0
-    
-        circle0 : tuple
-            the circle at time t0 specified as a tuple (radius,) (default *)
-    
-        line0 : tuple
-            the line(s) at time t0 (xa,ya,xb,yb,xc,yc, ...) (default *)
-            
-        polygon0 : tuple
-            the polygon at time t0 (xa,ya,xb,yb,xc,yc, ...) |n|
-            the last point will be auto connected to the start (default *)
-    
-        rectangle0 : tuple
-            the rectangle at time t0 |n| 
-            (xlowerleft,ylowerlef,xupperright,yupperright) (default *)
-    
-        image : str or PIL image
-            the image to be displayed |n|
-            This may be either a filename or a PIL image (default *)
-    
-        text : str
-            the text to be displayed (default *)
-    
-        font : str or list/tuple
-            font to be used for texts |n|
-            Either a string or a list/tuple of fontnames. (default *)
-            If not found, uses calibri or arial
-            
-        anchor : str
-            anchor position |n|
-            specifies where to put images or texts relative to the anchor
-            point (default *) |n|
-            possible values are (default: center): |n|
-            ``nw    n    ne`` |n|
-            ``w   center  e`` |n|
-            ``sw    s    se``  
-    
-        linewidth0 : float
-            linewidth of the contour at time t0 (default *)
-            
-        fillcolor0 : colorspec
-            color of interior/text at time t0 (default *)
-            
-        linecolor0 : colorspec
-            color of the contour at time t0 (default *)
-            
-        angle0 : float
-            angle of the polygon at time t0 (in degrees) (default *)
-            
-        fontsize0 : float
-            fontsize of text at time t0 (default *)
-            
-        width0 : float
-            width of the image to be displayed at time t0 (default *)
-        
-        t1 : float
-            time of end of the animation (default: inf) |n|
-            if keep=True, the animation will continue (frozen) after t1
-        
-        x1 : float
-            x-coordinate of the origin (default x0) at time t1
-        
-        y1 : float
-            y-coordinate of the origin (default y0) at time t1
-        
-        offsetx1 : float
-            offsets the x-coordinate of the object (default offsetx0) at time t1
-        
-        offsety1 : float
-            offsets the y-coordinate of the object (default offsety0) at time t1
-        
-        circle1: tuple
-             the circle at time t1 specified as a tuple (radius,)
-        
-        line1 : tuple
-            the line(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: line0) |n|
-            should have the same length as line0
-                
-        polygon1 : tuple
-            the polygon at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: polygon0) |n|
-            should have the same length as polygon0
-        
-        rectangle1 : tuple
-            the rectangle at time t1 (default: rectangle0) |n| 
-            (xlowerleft,ylowerlef,xupperright,yupperright)
-        
-        linewidth1 : float
-            linewidth of the contour at time t1 (default linewidth0)
-                
-        fillcolor1 : colorspec
-            color of interior/text at time t1 (default fillcolor0)
-                
-        linecolor1 : colorspec
-            color of the contour at time t1 (default linecolor0)
-                
-        angle1 : float
-            angle of the polygon at time t1 (in degrees) (default angle0)
-                
-        fontsize1 : float
-            fontsize of text at time t1 (default: fontsize0)
-                
-        width1 : float
-           width of the image to be displayed at time t1 (default: width0) |n|
-           
-            
-        note that the type of the animation cannot be changed with this method.    
-           
-        default * means that the current value (at time now) is used
-        ''' 
-
-        t=self.env._now
-        type0=self.settype(circle0,line0,polygon0,rectangle0,image,text)
-        if (type0!='') and (type0!=self.type):
-            raise AssertionError\
-              ('incorrect type '+type0+' (should be '+self.type)
-        type1=self.settype(circle1,line1,polygon1,rectangle1,None,None)
-        if (type1!='') and (type1!=self.type):
-            raise AssertionError\
-              ('incompatible types: '+self.type+' and '+ type1)
-
-        if layer!=None:
-            self.layer0=layer
-        if keep!=None:
-            self.keep=keep
-        if visible!=None:
-            self.visible0=visible
-        self.circle0=self.circle() if circle0 is None else circle0
-        self.line0=self.line() if line0 is None else line0
-        self.polygon0=self.polygon() if polygon0 is None else polygon0
-        self.rectangle0=\
-          self.rectangle() if rectangle0 is None else rectangle0
-        if text!=None: self.text0=text
-        self.width0=self.width() if width0 is None else width0
-        if image!=None:
-            self.image0=spec_to_image(image)
-            self.image_serial0=self.env.serialize()
-            self.width0=self.image0.size[0] if width0 is None else width0
-
-        if font!=None: self.font=font
-        if anchor!=None: self.anchor0=anchor
-            
-        self.x0=self.x(t) if x0 is None else x0
-        self.y0=self.y(t) if y0 is None else y0
-        self.offsetx0=self.offsetx(t) if offsetx0 is None else offsetx0
-        self.offsety0=self.offsety(t) if offsety0 is None else offsety0
-
-        self.fillcolor0=\
-          self.fillcolor(t) if fillcolor0 is None else fillcolor0
-        self.linecolor0=self.linecolor(t) if linecolor0 is None else linecolor0
-        self.linewidth0=self.linewidth(t) if linewidth0 is None else\
-          linewidth0
-        self.textcolor0=\
-          self.textcolor(t) if textcolor0 is None else textcolor0
-        self.angle0=self.angle(t) if angle0 is None else angle0
-        self.fontsize0=self.fontsize(t) if fontsize0 is None else fontsize0
-        self.t0=self.env._now if t0 is None else t0
-
-        self.circle1=self.circle0 if circle1 is None else circle1
-        self.line1=self.line0 if line1 is None else line1
-        self.polygon1=self.polygon0 if polygon1 is None else polygon1
-        self.rectangle1=\
-          self.rectangle0 if rectangle1 is None else rectangle1
-
-        self.x1=self.x0 if x1 is None else x1
-        self.y1=self.y0 if y1 is None else y1
-        self.offsetx1=self.offsetx0 if offsetx1 is None else offsetx1
-        self.offsety1=self.offsety0 if offsety1 is None else offsety1
-        self.fillcolor1=\
-          self.fillcolor0 if fillcolor1 is None else fillcolor1
-        self.linecolor1=\
-          self.linecolor0 if linecolor1 is None else linecolor1
-        self.textcolor1=\
-          self.textcolor0 if textcolor1 is None else textcolor1
-        self.linewidth1=\
-          self.linewidth0 if linewidth1 is None else linewidth1
-        self.angle1=self.angle0 if angle1 is None else angle1
-        self.fontsize1=\
-          self.fontsize0 if fontsize1 is None else fontsize1
-        self.width1=self.width0 if width1 is None else width1
-
-        self.t1=inf if t1 is None else t1
-        if self not in self.env.an_objects:
-            self.env.an_objects.append(self)
-
-    def remove(self):
-        '''
-        removes the animation object
-        
-        the animation object is removed from the animation queue,
-        so effectively ending this animation
-        
-        note that it might be still updated, if required
-        '''
-        if self in self.env.an_objects:
-            self.env.an_objects.remove(self)
-            
-    def x(self,t=None):
-        return interpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.x0,self.x1)
-
-    def y(self,t=None):
-        return interpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.y0,self.y1)
-
-    def offsetx(self,t=None):
-        return interpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.offsetx0,self.offsetx1)
-
-    def offsety(self,t=None):
-        return interpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.offsety0,self.offsety1)
-
-    def angle(self,t=None):
-        return interpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.angle0,self.angle1)
-
-    def linewidth(self,t=None):
-        return interpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.linewidth0,self.linewidth1)
-
-    def linecolor(self,t=None):
-        return colorinterpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.linecolor0,self.linecolor1)
-
-    def fillcolor(self,t=None):
-        return colorinterpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.fillcolor0,self.fillcolor1)
-
-    def circle(self,t=None):
-        return interpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.circle0,self.circle1)
-          
-    def textcolor(self,t=None):
-        return colorinterpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.textcolor0,self.textcolor1)
-          
-    def line(self,t=None):
-        return interpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.line0,self.line1)
-
-    def polygon(self,t=None):
-        return interpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.polygon0,self.polygon1)
-
-    def rectangle(self,t=None):
-        return interpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.rectangle0,self.rectangle1)
-
-    def width(self,t=None):
-        return interpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.width0,self.width1)
-
-    def fontsize(self,t=None):
-        return interpolate((self.env._now if t is None else t),\
-          self.t0,self.t1,self.fontsize0,self.fontsize1)
-    
-    def text(self,t=None):
-        return self.text0
-        
-    def anchor(self,t=None):
-        return self.anchor0
-        
-    def layer(self,t=None):
-        return self.layer0
-
-    def visible(self,t=None):
-        return self.visible0
-        
-    def image(self,t=None):
-        '''
-        returns image and a serial number at time t
-        use the function spec_to_image to change the image here
-        if there's a change in the image, a new serial numbder should be returned
-        if there'n no change, do not update the serial number
-        '''
-        return self.image0,self.image_serial0
 
 class AnimateButton(object):
     '''
     defines a button
     
-    Parameters:
-    -----------
+    Parameters
+    ----------    
     x : int
         x-coordinate of centre of the button in screen coordinates (default 0)
         
@@ -2694,6 +2755,8 @@ class AnimateButton(object):
         executed when the button is pressed (default None)
         the function should have no arguments |n|
         
+    Notes
+    -----
     On CPython platforms, the tkinter functionality is used, 
     on Pythonista, this is emulated by salabim
     '''
@@ -2761,8 +2824,8 @@ class AnimateSlider(object):
     '''
     defines a slider
     
-    Parameters:
-    -----------
+    Parameters
+    ----------
     x : int
         x-coordinate of centre of the slider in screen coordinates (default 0)
         
@@ -2817,6 +2880,8 @@ class AnimateSlider(object):
          the function should one arguments, being the new value |n|
          if None (default), no action
       
+    Notes
+    -----
     The current value of the slider is the v attibute of the slider. |n|
     On CPython platforms, the tkinter functionality is used, 
     on Pythonista, this is emulated by salabim
@@ -2860,11 +2925,29 @@ class AnimateSlider(object):
 
         self.env.ui_objects.append(self)
     
-    @property
     def v(self,value=None):
         '''
-        returns and/or sets the value
+        value |n|
+        
+        Parameters
+        ----------
+        value: float
+            new value |n|
+            if omitted, no change
+            
+        Returns
+        -------
+        Current value of the slider : float
         '''
+        if value is not None:
+            if Pythonista:
+                self._v=value
+            else:
+                if self.an_env == self.env:
+                    self.slider.set(value)
+                else:
+                    self._v=value
+
         if Pythonista:
             return self._v
         else:
@@ -2872,16 +2955,6 @@ class AnimateSlider(object):
                 return self.slider.get()
             else:
                 return self._v
-    
-    @v.setter
-    def v(self,value):
-        if Pythonista:
-            self._v=value
-        else:
-            if self.an_env == self.env:
-                self.slider.set(value)
-            else:
-                self._v=value
                 
     def install(self):    
         self.slider=tkinter.Scale\
@@ -2918,8 +2991,8 @@ class Component(object):
     or as a component with a process) |n|
     Usually, a component will be defined as a subclass of Component.
     
-    Parameters:
-    -----------
+    Parameters
+    ----------
     name : str
         name of the component. |n|
         if the name ends with a period (.),
@@ -2935,7 +3008,7 @@ class Component(object):
         schedule with a delay |n|
         if omitted, no delay
         
-    urgent : boolean 
+    urgent : bool
         urgency indicator |n|
         if False (default), the component will be scheduled
         behind all other components scheduled
@@ -2983,7 +3056,9 @@ class Component(object):
         self._request_failed=False
         self._creation_time=self.env._now
         self._suppress_trace=suppress_trace
-        self.mode=mode #this also sets self._mode_time
+        self._mode=mode 
+        self._mode_time=self.env._now
+        
         hasprocess=True
         try:
             process=self.process()
@@ -2995,11 +3070,12 @@ class Component(object):
     def __repr__(self):
         lines=[]
         lines.append('Component '+hex(id(self)))
-        lines.append('  name= '+self._name)
+        lines.append('  name='+self._name)
         lines.append('  class='+str(type(self)).split('.')[-1].split("'")[0])
         lines.append('  suppress_trace='+str(self._suppress_trace))
-        lines.append('  status='+self._status)
-        lines.append('  '+_modetxt(self._mode))
+        lines.append('  status='+self._status())
+        lines.append('  mode='+_modetxt(self._mode))
+        lines.append('  mode_time='+time_to_string(self._mode_time))
         lines.append('  creation_time='+time_to_string(self._creation_time))
         lines.append('  scheduled_time='+time_to_string(self._scheduled_time))
         if len(self._qmembers)>0:
@@ -3069,8 +3145,8 @@ class Component(object):
         '''
         reschedule component
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         process : generator function
            process to be started. |n|
            if omitted, process will not be changed |n|
@@ -3101,11 +3177,14 @@ class Component(object):
             if nothing specified, the mode will be unchanged.|n|
             also mode_time will be set to now, if mode is set.
             
+        Notes
+        -----
         if to be applied for the current component, use yield reschedule.
         
         '''
         if mode!='*':
-            self.mode=mode
+            self._mode=mode
+            self._mode_time=self.env._now
   
         if at is None:
             if delay is None:
@@ -3128,8 +3207,8 @@ class Component(object):
         '''
         activate component
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         process : generator function
            process to be started. |n|
            if omitted, the function called process will be used |n|
@@ -3160,10 +3239,13 @@ class Component(object):
             if nothing specified, the mode will be unchanged.|n|
             also mode_time will be set to now, if mode is set. 
                                                    
+        Notes
+        -----
         if to be applied for the current component, use ``yield activate``.
         '''
         if mode!='*':
-            self.mode=mode
+            self._mode=mode
+            self._mode_time=self.env._now
 
         if process is None:
             try:
@@ -3198,8 +3280,8 @@ class Component(object):
         '''
         reactivate component
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         at : float
            schedule time |n|
            if omitted, now is used |n|
@@ -3224,13 +3306,16 @@ class Component(object):
             if nothing specified, the mode will be unchanged.|n|
             also mode_time will be set to now, if mode is set.
             
+        Notes
+        -----
         if to be applied for the current component, use ``yield reactivate``.
         '''
         self._checknotcurrent()
         self._checkispassive()                 
 
         if mode!='*':
-            self.mode=mode
+            self._mode=mode
+            self._mode_time=self.env._now
 
         if at is None:
             if delay is None:
@@ -3252,8 +3337,8 @@ class Component(object):
         '''
         hold the current component
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         at : float
            schedule time |n|
            if omitted, now is used |n|
@@ -3278,12 +3363,15 @@ class Component(object):
             if nothing specified, the mode will be unchanged.|n|
             also mode_time will be set to now, if mode is set.
             
+        Note
+        ----
         *always* use as ``yield self.hold(...)``
         '''
 
         self._checkcurrent()       
         if mode!='*':
-            self.mode=mode
+            self._mode=mode
+            self._mode_time=self.env._now
         
         if till is None:
             if duration is None:
@@ -3311,13 +3399,17 @@ class Component(object):
             if nothing specified, the mode will be unchanged.|n|
             also mode_time will be set to now, if mode is set.
             
+        Note
+        ----
         *always* use as ``yield self.passivate()``
         '''
         self._checkcurrent()          
         self.env.print_trace('','','passivate',_modetxt(self._mode))
         self._scheduled_time=inf
         if mode!='*':
-            self.mode=mode
+            self._mode=mode
+            self._mode_time=self.env._now
+
         self._status=passive
                         
     def cancel(self,mode='*'):
@@ -3330,6 +3422,8 @@ class Component(object):
             if nothing specified, the mode will be unchanged.|n|
             also mode_time will be set to now, if mode is set.
             
+        Note
+        ----
         if to be applied for the current component, use ``yield self.cancel()``
         '''
         self.env.print_trace('','','cancel '+self._name+' '+_modetxt(self._mode))
@@ -3340,12 +3434,13 @@ class Component(object):
             self._remove()
         self._scheduled_time=inf
         if mode!='*':
-            self.mode=mode
+            self._mode=mode
+            self._mode_time=self.env._now
         self._status=data
       
     def standby(self,mode='*'):
         '''
-        puts the current container in standby mode
+        puts the component in standby mode
         
         mode : str preferred
             mode |n|
@@ -3353,6 +3448,8 @@ class Component(object):
             if nothing specified, the mode will be unchanged.|n|
             also mode_time will be set to now, if mode is set.
             
+        Note
+        ----
         *always* use as ``yield self.standby()``        
         '''
         if self!=self.env._current_component:
@@ -3361,37 +3458,28 @@ class Component(object):
         self._scheduled_time=self.env._now
         self.env._standbylist.append(self)
         if mode!='*':
-            self.mode=mode
+            self._mode=mode
+            self._mode_time=self.env._now
         self._status=standby
          
-    def request(self,*args,priority=None,greedy=False,fail_at=None,mode='*'):
+    def request(self,*args,greedy=False,fail_at=None,mode='*'):
         '''
         request from a resource or resources 
         
-        Parameters:
+        Parameters
         ----------
         args : sequence
-            a sequence of requested resources |n|
-            each resource can be optionally followed by a
-            quantity and a priority |n| 
-            if the quantity is not specified, 1 is assumed |n|
+            a sequence of either |n|
+            resources (quantity=1, priority=tail of requesters queue) |n|
+            |n|
+            or |n|
+            |n|
+            tuple/list containing |n|
+            resource, a quantity and optionally a priority.
             if the priority is not specified, this request 
             for the resources be added to the tail of
             the requesters queue |n|
-            alternatively, the request for a resource may
-            be specified as a list or tuple containing
-            the resource name, the quantity and the 
-            priority |n|
-            examples |n|
-            yield self.request(r1) |n|
-            --> requests 1 from r1 |n|
-            yield self.request(r1,r2) |n|
-            --> requests 1 from r1 and 1 from r2 |n|
-            yield self.request(r1,r2,2,r3,3,100) |n|
-            --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100 |n|
-            yield self.request((r1,1),(r2,2)) |n|
-            --> requests 1 from r1, 2 from r2 |n|
-                        
+                                    
         greedy : bool
             greedy indicator |n|
             if False (default), the request will be honoured
@@ -3409,19 +3497,35 @@ class Component(object):
             parameter request_failed will be set. |n|
             if not specified, the request will not time out. 
                           
+            
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations |n|
+            if nothing specified, the mode will be unchanged. |n|
+            also mode_time will be set to now, if mode is set.
+            
+        Notes
+        -----
         it is not allowed to claim a resource more than once by the same component |n|
         the requested quantity may exceed the current capacity of a resource |n|
         the parameter request_failed will be reset by calling request
             
-        mode : str preferred
-            mode |n|
-            will be used in trace and can be used in animations|n|
-            if nothing specified, the mode will be unchanged.|n|
-            also mode_time will be set to now, if mode is set.
-            
+        Note
+        ----
         always use as ``yield self.request(...)``
-        '''
         
+        Example
+        -------
+        yield self.request(r1) |n|
+        --> requests 1 from r1 |n|
+        yield self.request(r1,r2) |n|
+        --> requests 1 from r1 and 1 from r2 |n|
+        yield self.request(r1,(r2,2),(r3,3,100)) |n|
+        --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100 |n|
+        yield self.request((r1,1),(r2,2)) |n|
+        --> requests 1 from r1, 2 from r2 |n|        
+        
+        '''
         if fail_at is None:
             scheduled_time=inf
         else:
@@ -3433,29 +3537,23 @@ class Component(object):
         self._request_failed=False
         i=0
         if mode!='*':
-            self.mode=mode
-        while i<len(args):
+            self._mode=mode
+            self._mode_time=self.env._now
+        for i in range(len(args)):
             q=1
             priority=None
             argsi=args[i]
             if isinstance(argsi,Resource):
                 r=argsi
-                if i+1<len(args):
-                    if not isinstance(args[i+1],(Resource,list,tuple)):
-                        i+=1
-                        q=args[i]
-                if i+1<len(args):
-                    if not isinstance(args[i+1],(Resource,list,tuple)):
-                        i+=1
-                        priority=args[i]
-                    
-            else:
+            elif isinstance(argsi,(tuple,list)):
                 r=argsi[0]
                 if len(argsi)>=2:
                     q=argsi[1]
-                    if len(argsi)>=3:
-                        priority=argsi[2]
-                        
+                if len(argsi)>=3:
+                    priority=argsi[2]
+            else:
+                raise AssertionError('incorrect specifier',argsi)
+                      
             if r in self._requests:
                 raise AssertionError(resource._name+' requested twice')
             if q<=0:
@@ -3472,8 +3570,6 @@ class Component(object):
                 self._enter_sorted(r._requesters,priority)
             self.env.print_trace('','',self._name,\
               'request for '+str(q)+' from '+r._name+addstring+' '+_modetxt(self._mode))
-
-            i+=1
             
         for r in list(self._requests):
             r._claimtry()
@@ -3504,27 +3600,39 @@ class Component(object):
             
     def release(self,*args):
         '''
-        releases a quantity from a resource or resources
+        release a quantity from a resource or resources
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         args : sequence
-            a sequence of requested resources to be released |n|
-            each resource can be optionally followed by a
-            quantity |n|
-            if the quantity is not specified, the current
-            claimed quantity will be released |n|
-            alternatively, the release for a resource may
-            be specified as a list or tuple containing
-            the resource name and (optionally) a quantity
-            examples |n|
-            suppose c1 claims currently 1 from r1 and 2 from r2 and 3 from r3
-            c1.release |n|
-            --> releases 1 from r1, 2 from r2 and 3 from r3 |n|
-            c1.release(r2) |n|
-            --> releases 2 from r2 |n|
-            c1.release((r2,2),(r3,2)) |n|
-            --> releases 2 from r2,and 2 from r3
+            a sequence of either |n|
+            resources (quantity=cuurent claimed quantity |n|
+            |n|
+            or |n|
+            |n|
+            tuple/list containing |n|
+            resource and a quantity.
+
+        Notes
+        -----
+        It is not possible to release from an anonymous resource, this way.
+        Use Resource.release() in that case.
+
+        Example
+        -------
+        yield self.request(r1,(r2,2),(r3,3,100)) |n|
+        --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100 |n|
+
+        c1.release |n|
+        --> releases 1 from r1, 2 from r2 and 3 from r3 |n|
+
+        yield self.request(r1,(r2,2),(r3,3,100)) |n|
+        c1.release((r2,1)) |n|
+        --> releases 1 from r2 |n|
+
+        yield self.request(r1,(r2,2),(r3,3,100)) |n|
+        c1.release((r2,1),r3) |n|
+        --> releases 2 from r2,and 3 from r3
         '''
         
         if len(args)==0:
@@ -3532,31 +3640,26 @@ class Component(object):
                 self._release(r,None)                
                 
         else:
-            i=0
-            while i<len(args):
+            for i in range(len(args)):
                 q=None
                 argsi=args[i]
                 if isinstance(argsi,Resource):
                     r=argsi
-            
-                    if i+1<len(args):
-                        if not isinstance(args[i+1],(Resource,list,tuple)):
-                            i+=1
-                            q=args[i]
-                else:
+                elif isinstance(argsi,(tuple,list)):
                     r=argsi[0]
                     if len(argsi)>=2:
                         q=argsi[1]
-                self._release(r,q)       
-                i=i+1
-        
+                else:
+                    raise AssertionError('incorrect specifier'+argsi)
+                if r._anonymous:
+                    raise AssertionError('not possible to release anonymous resources'+r.name())       
             
     def claimed_quantity(self,resource):
         '''
         returns the claimed quantity from a resource
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
             resource : Resoure
                 resource to be queried
         
@@ -3567,156 +3670,134 @@ class Component(object):
         else:
             return 0
             
-    @property
     def claimed_resources(self):
         '''
         returns a list of claimed resources
         '''
         return self._claims.keys()
 
-    @property
     def request_failed(self):
         '''
         returns whether the latest request has failed
         '''
         return self._request_failed
         
-    @property
     def name(self,txt=None):
         '''
-        gets and/or sets the name of a component
+        optionally sets the name of the component |n|
+        returns the name of the component
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         txt : str
             name of the component |n|
             if txt ends with a period, the name will be serialized |n|
-            if omitted, the name will not be changed
+            if omittted, no change
         '''
+        
+        if txt is not None:
+            self._name,self._base_name,\
+              self._sequence_number=_reformatnameC(txt,self.env._nameserializeComponent)
         return self._name
-        
-    @name.setter
-    def name(self,txt):
-        self._name,self._base_name,\
-          self._sequence_number=_reformatnameC(txt,self.env._nameserializeComponent)
-        
-    @property
+
     def base_name(self):
         '''
-        returns the base name of a component (the name used at init or name)
+        returns the base name of the component (the name used at init or name)
         '''
         return self._base_name        
 
-    @property
     def sequence_number(self):
         '''
-        returns the sequence_number of a component
-        (the sequence number at init or name)
-
-        normally this will be the integer value of a serialized name
+        returns the sequence_number of the component 
+        (the sequence number at init or name) |n|
+        normally this will be the integer value of a serialized name,
+        but also non serialized names (without a dot at the end)
+        will be numbered)
         '''
-        return self._sequence_number
+        return self._sequence_number        
         
         
-    @property
-    def suppress_trace(self):
+    def suppress_trace(self,value=None):
+        '''
+        optionally sets the suppress_trace status |n|
+        returns the suppress_status |n|
+        
+        Parameters
+        ----------
+        value: bool
+            new suppress_trace value |n|
+            if omitted, no change
+            
+        components with the suppress_status of False, will be ignored in the trace
+        '''
+        if value is not None:
+            self._suppress_trace=value
         return self._suppress_trace
         
-    @suppress_trace.setter
-    def suppress_trace(self,value):
-        self._suppress_trace=value
+    def mode(self,value=None):
+        '''
+        optionally sets the mode of a component (along with mode_time)|n|
+        returns the mode
+        
+        Parameters
+        ----------
+        value: str recommended
+            new mode |n|
+            if omitted, no change
 
-    @property
-    def mode(self):
+        the mode is useful for tracing and animations. |n|
+        Usually the mode will be set in a call to passivate, hold, activate, standby.
         '''
-        returns/sets the mode of the component
-        '''
+        if value is not None:
+            self._mode_time=self.env._now
+            self._mode=value
+            self._mode_time=self.env._now
+
         return self._mode
         
-    @mode.setter
-    def mode(self,mode):
-        self._mode_time=self.env._now
-        self._mode=mode        
-        
-    @property
     def ispassive(self):
         '''
-        returns True if status is passive, False otherwise
-        '''
-        return self.status==passive
+        Returns
+        -------
+        True if status is passive, False otherwise : bool
         
-    @property
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise a test will be always True!
+        '''
+        return self._status==passive
+        
     def iscurrent(self):
         '''
         returns True if status is current, False otherwise
         '''
-        return self.status==current
+        return self._status==current
         
-    @property
     def isscheduled(self):
         '''
         returns True if status is scheduled, False otherwise
         '''
-        return self.status==scheduled
+        return self._status==scheduled
         
-    @property
     def isstandby(self):
         '''
         returns True if status is standby, False otherwise
         '''
-        return self.status==standby   
+        return self._status==standby   
         
-    @property
     def isdata(self):
         '''
         returns True if status is data, False otherwise
         '''
-        return self.status==data   
+        return self._status==data   
                         
-    @property
-    def main(self):
-        '''
-        returns the main component
-        '''
-        return self.env.main
-        
-    @property
-    def now(self):
-        '''
-        returns the current simulation time
-        '''   
-        return self.env.now 
-
-
-    @property
-    def trace(self,value=None):
-        '''
-        returns and/or sets the value
-        '''
-        return self.env._trace
-        
-    @trace.setter
-    def trace(self,value):
-        '''
-        returns and/or sets the value
-        '''
-        self.env._trace=value
-        
-
-    @property
-    def current_component(self):
-        '''
-        returns the current component
-        '''
-        return self.env.current_component
-
       
     def index_in_queue(self,q):
         '''
         get index of component in a queue
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         q : Queue
             queue to be queried
             
@@ -3745,8 +3826,8 @@ class Component(object):
         '''
         enters a queue at the tail
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         q : Queue
             queue to enter
             
@@ -3762,8 +3843,8 @@ class Component(object):
         '''
         enters a queue at the head
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         q : Queue
             queue to enter
             
@@ -3780,8 +3861,8 @@ class Component(object):
         '''
         enters a queue in front of a component
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         q : Queue
             queue to enter
             
@@ -3800,8 +3881,8 @@ class Component(object):
         '''
         enters a queue behind a component
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         q : Queue
             queue to enter
             
@@ -3821,8 +3902,8 @@ class Component(object):
         enters a queue, according to the priority
         
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         q : Queue
             queue to enter
             
@@ -3854,8 +3935,8 @@ class Component(object):
         '''
         leave queue
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         q : Queue
             queue to leave
             
@@ -3885,8 +3966,8 @@ class Component(object):
         '''
         gets the priority of a component in a queue
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         q : Queue
             queue where the component belongs to
         '''
@@ -3899,8 +3980,8 @@ class Component(object):
         '''
         sets the priority of a component in a queue
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         q : Queue
             queue where the component belongs to
         
@@ -3936,8 +4017,8 @@ class Component(object):
         '''
         successor of component in a queue
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         q : Queue
             queue where the component belongs to
             
@@ -3953,8 +4034,8 @@ class Component(object):
         '''
         predecessor of component in a queue
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         q : Queue
             queue where the component belongs to
             
@@ -3978,25 +4059,19 @@ class Component(object):
         mx=self._checkinqueue(q)
         return mx.enter_time
         
-    @property
     def creation_time(self):
         '''
         returns the time the component was created
         '''
-        
         return self._creation_time
         
-    @property
     def scheduled_time(self):
         '''
-        returns the time the component is scheduled for
-
         returns the time the component scheduled for, if it is scheduled |n|
         returns inf otherwise
         '''
         return self._scheduled_time
         
-    @property
     def mode_time(self):
         '''
         returns the time the component got it's latest mode |n|
@@ -4006,7 +4081,6 @@ class Component(object):
         '''
         return self._mode_time
         
-    @property
     def status(self):
         '''
         returns the status of a component
@@ -4061,14 +4135,7 @@ class Component(object):
             raise AssertionError(self._name+' is not passive')
         
 class _Distribution():
-        
-    @property
-    def mean(self):
-        '''
-        returns the mean of a distribution
-        '''
-        
-        return self._mean
+    pass
         
 class Exponential(_Distribution):
     '''
@@ -4076,8 +4143,8 @@ class Exponential(_Distribution):
     
     Exponential(mean,randomstream)
     
-    Parameters:
-    -----------
+    Parameters
+    ----------
     mean :float
         mean of the distribtion |n|
         must be >0
@@ -4102,13 +4169,21 @@ class Exponential(_Distribution):
     def __repr__(self):
         lines=[]
         lines.append('Exponential distribution '+hex(id(self)))
-        lines.append('  mean='+str(self.mean))
+        lines.append('  mean='+str(self._mean))
         lines.append('  randomstream='+hex(id(self.randomstream)))
         return '\n'.join(lines)
         
-    @property
     def sample(self):
+        '''
+        returns sample
+        '''
         return self.randomstream.expovariate(1/(self._mean))
+
+    def mean(self):
+        '''
+        returns the mean of the distribution
+        '''
+        return self._mean
 
 
 class Normal(_Distribution):
@@ -4117,8 +4192,8 @@ class Normal(_Distribution):
     
     Normal(mean,standard_deviation,randomstream)
     
-    Parameters:
-    -----------
+    Parameters
+    ----------
     mean : float
         mean of the distribution
         
@@ -4146,15 +4221,24 @@ class Normal(_Distribution):
     def __repr__(self):
         lines=[]
         lines.append('Normal distribution '+hex(id(self)))
-        lines.append('  mean='+str(self.mean))
-        lines.append('  standard_deviation='+str(self.standard_deviation))
+        lines.append('  mean='+str(self._mean))
+        lines.append('  standard_deviation='+str(self._standard_deviation))
         lines.append('  randomstream='+hex(id(self.randomstream)))
         return '\n'.join(lines)
 
-    @property
     def sample(self):
+        '''
+        returns sample
+        '''
         return self.randomstream.normalvariate\
           (self._mean,self._standard_deviation)
+
+    def mean(self):
+        '''
+        returns the mean of the distribution
+        '''
+        return self._mean
+
 
 class Uniform(_Distribution):
     '''
@@ -4162,13 +4246,19 @@ class Uniform(_Distribution):
     
     Uniform(lowerbound,upperboud,seed)
     
-    arguments:
-        lowerbound          lowerbound of the distribution
-        upperbound          upperbound of the distribution
-        randomstream        randomstream
-                            if omitted, random will be used
-                            if used as random.Random(12299)
-                              it assigns a new stream with the specified seed
+    Parameters
+    ----------
+    lowerbound : float
+        lowerbound of the distribution
+        
+    upperbound : float
+        upperbound of the distribution
+ 
+    randomstream: randomstream
+        randomstream to be used |n|
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
 
     upperbound must be >= lowerbound
     '''
@@ -4193,9 +4283,17 @@ class Uniform(_Distribution):
         return '\n'.join(lines)
         
 
-    @property
     def sample(self):
+        '''
+        returns sample
+        '''
         return self.randomstream.uniform(self._lowerbound,self._upperbound)
+
+    def mean(self):
+        '''
+        returns the mean of the distribution
+        '''
+        return self._mean
         
 class Triangular(_Distribution):
     '''
@@ -4203,16 +4301,24 @@ class Triangular(_Distribution):
     
     Triangular(low,high,mode,seed)
     
-    arguments:
-        low                 lowerbound of the distribution
-        upp                 upperbound of the distribution
-        mode                mode of the distribution
-        randomstream        randomstream
-                            if omitted, random will be used
-                            if used as random.Random(12299)
-                            it assigns a new stream with the specified seed
-                            
-    requirement: low <= mode <= upp
+    Parameters
+    ----------
+    low : float
+        lowerbound of the distribution
+        
+    hight : float
+        upperbound of the distribution
+        
+    mode : float
+        mode of the distribution
+        
+    randomstream: randomstream
+        randomstream to be used |n|
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
+        
+    requirement: low <= mode <= high
     '''
     def __init__(self,low,high,mode,randomstream=None):
         if low>high:
@@ -4240,9 +4346,17 @@ class Triangular(_Distribution):
         lines.append('  randomstream='+hex(id(self.randomstream)))
         return '\n'.join(lines)
 
-    @property
     def sample(self):
+        '''
+        returns sample
+        '''
         return self.randomstream.triangular(self._low,self._high,self._mode)
+
+    def mean(self):
+        '''
+        returns the mean of the distribution
+        '''
+        return self._mean
     
 class Constant(_Distribution):
     '''
@@ -4250,12 +4364,18 @@ class Constant(_Distribution):
     
     Constant(value,randomstream)
     
-    arguments:
-        value               value to be returned in sample
-        randomstream        randomstream
-                            if omitted, random will be used
-                            if used as random.Random(12299)
-                              it assigns a new stream with the specified seed
+    Parameters
+    ----------
+    value : float
+        value to be returned in sample
+        
+    randomstream: randomstream
+        randomstream to be used |n|
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed |n|
+        Note that this is only for compatibility with other distributions
+        
     '''
     def __init__(self,value,randomstream=None):
         self._value=value
@@ -4274,29 +4394,41 @@ class Constant(_Distribution):
         return '\n'.join(lines)
         
 
-    @property
     def sample(self):
+        '''
+        returns sample (is always the specified constant)
+        '''
         return(self._value)
         
+    def mean(self):
+        '''
+        returns the mean of the distribution
+        '''
+        return self._mean
+
 class Cdf(_Distribution):
     '''
     Cumulative distribution function
     
     Cdf(spec,seed)
     
-    arguments:
-        spec                list with x-values and corresponduing cumulative density
-                            (x1,c1,x2,c2, ...xn,cn)
-        randomstream        randomstream
-                            if omitted, random will be used
-                            if used as random.Random(12299)
-                              it assigns a new stream with the specified seed
+    Parameters
+    ----------
+    spec : list or tuple
+        list with x-values and corresponding cumulative density
+        (x1,c1,x2,c2, ...xn,cn)
+            
+    randomstream: randomstream
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it defines a new stream with the specified seed
+            
     requirements:
-        x1<=X2<= ...<=xn
-        c1<=c2<=cn
-        c1=0
-        cn>0
-        all cumulative densities are auto scaled according to cm,
+        x1<=x2<= ...<=xn |n|
+        c1<=c2<=cn |n|
+        c1=0 |n|
+        cn>0 |n|
+        all cumulative densities are auto scaled according to cn,
         so no need to set cn to 1 or 100.
     '''
     def __init__(self,spec,randomstream=None):
@@ -4346,9 +4478,10 @@ class Cdf(_Distribution):
         lines.append('  randomstream='+hex(id(self.randomstream)))
         return '\n'.join(lines)
 
-            
-    @property
     def sample(self):
+        '''
+        returns sample
+        '''
         r=self.randomstream.random()
         for i in range (len(self._cum)):
             if r<self._cum[i]:
@@ -4356,23 +4489,47 @@ class Cdf(_Distribution):
                   (r,self._cum[i-1],self._cum[i],self._x[i-1],self._x[i])
         return self._x[i]          
 
+    def mean(self):
+        '''
+        returns the mean of the distribution
+        '''
+        return self._mean
+
 class Pdf(_Distribution):
     '''
-    Probility distribution function
+    Probability distribution function
     
-    Pdf(list,seed)
+    Pdf(spec,spec2,seed)
     
-    arguments:
-        spec                list with x-values and corresponding probability
-                            (x1,p1,x2,p2, ...xn,pn)
-        randomstream        randomstream
-                            if omitted, random will be used
-                            if used as random.Random(12299)
-                              it assigns a new stream with the specified seed
+    Parameters
+    ----------
+    spec : list or tuple
+        list with x-values and corresponding probability |n|
+        (x1,p1,x2,p2, ...xn,pn) |n|
+        |n|
+        or, if spec2 is present: |n|
+        |n|
+        list with x-values
+        
+    spec2 : list, tuple or float
+        if omitted, spec contains the probabilities |n|
+        the list contains the probabilities of the corresponding
+        x-values from spec. |n|
+        alternatively, if a float is given (e.g. 1), all x-values
+        have equal probability. The value is not important.
+        
+    randomstream : randomstream
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
+        
     requirements:
-        p1+p2=...+pn>0
+        p1+p2=...+pn>0 |n|
         all densities are auto scaled according to the sum of p1 to pn,
-        so no need to have p1 to pn add up to 1 or 100.
+        so no need to have p1 to pn add up to 1 or 100. |n|
+        the x-values may be any type. If it is a salabim distribution,
+        not the distribution, but a sample will be returned when 
+        calling sample.
     '''
     def __init__(self,spec1,spec2=None,randomstream=None):
         self._x=[0] # just a place holder
@@ -4389,36 +4546,45 @@ class Pdf(_Distribution):
         hasmean=True
         if spec2==None:
             spec=list(spec1)
+
             if len(spec)==0:
                 raise AssertionError('no arguments specified')
             while len(spec)>0:
                 x=spec.pop(0)
                 if len(spec)==0:
                     raise AssertionError('uneven number of parameters specified')
+                self._x.append(x)
                 p=spec.pop(0)
                 sump+=p
+                self._cum.append(sump)
+                if isinstance(x,_Distribution):
+                    x=x._mean
                 try:
                     sumxp += float(x)*p
                 except:
                     hasmean=False
-                self._x.append(x)
-                self._cum.append(sump)
         else:
             spec=list(spec1)
             if isinstance(spec2,(list,tuple)):
                 spec2=list(spec2)
             else:
-                spec2=len(spec)*[spec2]
+                spec2=len(spec)*[1]
+            if len(spec)!=len(spec2):
+                raise AssertionError('length of x-values does not match length of probabilities')
+
             while len(spec)>0:
                 x=spec.pop(0)
+                self._x.append(x)
                 p=spec2.pop(0)
                 sump+=p
+                self._cum.append(sump)            
+                if isinstance(x,_Distribution):
+                    x=x._mean
                 try:
                     sumxp += float(x)*p
                 except:
                     hasmean=False
-                self._x.append(x)
-                self._cum.append(sump)            
+
         if sump==0:
             raise AssertionError('at least one probability should be >0')
 
@@ -4427,7 +4593,7 @@ class Pdf(_Distribution):
         if hasmean:
             self._mean=sumxp/sump            
         else:
-            self._mean=inf
+            self._mean=nan
 
     def __repr__(self):
         lines=[]
@@ -4435,13 +4601,27 @@ class Pdf(_Distribution):
         lines.append('  randomstream='+hex(id(self.randomstream)))
         return '\n'.join(lines)
 
-    @property
     def sample(self):
+        '''
+        returns sample
+        '''
         r=self.randomstream.random()
         for i in range (len(self._cum)):
             if r<=self._cum[i]:
+                if isinstance(self._x[i],_Distribution):
+                    return self._x[i].sample()
                 return self._x[i]
-        return self._x[i]  # just for safety  
+
+    def mean(self):
+        '''
+        returns the mean of the distribution
+        
+        if the mean can't be calculated (if not all x-values are scalars or distrubtions),
+        nan will be returned.
+        '''
+        return self._mean
+
+
         
 class Distribution(_Distribution):
     '''
@@ -4449,15 +4629,19 @@ class Distribution(_Distribution):
     
     Distribution(spec,randomstream)
     
-    arguments:
-        spec                string containing a valid salabim distribution
-        randomstream        randomstream
-                            if omitted, random will be used
-                            if used as random.Random(12299)
-                              it assigns a new stream with the specified seed
-                            note that the rendomstream in the string is ignored
+    Parameters
+    ----------
+    spec : str
+        string containing a valid salabim distribution
+
+    randomstream : randomstream
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed |n|
+        Note that the rendomstream in the specifying string is ignored.
+
     requirements:
-        spec must evakuate to a proper salabim distribution (including proper casing).
+        spec must evaluate to a proper salabim distribution (including proper casing).
     '''
 
     def __init__(self,spec,randomstream=None):
@@ -4473,17 +4657,25 @@ class Distribution(_Distribution):
     def __repr__(self):
         return self._distribution.__repr__()
         
-    @property
     def sample(self):
+        '''
+        returns sample
+        '''
         self._distribution.randomstream=self.randomstream
-        return self._distribution.sample        
+        return self._distribution.sample()        
+
+    def mean(self):
+        '''
+        returns the mean of the distribution
+        '''
+        return self._mean
                             
 class Resource(object):
     '''
     Resource
     
-    Parameters:
-    -----------
+    Parameters
+    ----------
     name : str
         name of the resource |n|
         if the name ends with a period (.),
@@ -4533,7 +4725,7 @@ class Resource(object):
         self._claimers=Queue(name='claimers:'+name,env=self.env)
         self._pendingclaimed_quantity=0
         self._claimed_quantity=0
-        self.anonymous=anonymous
+        self._anonymous=anonymous
         self._strict_order=strict_order
 
     def __repr__(self):
@@ -4559,7 +4751,7 @@ class Resource(object):
         
         lines.append('  claimed_quantity='+str(self._claimed_quantity))
         if self._claimed_quantity>=0:
-            if self.anonymous:
+            if self._anonymous:
                 lines.append('  not claimed by any components,'+\
                 ' because the resource is anonymous')
             else:
@@ -4599,7 +4791,7 @@ class Resource(object):
                     if r in c._pendingclaims:
                         r._pendingclaimed_quantity-=c._requests[r]
                         
-                    if not r.anonymous:
+                    if not r._anonymous:
                         if r in c._claims:
                             c._claims[r]+=c._requests[r]
                         else:
@@ -4617,17 +4809,19 @@ class Resource(object):
         '''
         releases all claims or a specified quantity
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         quantity : float
             quantity to be released |n|
             if not specified, the resource will be emptied completely |n|
             for non-anonymous resources, all components claiming from this resource
             will be released.
-                              
+            
+        Notes
+        -----
         quantity may not be specified for a non-anomymous resoure
         '''
-        if self.anonymous:
+        if self._anonymous:
             if quantity is None:
                 q=self._claimed_quantity
             else:
@@ -4648,14 +4842,12 @@ class Resource(object):
                 mx=mx.successor
                 c.release(self)
                 
-    @property
     def requesters(self):
         '''
         returns the queue containing all components with not yet honoured requests.
         '''
         return self._requesters
         
-    @property
     def claimers(self):
         '''
         returns the queue with all components claiming from the resource. |n|
@@ -4663,77 +4855,84 @@ class Resource(object):
         '''
         return self._claimers
 
-    @property
     def capacity(self,cap=None):
         '''
-        gets or sets the capacity of a resource.
+        optionally sets the capacity |n|
+        returns the capacity
         
-        this may lead to honouring one or more requests.
+        Parameters
+        ----------
+        cap : float or int
+            capacity of the resource |n|
+            this may lead to honouring one or more requests.|n|
+            if omitted, no change
         '''
+        if cap is not None:
+            self._capacity=cap
+            self._claimtry()
         return self._capacity
 
-    @capacity.setter
-    def capacity(self,cap):
-        self._capacity=cap
-        self._claimtry()
         
-    @property
     def claimed_quantity(self):
         '''
-        returns the claimed quantity
+        Returns
+        -------
+        the claimed quantity : float
         '''
         return self._claimed_quantity
             
-    @property
-    def strict_order(self):
+    def strict_order(self,strict_order):
         '''
-        gets or sets the strict_order property of a resource
+        sets the strict_order value
         
-        this may lead to honouring one or more requests.        
+        Parameters
+        ----------
+        strict_order : bool
+            determines whether strict_order is applicable |n|
+            this may lead to honouring one or more requests.|n|
+            if omitted, no change
+            
+        Returns
+        -------
+        The strict_order value : bool
         '''
+        if strict_order is not None:
+            self._strict_order=strict_order
+            self._claimtry()
         return self._strict_order
         
-    @strict_order.setter
-    def strict_order(self,strict_order):
-        self._strict_order=strict_order
-        self._claimtry()
-
-    @property
-    def name(self):
+    def name(self,txt=None):
         '''
-        gets or sets the name of a resource
+        optionally sets the name of the resource |n|
+        returns the name of the resource
         
-        Parameters:
+        Parameters
         ----------
         txt : str
             name of the resource |n|
-            if txt ends with a period, the name will be serialized
+            if txt ends with a period, the name will be serialized |n|
+            if omittted, no change
         '''
+        if txt is not None:
+            self._name,self._base_name,self._sequence_number=\
+              _reformatname(txt,self.env._nameserializeResource)
         return self._name
 
-    @name.setter
-    def name(self,txt):
-        self._name,self._base_name,self._sequence_number=\
-          _reformatname(txt,self.env._nameserializeResource)
-        
-    @property
     def base_name(self):
         '''
-        returns the base name of a resource (the name used at init or name)
+        returns the base name of the resource (the name used at init or name)
         '''
         return self._base_name        
 
-    @property
     def sequence_number(self):
         '''
-        returns the sequence_number of a resource
-        (the sequence number at init or name)
-
+        returns the sequence_number of the resource 
+        (the sequence number at init or name) |n|
         normally this will be the integer value of a serialized name,
         but also non serialized names (without a dot at the end)
         will be numbered)
         '''
-        return self._sequence_number  
+        return self._sequence_number        
 
 def colornames():
     return {'':'#00000000','10%gray':'#191919','20%gray':'#333333',
@@ -4968,10 +5167,20 @@ def _modetxt(mode):
     else:
         return 'mode='+str(mode)       
     
-def trace(value=None):
-    if value!=None:
-        _default_env._trace=value
-    return _default_env._trace
+def data():
+    return 'data'
+    
+def current():
+    return 'current'
+    
+def standby():
+    return 'standby'
+    
+def passive():
+    return 'passive'
+    
+def scheduled():
+    return 'scheduled'
     
 def random_seed(seed,randomstream=None):
     '''
@@ -4981,19 +5190,6 @@ def random_seed(seed,randomstream=None):
     if randomstream==None:
         randomstream=random
     randomstream.seed(seed)
-        
-    
-def now():
-    '''
-    returns now for the default environment
-    '''
-    return _default_env._now
-
-def current_component():
-    '''
-    returns the current component for the default environment
-    '''
-    return _default_env.current_component
     
 def pythonistacolor(c):
     return (c[0]/255,c[1]/255,c[2]/255,c[3]/255)
@@ -5351,16 +5547,81 @@ def show_colornames():
         print('{:22s}{}'.format(name,colornames()[name]))
  
 def default_env():
+    '''
+    Returns
+    -------
+    default environment : Environment
+    '''
     return _default_env
        
 def main():
+    '''
+    returns the main component of the default environment
+    '''
     return _default_env._main
+        
+def now():
+    '''
+    returns the current simulation time of the default environment
+    '''   
+    return _default_env._now 
+            
+def trace(value=None):
+    '''
+    optionally sets the trace status of the default environment |n|
+    returns the trace status of the default environment
+        
+    Parameters
+    ----------
+    value : bool
+        new trace value |n|
+        if omitted, no change
+    '''
+    if value is not None:
+        self._default_env._trace=value
+    return _default_env._trace
+        
+def current_component():
+    '''
+    returns the current_component of the default environment
+    '''
+    return _default_env._current_component
+        
+def run(*args,**kwargs):
+    '''
+    run for the default environment
+    '''
+    _default_env.run(*args,**kwargs)
+    
+def animation_parameters(*args,**kwargs):
+    '''
+    animation_parameters for the default environment
+    '''
 
- 
+    _default_env.animation_parameters(*args,**kwargs)
+    
+def stop_run(*args,**kwargs):
+    '''
+    stop_run for the default environment
+    '''
+    _default_env.stop_run(*args,**kwargs)
+    
+def step():
+    '''
+    step for the default environment
+    '''
+    _default_env.step
+    
+def peek():
+    '''
+    peek for the default environment
+    '''
+    return _default_env.peek()
+
 if __name__ == '__main__':
     try:
         import salabim_test
     except:
         print ('salabim_test.py not found')
     else:
-        salabim_test.test17()
+        salabim_test.test22()

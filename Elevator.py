@@ -41,9 +41,9 @@ class Visitor(sim.Component):
     def process(self):
         self.enter(self.fromfloor.visitors)
         if not (self.fromfloor,self.direction)  in requests:
-            requests[self.fromfloor,self.direction]=sim.now()            
+            requests[self.fromfloor,self.direction]=self.env.now()            
         for car in cars:
-            if car.ispassive:
+            if car.ispassive():
                 car.reactivate()
         
         yield self.passivate()
@@ -86,15 +86,15 @@ class Car(sim.Component):
                         dooropen=True
                     for visitor in self.floor.visitors:
                         if visitor.direction==self.direction:
-                            if self.visitors.length<self.capacity:
+                            if len(self.visitors)<self.capacity:
                                 visitor.leave(self.floor.visitors)
                                 visitor.enter(self.visitors)
                         yield self.hold(enter_time,mode='Let in')
                     if (self.floor.count_in_direction(self.direction)>0):
                         if not (self.floor,self.direction) in requests:
-                            requests[self.floor,self.direction]=sim.now()
+                            requests[self.floor,self.direction]=self.env.now()
 
-                if self.visitors.length>0:
+                if len(self.visitors)>0:
                     break
             else:
                 if len(requests)>0:
@@ -147,7 +147,7 @@ def getdirection(fromfloor,tofloor):
         return -1
     return 0
     
-de=sim.Environment(random_seed=1234567)
+de=sim.Environment(random_seed=1234567,trace=True)
 up=1
 still=0
 down=-1
@@ -183,7 +183,6 @@ for icar in range(ncars):
     thiscar=Car(name='car '+str(icar),capacity=capacity)
     cars.append(thiscar)
         
-de.trace=True
 de.run(500)
 
 

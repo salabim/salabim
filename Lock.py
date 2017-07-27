@@ -10,11 +10,11 @@ class Shipgenerator(sim.Component):
 
     def process(self):
         while True:
-            yield self.hold(sim.Exponential(iat).sample)
+            yield self.hold(sim.Exponential(iat).sample())
             ship=Ship(name=sidename(self.side)+'ship.')
             ship.side=self.side
-            ship.length=meanlength*sim.Uniform(2/3,4/3).sample
-            if lock.mode=='Idle':
+            ship.length=meanlength*sim.Uniform(2/3,4/3).sample()
+            if lock.mode()=='Idle':
                 lock.reactivate()
             
 class Ship(sim.Component):
@@ -50,7 +50,7 @@ class Lock(sim.Component):
                 ship.reactivate()
                 yield self.passivate('Wait for sail out')
 
-de=sim.Environment(random_seed=1234567)
+de=sim.Environment(random_seed=1234567,trace=True)
 locklength=60
 switchtime=10
 intime=2
@@ -71,6 +71,5 @@ for side in (left,right):
 lock=Lock('Lock')
 lock.side=left
 
-de.trace=True
 de.run(500)
 

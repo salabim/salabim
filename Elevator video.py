@@ -54,9 +54,9 @@ class AnimateCar(sim.Animate):
           fillcolor0='lightblue')
       
     def y(self,t):
-        if self.car.mode=='Move':
+        if self.car.mode()=='Move':
             return sim.interpolate(
-              t,self.car.mode_time,self.car.scheduled_time,
+              t,self.car.mode_time(),self.car.scheduled_time(),
               self.car.floor.y,self.car.nextfloor.y)
                  
         else:
@@ -81,9 +81,9 @@ class AnimateCarVisitor(sim.Animate):
             return direction_color(visitor.direction)
             
     def y(self,t):
-        if self.car.mode=='Move':
+        if self.car.mode()=='Move':
             return sim.interpolate(
-              t,self.car.mode_time,self.car.scheduled_time,
+              t,self.car.mode_time(),self.car.scheduled_time(),
               self.car.floor.y,self.car.nextfloor.y)
         else:
             return self.car.floor.y
@@ -181,23 +181,29 @@ def do_animation():
                 
 def set_load_0_n(val):
     global load_0_n
-    load_0_n=float(val)   
+    load_0_n=float(val)
+    if vg_0_n.ispassive():
+        vg_0_n.reactivate()
 
 def set_load_n_n(val):
     global load_n_n
     load_n_n=float(val)
-        
+    if vg_n_n.ispassive():
+        vg_n_n.reactivate()
+                
 def set_load_n_0(val):
     global load_n_0
     load_n_0=float(val)   
-    
+    if vg_n_0.ispassive():
+        vg_n_0.reactivate()
+            
 def set_capacity(val):
     global capacity
     global capacity_last
     capacity=int(val)
     if capacity!=capacity_last:
         capacity_last=capacity
-        sim.main.stop_run()    
+        de.stop_run()    
         
 def set_ncars(val):
     global ncars
@@ -205,7 +211,7 @@ def set_ncars(val):
     ncars=int(val)
     if ncars!=ncars_last:
         ncars_last=ncars
-        sim.main.stop_run()    
+        de.stop_run()    
         
 def set_topfloor(val):
     global topfloor
@@ -213,11 +219,18 @@ def set_topfloor(val):
     topfloor=int(val)
     if topfloor!=topfloor_last:
         topfloor_last=topfloor
-        sim.main.stop_run()    
+        de.stop_run()    
+        
+def direction_color(direction):
+    if direction==1:
+        return 'red'
+    if direction==-1:
+        return 'green'
+    return 'yellow'
    
 class  VisitorGenerator(sim.Component):
     def __init__(self,from_,to,id,*args,**kwargs):
-        super()__init__(*args,**kwargs)
+        super().__init__(*args,**kwargs)
         self.from_=from_
         self.to=to
         self.id=id
@@ -234,7 +247,7 @@ class  VisitorGenerator(sim.Component):
             if self.id=='0_n':
                 load=load_0_n
             elif self.id=='n_0':
-                load=load_0_n
+                load=load_n_0
             else:
                 load=load_n_n                    
                 
@@ -256,9 +269,9 @@ class Visitor(sim.Component):
     def process(self):
         self.enter(self.fromfloor.visitors)
         if not (self.fromfloor,self.direction)  in requests:
-            requests[self.fromfloor,self.direction]=sim.now()            
+            requests[self.fromfloor,self.direction]=self.env.now()            
         for car in cars:
-            if car.ispassive:
+            if car.ispassive():
                 car.reactivate()
         
         yield self.passivate()
@@ -301,15 +314,15 @@ class Car(sim.Component):
                         dooropen=True
                     for visitor in self.floor.visitors:
                         if visitor.direction==self.direction:
-                            if self.visitors.length<self.capacity:
+                            if len(self.visitors)<self.capacity:
                                 visitor.leave(self.floor.visitors)
                                 visitor.enter(self.visitors)
                         yield self.hold(enter_time,mode='Let in')
                     if (self.floor.count_in_direction(self.direction)>0):
                         if not (self.floor,self.direction) in requests:
-                            requests[self.floor,self.direction]=sim.now()
+                            requests[self.floor,self.direction]=self.env.now()
 
-                if self.visitors.length>0:
+                if len(self.visitors)>0:
                     break
             else:
                 if len(requests)>0:
@@ -361,22 +374,6 @@ def getdirection(fromfloor,tofloor):
     if fromfloor.n>tofloor.n:
         return -1
     return 0
-        
-def direction_name(direction):
-    if direction==1:
-        return 'up'
-    if direction==-1:
-        return 'down'
-    return 'none'
-
-def direction_color(direction):
-    if direction==1:
-        return 'red'
-    if direction==-1:
-        return 'green'
-    return 'yellow'
-    
-de=sim.Environment(random_seed=1234567)
 
 up=1
 still=0
@@ -394,12 +391,15 @@ load_n_0=100
 capacity=4
 ncars=3
 topfloor=15
-       
-VisitorGenerator(
+sim.random_seed(1234567)
+
+de=sim.Environment()
+    
+vg_0_n=VisitorGenerator(
   from_=(0,0),to=(1,topfloor),id='0_n',name='vg_0_n')
-VisitorGenerator(
+vg_n_0=VisitorGenerator(
   from_=(1,topfloor),to=(0,0),id='n_0',name='vg_n_0')
-VisitorGenerator(
+vg_n_n=VisitorGenerator(
   from_=(1,topfloor),to=(1,topfloor),id= 'n_n',name='vg_n_n')
   
 requests={}
@@ -416,6 +416,3 @@ for icar in range(ncars):
 do_animation()
 
 de.run(500)
-
-
-    

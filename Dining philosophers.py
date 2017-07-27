@@ -15,7 +15,7 @@ class Philosopher(sim.Component):
             yield self.hold(eatingtime,mode='eating')
             self.release()   
             
-de=sim.Environment(random_seed=1234567)
+de=sim.Environment(random_seed=1234567,trace=True)
 eatingtime_mean=20
 thinkingtime_mean=20
 nphilosophers=8
@@ -30,7 +30,6 @@ for i in range(nphilosophers):
     philosopher[i].rightfork=fork[i]
         
 philosopher[0].leftfork=fork[nphilosophers-1]
-    
-de.trace=True
+
 de.run(500)    
     
