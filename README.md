@@ -1,5 +1,5 @@
 # salabim
-![Logo]('salabim logo red black.png')
+![Logo](x.png')
 
 salabim is a discrete event simulation package in Python.
 
