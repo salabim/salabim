@@ -1,5 +1,5 @@
 # salabim
-![Logo](http://salabim.org/x.jpg)
+![Logo](x.png)
 ![Logo](http://images.boomsbeat.com/data/images/full/3006/baby-panda_4-jpg.jpg)
 
 
