@@ -1,5 +1,5 @@
 # salabim
-![a](../master/salabim logo red black.png)
+![a](salabim/salabim/salabim logo red black.png)
 salabim is a discrete event simulation package in Python.
 
 Fully object oriented simulation, similar to must and Tomas.
