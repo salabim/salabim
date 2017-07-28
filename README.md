@@ -1,4 +1,3 @@
-# salabim
 ![Logo](x.png)
 
 salabim is a discrete event simulation package in Python.
