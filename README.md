@@ -1,4 +1,4 @@
-![Logo](http://www.salabim.org/salabim_logo_red_black.png)
+![Logo](http://www.salabim.org/salabim_logo_red_black_300px.png)
 
 discrete event simulation package in Python.
 
