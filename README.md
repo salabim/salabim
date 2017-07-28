@@ -1,6 +1,6 @@
 ![Logo](x.png)
 
-salabim is a discrete event simulation package in Python.
+discrete event simulation package in Python.
 
 Fully object oriented simulation, similar to must and Tomas.
 
