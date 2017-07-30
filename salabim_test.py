@@ -742,5 +742,10 @@ def test22():
 
     sim.run(12)
     
+def test23():
+    for d in ('uni(12,30)','n(12)','exponentia(12)','TRI(1)','(12)'):
+        print(d)
+        print(sim.Distribution(d))
+    
 if __name__ == '__main__':
-    test2()
+    test23()

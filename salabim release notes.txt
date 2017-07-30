@@ -1,5 +1,30 @@
 Salabim release notes
 
+version 2.0.1
+=========================
+Distribution now also supports:
+'c1'.      ==> Constant(c1)
+'c1,c2'    ==> Uniform(c1,c2)
+'c1,c2,c3' ==> Triangular (c1,c2,c3)
+
+Normal distribution now has a default value for standard_deviation : 0, so effectively constant
+Uniform distribution now has a default value for upperbound : lowerbound, so effectively constant
+Trianguar distribution now has a default value for high : low, so effectively constant
+Trianguar distribution now has a default value for mode : (low+high)/2, so a symmetric distribution
+
+Also for Distribution:
+If you specify only the first letters of the distribution name, the correct distribution will be selected,
+regardless of casing.
+
+Examples of these new features
+Uniform(13)  ==> Uniform(13)
+Uni(12,15)   ==> Uniform(12,15)
+UNIF(12,15)  ==> Uniform(12,15)
+N(12,3)      ==> Normal(12,3)
+Tri(10,20).  ==> Triangular(10,20,15)
+10.          ==> Constant(10)
+12,15        ==> Uniform(12,15)
+
 version 2.0.0  2017-07-24
 =========================
 Major reorganization of the interface.
@@ -118,8 +143,7 @@ for details.
 The method Queue.index_of() has been renamed Queue.index() to be more in line
 with Python standards.
 
-The script to install salalabim in site-packages is now called setup.py
-(instead of salabim_install.py), again more in line with Python conventions.
+The script to install salalabim in site-packages is now called install.py
 
 There are two new sample models, 'Lock with resources' and 'Lock with resources animated',
 showing a different approach of the Lock model, involving resources.

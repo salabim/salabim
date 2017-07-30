@@ -3,7 +3,7 @@ salabim  discrete event simulation module
 
 The MIT License (MIT)
 
-Copyright (c) 2017 Ruud van der Ham, Upward Systems
+Copyright (c) 2017 Ruud van der Ham, ruud@salabim.org
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -71,7 +71,7 @@ except:
     inf=float('inf')
     nan=float('nan')
 
-__version__='2.0.0'
+__version__='2.0.1'
 
 class SalabimException(Exception):
     def __init__(self,value):
@@ -245,6 +245,7 @@ class Queue(object):
         if the name ends with a period (.),
         auto serializing will be applied |n|
         if omitted, the name queue (serialized)
+        
     env : Environment
         environment where the queue is defined |n|
         if omitted, default_env will be used
@@ -993,7 +994,7 @@ class Environment(object):
         defines whether to trace or not |n|
         if omitted, False
         
-    random_seed : int
+    random_seed : hashable object, usually int
         the seed for random, equivalent to random.seed() |n|
         if None, a purely random value (based on the current time) will be used
         (not reproducable) |n|
@@ -1323,7 +1324,7 @@ class Environment(object):
             if omitted, no change
             
         Returns
-        _______
+        -------
         trace status : bool
         
         Note
@@ -1762,7 +1763,7 @@ class Environment(object):
 
     def base_name(self):
         '''
-        returns the base name of the environmnet (the name used at init or name)
+        returns the base name of the environment (the name used at init or name)
         '''
         return self._base_name        
 
@@ -1821,6 +1822,11 @@ class Animate(object):
     keep : bool
         keep |n|
         if False, animation object is hidden after t1, shown otherwise
+        (default True)
+            
+    visible : bool
+        visible |n|
+        if False, animation object is not shown, shown otherwise
         (default True)
             
     screen_coordinates : bool
@@ -2119,6 +2125,11 @@ class Animate(object):
         keep : bool
             keep |n|
             if False, animation object is hidden after t1, shown otherwise
+            (default see below)
+                
+        visible : bool
+            visible |n|
+            if False, animation object is not shown, shown otherwise
             (default see below)
                 
         t0 : float
@@ -4199,6 +4210,7 @@ class Normal(_Distribution):
         
     standard_deviation : float
         standard deviation of the distribution |n|
+        if omitted, 0 is used, thus effectively a contant distributiin |n|
         must be >=0
 
     randomstream: randomstream
@@ -4207,11 +4219,14 @@ class Normal(_Distribution):
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
     '''
-    def __init__(self,mean,standard_deviation,randomstream=None):
-        if standard_deviation<0:
-            raise AsserionError('standard_deviation<0')
+    def __init__(self,mean,standard_deviation=None,randomstream=None):
         self._mean=mean
-        self._standard_deviation=standard_deviation
+        if standard_deviation==None:
+            self._standard_deviation=0
+        else:
+            self._standard_deviation=standard_deviation
+        if self._standard_deviation<0:
+            raise AsserionError('standard_deviation<0')
         if randomstream is None:
             self.randomstream=random
         else:
@@ -4252,27 +4267,30 @@ class Uniform(_Distribution):
         lowerbound of the distribution
         
     upperbound : float
-        upperbound of the distribution
+        upperbound of the distribution |n|
+        if omitted, lowerbound will be used |n
+        must be >= lowerbound
  
     randomstream: randomstream
         randomstream to be used |n|
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
-
-    upperbound must be >= lowerbound
     '''
-    def __init__(self,lowerbound,upperbound,randomstream=None):
-        if lowerbound>upperbound:
-            raise AssertionError('lowerbound>upperbound')
+    def __init__(self,lowerbound,upperbound=None,randomstream=None):
         self._lowerbound=lowerbound
-        self._upperbound=upperbound
+        if upperbound==None:
+            self._upperbound=lowerbound
+        else:
+            self._upperbound=upperbound
+        if self._lowerbound>self._upperbound:
+            raise AssertionError('lowerbound>upperbound')
         if randomstream is None:
             self.randomstream=random
         else:
             assert isinstance(randomstream,random.Random)
             self.randomstream=randomstream
-        self._mean=(lowerbound+upperbound)/2
+        self._mean=(self._lowerbound+self._upperbound)/2
         
     def __repr__(self):
         lines=[]
@@ -4306,36 +4324,44 @@ class Triangular(_Distribution):
     low : float
         lowerbound of the distribution
         
-    hight : float
-        upperbound of the distribution
-        
+    high : float
+        upperbound of the distribution |n|
+        if omitted, low will be used, thus effectively a constant distribution |n|
+        high must be >= low
+               
     mode : float
-        mode of the distribution
+        mode of the distribution |n|
+        if omitted, the average of low and high will be used, thus a symmetric triangular distribution |n|
+        mode must be between low and high
         
     randomstream: randomstream
         randomstream to be used |n|
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
-        
-    requirement: low <= mode <= high
     '''
-    def __init__(self,low,high,mode,randomstream=None):
-        if low>high:
-            raise AssertionError('low>high')
-        if low>mode:
-            raise AssertionError('low>mode')
-        if high<mode:
-            raise AssertionError('high<mode')
+    def __init__(self,low,high=None,mode=None,randomstream=None):
         self._low=low
-        self._high=high
-        self._mode=mode
+        if high==None:
+            self._high=low
+        else:
+            self._high=high
+        if mode==None:
+            self._mode=(self._high+self._low)/2
+        else:
+            self._mode=mode
+        if self._low>self._high:
+            raise AssertionError('low>high')
+        if self._low>self._mode:
+            raise AssertionError('low>mode')
+        if self._high<self._mode:
+            raise AssertionError('high<mode')
         if randomstream is None:
             self.randomstream=random
         else:
             assert isinstance(randomstream,random.Random)
             self.randomstream=randomstream
-        self._mean=(low+mode+high)/3
+        self._mean=(self._low+self._mode+self._high)/3
 
     def __repr__(self):
         lines=[]
@@ -4621,7 +4647,6 @@ class Pdf(_Distribution):
         '''
         return self._mean
 
-
         
 class Distribution(_Distribution):
     '''
@@ -4640,11 +4665,68 @@ class Distribution(_Distribution):
         it assigns a new stream with the specified seed |n|
         Note that the rendomstream in the specifying string is ignored.
 
-    requirements:
-        spec must evaluate to a proper salabim distribution (including proper casing).
+    Notes
+    -----
+    spec must evaluate to a proper salabim distribution. |n|
+
+
+    spec also supports: |n|
+    'c1'       ==> Constant(c1) |n|
+    'c1,c2'    ==> Uniform(c1,c2) |n|
+    'c1,c2,c3' ==> Triangular (c1,c2,c3) |n|
+
+    If you specify only the first letters of the distribution name, the correct distribution will be selected,
+    regardless of casing.
+
+    Examples
+    --------
+    Uniform(13)  ==> Uniform(13) |n|
+    Uni(12,15)   ==> Uniform(12,15) |n|
+    UNIF(12,15)  ==> Uniform(12,15) |n|
+    N(12,3)      ==> Normal(12,3) |n|
+    Tri(10,20).  ==> Triangular(10,20,15) |n|
+    10.          ==> Constant(10) |n|
+    12,15        ==> Uniform(12,15) |n|
     '''
 
     def __init__(self,spec,randomstream=None):
+            
+        sp=spec.split(',')
+        if len(sp)==1:
+            try:
+                c=int(sp[0])
+                spec='Constant({})'.format(c)
+            except:
+                pass
+        elif len(sp)==2:
+            try:
+                c1=int(sp[0])
+                c2=int(sp[1])
+                spec='Uniform({},{})'.format(c1,c2)
+            except:
+                pass
+        elif len(sp)==3:
+            try:
+                c1=int(sp[0])
+                c2=int(sp[1])
+                c3=int(sp[2])            
+                spec='Triangular({},{},{})'.format(c1,c2,c3)
+            except:
+                pass
+                
+        sp=spec.split('(')
+        if len(sp)==0:
+            raise AssertionError('incorrect specifier',spec)
+        sp0=sp[0].upper().strip()
+        if sp0=='':
+            raise AssertionError('incorrect specifier',spec)
+        
+        for distype in ('Uniform','Constant','Triangular','Exponential','Normal','Cdf','Pdf'):
+            if sp0==distype.upper()[:len(sp0)]:
+                sp[0]=distype
+                spec='('.join(sp)
+                break
+                     
         d=eval(spec)
         if randomstream is None:
             self.randomstream=random
@@ -5054,11 +5136,71 @@ def _i(p,v0,v1):
     return v
 
 def colorinterpolate(t,t0,t1,v0,v1):
+    '''
+    does linear interpolation of colorspecs
+    
+    Parameters
+    ----------
+    t : float
+        value to be interpolated from
+        
+    t0: float
+        f(t0)=v0
+        
+    t1: float
+        f(t1)=v1
+        
+    v0: colorspec
+        f(t0)=v0
+        
+    v1: colorspec
+        f(t1)=v1        
+        
+    Returns
+    -------
+    f(t) : float
+    
+    Notes
+    -----
+    Note that no extrapolation is done, i.e f(t)=v0 for t<t0 and f(t)=v1 for
+    t>t1. |n|
+    This function is heavily used during animation.
+    ''' 
     vt0=colorspec_to_tuple(v0)
     vt1=colorspec_to_tuple(v1)
     return tuple(int(c) for c in interpolate(t,t0,t1,vt0,vt1))
     
 def interpolate(t,t0,t1,v0,v1):
+    '''
+    does linear interpolation
+    
+    Parameters
+    ----------
+    t : float
+        value to be interpolated from
+        
+    t0: float
+        f(t0)=v0
+        
+    t1: float
+        f(t1)=v1
+        
+    v0: float, list or tuple
+        f(t0)=v0
+        
+    v1: float, list or tuple
+        f(t1)=v1        
+        
+    Returns
+    -------
+    f(t) : float
+    
+    Notes
+    -----
+    Note that no extrapolation is done, i.e f(t)=v0 for t<t0 and f(t)=v1 for
+    t>t1. |n|
+    This function is heavily used during animation.
+    '''
     if (v0 is None) or (v1 is None):
         return None
     if t0==t1:
@@ -5184,8 +5326,19 @@ def scheduled():
     
 def random_seed(seed,randomstream=None):
     '''
-    sets the seed for random
-    
+    Parameters
+    ----------
+    seed : hashable object, usually int
+        the seed for random, equivalent to random.seed() |n|
+        if None, a purely random value (based on the current time) will be used
+        (not reproducable) |n|
+        if omitted, the no action on random is taken
+            
+    randomstream: randomstream
+        randomstream to be used |n|
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed    
     '''
     if randomstream==None:
         randomstream=random
@@ -5466,7 +5619,7 @@ def _std_fonts():
     'yearsupplyoffairycakes':'Year supply of fairy cakes'}
         
 def _ttf_fonts():
-# in order to gain speed and avoid problems with calling ImgeFont.truetype too often, first we look in _std_fonts().
+# in order to gain speed and avoid problems with calling ImageFont.truetype too often, first we look in _std_fonts().
 # if not found there, the information from the font file is used.
 # this function returns a dictionary with references from the normalized filename and the normalized description 
     
@@ -5529,7 +5682,7 @@ def _show_ttf_fonts():
 
 def show_fonts():
     '''
-    show all available fonts on this machine
+    show (prints) all available fonts on this machine
     '''
     
     if Pythonista:
@@ -5539,7 +5692,7 @@ def show_fonts():
 
 def show_colornames():
     '''
-    show all available colours
+    show (prints) all available colours and their value
     '''
 
     names=sorted(colornames().keys())
@@ -5556,26 +5709,38 @@ def default_env():
        
 def main():
     '''
-    returns the main component of the default environment
+    Returns
+    -------
+    main component of the default environment : Component
     '''
     return _default_env._main
         
 def now():
     '''
-    returns the current simulation time of the default environment
+    Returns
+    -------
+    the current simulation time of the default environment : float
     '''   
     return _default_env._now 
             
 def trace(value=None):
     '''
-    optionally sets the trace status of the default environment |n|
-    returns the trace status of the default environment
+    trace status of the default environment
         
     Parameters
     ----------
     value : bool
-        new trace value |n|
+        new trace status |n|
         if omitted, no change
+            
+    Returns
+    -------
+    trace status : bool
+        
+    Note
+    ----
+    If you want to test the status, always include parentheses, like |n|
+    if de.trace():
     '''
     if value is not None:
         self._default_env._trace=value
@@ -5583,41 +5748,129 @@ def trace(value=None):
         
 def current_component():
     '''
-    returns the current_component of the default environment
+    Returns
+    -------
+    the current_component of the default environment : Component
     '''
     return _default_env._current_component
         
 def run(*args,**kwargs):
     '''
-    run for the default environment
+    start execution of the simulation for the default environment
+
+    Parameters
+    ----------
+    duration : float
+        schedule with a delay of duration |n|
+        if 0, now is used
+            
+    till : float
+        schedule time |n|
+        if omitted, 0 is assumed
+          
+    Note
+    ----
+    only issue run() from the main level    run for the default environment
     '''
     _default_env.run(*args,**kwargs)
     
 def animation_parameters(*args,**kwargs):
     '''
-    animation_parameters for the default environment
-    '''
+    set animation_parameters for the default environment
 
+    Parameters
+    ----------
+    animate : bool
+        animate indicator |n|
+        if omitted, True, i.e. animation |n|
+        Installation of PIL is required for animation.
+        
+    speed : float
+        speed |n|
+        specifies how much faster or slower than real time the animation will run. 
+        e.g. if 2, 2 simulation time units will be displayed per second.
+        
+    width : int
+        width of the animation in screen coordinates |n|
+        if omitted, no change. At init of the environment, the width will be
+        set to 1024 for CPython and the current screen width for Pythonista.
+        
+    height : int
+        height of the animation in screen coordinates |n|
+        if omitted, no change. At init of the environment, the height will be
+        set to 768 for CPython and the current screen height for Pythonista.        
+        
+    x0 : float
+        user x-coordinate of the lower left corner |n|
+        if omitted, no change. At init of the environment, x0 will be set to 0.        
+                    
+    y0 : float
+        user y_coordinate of the lower left corner |n|
+        if omitted, no change. At init of the environment, y0 will be set to 0.        
+                    
+    x1 : float
+        user x-coordinate of the lower right corner |n|
+        if omitted, no change. At init of the environment, x1 will be set to 1024
+        for CPython and the current screen width for Pythonista.
+    
+    background_color : colorspec
+        color of the background |n|
+        if omitted, no change. At init of the environment, this will be set to white.
+        
+    fps : float
+        number of frames per second
+        
+    modelname : str
+        name of model to be shown in upper left corner,
+        along with text 'a salabim model' |n|
+        if omitted, no change. At init of the environment, this will be set
+        to the null string, which implies suppression of this feature.
+               
+    use_toplevel : bool
+        if salabim animation is used in parallel with
+        other modules using tkinter, it might be necessary to 
+        initialize the root with tkinter.TopLevel().
+        In that case, set this parameter to True. |n|
+        if False (default), the root will be initialized with tkinter.Tk()
+
+    show_fps : bool
+        if True, show the number of frames per second (default)|n|
+        if False, do not show the number of frames per second
+
+    show_speed: bool
+        if True, show the animation speed (default)|n|
+        if False, do not show the animation speed
+
+    show_time: bool
+        if True, show the time (default)|n|
+        if False, do not show the time
+        
+    video : str
+        if video is not omitted, a mp4 format video with the name video 
+        will be created. |n|
+        The video has to have a .mp4 etension |n|
+        This requires installation of numpy and opencv (cv2).
+                      
+    Notes
+    -----
+    The y-coordinate of the upper right corner is determined automatically
+    in such a way that the x and scaling are the same. |n|
+
+    Note that changing the parameters x0, x1, y0, width, height, background_color, modelname,
+    use_toplevelmand video, animate has no effect on the current animation.
+    So to avoid confusion, do not use change these parameters when an animation is running. |n|
+    On the other hand, changing speed, show_fps, show_time, show_speed and fps can be useful in
+    a running animation.
+    '''
     _default_env.animation_parameters(*args,**kwargs)
     
 def stop_run(*args,**kwargs):
     '''
-    stop_run for the default environment
+    stops the simulation from the default environment  and gives control to
+    the main program, at the next event.
     '''
     _default_env.stop_run(*args,**kwargs)
     
-def step():
-    '''
-    step for the default environment
-    '''
-    _default_env.step
-    
-def peek():
-    '''
-    peek for the default environment
-    '''
-    return _default_env.peek()
-
 if __name__ == '__main__':
     try:
         import salabim_test
