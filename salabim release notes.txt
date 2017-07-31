@@ -19,6 +19,7 @@ N(12,3)      ==> Normal(12,3)
 Tri(10,20).  ==> Triangular(10,20,15)
 10           ==> Constant(10)
 12,15        ==> Uniform(12,15)
+(12,15)      ==> Uniform(12,15)
 
 Normal distribution now has a default value for standard_deviation : 0, so effectively constant
 Uniform distribution now has a default value for upperbound : lowerbound, so effectively constant
