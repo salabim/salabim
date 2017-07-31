@@ -2,17 +2,12 @@ Salabim release notes
 
 version 2.0.1
 =========================
-Distribution now also supports:
-'c1'.      ==> Constant(c1)
-'c1,c2'    ==> Uniform(c1,c2)
-'c1,c2,c3' ==> Triangular (c1,c2,c3)
+In the specification of Distribution, it is now also possible to use:
+c1       ==> Constant(c1)
+c1,c2,   ==> Uniform(c1,c2)
+c1,c2,c3 ==> Triangular (c1,c2,c3)
 
-Normal distribution now has a default value for standard_deviation : 0, so effectively constant
-Uniform distribution now has a default value for upperbound : lowerbound, so effectively constant
-Trianguar distribution now has a default value for high : low, so effectively constant
-Trianguar distribution now has a default value for mode : (low+high)/2, so a symmetric distribution
-
-Also for Distribution:
+It is not required to use the exact name of the distribution anymore.
 If you specify only the first letters of the distribution name, the correct distribution will be selected,
 regardless of casing.
 
@@ -22,8 +17,13 @@ Uni(12,15)   ==> Uniform(12,15)
 UNIF(12,15)  ==> Uniform(12,15)
 N(12,3)      ==> Normal(12,3)
 Tri(10,20).  ==> Triangular(10,20,15)
-10.          ==> Constant(10)
+10           ==> Constant(10)
 12,15        ==> Uniform(12,15)
+
+Normal distribution now has a default value for standard_deviation : 0, so effectively constant
+Uniform distribution now has a default value for upperbound : lowerbound, so effectively constant
+Trianguar distribution now has a default value for high : low, so effectively constant
+Trianguar distribution now has a default value for mode : (low+high)/2, so a symmetric distribution
 
 version 2.0.0  2017-07-24
 =========================

@@ -3480,16 +3480,12 @@ class Component(object):
         Parameters
         ----------
         args : sequence
-            a sequence of either |n|
-            resources (quantity=1, priority=tail of requesters queue) |n|
-            |n|
-            or |n|
-            |n|
-            tuple/list containing |n|
-            resource, a quantity and optionally a priority.
-            if the priority is not specified, this request 
-            for the resources be added to the tail of
-            the requesters queue |n|
+            - sequence of resources, where quantity=1, priority=tail of requesters queue)
+            - sequence of tuples/lists containing
+                resource, a quantity and optionally a priority.
+                if the priority is not specified, this request 
+                for the resources be added to the tail of
+                the requesters queue |n|
                                     
         greedy : bool
             greedy indicator |n|
@@ -3616,13 +3612,8 @@ class Component(object):
         Parameters
         ----------
         args : sequence
-            a sequence of either |n|
-            resources (quantity=cuurent claimed quantity |n|
-            |n|
-            or |n|
-            |n|
-            tuple/list containing |n|
-            resource and a quantity.
+            - sequence of resources, whre quantity=cuurent claimed quantity
+            - sequence of tuples/lists containing the resource and the quantity.
 
         Notes
         -----
@@ -4268,7 +4259,7 @@ class Uniform(_Distribution):
         
     upperbound : float
         upperbound of the distribution |n|
-        if omitted, lowerbound will be used |n
+        if omitted, lowerbound will be used |n|
         must be >= lowerbound
  
     randomstream: randomstream
@@ -4657,27 +4648,26 @@ class Distribution(_Distribution):
     Parameters
     ----------
     spec : str
-        string containing a valid salabim distribution
+        - string containing a valid salabim distribution, where only the first
+            letters are relevant and casing is not important
+        - string containing one float (c1), resulting in Constant(c1)
+        - string containing two floats seperated by a comma (c1,c2),
+            resulting in a Uniform(c1,c2)
+        - string containing three floats, separated by commas (c1,c2,c3),
+            resulting in a Triangular(c1,c2,c3)
 
     randomstream : randomstream
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it assigns a new stream with the specified seed |n|
-        Note that the rendomstream in the specifying string is ignored.
-
+        
     Notes
     -----
-    spec must evaluate to a proper salabim distribution. |n|
-
-
-    spec also supports: |n|
-    'c1'       ==> Constant(c1) |n|
-    'c1,c2'    ==> Uniform(c1,c2) |n|
-    'c1,c2,c3' ==> Triangular (c1,c2,c3) |n|
-
-    If you specify only the first letters of the distribution name, the correct distribution will be selected,
-    regardless of casing.
-
+    The randomstream in the specifying string is ignored. |n|
+    It is possible to use expressions in the specification, as long these
+    are valid within the context of the salabim module, which usually implies 
+    a global variable of the salabim package.
+    
     Examples
     --------
     Uniform(13)  ==> Uniform(13) |n|
@@ -4687,47 +4677,44 @@ class Distribution(_Distribution):
     Tri(10,20).  ==> Triangular(10,20,15) |n|
     10.          ==> Constant(10) |n|
     12,15        ==> Uniform(12,15) |n|
+    (12,15)      ==> Uniform(12,15) |n|
+    Exp(a)       ==> Exponential(100), provided sim.a=100 |n|
     '''
-
     def __init__(self,spec,randomstream=None):
             
-        sp=spec.split(',')
-        if len(sp)==1:
-            try:
-                c=int(sp[0])
-                spec='Constant({})'.format(c)
-            except:
-                pass
-        elif len(sp)==2:
-            try:
-                c1=int(sp[0])
-                c2=int(sp[1])
-                spec='Uniform({},{})'.format(c1,c2)
-            except:
-                pass
-        elif len(sp)==3:
-            try:
-                c1=int(sp[0])
-                c2=int(sp[1])
-                c3=int(sp[2])            
-                spec='Triangular({},{},{})'.format(c1,c2,c3)
-            except:
-                pass
-                
+        spec_orig=spec
+
         sp=spec.split('(')
-        if len(sp)==0:
-            raise AssertionError('incorrect specifier',spec)
-        sp0=sp[0].upper().strip()
-        if sp0=='':
-            raise AssertionError('incorrect specifier',spec)
+        pre=sp[0].upper().strip()
         
-        for distype in ('Uniform','Constant','Triangular','Exponential','Normal','Cdf','Pdf'):
-            if sp0==distype.upper()[:len(sp0)]:
-                sp[0]=distype
-                spec='('.join(sp)
-                break
+        if (pre=='') or not('(' in spec) : # here we have either a string starting with a ( of no ( at all
+            spec=spec.replace(')','') # get rid of closing parenthesis
+            spec=spec.replace('(','') # get rid of starting parenthesis
+            sp=spec.split(',')
+            if len(sp)==1:
+                c1=sp[0]
+                spec='Constant({})'.format(c1)
+            elif len(sp)==2:
+                c1=sp[0]
+                c2=sp[1]
+                spec='Uniform({},{})'.format(c1,c2)
+            elif len(sp)==3:
+                c1=sp[0]
+                c2=sp[1]
+                c3=sp[2]
+                spec='Triangular({},{},{})'.format(c1,c2,c3)
+            else:
+                raise AssertionError ('incorrect specifier',spec_orig)
+                
+        else:
+            for distype in ('Uniform','Constant','Triangular','Exponential','Normal','Cdf','Pdf'):
+                if pre==distype.upper()[:len(pre)]:
+                    sp[0]=distype
+                    spec='('.join(sp)
+                    break
                      
         d=eval(spec)
+            
         if randomstream is None:
             self.randomstream=random
         else:
@@ -5877,4 +5864,4 @@ if __name__ == '__main__':
     except:
         print ('salabim_test.py not found')
     else:
-        salabim_test.test22()
+        salabim_test.test23()
