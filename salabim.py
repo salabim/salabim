@@ -7,7 +7,7 @@ Copyright (c) 2017 Ruud van der Ham, ruud@salabim.org
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
-theSoftwarewithout restriction, including without limitation the rights to
+theSoftwarewithout restriction, including without limitation the rights to 
 use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
 the Software, and to permit persons to whom the Software is furnished to do so,
 subject to the following conditions:
@@ -71,7 +71,7 @@ except:
     inf=float('inf')
     nan=float('nan')
 
-__version__='2.0.1'
+__version__='2.0.2'
 
 class SalabimException(Exception):
     def __init__(self,value):
@@ -294,8 +294,6 @@ class Queue(object):
             
     def name(self,txt=None):
         '''
-        name of the queue
-        
         Parameters
         ----------
         txt : str
@@ -965,19 +963,6 @@ class Queue(object):
             mx=mx.successor
         self._start_statistics=self.env._now
     
-def _check_fail(c):
-    if len(c._requests)!=0:
-        c.env.print_trace('','',c._name,'request failed') 
-        for r in list(c._requests.keys()):
-            c._leave(r._requesters)
-        for r in c._pendingclaims:
-            r._pendingclaimed_quantity-=c._requests[r]
-        c._requests={}
-        for r in c._pendingclaims:
-            r._claimtry()
-        c._pendingclaims=[]
-        c._request_failed=True
-        
 def finish():
     raise SalabimException('Stopped by user')    
     if Pythonista:
@@ -1101,8 +1086,8 @@ class Environment(object):
                 c._status=current
                 c._scheduled_time=inf
                 self.env._current_component=c
-                self.print_trace('{:10.3f}'.format(self._now),c._name,\
-                  'current (standby) @ '+_atprocess(c._process))  
+                self.print_trace('{:10.3f}'.format(self._now),c._name,
+                  'current (standby)')
                 try:
                     next(c._process)
                     return
@@ -1116,7 +1101,12 @@ class Environment(object):
             self.env._pendingstandbylist=list(self.env._standbylist)
             self.env._standbylist=[]
 
-        (t,_,c)=heapq.heappop(self._event_list)
+        if len(self._event_list)==0:
+            t=inf
+            c=self._main
+        else:
+            (t,_,c)=heapq.heappop(self._event_list)
+        c._on_event_list=False
         self.env._now=t
 
         try:
@@ -1125,9 +1115,9 @@ class Environment(object):
                 return
                    
             c._status=current
-            self.print_trace('{:10.3f}'.format(self._now),c._name,\
-              'current'+_atprocess(c._process)) 
-            _check_fail(c)
+            self.print_trace('{:10.3f}'.format(self._now),c._name,
+              'current') 
+            c._check_fail()
             c._scheduled_time=inf
             next(c._process)
             return
@@ -1137,6 +1127,11 @@ class Environment(object):
             c._scheduled_time=inf
             c._process=None
             return
+            
+    def _print_event_list(self,s):
+        print('eventlist ',s)
+        for (t,seq,comp) in self._event_list:
+            print('{:10.3f} {}'.format(t,comp.name()))            
         
     def animation_parameters(self,
       animate=None,speed=None,width=None,height=None,
@@ -1283,19 +1278,6 @@ class Environment(object):
             else:
                 return self.env._event_list[0][0]
             
-    def stop_run(self):
-        '''
-        stops the simulation and gives control to the main program, at the next event
-        '''
-        scheduled_time=self._now
-        self.print_trace('','','stop_run',
-          'scheduled for={:10.3f}'.format(scheduled_time))
-
-        if self._main._scheduled_time!=inf: # just to be sure
-            self._main._remove()
-        self._main._scheduled_time=scheduled_time
-        self._main._push(scheduled_time,urgent=True)
-        self._main._status=scheduled
         
     def main(self):
         '''
@@ -1377,21 +1359,8 @@ class Environment(object):
                 scheduled_time=till
             else:
                 raise AssertionError('both duration and till specified')
-                
-        if scheduled_time<self.env._now:
-            raise AssertionError(
-              'scheduled time ({:0.3f}) before now ({:0.3f})'.
-              format(scheduled_time,self.env._now))                           
-                
-        if scheduled_time==inf:
-            self.print_trace('','','main','scheduled for        inf') 
-        else:
-            self.print_trace('','','main',
-              'scheduled for {:10.3f}'.format(scheduled_time)) 
-                        
-        self._main._status=scheduled
-        self._scheduled_time=scheduled_time
-        self._main._push(scheduled_time,False)
+                                        
+        self._main._reschedule(scheduled_time,False,'run')
 
         if self.animate:
             if not pil_installed:
@@ -1744,16 +1713,16 @@ class Environment(object):
                   
     def name(self,txt=None):
         '''
-        the name of the environment
-        
         Parameters
         ----------
         txt : str
-            name of the queue |n|
+            name of the environment |n|
             if txt ends with a period, the name will be serialized |n|
             if omittted, no change
             
-            
+        Returns
+        -------
+        Name of the environment : str
         '''
         
         if txt is not None:
@@ -3028,12 +2997,6 @@ class Component(object):
         in front of all components scheduled
         for the same time
         
-    mode : str preferred
-        mode |n|
-        will be used in trace and can be used in animations|n|
-        if nothing specified, the mode will be None.|n|
-        also mode_time will be set to now.
-        
     auto_start : bool
         auto start indicator |n|
         if there is a generator call process defined in the
@@ -3041,13 +3004,25 @@ class Component(object):
         automatically, unless overridden with auto_start |n|
         if there is no generator called process, no activation 
         takes place, anyway
+
+    suppress_trace : bool
+        suppress_trace indicator |n|
+        if True, this component will be excluded from the trace |n|
+        If False (default), the componetn will be in the trace |n|
+        Can be queried of set later with the suppress_trace method.
+        
+    mode : str preferred
+        mode |n|
+        will be used in trace and can be used in animations|n|
+        if nothing specified, the mode will be None.|n|
+        also mode_time will be set to now.
         
     env : Environment
         environment where the component is defined |n|
         if omitted, _default_env will be used
     '''
     
-    def __init__(self,name=None,at=None,delay=None,urgent=False,\
+    def __init__(self,name=None,at=None,delay=0,urgent=False,
       auto_start=True,suppress_trace=False,mode=None,env=None): 
         if env is None:
             self.env=_default_env
@@ -3063,20 +3038,15 @@ class Component(object):
         self._requests={}
         self._pendingclaims=[]
         self._claims={}
+        self._on_event_list=False
         self._scheduled_time=inf
         self._request_failed=False
         self._creation_time=self.env._now
         self._suppress_trace=suppress_trace
         self._mode=mode 
         self._mode_time=self.env._now
-        
-        hasprocess=True
-        try:
-            process=self.process()
-        except AttributeError:
-            hasprocess=False
-        if hasprocess and auto_start:
-            self.activate(process=process,at=at,delay=delay,urgent=urgent)
+        if self.hasprocess() and auto_start:
+            self.activate(process=self.process(),at=at,delay=delay,urgent=urgent)
         
     def __repr__(self):
         lines=[]
@@ -3085,7 +3055,7 @@ class Component(object):
         lines.append('  class='+str(type(self)).split('.')[-1].split("'")[0])
         lines.append('  suppress_trace='+str(self._suppress_trace))
         lines.append('  status='+self._status())
-        lines.append('  mode='+_modetxt(self._mode))
+        lines.append('  mode='+_modetxt(self._mode).strip())
         lines.append('  mode_time='+time_to_string(self._mode_time))
         lines.append('  creation_time='+time_to_string(self._creation_time))
         lines.append('  scheduled_time='+time_to_string(self._scheduled_time))
@@ -3118,56 +3088,76 @@ class Component(object):
                   ' quantity='+str(self._claims[r]))
         return '\n'.join(lines)
                 
+    def hasprocess(self):
+        try:
+            process=self.process()
+            return True
+        except AttributeError:
+            pass
+        return False
+    
     def _push(self,t,urgent):
         self.env._seq+=1
         if urgent:
             seq=-self.env._seq
         else:
             seq=self.env._seq
+        self._on_event_list=True
         heapq.heappush(self.env._event_list,(t,seq,self))
     
     def _remove(self):
-        for i in range(len(self.env._event_list)):
-            if self.env._event_list[i][2]==self:
-                self.env._event_list[i]=self.env._event_list[0]
-                heapq.heapify(self.env._event_list)
-                return
-        raise AssertionError('remove error')
-     
-    def _reschedule(self,scheduled_time,urgent,caller):
+        
+        if self._on_event_list:
+            for i in range(len(self.env._event_list)):
+                if self.env._event_list[i][2]==self:
+                    self.env._event_list[i]=self.env._event_list[0]
+                    self.env._event_list.pop(0)
+                    heapq.heapify(self.env._event_list)
+                    self._on_event_list=False
+                    return
+            raise AssertionError('remove error',self.name())
+        if self.status==standby:
+            if self in self.env._standby_list:
+                self.env._standby_list(self)
+            if self in self.env._pending_standby_list:
+                self.env._pending_standby_list(self)
+
+    def _check_fail(self):
+        if len(self._requests)!=0:
+            self.env.print_trace('','',self._name,'request failed') 
+            for r in list(self._requests.keys()):
+                self._leave(r._requesters)
+            for r in self._pendingclaims:
+                r._pendingclaimed_quantity-=self._requests[r]
+            self._requests={}
+            for r in self._pendingclaims:
+                r._claimtry()
+            self._pendingclaims=[]
+            self._request_failed=True
+             
+    def _reschedule(self,scheduled_time,urgent,caller,extra=''):
         if scheduled_time<self.env._now:
             raise AssertionError(
               'scheduled time ({:0.3f}) before now ({:0.3f})'.
-              format(scheduled_time,self.env._now))                                                 
-        if self._scheduled_time!=inf:
-            self._remove() 
-        self._scheduled_time=scheduled_time                       
-        if scheduled_time==inf:
-            self._status=passive
-            self.env.print_trace('','',caller+' '+self._name,'(passivate)'+_modetxt(self._mode))
-        else:                     
+              format(scheduled_time,self.env._now))
+        self._scheduled_time=scheduled_time 
+        if scheduled_time!=inf:
             self._push(scheduled_time,urgent)
-            self._status=scheduled
-            self.env.print_trace('','',self._name+' '+caller,
-              'scheduled for {:10.3f}'.format(scheduled_time)+
-              _urgenttxt(urgent)+_atprocess(self._process)+' '+_modetxt(self._mode))       
+        self._status=scheduled
+        self.env.print_trace('','',self._name+' '+caller,
+          'scheduled for {:10.3f}'.format(scheduled_time)+extra+
+          _urgenttxt(urgent)+_modetxt(self._mode))  
            
-    def reschedule(self,process=None,at=None,delay=None,urgent=False,mode='*'):
+    def activate(self,at=None,delay=0,urgent=False,process=None,keep_request=False,mode='*'):
         '''
-        reschedule component
+        activate component
 
         Parameters
         ----------
-        process : generator function
-           process to be started. |n|
-           if omitted, process will not be changed |n|
-           note that the function *must* be a generator,
-           i.e. contains at least one yield.
-                     
         at : float
            schedule time |n|
            if omitted, now is used |n|
-           if inf, this results in a passivate
+           inf is allowed
            
         delay : float
            schedule with a delay |n|
@@ -3181,6 +3171,19 @@ class Component(object):
             if True, the component will be scheduled 
             in front of all components scheduled
             for the same time
+
+        process : generator function
+            process to be started. |n|
+            if omitted, process will not be changed |n|
+            if the component is a data component, the 
+            generator function process will be used as the default process. |n|
+            note that the function *must* be a generator,
+            i.e. contains at least one yield.
+           
+        keep_request : bool
+            this affects only components that are requesting. |n|
+            if True, the requests will be kept and thus the status will remain requesting |n|
+            if False (the default), the request(s) will be canceled and the status will become scheduled
                             
         mode : str preferred
             mode |n|
@@ -3190,174 +3193,55 @@ class Component(object):
             
         Notes
         -----
-        if to be applied for the current component, use yield reschedule.
-        
+        if to be applied for the current component, use yield acctivate(). |n|
+        if both at and delay are specified, the component becomes current at the sum
+        of the two values.
         '''
+        if self._status!=current:
+            self._remove()
+            if not keep_request:
+                self._check_fail()
+
         if mode!='*':
             self._mode=mode
             self._mode_time=self.env._now
   
         if at is None:
-            if delay is None:
-                scheduled_time=self.env._now
-            else:
-                if delay==inf:
-                    scheduled_time=inf
-                else:
-                    scheduled_time=self.env._now+delay
+            scheduled_time=self.env._now+delay
         else:
-            if delay is None:                
-                scheduled_time=at
-            else:
-                raise AssertionError('both at and delay specified') 
-        if process!=None:
-            self._process=process
-        self._reschedule(scheduled_time,urgent,'reschedule')
-                      
-    def activate(self,process=None,at=None,delay=None,urgent=False,mode='*'):
-        '''
-        activate component
-
-        Parameters
-        ----------
-        process : generator function
-           process to be started. |n|
-           if omitted, the function called process will be used |n|
-           note that the function *must* be a generator,
-           i.e. contains at least one yield.
-                     
-        at : float
-           schedule time |n|
-           if omitted, now is used |n|
-           if inf, an error will be raised
-           
-        delay : float
-           schedule with a delay |n|
-           if omitted, no delay
-           
-        urgent : bool
-            urgency indicator |n|
-            if False (default), the component will be scheduled
-            behind all other components scheduled
-            for the same time |n|
-            if True, the component will be scheduled 
-            in front of all components scheduled
-            for the same time
+            scheduled_time=at+delay
             
-        mode : str preferred
-            mode |n|
-            will be used in trace and can be used in animations|n|
-            if nothing specified, the mode will be unchanged.|n|
-            also mode_time will be set to now, if mode is set. 
-                                                   
-        Notes
-        -----
-        if to be applied for the current component, use ``yield activate``.
-        '''
-        if mode!='*':
-            self._mode=mode
-            self._mode_time=self.env._now
+        extra=''
 
-        if process is None:
-            try:
-                self._process=self.process()
-            except AttributeError:
-                raise AssertionError('default '+self._name+
-                '.process() not found')
+        if process==None:
+            if self._status==data:
+                if self.hasprocess():
+                    self._process=self.process()
+                    extra=' @'+self._process.__name__
+                else:
+                    raise AssertionError('data component must have a process')
+            else:
+                pass
         else:
             self._process=process
-        if at is None:
-            if delay is None:
-                scheduled_time=self.env._now
-            else:
-                if delay==inf:
-                    scheduled_time=inf
-                else:
-                    scheduled_time=self.env._now+delay
-        else:
-            if delay is None:                
-                scheduled_time=at
-            else:
-                raise AssertionError('both at and delay specified') 
-                
-        if scheduled_time==inf:
-            raise AssertionError('inf not allowed')
-        self._request_failed=False
-          # ensures that an activate of a cancelled component resets
-          # the failed state
-        self._reschedule(scheduled_time,urgent,'activate')
-                    
-    def reactivate(self,at=None,delay=None,urgent=False,mode='*'):
+            extra=' @'+self._process.__name__
+        self._reschedule(scheduled_time,urgent,'activate',extra)
+                                              
+    def hold(self,duration=0,till=None,urgent=False,mode='*'):
         '''
-        reactivate component
+        hold the component
 
         Parameters
         ----------
-        at : float
-           schedule time |n|
+        duration : float
+           specifies the duration |n|
+           if omitted, 0 is used |n|
+           inf is allowed
+           
+        till : float
+           specifies at what time the component will become current |n|
            if omitted, now is used |n|
-           if inf, an error will be raised
-           
-        delay : float
-           schedule with a delay |n|
-           if omitted, no delay
-           
-        urgent : bool
-            urgency indicator |n|
-            if False (default), the component will be scheduled
-            behind all other components scheduled
-            for the same time |n|
-            if True, the component will be scheduled 
-            in front of all components scheduled
-            for the same time
-         
-        mode : str preferred
-            mode |n|
-            will be used in trace and can be used in animations|n|
-            if nothing specified, the mode will be unchanged.|n|
-            also mode_time will be set to now, if mode is set.
-            
-        Notes
-        -----
-        if to be applied for the current component, use ``yield reactivate``.
-        '''
-        self._checknotcurrent()
-        self._checkispassive()                 
-
-        if mode!='*':
-            self._mode=mode
-            self._mode_time=self.env._now
-
-        if at is None:
-            if delay is None:
-                scheduled_time=self.env._now
-            else:
-                if delay==inf:
-                    scheduled_time=inf
-                else:
-                    scheduled_time=self.env._now+delay
-        else:
-            if delay is None:                
-                scheduled_time=at
-            else:
-                raise AssertionError('both at and delay specified') 
-                
-        self._reschedule(scheduled_time,urgent,'reactivate')
-                        
-    def hold(self,duration=None,till=None,urgent=False,mode='*'):
-        '''
-        hold the current component
-
-        Parameters
-        ----------
-        at : float
-           schedule time |n|
-           if omitted, now is used |n|
-           if inf, an error will be raised
-           
-        delay : float
-           schedule with a delay |n|
-           if omitted, no delay
+           if is allowed   
            
         urgent : bool
             urgency indicator |n|
@@ -3374,12 +3258,18 @@ class Component(object):
             if nothing specified, the mode will be unchanged.|n|
             also mode_time will be set to now, if mode is set.
             
-        Note
+        Notes
         ----
-        *always* use as ``yield self.hold(...)``
+        if to be used for the current component, use `yield self.hold(...)``. |n|
+        
+        if both duration and till are specified, the component will become current at the sum of
+        these two.
         '''
-
-        self._checkcurrent()       
+        if self._status!=passive:
+            if self.status!=current:
+                self._checkisnotdata()
+                self._remove()
+                self._check_fail()
         if mode!='*':
             self._mode=mode
             self._mode_time=self.env._now
@@ -3388,10 +3278,7 @@ class Component(object):
             if duration is None:
                 scheduled_time=self.env._now
             else:
-                if duration==inf:
-                    scheduled_time=inf
-                else:
-                    scheduled_time=self.env._now+duration
+                scheduled_time=self.env._now+duration
         else:
             if duration is None:
                 scheduled_time=till
@@ -3402,7 +3289,7 @@ class Component(object):
         
     def passivate(self,mode='*'):
         '''
-        passivate the current component
+        passivate the component
 
         mode : str preferred
             mode |n|
@@ -3412,10 +3299,13 @@ class Component(object):
             
         Note
         ----
-        *always* use as ``yield self.passivate()``
+        if to be used for the current component (nearly always the case), use `yield self.passivate(...)`.
         '''
-        self._checkcurrent()          
-        self.env.print_trace('','','passivate',_modetxt(self._mode))
+        if self._status!=current:
+            self._checkisnotdata()
+            self._remove()
+            self._check_fail()
+        self.env.print_trace('','',self._name+' passivate',_modetxt(self._mode))
         self._scheduled_time=inf
         if mode!='*':
             self._mode=mode
@@ -3427,6 +3317,8 @@ class Component(object):
         '''
         cancel component (makes the component data)
           
+        Parameters
+        ----------
         mode : str preferred
             mode |n|
             will be used in trace and can be used in animations|n|
@@ -3435,14 +3327,14 @@ class Component(object):
             
         Note
         ----
-        if to be applied for the current component, use ``yield self.cancel()``
+        if to be used for the current component, use `yield self.cancel(...)`.
         '''
-        self.env.print_trace('','','cancel '+self._name+' '+_modetxt(self._mode))
-           
-        _check_fail(self)
-        self._process=None
-        if self._scheduled_time!=inf:
+        if self._status!=current:
+            self._checkisnotdata()
             self._remove()
+            self._check_fail()
+        self.env.print_trace('','','cancel '+self._name+' '+_modetxt(self._mode))
+        self._process=None
         self._scheduled_time=inf
         if mode!='*':
             self._mode=mode
@@ -3453,18 +3345,27 @@ class Component(object):
         '''
         puts the component in standby mode
         
+        Parameters
+        ----------
         mode : str preferred
             mode |n|
             will be used in trace and can be used in animations|n|
             if nothing specified, the mode will be unchanged.|n|
             also mode_time will be set to now, if mode is set.
             
-        Note
-        ----
-        *always* use as ``yield self.standby()``        
+        Notes
+        -----
+        Not allowed for data components or main.
+        
+        if to be used for the current component 
+        (which will be nearly always the case), 
+        use `yield self.standby(...)`.
         '''
-        if self!=self.env._current_component:
-            raise AssertionError(self._name+' is not current')            
+        if self._status!=current:
+            self._checkisnotdata()
+            self._checkisnotmain()
+            self._remove()
+            self._check_fail()
         self.env.print_trace('','','standby',_modetxt(self._mode))
         self._scheduled_time=self.env._now
         self.env._standbylist.append(self)
@@ -3473,7 +3374,7 @@ class Component(object):
             self._mode_time=self.env._now
         self._status=standby
          
-    def request(self,*args,greedy=False,fail_at=None,mode='*'):
+    def request(self,*args,greedy=False,fail_at=None,fail_delay=None,mode='*'):
         '''
         request from a resource or resources 
         
@@ -3503,7 +3404,13 @@ class Component(object):
             the request will be cancelled and the
             parameter request_failed will be set. |n|
             if not specified, the request will not time out. 
-                          
+                        
+        fail_delay : float
+            time out |n|
+            if the request is not honoured before now+fail_delay,
+            the request will be cancelled and the
+            parameter request_failed will be set. |n|
+            if not specified, the request will not time out.                           
             
         mode : str preferred
             mode |n|
@@ -3513,14 +3420,16 @@ class Component(object):
             
         Notes
         -----
+        Not allowed for data components or main.
+        
+        if to be used for the current component 
+        (which will be nearly always the case), 
+        use `yield self.request(...)``.
+        
         it is not allowed to claim a resource more than once by the same component |n|
         the requested quantity may exceed the current capacity of a resource |n|
-        the parameter request_failed will be reset by calling request
+        the parameter request_failed will be reset by a calling request
             
-        Note
-        ----
-        always use as ``yield self.request(...)``
-        
         Example
         -------
         yield self.request(r1) |n|
@@ -3533,12 +3442,25 @@ class Component(object):
         --> requests 1 from r1, 2 from r2 |n|        
         
         '''
+        if self._status!=current:
+            self._checkisnotdata()
+            self._checkisnotmain()
+            self._remove()
+            self._check_fail()
         if fail_at is None:
-            scheduled_time=inf
+            if fail_delay is None:
+                scheduled_time=inf
+            else:
+                if fail_delay==inf:
+                    scheduled_time=inf
+                else:
+                    scheduled_time=self.env._now+delay
         else:
-            scheduled_time=fail_at
-
-        self._checkcurrent()
+            if fail_delay is None:                
+                scheduled_time=fail_at
+            else:
+                raise AssertionError('both fail_at and fail_delay specified') 
+        
         self._greedy=greedy
 
         self._request_failed=False
@@ -3583,8 +3505,7 @@ class Component(object):
             break # no need to check for other resources
             
         if len(self._requests)!=0: 
-            self._status=scheduled            
-            self._push(scheduled_time,False)
+            self._reschedule(scheduled_time,False,'request')
         
     def _release(self,r,q):
         if not r in self._claims:
@@ -3603,7 +3524,7 @@ class Component(object):
             del self._claims[r]
         self.env.print_trace('','',self._name,\
           'release '+str(q)+' from '+r._name)
-        r._claimtry()    
+        r._claimtry()   
             
     def release(self,*args):
         '''
@@ -3612,7 +3533,7 @@ class Component(object):
         Parameters
         ----------
         args : sequence
-            - sequence of resources, whre quantity=cuurent claimed quantity
+            - sequence of resources, where quantity=current claimed quantity
             - sequence of tuples/lists containing the resource and the quantity.
 
         Notes
@@ -3655,46 +3576,54 @@ class Component(object):
                     raise AssertionError('incorrect specifier'+argsi)
                 if r._anonymous:
                     raise AssertionError('not possible to release anonymous resources'+r.name())       
-            
+                self._release(r,None)  
+                                                                  
     def claimed_quantity(self,resource):
         '''
-        returns the claimed quantity from a resource
-        
         Parameters
         ----------
-            resource : Resoure
-                resource to be queried
+        resource : Resoure
+            resource to be queried
         
-        if the resource is not claimed, 0 will be returned
+        Returns
+        -------
+        the claimed quantity from a resource : float or int
+            if the resource is not claimed, 0 will be returned
         '''
-        if resource in self._resources:
-            return self._resources[resource]
+        if resource in self._claims:
+            return self._claims[resource]
         else:
             return 0
             
     def claimed_resources(self):
         '''
-        returns a list of claimed resources
+        Returns
+        -------
+        list of claimed resources : list
         '''
         return self._claims.keys()
 
     def request_failed(self):
         '''
-        returns whether the latest request has failed
+        Returns
+        -------
+        True, if the latest request has failed (either by timeout or external) : bool
+        False, otherwise
         '''
         return self._request_failed
         
     def name(self,txt=None):
         '''
-        optionally sets the name of the component |n|
-        returns the name of the component
-        
         Parameters
         ----------
         txt : str
             name of the component |n|
             if txt ends with a period, the name will be serialized |n|
             if omittted, no change
+            
+        Returns
+        -------
+        Name of the component : str
         '''
         
         if txt is not None:
@@ -3704,33 +3633,37 @@ class Component(object):
 
     def base_name(self):
         '''
-        returns the base name of the component (the name used at init or name)
+        Returns
+        -------
+        base name of the component (the name used at init or name): str
         '''
         return self._base_name        
 
     def sequence_number(self):
         '''
-        returns the sequence_number of the component 
-        (the sequence number at init or name) |n|
-        normally this will be the integer value of a serialized name,
-        but also non serialized names (without a dot at the end)
-        will be numbered)
+        Returns
+        -------
+        sequence_number of the component : int
+            (the sequence number at init or name) |n|
+            normally this will be the integer value of a serialized name,
+            but also non serialized names (without a dot at the end)
+            will be numbered)
         '''
         return self._sequence_number        
         
         
     def suppress_trace(self,value=None):
         '''
-        optionally sets the suppress_trace status |n|
-        returns the suppress_status |n|
-        
         Parameters
         ----------
         value: bool
             new suppress_trace value |n|
             if omitted, no change
             
-        components with the suppress_status of False, will be ignored in the trace
+        Returns
+        -------
+        suppress_status : bool
+            components with the suppress_status of False, will be ignored in the trace
         '''
         if value is not None:
             self._suppress_trace=value
@@ -3738,22 +3671,22 @@ class Component(object):
         
     def mode(self,value=None):
         '''
-        optionally sets the mode of a component (along with mode_time)|n|
-        returns the mode
-        
         Parameters
         ----------
-        value: str recommended
+        value: any, str recommended
             new mode |n|
-            if omitted, no change
-
-        the mode is useful for tracing and animations. |n|
-        Usually the mode will be set in a call to passivate, hold, activate, standby.
+            if omitted, no change |n|
+            mode_time will be set if a new mode is specified
+            
+        Returns
+        -------
+        mode of the component. any, usually str
+            the mode is useful for tracing and animations. |n|
+            Usually the mode will be set in a call to passivate, hold, activate, request or standby.
         '''
         if value is not None:
             self._mode_time=self.env._now
             self._mode=value
-            self._mode_time=self.env._now
 
         return self._mode
         
@@ -3765,46 +3698,82 @@ class Component(object):
         
         Note
         ----
-        Be sure to always include the parentheses, otherwise a test will be always True!
+        Be sure to always include the parentheses, otherwise the result will be always True!
         '''
         return self._status==passive
         
     def iscurrent(self):
         '''
-        returns True if status is current, False otherwise
+        Returns
+        -------
+        True if status is current, False otherwise : bool
+        
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True!
         '''
         return self._status==current
         
+    def isrequesting(self):
+        '''
+        Returns
+        -------
+        True if status is requesting, False otherwise : bool
+        
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True!
+        '''
+        return len(self._requests)!=0
+        
     def isscheduled(self):
         '''
-        returns True if status is scheduled, False otherwise
+        Returns
+        -------
+        True if status is scheduled, False otherwise : bool
+        
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True!
         '''
-        return self._status==scheduled
+        return (self._status==scheduled) and (len(self._requests)==0)
         
     def isstandby(self):
         '''
-        returns True if status is standby, False otherwise
+        Returns
+        -------
+        True if status is standby, False otherwise : bool
+        
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True
         '''
         return self._status==standby   
         
     def isdata(self):
         '''
-        returns True if status is data, False otherwise
+        Returns
+        -------
+        True if status is data, False otherwise : bool
+        
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True!
         '''
-        return self._status==data   
-                        
+        return self._status==data                           
       
     def index_in_queue(self,q):
         '''
-        get index of component in a queue
-        
         Parameters
         ----------
         q : Queue
             queue to be queried
             
-        Returns the index of component in q, if component belongs to q |n|
-        Returns -1 if component does not belong to q
+        Returns
+        -------
+        index of component in q : int
+            if component belongs to q |n|
+            -1 if component does not belong to q
         '''
         m1=self._member(q)
         if m1 is None:
@@ -3817,7 +3786,6 @@ class Component(object):
                 index+=1
             return index    
         
-
     def _enter(self,q):
         savetrace=self.env._trace
         self.env._trace=False
@@ -3833,6 +3801,8 @@ class Component(object):
         q : Queue
             queue to enter
             
+        Notes
+        -----
         the priority will be set to
         the priority of the tail component of the queue, if any
         or 0 if queue is empty
@@ -3850,6 +3820,8 @@ class Component(object):
         q : Queue
             queue to enter
             
+        Notes
+        -----
         the priority will be set to
         the priority of the head component of the queue, if any
         or 0 if queue is empty
@@ -3871,6 +3843,8 @@ class Component(object):
         poscomponent : Component
             component to be entered in front of
                         
+        Notes
+        -----
         the priority will be set to the priority of poscomponent
         '''
         
@@ -3891,6 +3865,8 @@ class Component(object):
         poscomponent : Component
             component to be entered behind
                         
+        Notes
+        -----
         the priority will be set to the priority of poscomponent
         '''
         
@@ -3903,7 +3879,6 @@ class Component(object):
         '''
         enters a queue, according to the priority
         
-        
         Parameters
         ----------
         q : Queue
@@ -3912,6 +3887,8 @@ class Component(object):
         priority: float
             priority in the queue
             
+        Notes
+        -----
         The component is placed just before the first component with a priority > given priority 
         '''
 
@@ -3942,6 +3919,8 @@ class Component(object):
         q : Queue
             queue to leave
             
+        Notes
+        -----
         statistics are updated accordingly
         '''
 
@@ -3964,23 +3943,10 @@ class Component(object):
         del self._qmembers[q]
         self.env.print_trace('','',self._name, 'leave '+q._name)                 
         
-    def get_priority(self,q):
-        '''
-        gets the priority of a component in a queue
-        
-        Parameters
-        ----------
-        q : Queue
-            queue where the component belongs to
-        '''
-        
-        mx=self._checkinqueue(q)
-        return mx.priority
 
-
-    def set_priority(self,q,priority):
+    def priority(self,q,priority=None):
         '''
-        sets the priority of a component in a queue
+        gest/sets the priority of a component in a queue
         
         Parameters
         ----------
@@ -3988,45 +3954,53 @@ class Component(object):
             queue where the component belongs to
         
         priority : float
-            priority in queue
+            priority in queue |n|
+            if omitted, no change
 
-        the order of the queue may be changed
+        Returns
+        -------
+        the priority of the component in the queue
+
+        Notes
+        -----
+        if you change the priority, the order of the queue may change
         '''
         
         mx=self._checkinqueue(q)
-        if priority!=mx.priority:
-            # leave.sort is not possible, because statistics will be affected
-
-            mx.predecessor.successor=mx.successor
-            mx.successor.predecessor=mx.predecessor
-            
-            m2=q._head.successor
-            while (m2!=q._tail) and (m2.priority<=priority):
-                m2=m2.successor
-    
-            m1=m2.predecessor
-            m1.successor=mx
-            m2.predecessor=mx
-            mx.predecessor=m1
-            mx.successor=m2
-            mx.priority=priority
-            for iter in q._iter_touched:
-                q._iter_touched[iter]=True
-            if q._resource!=None:
-               q._resource._claimtry()
+        if priority!=None:
+            if priority!=mx.priority:
+                # leave.sort is not possible, because statistics will be affected
+                mx.predecessor.successor=mx.successor
+                mx.successor.predecessor=mx.predecessor
+                
+                m2=q._head.successor
+                while (m2!=q._tail) and (m2.priority<=priority):
+                    m2=m2.successor
+        
+                m1=m2.predecessor
+                m1.successor=mx
+                m2.predecessor=mx
+                mx.predecessor=m1
+                mx.successor=m2
+                mx.priority=priority
+                for iter in q._iter_touched:
+                    q._iter_touched[iter]=True
+                if q._resource!=None:
+                   q._resource._claimtry()
+        return mx.priority
         
     def successor(self,q):
         '''
-        successor of component in a queue
-        
         Parameters
         ----------
         q : Queue
             queue where the component belongs to
             
-        returns the successor of the component in the queue
-        if component is not at the tail. |n|
-        returns None if component is at the tail.
+        Returns
+        -------
+        the successor of the component in the queue: Component
+            if component is not at the tail. |n|
+            returns None if component is at the tail.
         ''' 
         
         mx=self._checkinqueue(q)
@@ -4034,16 +4008,15 @@ class Component(object):
 
     def predecessor(self,q):
         '''
-        predecessor of component in a queue
-        
         Parameters
         ----------
         q : Queue
             queue where the component belongs to
             
-        returns the predecessor of the component in the queue
-        if component is not at the head. |n|
-        returns None if component is at the head.
+        Returns : Component
+            predecessor of the component in the queue
+            if component is not at the head. |n|
+            returns None if component is at the head.
         '''
         
         mx=self._checkinqueue(q)
@@ -4051,35 +4024,43 @@ class Component(object):
         
     def enter_time(self,q):
         '''
-        time the component entered the queue
+        Parameters
+        ----------
+        q : Queue
+            queue where component belongs to
         
-        arguments:
-            q                       queue where component belongs to
-        
-        returns the time the component entered the queue
+        Returns
+        -------
+        time the component entered the queue : float
         '''
         mx=self._checkinqueue(q)
         return mx.enter_time
         
     def creation_time(self):
         '''
-        returns the time the component was created
+        Returns
+        -------
+        time the component was created : float
         '''
         return self._creation_time
         
     def scheduled_time(self):
         '''
-        returns the time the component scheduled for, if it is scheduled |n|
-        returns inf otherwise
+        Returns
+        -------
+        time the component scheduled for, if it is scheduled : float
+            returns inf otherwise
         '''
         return self._scheduled_time
         
     def mode_time(self):
         '''
-        returns the time the component got it's latest mode |n|
-        For a new component this is
-        the time the component was created. |n|
-        this function is particularly useful for animations.
+        Returns
+        -------
+        time the component got it's latest mode : float
+            For a new component this is
+            the time the component was created. |n|
+            this function is particularly useful for animations.
         '''
         return self._mode_time
         
@@ -4091,13 +4072,16 @@ class Component(object):
         - data
         - passive
         - scheduled
+        - requesting
         - current
         - standby
         '''
         
-        return self._status
-        
-  
+        if len(self._requests)==0:
+            return self._status
+        else:
+            return requesting
+
     def _member(self,q):
         try:
             return self._qmembers[q]
@@ -4118,24 +4102,14 @@ class Component(object):
         else:
             return mx
             
-    def _checkcurrent(self):
-        if self.env._current_component==self:
-            pass
-        else:
-            raise AssertionError(self._name+' is not current')
+    def _checkisnotdata(self):
+        if self._status==data:
+            raise AssertionError(self._name+' data component not allowed')
             
-    def _checknotcurrent(self):
-        if not self.env._current_component==self:
-            pass
-        else:
-            raise AssertionError(self._name+' is current')
-                        
-    def _checkispassive(self):
-        if self._status==passive:
-            pass
-        else:
-            raise AssertionError(self._name+' is not passive')
-        
+    def _checkisnotmain(self):
+        if self==self.env._main:
+            raise AssertionError(self._name+' main component not allowed')            
+                                                        
 class _Distribution():
     pass
         
@@ -4497,7 +4471,9 @@ class Cdf(_Distribution):
 
     def sample(self):
         '''
-        returns sample
+        Returns
+        -------
+        sample : float
         '''
         r=self.randomstream.random()
         for i in range (len(self._cum)):
@@ -4508,7 +4484,9 @@ class Cdf(_Distribution):
 
     def mean(self):
         '''
-        returns the mean of the distribution
+        Returns
+        -------
+        mean of the distribution : float
         '''
         return self._mean
 
@@ -4620,7 +4598,9 @@ class Pdf(_Distribution):
 
     def sample(self):
         '''
-        returns sample
+        Returns
+        -------
+        sample : any (usually float)
         '''
         r=self.randomstream.random()
         for i in range (len(self._cum)):
@@ -4631,10 +4611,11 @@ class Pdf(_Distribution):
 
     def mean(self):
         '''
-        returns the mean of the distribution
-        
-        if the mean can't be calculated (if not all x-values are scalars or distrubtions),
-        nan will be returned.
+        Returns
+        -------
+        mean of the distribution : float
+            if the mean can't be calculated (if not all x-values are scalars or distributions),
+            nan will be returned.
         '''
         return self._mean
 
@@ -4728,14 +4709,18 @@ class Distribution(_Distribution):
         
     def sample(self):
         '''
-        returns sample
+        Returns
+        -------
+        sample : float
         '''
         self._distribution.randomstream=self.randomstream
         return self._distribution.sample()        
 
     def mean(self):
         '''
-        returns the mean of the distribution
+        Returns
+        -------
+        mean of the distribution : float
         '''
         return self._mean
                             
@@ -4753,7 +4738,7 @@ class Resource(object):
         
     capacity : float
         capacity of the resouce |n|
-        if omitted, 0
+        if omitted, 1
         
     strict_order : bool
         strict_order specifier |n|
@@ -4776,10 +4761,6 @@ class Resource(object):
     
     def __init__(self,name=None,capacity=1,strict_order=False,\
       anonymous=False,env=None):
-        '''
-        
-        '''
-        
         if (env is None):
             self.env=_default_env
         else:
@@ -4913,28 +4894,33 @@ class Resource(object):
                 
     def requesters(self):
         '''
-        returns the queue containing all components with not yet honoured requests.
+        Return
+        ------
+        queue containing all components with not yet honoured requests.
         '''
         return self._requesters
         
     def claimers(self):
         '''
-        returns the queue with all components claiming from the resource. |n|
+        Returns
+        -------
+        queue with all components claiming from the resource. |n|
         will be an empty queue for an anonymous resource
         '''
         return self._claimers
 
     def capacity(self,cap=None):
         '''
-        optionally sets the capacity |n|
-        returns the capacity
-        
         Parameters
         ----------
         cap : float or int
             capacity of the resource |n|
             this may lead to honouring one or more requests.|n|
             if omitted, no change
+                        
+        Returns
+        -------
+        the capacity : float orvint
         '''
         if cap is not None:
             self._capacity=cap
@@ -4952,8 +4938,6 @@ class Resource(object):
             
     def strict_order(self,strict_order):
         '''
-        sets the strict_order value
-        
         Parameters
         ----------
         strict_order : bool
@@ -4972,15 +4956,16 @@ class Resource(object):
         
     def name(self,txt=None):
         '''
-        optionally sets the name of the resource |n|
-        returns the name of the resource
-        
         Parameters
         ----------
         txt : str
             name of the resource |n|
             if txt ends with a period, the name will be serialized |n|
             if omittted, no change
+            
+        Returns
+        -------
+        Name of the resource : str
         '''
         if txt is not None:
             self._name,self._base_name,self._sequence_number=\
@@ -4989,17 +4974,21 @@ class Resource(object):
 
     def base_name(self):
         '''
-        returns the base name of the resource (the name used at init or name)
+        Returns
+        -------
+        base name of the resource (the name used at init or name): str
         '''
         return self._base_name        
 
     def sequence_number(self):
         '''
-        returns the sequence_number of the resource 
-        (the sequence number at init or name) |n|
-        normally this will be the integer value of a serialized name,
-        but also non serialized names (without a dot at the end)
-        will be numbered)
+        Returns
+        -------
+        sequence_number of the resource : int
+            (the sequence number at init or name) |n|
+            normally this will be the integer value of a serialized name,
+            but also non serialized names (without a dot at the end)
+            will be numbered)
         '''
         return self._sequence_number        
 
@@ -5284,17 +5273,11 @@ def _urgenttxt(urgent):
     else:
         return '' 
         
-def _atprocess(process):
-    if process.__name__=='process':
-        return ''
-    else:
-        return (' @ '+process.__name__)
-        
 def _modetxt(mode):
     if mode==None:
         return ''
     else:
-        return 'mode='+str(mode)       
+        return ' mode='+str(mode)       
     
 def data():
     return 'data'
@@ -5310,6 +5293,9 @@ def passive():
     
 def scheduled():
     return 'scheduled'
+    
+def requesting():
+    return 'requesting'
     
 def random_seed(seed,randomstream=None):
     '''
@@ -5850,18 +5836,11 @@ def animation_parameters(*args,**kwargs):
     a running animation.
     '''
     _default_env.animation_parameters(*args,**kwargs)
-    
-def stop_run(*args,**kwargs):
-    '''
-    stops the simulation from the default environment  and gives control to
-    the main program, at the next event.
-    '''
-    _default_env.stop_run(*args,**kwargs)
-    
+        
 if __name__ == '__main__':
     try:
         import salabim_test
     except:
-        print ('salabim_test.py not found')
+        print ('test.py not found')
     else:
-        salabim_test.test23()
+        salabim_test.test()

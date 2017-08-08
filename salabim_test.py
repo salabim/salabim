@@ -5,6 +5,49 @@ import random
 import platform
 Pythonista=(platform.system()=='Darwin')
 
+def test():
+    test24()    
+    
+def test25():
+    de=sim.Environment()
+    q=sim.Queue('q')
+    c={}
+    for i in range(8):
+        c[i]=sim.Component(name='c.')
+        c[i].enter(q)
+    print(q)
+    for c in q:
+        c.priority(q,-c.sequence_number())
+    print(q)
+    
+def test24():
+    class X1(sim.Component):
+        def process(self):
+            print('**x1 active')
+            yield self.request((r,2))
+        def p1(self):
+            yield self.hold(0.5)
+            yield self.activate(process=self.process())
+            
+    class X2(sim.Component):
+        def process(self):
+            yield self.hold(1)
+            x1.activate(at=3,keep_request=True)
+            yield self.hold(5)
+            x1.request(r)
+            yield self.hold(1)
+            x1.passivate()
+#            de.main().passivate()
+            yield self.hold(5)
+            x1.reactivate(at=20)
+            
+    de=sim.Environment(trace=True)
+    x1=X1(auto_start=False)
+    x1.activate(at=0.5,process=x1.process(),urgent=True,mode='blabla')
+    x2=X2()
+    r=sim.Resource('resource')
+    de.run(till=sim.inf)
+    
 def test1():
     print('test1')
 
@@ -27,12 +70,11 @@ def test1():
                 
         def actionx(self):
             pass
-                
-    
+                    
     class Y(sim.Component):
         
         def process(self):
-            x[3].reschedule(process=x[3].action2(),at=30)
+            x[3].reactivate(process=x[3].action2(),at=30)
             x[4].cancel()
             yield self.hold(0.5)
             yield self.standby()
@@ -47,7 +89,7 @@ def test1():
             while sim.now()<30:
                 yield self.standby()
                         
-    sim.Environment()
+    de=sim.Environment(trace=True)
     q=sim.Queue()
 
     x=[0]
@@ -748,5 +790,6 @@ def test23():
         print(d)
         print(sim.Distribution(d))
     
+
 if __name__ == '__main__':
-    test23()
+    test()

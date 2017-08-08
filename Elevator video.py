@@ -183,19 +183,19 @@ def set_load_0_n(val):
     global load_0_n
     load_0_n=float(val)
     if vg_0_n.ispassive():
-        vg_0_n.reactivate()
+        vg_0_n.activate()
 
 def set_load_n_n(val):
     global load_n_n
     load_n_n=float(val)
     if vg_n_n.ispassive():
-        vg_n_n.reactivate()
+        vg_n_n.activate()
                 
 def set_load_n_0(val):
     global load_n_0
     load_n_0=float(val)   
     if vg_n_0.ispassive():
-        vg_n_0.reactivate()
+        vg_n_0.activate()
             
 def set_capacity(val):
     global capacity
@@ -272,7 +272,7 @@ class Visitor(sim.Component):
             requests[self.fromfloor,self.direction]=self.env.now()            
         for car in cars:
             if car.ispassive():
-                car.reactivate()
+                car.activate()
         
         yield self.passivate()
 
@@ -299,7 +299,7 @@ class Car(sim.Component):
                 for visitor in self.visitors:
                     if visitor.tofloor==self.floor:
                         visitor.leave(self.visitors)
-                        visitor.reactivate()
+                        visitor.activate()
                 yield self.hold(exit_time,mode='Let exit')
                 
             if self.direction==still:

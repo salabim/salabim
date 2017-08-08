@@ -15,12 +15,12 @@ class Shipgenerator(sim.Component):
             ship.side=self.side
             ship.length=meanlength*sim.Uniform(2/3,4/3).sample()
             if lock.mode()=='Idle':
-                lock.reactivate()
+                lock.activate()
             
 class Ship(sim.Component):
     def process(self):
         if lock.ispassive():
-            lock.reactivate()
+            lock.activate()
         yield self.request((lockmeters[self.side],self.length),key_in[self.side])
         self.enter(lockqueue)
         yield self.hold(intime)

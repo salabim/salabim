@@ -44,7 +44,7 @@ class Visitor(sim.Component):
             requests[self.fromfloor,self.direction]=self.env.now()            
         for car in cars:
             if car.ispassive():
-                car.reactivate()
+                car.activate()
         
         yield self.passivate()
 
@@ -71,7 +71,7 @@ class Car(sim.Component):
                 for visitor in self.visitors:
                     if visitor.tofloor==self.floor:
                         visitor.leave(self.visitors)
-                        visitor.reactivate()
+                        visitor.activate()
                 yield self.hold(exit_time,mode='Let exit')
                 
             if self.direction==still:

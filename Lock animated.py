@@ -203,7 +203,7 @@ class Shipgenerator(sim.Component):
             ship.side=self.side
             ship.length=meanlength*sim.Uniform(2/3,4/3).sample()
             if lock.mode()=='Idle':
-                lock.reactivate()
+                lock.activate()
             
 class Ship(sim.Component):
     def process(self):
@@ -212,11 +212,11 @@ class Ship(sim.Component):
         yield self.hold(intime,mode='Sail in')
         self.leave(wait[self.side])
         self.enter(lockqueue)
-        lock.reactivate()
+        lock.activate()
         yield self.passivate(mode='In lock')
         yield self.hold(outtime,mode='Sail out')
         self.leave(lockqueue)
-        lock.reactivate()
+        lock.activate()
         
 class Lock(sim.Component):
 
@@ -230,12 +230,12 @@ class Lock(sim.Component):
             for ship in wait[self.side]:
                 if usedlength+ship.length<=locklength:
                     usedlength += ship.length
-                    ship.reactivate()
+                    ship.activate()
                     yield self.passivate('Wait for sail in')
             yield self.hold(switchtime,mode='Switch')
             self.side=-self.side
             for ship in lockqueue:
-                ship.reactivate()
+                ship.activate()
                 yield self.passivate('Wait for sail out')
 
 de=sim.Environment(random_seed=1234567)
