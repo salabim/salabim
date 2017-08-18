@@ -1,6 +1,95 @@
 Salabim release notes
 
-version 2.0.2. 2017-08-08
+version 2.1.0  2017-08-18
+=========================
+At creation of a component, it is now possible to specify a process other than self.process to start.
+The new process parameter for the init of a component is a string containing the name of the 
+(generation)function. 
+Now, there also a check to see if process is a generator (i.e. contains at least one yield statement).
+
+If there is a process attribute in a component, but you do not want that to be activated,
+specify process=None. The parameter auto_start is phased out, as there is now process=None.
+
+The process parameter of Component.activate() has been changed. It is now a string containing the
+name of the process to be started. If None, no change.
+
+With the function running_process, the name of the currently running process can be retrieved.
+For data components, None will be returned.
+
+
+New to salabim are monitors, which are very useful for collecting (statistical) data. 
+It is possible to tally values based on occurence, like the length of a ship, each time one is
+created. Or the length of stay for components leaving a queue.
+Another feature is a timestamped value. This is useful when collecting data on a time axis,
+like the length of a queue. Each time the queue length changes, the new length, together
+with time is then collected. This is a much more accurate and usually more efficient way of 
+collecting data than just sampling on a regular basis.
+
+Queue now supports monitoring of key statistics:
+  length *
+  length_of_stay
+
+Resource now supports monitoring of key statistics:
+  requesters.length *
+  claimers.length *
+  requesters.length_of_stay
+  claimers.length_of_stay
+  claimed_quantity *
+  available_quantity *
+  capacity *
+  
+The timestamped monitors (marked with a *) can be also used to query the current value, like
+  c=myresource.claimed_quantity() or
+  l=myqueue.length() although len(myqueue) is preferred
+  
+Monitors can be disabled/enabled with monitor (on the level of a Resource, a Queue or an individual Monitor or
+MonitorTimeStamp).
+
+salabim <2.1.0                     salabim >= 2.1.0 
+-------------------------------------------------------------------------------   
+Queue.reset_statistics()           Queue.reset() / Queue.monitor()
+Queue.minimum_length()             Queue.length.minimum()
+Queue.maximum_length()             Queue.length.maximum()
+Queue.number_passed()              Queue.length_of_stay.number_entries()
+Queue.number_direct_passed()       Queue.length_of_stay.number_entries_zero()
+Queue.mean_length()                Queue.length.mean()
+Queue.mean_length_of_stay()        Queue.length_of_stay.mean()
+Queue.minimum_length_of_stay()     Queue.length_of_stay.minimum()
+Queue.maximum_length_of_stay()     Queue.length_of_stay.maximum()
+Queue.length()                     Queue.length() / len()
+Queue.print_statistics()           Queue.print_histogram()
+                                   Queue.length.std()
+                                   Queue.length.median()
+                                   Queue.length.percentile()
+                                   Queue.length.bin_count()
+                                   Queue.length_of_stay.std()
+                                   Queue.length_of_stay.median()
+                                   Queue.length_of_stay.percentile()
+                                   Queue.length_of_stay.bin_count()                                   
+                                   Resource.availabe_quantity ==> MonitorTimeStamp
+                                   Resource.claimed_quantity ==> MonitorTimeStamp
+                                   Resource.capacity ==> MonitorTimeStamp
+Resource.capacity(cap)             Resource.set_capacity(cap)
+                                   Component.requested_resources()
+                                   Component.requested_quantity(resource)
+
+All monitors can be used with MatPlotLib. For Monitor, there is Monitor.x() to get an array of all
+tallied values. For MonitorTimestamp, MonitorTimestamp.xduration() and MonitorTimestamp.xt() are available.
+Note that for the time a MonitorTimestamp is disabled, x will be nan.
+
+Defining a non timestamped monitor (class Monitor) is fairly straightforward.
+Defining a timestamped monitor is a bit more complicated. The Lock with monitor script shows an example.
+Furthermore, refer to the manual for details.
+
+As a consequence of this, Resource.capacity() can no longer be used to change the capacity. 
+A new method Resource.set_capacity() is provided, instead.
+
+All examples have been updated to support or show the new functionality.
+
+Thanks to Frans Sopers: Bug in Component.release() fixed.
+Thanks to Jan Knoop: arialmt font is now included in getfont, which is required for iPad without additional fonts.
+
+version 2.0.2  2017-08-08
 =========================
 Internal event handling changed, in order to be able to use all event methods (i.e.
 activate, hold, request, standby, cancel and passivate regardless whether

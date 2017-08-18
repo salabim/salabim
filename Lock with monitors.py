@@ -19,6 +19,7 @@ class Shipgenerator(sim.Component):
             
 class Ship(sim.Component):
     def process(self):
+        self.arrivaltime=de.now()
         self.enter(wait[self.side])
         yield self.passivate(mode='Wait')
         yield self.hold(intime,mode='Sail in')
@@ -29,19 +30,29 @@ class Ship(sim.Component):
         yield self.hold(outtime,mode='Sail out')
         self.leave(lockqueue)
         lock.activate()
+        lock.monitor_time_in_complex.tally(de.now()-self.arrivaltime)
         
 class Lock(sim.Component):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.usedlength=0
+        self.side=left
+        self.monitor_usedlength=sim.MonitorTimestamp(name='used length',getter=self.get_usedlength)
+        self.monitor_time_in_complex=sim.Monitor(name='time in complex')
+        
+        
+    def get_usedlength(self):
+        return self.usedlength
 
     def process(self):
+        self.usedlength=0
         while True:
             if len(wait[left])+len(wait[right])==0:
                 yield self.passivate(mode='Idle')
-
-            usedlength=0
-
             for ship in wait[self.side]:
-                if usedlength+ship.length<=locklength:
-                    usedlength += ship.length
+                if self.usedlength+ship.length<=locklength:
+                    self.usedlength += ship.length
+                    self.monitor_usedlength.tally()
                     ship.activate()
                     yield self.passivate('Wait for sail in')
             yield self.hold(switchtime,mode='Switch')
@@ -49,7 +60,9 @@ class Lock(sim.Component):
             for ship in lockqueue:
                 ship.activate()
                 yield self.passivate('Wait for sail out')
-
+                self.usedlength=max(self.usedlength-ship.length,0) #avoid rounding errors
+                self.monitor_usedlength.tally()
+                
 de=sim.Environment(random_seed=1234567,trace=False)
 locklength=60
 switchtime=10
@@ -69,7 +82,6 @@ for side in (left,right):
     shipgenerator.side=side
 
 lock=Lock('Lock')
-lock.side=left
 
 de.run(50000)
 lockqueue.length.print_histogram(5,0,1)
@@ -77,4 +89,5 @@ lockqueue.length_of_stay.print_histogram(10,10,1)
 for side in (left,right):
     wait[side].length.print_histogram(30,0,1)
     wait[side].length_of_stay.print_histogram(30,0,10)    
-
+lock.monitor_usedlength.print_histogram(20,0,5)
+lock.monitor_time_in_complex.print_histogram(30,0,10)

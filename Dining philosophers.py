@@ -7,8 +7,8 @@ class Philosopher(sim.Component):
     def process(self):
         while True:
 
-            thinkingtime=sim.random.uniform(0.5,1.5)*thinkingtime_mean
-            eatingtime=sim.random.uniform(0.5,1.5)*eatingtime_mean
+            thinkingtime=sim.Uniform(0.5,1.5).sample()*thinkingtime_mean
+            eatingtime=sim.Uniform(0.5,1.5).sample()*eatingtime_mean
             
             yield self.hold(thinkingtime,mode='thinking')          
             yield self.request(self.leftfork,self.rightfork,mode='waiting')

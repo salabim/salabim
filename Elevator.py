@@ -147,7 +147,7 @@ def getdirection(fromfloor,tofloor):
         return -1
     return 0
     
-de=sim.Environment(random_seed=1234567,trace=True)
+de=sim.Environment(random_seed=1234567)
 up=1
 still=0
 down=-1
@@ -183,7 +183,15 @@ for icar in range(ncars):
     thiscar=Car(name='car '+str(icar),capacity=capacity)
     cars.append(thiscar)
         
-de.run(500)
+de.trace(True)
+de.run(1000)
+de.trace(False)
+for floor in floors.values():
+    floor.visitors.reset()
+de.run(50000)
 
-
-    
+print('Floor    n         length length_of_stay')
+for floor in floors.values():
+    print('{:5d}{:5d}{:15.3f}{:15.3f}'.\
+      format(floor.n,floor.visitors.length.number_of_entries(),
+      floor.visitors.length.mean(),floor.visitors.length_of_stay.mean()))

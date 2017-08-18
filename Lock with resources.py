@@ -49,7 +49,7 @@ class Lock(sim.Component):
             self.release(key_out)
             yield self.request((key_out,1,1000),mode=None)
             
-de=sim.Environment(random_seed=1234567,trace=True)
+de=sim.Environment(random_seed=1234567,trace=False)
 
 locklength=60
 switchtime=10
@@ -72,4 +72,9 @@ for side in (left,right):
 lock=Lock('Lock')
 lock.side=left
 
-de.run(1000)
+de.run(50000)
+
+for side in (left,right):
+    lockmeters[side].claimed_quantity.print_histogram(30,0,10)
+
+

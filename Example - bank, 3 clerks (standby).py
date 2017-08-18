@@ -30,4 +30,6 @@ for i in range(3):
 waitingline=sim.Queue('waitingline')
 
 de.run(till=50000)
-waitingline.print_statistics()
+waitingline.length.print_histogram(30,0,1)
+print()
+waitingline.length_of_stay.print_histogram(30,0,10)

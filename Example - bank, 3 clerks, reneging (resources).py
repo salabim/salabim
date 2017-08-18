@@ -13,7 +13,7 @@ class Customer(sim.Component):
             de.number_balked += 1
             de.print_trace('','','balked')
             yield self.cancel()
-        yield self.request(clerks,fail_at=de.now()+50)
+        yield self.request(clerks,fail_delay=50)
         if self.request_failed():
             de.number_reneged += 1
             de.print_trace('','','reneged')
@@ -29,6 +29,8 @@ clerks=sim.Resource('clerk',3)
 
 de.run(till=50000)
 
-clerks.requesters().print_statistics()
+clerks.requesters().length.print_histogram(30,0,1)
+print()
+clerks.requesters().length_of_stay.print_histogram(30,0,10)
 print('number reneged',de.number_reneged)
 print('number balked',de.number_balked)

@@ -45,8 +45,16 @@ for i in range(3):
     Clerk().enter(clerks)
     
 waitingline=sim.Queue('waitingline')
-de.run(till=50000)
-
-waitingline.print_statistics()
+waitingline.length.monitor(False)
+de.run(duration=1500)
+waitingline.length.monitor(True)
+de.run(duration=1500)
+waitingline.length.print_histogram(30,0,1)
+print()
+waitingline.length_of_stay.print_histogram(30,0,10)
 print('number reneged',de.number_reneged)
 print('number balked',de.number_balked)
+import matplotlib.pyplot as plt
+plt.plot(*waitingline.length.tx(),'bo')
+plt.ylabel('length of '+waitingline.name())
+plt.show()

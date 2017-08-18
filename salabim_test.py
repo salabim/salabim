@@ -6,7 +6,87 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test24()    
+    test26() 
+    
+def test27():
+    m1=sim.Monitor('m1')
+    print (m1.mean(),m1.std(),m1.percentile(50),m1.histogram())
+    m1.tally(10)
+    print (m1.mean(),m1.std(),m1.percentile(50),m1.histogram())
+    
+    
+def test26():
+    global de
+    class X(sim.Component):
+        def _get_a(self):
+            return self.a
+           
+        def _now(self):
+            return self.env._now
+           
+
+        def process(self):
+            
+            yield self.hold(1)
+            m2.tally()
+            m2.monitor(True)
+            print('3',m2.xt())
+            yield self.hold(1)
+            self.a=20
+            m2.tally()
+            yield self.hold(1)
+            self.a=0
+            m2.tally()
+            yield self.hold(1)
+            m3.tally()
+            m2.monitor(True)
+
+
+        
+    
+    de=sim.Environment()
+    m1=sim.Monitor('m1')
+    print (m1.mean())    
+    m1.tally(10)
+    m1.tally(15)
+    m1.tally(20)
+    m1.tally(20)
+    m1.tally(0)
+        
+    print ('m1',m1.mean(),m1.std(),m1.percentile(50))
+    print ('m1 ex0',m1.mean(ex0=True),m1.std(ex0=True),m1.percentile(50,ex0=True))
+    x=X()
+    x.a=10
+    m2=sim.MonitorTimestamp('m2',getter=x._get_a)
+    print('1',m2.xt())
+    m2.monitor(False)
+    m2.tally()
+    print('a',m2.xt())
+#    m2.monitor(True)
+    m2.tally()
+    print('2',m2.xt())
+
+        
+    m3=sim.MonitorTimestamp('m3',getter=x._now) 
+    print(m3())
+
+    de.run(10)
+    print('4',m2.xt()) 
+    print('5',m2.xduration())     
+    print(m2.mean(),m2.std(),m2.percentile(50))
+    m1.print_histogram(10,0,10)    
+    m2.print_histogram(10,0,10)
+    print(m3.xduration())
+
+    m3.print_histogram(10,0,10)
+    print('done')
+
+#    for i in range(101):
+#        print(i,m1.percentile(i),m2.percentile(i))
+    m3=sim.Monitor('m3')
+    m3.tally(1)
+    m3.tally(3)
+    print('xx')    
     
 def test25():
     de=sim.Environment()
@@ -37,14 +117,24 @@ def test24():
             x1.request(r)
             yield self.hold(1)
             x1.passivate()
-#            de.main().passivate()
+            de.main().passivate()
             yield self.hold(5)
             x1.reactivate(at=20)
             
+    class X3(sim.Component):
+        def process(self):
+            a=1
+            yield self.hold(1)
+        pass
+            
     de=sim.Environment(trace=True)
-    x1=X1(auto_start=False)
-    x1.activate(at=0.5,process=x1.process(),urgent=True,mode='blabla')
+    x1=X1(process='p1')
+    x1.activate(at=0.5,process='process',urgent=True,mode='blabla')
     x2=X2()
+    x3=X3()
+    print('***name=',x3.running_process())
+    x4=sim.Component()
+    x3.activate(process='process')
     r=sim.Resource('resource')
     de.run(till=sim.inf)
     

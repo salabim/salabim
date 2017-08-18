@@ -29,4 +29,3 @@ clerk=Clerk()
 waitingline=sim.Queue('waitingline')
 
 de.run(till=50)
-waitingline.print_statistics()

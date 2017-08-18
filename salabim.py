@@ -16,7 +16,7 @@ The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS\
 FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -40,9 +40,10 @@ import itertools
 import functools
 import glob
 import os
+import inspect
 
 try:
-    import numpy
+    import numpy as np
     import cv2
     numpy_and_cv2_installed=True
 except:
@@ -71,7 +72,7 @@ except:
     inf=float('inf')
     nan=float('nan')
 
-__version__='2.0.2'
+__version__='2.1.0'
 
 class SalabimException(Exception):
     def __init__(self,value):
@@ -80,10 +81,770 @@ class SalabimException(Exception):
     def __str__(self):
         return self.value
 
+class Monitor(object):
+    '''
+    Monitor object
+    
+    Parameters
+    ----------
+    name : str
+        name to be used at print_histogram
+
+    monitor : bool
+        if True (default}, monitoring will be on. |n|
+        if False, monitoring is disabled |n|
+        it is possible to control monitoring later,
+        with the monitor method
+    '''    
+    def __init__(self,name,monitor=True):
+        self._name=name
+        self._timestamp=False
+        self.reset(monitor)
+         
+    def reset(self,monitor=None):
+        '''
+        resets monitor
+
+        Parameters
+        ----------
+        monitor : bool
+            if True (default}, monitoring will be on. |n|
+            if False, monitoring is disabled
+        ''' 
+        
+        if monitor is None:
+            monitor=self._monitor
+        self._x=[]
+        self.monitor(monitor)        
+                
+    def monitor(self,value=None):
+        '''
+        enables/disabled monitor
+
+        Parameters
+        ----------
+        value : bool
+            if True, monitoring will be on. |n|
+            if False, monitoring is disabled |n|
+            if not specified, no change
+            
+        Returns
+        -------
+        True, if monitoring enabled. False, if not : bool
+        ''' 
+        if value is not None:
+            self._monitor=value
+        return self.monitor
+
+    def tally(self,x):
+        '''
+        Parameters
+        ----------
+        x : float or int
+            value to be tallied
+        '''
+        if self._monitor:
+            self._x.append(x)
+        
+    def mean(self,ex0=False):
+        '''
+        mean of tallied values
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        mean : float
+        '''
+        
+        x=self.x(ex0=ex0)
+        if len(x)==0:
+            return nan
+        return np.mean(x)
+    
+    def std(self,ex0=False):
+        '''
+        standard deviation of tallied values
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        standard deviation : float
+        '''
+        x=self.x(ex0=ex0)
+        if len(x)==0:
+            return nan
+        else:
+            return np.std(x)
+                
+    def minimum(self,ex0=False):
+        '''
+        minimum of tallied values
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        minimum : float
+        '''
+        x=self.x(ex0=ex0)
+        return x.min()
+        
+    def maximum(self,ex0=False):
+        '''
+        maximum of tallied values
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        maximum : float
+        '''
+
+        x=self.x(ex0=ex0)
+        return x.max()   
+        
+    def median(self,ex0=False):
+        '''
+        median of tallied values weighted wioth their durations
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        median : float
+        '''
+        return self.percentile(50,ex0=ex0)
+        
+    def percentile(self,q,ex0=False):
+        '''
+        q-th percentile of tallied values
+        
+        Parameters
+        ----------
+        q : float
+            percentage of the distribution |n|
+            must be between 0 and 100
+            
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        q-th percentile: float
+            0 returns the minimum, 50 the median and 100 the maximum
+        '''
+        x=self.x(ex0=ex0)
+        assert (q>=0) and (q<=100)
+        if len(x)==0:
+            return nan
+        return np.percentile(x,q)
+            
+    def bin_count(self,lowerbound,upperbound,ex0=False):
+        '''
+        count of the number of tallied values in range (lowerbound,upperbound]
+        
+        Parameters
+        ----------
+        lowerbound : float
+            non inclusive lowerbound
+            
+        upperbound : float
+            inclusive upperbound
+
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        number of values >lowerbound and <=upperbound : int
+        '''
+        x=self.x(ex0=ex0)
+        x_in_class=(x>lowerbound) * (x<=upperbound)
+        return x_in_class.sum()    
+
+    def number_of_entries(self,ex0=False):
+        '''
+        count of the number of entries
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        number of entries : int
+        '''
+        x=self.x(ex0=ex0)
+        return len(x)
+        
+    def number_of_entries_zero(self):
+        '''
+        count of the number of zero entries
+        
+        Returns
+        -------
+        number of zero entries : int
+        '''
+        return self.number_of_entries()-self.number_of_entries(ex0=True)
+        
+    def histogram(self,bins=10, range=None,ex0=False):
+        '''
+        numpy histogram of tallied values
+        
+        Parameters
+        ----------
+        bins : int
+            number of bins
+            
+        range : float
+            see numpy documentation
+
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        numpy histogram : see numpy documentation
+        
+        Notes
+        -----
+        The numpy definition of a histogram is different from the salabim print_histogram!
+        
+        '''
+        return np.histogram(self.x(ex0=ex0),bins=bins,range=range)
+        
+    def print_histogram(self,number_of_bins=30,lowerbound=0,bin_width=1,print_header=True,ex0=False):
+        '''
+        print monitor statistics and histogram
+        
+        Parameters
+        ----------
+        number_of_bins : int
+            number of bins |n|
+            if 0, also the header of the histogram will be surpressed
+            
+        lowerbound: float
+            first bin
+            
+        bin_width : float
+            width of the bins
+            
+        print_header : bool
+            if True (default), the text 'Histogram of' followed by the name of the monitor will be printed {n}
+            if False, no header            
+
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+        '''
+        
+        if self._timestamp:
+            x,weights=self.xduration(ex0=ex0)
+        else:
+            x=self.x(ex0=ex0)
+            weights=np.ones(len(self._x))
+
+        if print_header:
+            print('Histogram of',self._name)
+        print('                        all    excl.zero         zero')
+        print('-------------- ------------ ------------ ------------')
+        if self._timestamp:
+            x,duration=self.xduration()
+            x,duration_ex0=self.xduration(ex0=True)
+            print('duration      {:13.3f}{:13.3f}{:13.3f}'.format(self.duration(),
+              self.duration(ex0=True),self.duration_zero()))
+        else:
+            print('entries       {:13d}{:13d}{:13d}'.format(self.number_of_entries(),
+              self.number_of_entries(ex0=True),self.number_of_entries_zero()))
+
+        print('mean          {:13.3f}{:13.3f}'.format(self.mean(),self.mean(ex0=True)))
+        print('std.deviation {:13.3f}{:13.3f}'.format(self.std(),self.std(ex0=True)))
+        print()
+        print('minimum       {:13.3f}{:13.3f}'.format(self.percentile(  0),self.percentile(  0,ex0=True)))
+        print('median        {:13.3f}{:13.3f}'.format(self.percentile( 50),self.percentile( 50,ex0=True)))
+        print('90% percentile{:13.3f}{:13.3f}'.format(self.percentile( 90),self.percentile( 90,ex0=True)))
+        print('95% percentile{:13.3f}{:13.3f}'.format(self.percentile( 95),self.percentile( 95,ex0=True)))
+        print('maximum       {:13.3f}{:13.3f}'.format(self.percentile(100),self.percentile(100,ex0=True)))
+        if number_of_bins>0:
+            print()
+            if self._timestamp:
+                print('           <=      duration     %  cum%')
+            else:
+                print('           <=       entries     %  cum%')
+
+            cumperc=0
+            for i in range(-1,number_of_bins+1):
+                if i==-1:
+                    lb=-inf
+                else:
+                    lb=lowerbound+i*bin_width
+                if i==number_of_bins:
+                    ub=inf
+                else:
+                    ub=lowerbound+(i+1)*bin_width
+                count=self.bin_count(lb,ub)
+                weight_total=np.sum(weights)
+                if weight_total==0:
+                    perc=nan
+                    cumperc=nan
+                    s='|'
+                else:
+                    perc=count/weight_total
+                    cumperc += perc
+                    scale=80
+                    n=int(perc*scale)
+                    ncum=int(cumperc*scale)+1
+                    s=('*'*n)+(' '* (scale-n))
+                    s=s[:ncum-1]+'|'+s[ncum+1:]
+            
+                print ('{:13.3f} {:13.3f}{:6.1f}{:6.1f} {}'.format(ub,count,perc*100,cumperc*100,s))
+                 
+    def x(self,ex0=False):
+        '''
+        array of tallied values
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        all tallied values : array
+        '''
+        
+        x=np.array(self._x)
+        if ex0:
+            return x[np.where(x!=0)]
+        else:
+            return x    
+                        
+class MonitorTimestamp(Monitor):
+    '''
+    monitortimestamp object
+    
+    Parameters
+    ----------
+    name : str
+        name to be used at print_histogram
+        
+    getter : function
+        this function must return the current value |n|
+        usually this will be a method of an object
+    
+    monitor : bool
+        if True (default), monitoring will be on. |n|
+        if False, monitoring is disabled |n|
+        it is possible to control monitoring later,
+        with the monitor method
+    
+    env : Environment
+        environment where the monitor is defined |n|
+        if omitted, default_env will be used
+        
+    Notes
+    -----
+    A MonitorTimestamp collects both the value and the time. All statistics are based
+    on the durations as weights.
+
+    Example
+    -------
+        Tallied at time   0: 10 (xnow in definition of the monitortimestamp) |n|
+        Tallied at time  50: 11 |n|
+        Tallied at time  70: 12 |n|
+        Tallied at time  80: 10 |n|
+        Now = 100
+            
+        This results in:  |n|
+        x=  10 duration 50 |n|
+        x=  11 duration 20 |n|
+        x=  12 duration 10 |n|
+        x=  10 duration 20
+        
+        And thus a mean of (10*50+11*20+12*10+10*20)/(50+20+10+20)
+    '''    
+
+    def __init__(self,name,getter,monitor=True,env=None):
+        self._name=name
+        if env is None:
+            self.env=_default_env
+        else:
+            self.env=env
+        self._timestamp=True
+        self._getter=getter
+        self.reset(monitor=monitor)
+        
+    def __call__(self): # direct moneypatching __call__ doesn't work
+        return self._getter()
+        
+    def reset(self,monitor=None):
+        '''
+        resets timestamped monitor
+
+        Parameters
+        ----------
+        monitor : bool
+            if True (default}, monitoring will be on. |n|
+            if False, monitoring is disabled |n|
+            if None (default), the monitor state remains unchanged
+        ''' 
+        if monitor is not None:
+            self._monitor=monitor
+        if self._monitor:
+            self._x=[self._getter()]
+        else:
+            self._x=[nan]
+        self._t=[self.env._now]   
+                
+    def monitor(self,value=None):
+        '''
+        enables/disabled timestamped monitor
+
+        Parameters
+        ----------
+        value : bool
+            if True, monitoring will be on. |n|
+            if False, monitoring is disabled |n|
+            if None (default), no change
+            
+        Returns
+        -------
+        True, if monitoring enabled. False, if not : bool
+        ''' 
+
+        if value is not None:
+            self._monitor=value
+            if self._monitor:
+                self.tally()
+            else:
+                self._tally_nan()
+        return self.monitor
+        
+    def tally(self):
+        '''
+        tally the current value, if monitor is on
+        '''
+        if self._monitor:
+            x=self._getter()
+            t=self.env._now
+            if self._t[-1]==t:
+                self._x[-1]=x
+            else:
+                self._x.append(x)
+                self._t.append(t)       
+       
+    def _tally_nan(self):
+        t=self.env._now
+        if self._t[-1]==t:
+            self._x[-1]=nan
+        else:
+            self._x.append(nan)
+            self._t.append(t)  
+                         
+    def mean(self,ex0=False):
+        '''
+        mean of tallied values, weighted with their durations
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        mean : float
+        '''
+        x,duration=self.xduration(ex0=ex0)
+        if duration.sum()==0:
+            return nan
+        return np.average(x,weights=duration)
+        
+    def std(self,ex0=False):
+        '''
+        standard deviation of tallied values, weighted with their durations
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        standard deviation : float
+        '''
+        x,duration=self.xduration(ex0=ex0)
+        dtot = duration.sum()
+        if dtot==0:
+            return nan
+        wmean = ( duration*x ).sum()/dtot
+        wvar = ( duration*(x-wmean)**2 ).sum()/dtot
+        return np.sqrt(wvar)
+        
+    def minimum(self,ex0=False):
+        '''
+        minimum of tallied values
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        minimum : float
+        '''
+        x,duration=self.xduration(ex0=ex0)
+        return x.min()
+        
+    def maximum(self,ex0=False):
+        '''
+        maximum of tallied values
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        maximum : float
+        '''
+        x,duration=self.xduration(ex0=ex0)
+        return x.max()   
+        
+    def median(self,ex0=False):
+        '''
+        median of tallied values weighted with their durations
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        median : float
+        '''
+        return self.percentile(50,ex0=ex0) 
+                       
+    def percentile(self,q,ex0=False):
+        '''
+        q-th percentile of tallied values, weighted with their durations
+        
+        Parameters
+        ----------
+        q : float
+            percentage of the distribution |n|
+            must be between 0 and 100
+            
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        q-th percentile: float
+            0 returns the minimum, 50 the median and 100 the maximum
+        '''
+        x,duration = self.xduration(ex0=ex0)
+        if len(x)==1:
+            return x[0]
+        dtot = duration.sum()
+        if dtot==0:
+            return nan
+        ind_sorted = np.argsort(x)
+        x_sorted = x[ind_sorted]
+        duration_sorted = duration[ind_sorted]
+        duration_cum = np.cumsum(duration_sorted)
+        p = (duration_cum-duration[0])/(dtot-duration[0])
+        return np.interp(q/100, p, x_sorted)
+            
+    def bin_count(self,lowerbound,upperbound,ex0=False):
+        '''
+        count of the number of tallied values, weighted with the duration in range (lowerbound,upperbound]
+        
+        Parameters
+        ----------
+        lowerbound : float
+            non inclusive lowerbound
+            
+        upperbound : float
+            inclusive upperbound
+
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        number of values >lowerbound and <=upperbound: int
+        '''
+        x,duration=self.xduration(ex0=ex0)
+        x_in_class=np.where((x>lowerbound) * (x<=upperbound))
+        return sum(duration[x_in_class])        
+        
+    def duration(self,ex0=False):
+        x,duration=self.xduration(ex0=ex0)
+        return duration.sum()
+        
+    def duration_zero(self):
+        return self.duration()-self.duration(ex0=True) 
+               
+    def histogram(self,bins=10, range=None,ex0=False):
+        '''
+        numpy histogram of tallied values, weighted with their durations
+        
+        Parameters
+        ----------
+        bins : int
+            number of bins
+            
+        range : float
+            see numpy documentation
+
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        numpy histogram : see numpy documentation
+        
+        Notes
+        -----
+        The numpy definition of a histogram is different from the salabim print_histogram!
+        
+        '''
+        x,duration=self.xduration(ex0=ex0)
+        return np.histogram(x,bins=bins,range=range, weights=duration)
+        
+    def xduration(self,ex0=False):
+        '''
+        tuple of array with x-values and array with durations
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        Returns
+        -------
+        array with x-values and array with durations : tuple
+        '''
+        x=np.array(self._x)
+        duration = np.zeros(len(self._x))
+        for i,t in enumerate(self._t):
+            if i!=0:
+                duration[i-1]=t-lastt
+            lastt=t
+        
+        duration[-1]=self.env._now-lastt
+        filter_not_isnan=np.where(~np.isnan(x))
+        duration=duration[filter_not_isnan]
+        x=x[filter_not_isnan]
+           
+        if ex0:
+            filter_ex0=np.where(x!=0)
+            return x[filter_ex0],duration[filter_ex0]
+        else:
+            return x,duration 
+               
+    def xt(self,ex0=False,exnan=False):
+        '''
+        tuple of array with x-values and array with timestamps
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        exnan : bool
+            if False (default), include nan. if True, exclude nans
+            
+        Returns
+        -------
+        array with x-values and array with timestamps : tuple
+        
+        Notes
+        -----
+        The value nan is stored when monitoring is turned off
+        '''
+        x=np.array(self._x)
+        t=np.array(self._t)        
+        if ex0:
+            filter_ex0=np.where(x!=0)
+            x=x[filter_ex0]
+            t=t[filter_ex0]
+        if exnan:
+            filter_exnan=np.where(~np.isnan(x))
+            x=x[filter_exnan]
+            t=t[filter_exnan]
+        return x,t
+            
+    def tx(self,ex0=False,exnan=False):
+        '''
+        tuple of array with timestamps and array with x-values
+        
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+            
+        exnan : bool
+            if False (default), include nan. if True, exclude nans            
+            
+        Returns
+        -------
+        array with timestamps and array with x-values : tuple
+        
+        Notes
+        -----
+        The value nan is stored when monitoring is turned off
+        '''
+        return tuple(reversed(self.xt(ex0=ex0,exnan=exnan)))
+            
+    def print_histogram(self,number_of_bins=30,lowerbound=0,bin_width=1,print_header=True,ex0=False):
+        '''
+        print timestamped monitor statistics and histogram
+        
+        Parameters
+        ----------
+        number_of_bins : int
+            number of bins |n|
+            if 0, also the header of the histogram will be surpressed
+            
+        lowerbound: float
+            first bin
+            
+        bin_width : float
+            width of the bins
+            
+        print_header : bool
+            if True (default), the text 'Histogram of' followed by the name of the timestamed monitor will be printed {n}
+            if False, no header            
+
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+        '''
+        super().print_histogram(number_of_bins,lowerbound,bin_width,print_header,ex0)
+                        
 if Pythonista:
         
     class MyScene(scene.Scene):
-        ''' internal class for Pythonista animation '''
 
         def __init__(self,*args,**kwargs):
             scene.Scene.__init__(self,*args,**kwargs)
@@ -230,13 +991,13 @@ class Qmember():
         q._length+=1
         for iter in q._iter_touched:
             q._iter_touched[iter]=True
-        q._maximum_length=max(q._maximum_length,q._length)
         c._qmembers[q]=self
         q.env.print_trace('','',c._name,'enter '+q._name)        
+        q.length.tally()
 
 class Queue(object):
     '''
-    queue object
+    Queue object
     
     Parameters
     ----------
@@ -246,12 +1007,16 @@ class Queue(object):
         auto serializing will be applied |n|
         if omitted, the name queue (serialized)
         
+    monitor : bool
+        if True (default) , both length and length_of_stay are monitored |n|
+        if False, monitoring is disabled.
+        
     env : Environment
         environment where the queue is defined |n|
         if omitted, default_env will be used
     '''
    
-    def __init__(self,name=None,env=None):
+    def __init__(self,name=None,monitor=True,env=None):
         if env is None:
             self.env=_default_env
         else:
@@ -274,7 +1039,48 @@ class Queue(object):
         self._length=0
         self._iter_sequence=0
         self._iter_touched={}
-        self.reset_statistics()
+        self.length=MonitorTimestamp('Length of '+self._name,getter=self._getlength,monitor=monitor,env=self.env)
+        self.length_of_stay=Monitor('Length of stay in '+self._name,monitor=monitor)
+
+    def _getlength(self):
+        return self._length
+        
+    def reset(self,monitor=None):
+        '''
+        resets queue monitor length_of_stay and time stamped monitr length
+
+        Parameters
+        ----------
+        monitor : bool
+            if True (default}, monitoring will be on. |n|
+            if False, monitoring is disabled
+            
+        Notes
+        -----
+        it is possible to reset individual monitoring with length_of_stay.reset() and length.reset()
+        ''' 
+        self.length.reset(monitor=monitor)
+        self.length_of_stay.reset(monitor=monitor)
+
+    def monitor(self,value=None):
+        '''
+        enables/disables monitoring of length_of_stay and length
+
+        Parameters
+        ----------
+        value : bool
+            if True, monitoring will be on. |n|
+            if False, monitoring is disabled |n|
+            if not specified, no change
+
+        Notes
+        -----
+        it is possible to individually control monitoring with length_of_stay.monitor() and length.monitor()
+        ''' 
+
+        self.length.monitor(value=value)
+        self.length_of_stay.monitor(value=value)
+
         
     def __repr__(self):
         lines=[]
@@ -330,23 +1136,6 @@ class Queue(object):
             will be numbered)
         '''
         return self._sequence_number        
-
-    def print_statistics(self):
-        '''
-        prints a summary of statistics of a queue
-        ''' 
-        
-        print('Info on',self._name,'@',self.env._now)
-        print('  length                ',self._length)
-        print('  mean_length           ',self.mean_length())
-        print('  minimum_length        ',self.minimum_length())
-        print('  maximum_length        ',self.maximum_length())
-        print('  mean_length_of_stay   ',self.mean_length_of_stay())                
-        print('  minimum_length_of_stay',self.minimum_length_of_stay())                
-        print('  maximum_length_of_stay',self.maximum_length_of_stay())                        
-        print('  number_passed         ',self.number_passed())                                    
-        print('  number_passed_direct  ',self.number_passed_direct())                                        
-      
                 
     def add(self,component):
         '''
@@ -653,110 +1442,7 @@ class Queue(object):
                 return mx.component
             mx=mx.successor
         return None 
-        
-    def length(self):
-        '''
-        the length of a queue
-        
-        Returns
-        -------
-        length of the queue : int
-        
-        Notes
-        -----
-        it is advised to use the builtin len function.
-        '''
-        return self._length
-        
-    def minimum_length(self):
-        '''
-        Returns
-        -------
-        the minimum length of the queue since the last reset_statistics : int
-        '''
-        return self._minimum_length
-        
-    def maximum_length(self):
-        '''
-        Returns
-        -------
-        the maximum length of the queue since the last reset_statistics : int
-        '''
-        return self._maximum_length
-        
-    def minimum_length_of_stay(self):
-        '''
-        Returns
-        -------
-        the minimum length of stay of components that left the queue : int
-            since the last reset_statistics |n|
-            returns nan if no component has left the queue
-        '''
-        if self._number_passed==0:
-            return nan
-        else:
-            return self._minimum_length_of_stay
-        
-    def maximum_length_of_stay(self):
-        '''
-        Returns
-        -------
-        the maximum length of stay of components that left the queue : int
-            since the last reset_statistics |n|
-            returns nan if no component has left the queue
-        '''
-        if self._number_passed==0:
-            return nan
-        else:
-            return self._maximum_length_of_stay
-                
-    def number_passed(self):
-        '''
-        Returns
-        -------
-        the number of components that have left the queue since the last reset_statistics : int
-        '''
-        return self._number_passed
-        
-    def number_passed_direct(self):
-        '''
-        Returns
-        -------
-        the number of components that have left the queue with zero length of stay since the last reset_statistics : int
-        '''
-        return self._number_passed_direct
-        
-    def mean_length_of_stay(self):
-        '''
-        Returns
-        -------
-        the mean length of stay of components that left the queue : float
-            since the last reset_statistics |n|
-            returns nan if no component has left the queue
-        '''
-        if self._number_passed==0:
-            return nan
-        else:
-            return self._total_length_of_stay/self._number_passed
-    
-    def mean_length(self):
-        '''
-        Returns
-        -------
-        the mean length of the queue : float
-            since the last reset_statistics
-        '''
-        total_time=self._total_length_of_stay
-        mx=self._head.successor
-        while mx!=self._tail:
-            total_time+=(self.env._now-mx.enter_time)
-            mx=mx.successor
-        duration=self.env._now-self._start_statistics
-        if duration==0:
-            return self._length
-        else:
-            return total_time/duration
-                         
+                                 
     def __iter__(self):
         self._iter_sequence += 1
         iter_sequence = self._iter_sequence
@@ -943,26 +1629,7 @@ class Queue(object):
             c=mx.component
             mx=mx.successor
             c._leave(self)
-        
-    def reset_statistics(self):
-        '''
-        resets the statistics of the queue
-        '''        
-    
-        self._minimum_length_of_stay=inf
-        self._maximum_length_of_stay=-inf
-        self._minimum_length=self._length
-        self._maximum_length=self._length
-        self._number_passed=0
-        self._number_passed_direct=0
-        self._total_length_of_stay=0
-        mx=self._head.successor
-        while mx!=self._tail:
-            c=mx.component
-            self._total_length_of_stay-(self.env._now-c.enter_time)
-            mx=mx.successor
-        self._start_statistics=self.env._now
-    
+                  
 def finish():
     raise SalabimException('Stopped by user')    
     if Pythonista:
@@ -1023,7 +1690,7 @@ class Environment(object):
         self.env=self 
         self._nameserializeComponent={} # just to allow main to be created; will be reset later
         self._now=0 
-        self._main=Component(name='main',env=self)
+        self._main=Component(name='main',env=self,process=None)
         self._main._status=current
         self._current_component=self._main
         self.ui_objects=[]
@@ -1530,10 +2197,10 @@ class Environment(object):
                         uio.button.config(text=thistext)       
 
             if self.dovideo:
-                open_cv_image = numpy.array(capture_image) 
+                open_cv_image = np.array(capture_image) 
                    # Convert RGB to BGR 
                 open_cv_image = open_cv_image[:, :, ::-1].copy() 
-                open_cv_image=cv2.cvtColor(numpy.array(capture_image), cv2.COLOR_RGB2BGR)
+                open_cv_image=cv2.cvtColor(np.array(capture_image), cv2.COLOR_RGB2BGR)
                 self.out.write(open_cv_image)
                 self.video_sequence += 1
                 
@@ -1666,7 +2333,7 @@ class Environment(object):
             fontlist=fontname
 
         font=None
-        for ifont in itertools.chain(fontlist,('calibri', 'arial')):
+        for ifont in itertools.chain(fontlist,('calibri', 'arial','arialmt')):
             try:
                 font=ImageFont.truetype(font=ifont,size=int(fontsize))
                 break
@@ -1683,7 +2350,7 @@ class Environment(object):
         if font==None:
             raise AssertionError('no matching fonts found for ',fontname)
         return font
-        
+                
     def getwidth(self,text,font='',fontsize=20,screen_coordinates=False):
         if not screen_coordinates:
             fontsize=fontsize*self.scale
@@ -2996,15 +3663,15 @@ class Component(object):
         if True, the component will be scheduled 
         in front of all components scheduled
         for the same time
-        
-    auto_start : bool
-        auto start indicator |n|
-        if there is a generator call process defined in the
-        component class, this will be activated 
-        automatically, unless overridden with auto_start |n|
-        if there is no generator called process, no activation 
-        takes place, anyway
-
+    
+    process : str
+        name of process to be started. |n|
+        if omitted, it will try to start self.process() |n|
+        if None, no process will be started even if self.process() exists,
+        i.e. become a data component. |n|
+        note that the function *must* be a generator,
+        i.e. contains at least one yield.
+            
     suppress_trace : bool
         suppress_trace indicator |n|
         if True, this component will be excluded from the trace |n|
@@ -3023,7 +3690,7 @@ class Component(object):
     '''
     
     def __init__(self,name=None,at=None,delay=0,urgent=False,
-      auto_start=True,suppress_trace=False,mode=None,env=None): 
+      process='*',suppress_trace=False,mode=None,env=None): 
         if env is None:
             self.env=_default_env
         else:
@@ -3045,9 +3712,15 @@ class Component(object):
         self._suppress_trace=suppress_trace
         self._mode=mode 
         self._mode_time=self.env._now
-        if self.hasprocess() and auto_start:
-            self.activate(process=self.process(),at=at,delay=delay,urgent=urgent)
-        
+        if process==None:
+            return
+        if process=='*':
+            if self.hasprocess():
+                process='process'
+            else:
+                return   
+        self.activate(process=process,at=at,delay=delay,urgent=urgent)                
+                      
     def __repr__(self):
         lines=[]
         lines.append('Component '+hex(id(self)))
@@ -3090,7 +3763,7 @@ class Component(object):
                 
     def hasprocess(self):
         try:
-            process=self.process()
+            p=self.process()
             return True
         except AttributeError:
             pass
@@ -3172,8 +3845,8 @@ class Component(object):
             in front of all components scheduled
             for the same time
 
-        process : generator function
-            process to be started. |n|
+        process : str
+            name of process to be started. |n|
             if omitted, process will not be changed |n|
             if the component is a data component, the 
             generator function process will be used as the default process. |n|
@@ -3193,10 +3866,31 @@ class Component(object):
             
         Notes
         -----
-        if to be applied for the current component, use yield acctivate(). |n|
+        if to be applied for the current component, use yield self.activate(). |n|
         if both at and delay are specified, the component becomes current at the sum
         of the two values.
         '''
+        p=None
+        if process==None:
+            if self._status==data:
+                if self.hasprocess():
+                    p=self.process
+                else:
+                    raise AssertionError('no process for data component')                    
+        else:
+            try:
+                p=eval('self.'+process)
+            except:
+                raise AssertionError('self.'+process+' not found')
+                
+        if p==None:
+            extra=''
+        else:
+            if not inspect.isgeneratorfunction(p):
+                raise AssertionError(process,'has no yield statement')
+            self._process=p()
+            extra=' @'+process
+                                        
         if self._status!=current:
             self._remove()
             if not keep_request:
@@ -3211,20 +3905,6 @@ class Component(object):
         else:
             scheduled_time=at+delay
             
-        extra=''
-
-        if process==None:
-            if self._status==data:
-                if self.hasprocess():
-                    self._process=self.process()
-                    extra=' @'+self._process.__name__
-                else:
-                    raise AssertionError('data component must have a process')
-            else:
-                pass
-        else:
-            self._process=process
-            extra=' @'+self._process.__name__
         self._reschedule(scheduled_time,urgent,'activate',extra)
                                               
     def hold(self,duration=0,till=None,urgent=False,mode='*'):
@@ -3454,7 +4134,7 @@ class Component(object):
                 if fail_delay==inf:
                     scheduled_time=inf
                 else:
-                    scheduled_time=self.env._now+delay
+                    scheduled_time=self.env._now+fail_delay
         else:
             if fail_delay is None:                
                 scheduled_time=fail_at
@@ -3514,7 +4194,7 @@ class Component(object):
         if q is None:
             q=self._claims[r]
         if q>self._claims[r]:
-            q=self.claimers[r]        
+            q=self._claims[r]    
         r._claimed_quantity-=q
         self._claims[r]-=q
         if self._claims[r]<1e-8:
@@ -3522,6 +4202,8 @@ class Component(object):
             if r._claimers._length==0:
                 r._claimed_quantity=0 #to avoid rounding problems
             del self._claims[r]
+        r.claimed_quantity.tally()
+        r.available_quantity.tally()
         self.env.print_trace('','',self._name,\
           'release '+str(q)+' from '+r._name)
         r._claimtry()   
@@ -3575,8 +4257,8 @@ class Component(object):
                 else:
                     raise AssertionError('incorrect specifier'+argsi)
                 if r._anonymous:
-                    raise AssertionError('not possible to release anonymous resources'+r.name())       
-                self._release(r,None)  
+                    raise AssertionError('not possible to release anonymous resources '+r.name())       
+                self._release(r,q)   
                                                                   
     def claimed_quantity(self,resource):
         '''
@@ -3602,7 +4284,32 @@ class Component(object):
         list of claimed resources : list
         '''
         return self._claims.keys()
-
+        
+    def requested_resources(self):
+        '''
+        Returns
+        -------
+        list of requested resources : list
+        '''
+        return self._requests.keys()
+        
+    def requested_quantity(self,resource):
+        '''
+        Parameters
+        ----------
+        resource : Resoure
+            resource to be queried
+        
+        Returns
+        -------
+        the requested (not yet honoured) quantity from a resource : float or int
+            if there is no request for the resource, 0 will be returned
+        '''
+        if resource in self._requests:
+            return self._requests[resource]
+        else:
+            return 0
+        
     def request_failed(self):
         '''
         Returns
@@ -3651,7 +4358,18 @@ class Component(object):
         '''
         return self._sequence_number        
         
-        
+    def running_process(self):
+        '''
+        Returns
+        -------
+        name of the running process : str
+            if data component, None
+        '''
+        if self._process==None:
+            return None
+        else:
+            return self._process.__name__
+                    
     def suppress_trace(self,value=None):
         '''
         Parameters
@@ -3931,18 +4649,12 @@ class Component(object):
         m2.predecessor=m1
         mx.component=None
           # signal for components method that member is not in the queue
-        q._number_passed+=1
-        length_of_stay=self.env._now-mx.enter_time       
-        if length_of_stay==0:
-            q._number_passed_direct+=1
-        q._total_length_of_stay+=length_of_stay
-        q._minimum_length_of_stay=min(q._minimum_length_of_stay,length_of_stay)
-        q._maximum_length_of_stay=max(q._maximum_length_of_stay,length_of_stay)
         q._length-=1
-        q._minimum_length=min(q._minimum_length,q._length)
         del self._qmembers[q]
-        self.env.print_trace('','',self._name, 'leave '+q._name)                 
-        
+        self.env.print_trace('','',self._name, 'leave '+q._name)
+        length_of_stay=self.env._now-mx.enter_time
+        q.length_of_stay.tally(length_of_stay)
+        q.length.tally()
 
     def priority(self,q,priority=None):
         '''
@@ -4759,8 +5471,8 @@ class Resource(object):
         if omitted, _default_env is used
     '''
     
-    def __init__(self,name=None,capacity=1,strict_order=False,\
-      anonymous=False,env=None):
+    def __init__(self,name=None,capacity=1,strict_order=False,
+      anonymous=False,monitor=True,env=None):
         if (env is None):
             self.env=_default_env
         else:
@@ -4770,14 +5482,64 @@ class Resource(object):
         self._capacity=capacity
         self._name,self._base_name,self._sequence_number = \
           _reformatname(name,self.env._nameserializeResource)
-        self._requesters=Queue(name='requesters:'+name,env=self.env)
+        self._requesters=Queue(name='requesters of '+name,monitor=monitor,env=self.env)
         self._requesters._resource=self
-        self._claimers=Queue(name='claimers:'+name,env=self.env)
+        self._claimers=Queue(name='claimers of '+name,monitor=monitor,env=self.env)
         self._pendingclaimed_quantity=0
         self._claimed_quantity=0
         self._anonymous=anonymous
         self._strict_order=strict_order
+        self.capacity=MonitorTimestamp(
+          'Capacity of '+self._name,getter=self._get_capacity,monitor=monitor,env=self.env)
+        self.claimed_quantity=MonitorTimestamp(
+          'Claimed quantity of '+self._name,getter=self._get_claimed_quantity,monitor=monitor,env=self.env)
+        self.available_quantity=MonitorTimestamp(
+          'Available quantity of '+self._name,getter=self._get_available_quantity,monitor=monitor,env=self.env)
 
+    def reset(monitor=None):
+        '''
+        resets the resource monitors  and timestamped monitors
+
+        Parameters
+        ----------
+        monitor : bool
+            if True (default}, monitoring will be on. |n|
+            if False, monitoring is disabled
+            
+        Notes
+        -----
+        it is possible to reset individual monitoring with claimers().reset() and requesters().reset,
+            capacity.reset(), available_quantity.reset() or claimed_quantity.reset()
+        '''
+
+        self.requesters().reset(monitor)
+        self.claimers().reset(monitor)
+        self.capacity.reset(monitor)
+        self.available_quantity.reset(monitor)
+        self.claimed_quantity.reset(monitor)
+         
+    def monitor(self,value=None):
+        '''
+        enables/disables the resource monitors  and timestamped monitors
+
+        Parameters
+        ----------
+        value : bool
+            if True, monitoring will be on. |n|
+            if False, monitoring is disabled |n|
+            if not specified, no change
+
+        Notes
+        -----
+        it is possible to individually control monitoring with claimers().monitor() and requesters().monitor(),
+            capacity.monitor(), available_quantity.monitor) or claimed_quantity.monitor()
+        '''
+        self.requesters().monitor(value)
+        self.claimers().monitor(value)
+        self.capacity.monitor(value)
+        self.available_quantity.monitor(value)
+        self.claimed_quantity.monitor(value)
+         
     def __repr__(self):
         lines=[]
         lines.append('Resource '+hex(id(self)))
@@ -4836,7 +5598,6 @@ class Resource(object):
                         break
             if claimed:
                 for r in list(c._requests):
-
                     r._claimed_quantity+=c._requests[r]
                     if r in c._pendingclaims:
                         r._pendingclaimed_quantity-=c._requests[r]
@@ -4848,9 +5609,13 @@ class Resource(object):
                             c._claims[r]=c._requests[r]
                         c._enter(r._claimers)
                     c._leave(r._requesters)
+                    r.claimed_quantity.tally()
+                    r.available_quantity.tally()
                 c._requests={}   
                 c._pendingclaims=[]
-                c._reschedule(self.env._now,False,'request honoured')                  
+                c._remove()
+                c._reschedule(self.env._now,False,'request honoured')  
+                                
             else:
                 if self._strict_order:
                     return
@@ -4871,15 +5636,19 @@ class Resource(object):
         -----
         quantity may not be specified for a non-anomymous resoure
         '''
+
         if self._anonymous:
             if quantity is None:
                 q=self._claimed_quantity
             else:
                 q=quantity
+            
             self._claimed_quantity-=q
             if self._claimed_quantity<1e-8:
                 self._claimed_quantity=0
-            self._claimtry
+            self.claimed_quantity.tally()
+            self.available_quantity.tally()
+            self._claimtry()
             
         else:
             if quantity!=None:
@@ -4908,8 +5677,17 @@ class Resource(object):
         will be an empty queue for an anonymous resource
         '''
         return self._claimers
+        
+    def _get_capacity(self):
+        return self._capacity
 
-    def capacity(self,cap=None):
+    def _get_claimed_quantity(self):
+        return self._claimed_quantity
+
+    def _get_available_quantity(self):
+        return self._capacity-self._claimed_quantity
+
+    def set_capacity(self,cap):
         '''
         Parameters
         ----------
@@ -4922,20 +5700,12 @@ class Resource(object):
         -------
         the capacity : float orvint
         '''
-        if cap is not None:
-            self._capacity=cap
-            self._claimtry()
-        return self._capacity
-
+        self._capacity=cap
+        self.capacity.tally()
+        self.available_quantity.tally()
+        self._claimtry()
         
-    def claimed_quantity(self):
-        '''
-        Returns
-        -------
-        the claimed quantity : float
-        '''
-        return self._claimed_quantity
-            
+          
     def strict_order(self,strict_order):
         '''
         Parameters
@@ -4990,8 +5760,8 @@ class Resource(object):
             but also non serialized names (without a dot at the end)
             will be numbered)
         '''
-        return self._sequence_number        
-
+        return self._sequence_number   
+               
 def colornames():
     return {'':'#00000000','10%gray':'#191919','20%gray':'#333333',
     '30%gray':'#464646','40%gray':'#666666','50%gray':'#7F7F7F',
