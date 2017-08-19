@@ -331,7 +331,7 @@ class Monitor(object):
         '''
         return np.histogram(self.x(ex0=ex0),bins=bins,range=range)
         
-    def print_histogram(self,number_of_bins=30,lowerbound=0,bin_width=1,print_header=True,ex0=False):
+    def print_histogram(self,number_of_bins=30,lowerbound=0,bin_width=1,print_header=True,print_legend=True,indent='',ex0=False):
         '''
         print monitor statistics and histogram
         
@@ -351,6 +351,10 @@ class Monitor(object):
             if True (default), the text 'Histogram of' followed by the name of the monitor will be printed {n}
             if False, no header            
 
+        print_legend : bool
+            if True (default), the legend will be printed {n}
+            if False, no legend
+                        
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
         '''
@@ -361,33 +365,34 @@ class Monitor(object):
             x=self.x(ex0=ex0)
             weights=np.ones(len(self._x))
 
+        if print_legend:
+            print(indent+'                        all    excl.zero         zero')
+            print(indent+'-------------- ------------ ------------ ------------')
+
         if print_header:
             print('Histogram of',self._name)
-        print('                        all    excl.zero         zero')
-        print('-------------- ------------ ------------ ------------')
+            
         if self._timestamp:
-            x,duration=self.xduration()
-            x,duration_ex0=self.xduration(ex0=True)
-            print('duration      {:13.3f}{:13.3f}{:13.3f}'.format(self.duration(),
+            print(indent+'duration      {:13.3f}{:13.3f}{:13.3f}'.format(self.duration(),
               self.duration(ex0=True),self.duration_zero()))
         else:
-            print('entries       {:13d}{:13d}{:13d}'.format(self.number_of_entries(),
+            print(indent+'entries       {:13d}{:13d}{:13d}'.format(self.number_of_entries(),
               self.number_of_entries(ex0=True),self.number_of_entries_zero()))
 
-        print('mean          {:13.3f}{:13.3f}'.format(self.mean(),self.mean(ex0=True)))
-        print('std.deviation {:13.3f}{:13.3f}'.format(self.std(),self.std(ex0=True)))
+        print(indent+'mean          {:13.3f}{:13.3f}'.format(self.mean(),self.mean(ex0=True)))
+        print(indent+'std.deviation {:13.3f}{:13.3f}'.format(self.std(),self.std(ex0=True)))
         print()
-        print('minimum       {:13.3f}{:13.3f}'.format(self.percentile(  0),self.percentile(  0,ex0=True)))
-        print('median        {:13.3f}{:13.3f}'.format(self.percentile( 50),self.percentile( 50,ex0=True)))
-        print('90% percentile{:13.3f}{:13.3f}'.format(self.percentile( 90),self.percentile( 90,ex0=True)))
-        print('95% percentile{:13.3f}{:13.3f}'.format(self.percentile( 95),self.percentile( 95,ex0=True)))
-        print('maximum       {:13.3f}{:13.3f}'.format(self.percentile(100),self.percentile(100,ex0=True)))
+        print(indent+'minimum       {:13.3f}{:13.3f}'.format(self.minimum(),self.minimum(ex0=True)))
+        print(indent+'median        {:13.3f}{:13.3f}'.format(self.percentile( 50),self.percentile( 50,ex0=True)))
+        print(indent+'90% percentile{:13.3f}{:13.3f}'.format(self.percentile( 90),self.percentile( 90,ex0=True)))
+        print(indent+'95% percentile{:13.3f}{:13.3f}'.format(self.percentile( 95),self.percentile( 95,ex0=True)))
+        print(indent+'maximum       {:13.3f}{:13.3f}'.format(self.maximum(),self.maximum(ex0=True)))
         if number_of_bins>0:
             print()
             if self._timestamp:
-                print('           <=      duration     %  cum%')
+                print(indent+'           <=      duration     %  cum%')
             else:
-                print('           <=       entries     %  cum%')
+                print(indent+'           <=       entries     %  cum%')
 
             cumperc=0
             for i in range(-1,number_of_bins+1):
@@ -414,7 +419,7 @@ class Monitor(object):
                     s=('*'*n)+(' '* (scale-n))
                     s=s[:ncum-1]+'|'+s[ncum+1:]
             
-                print ('{:13.3f} {:13.3f}{:6.1f}{:6.1f} {}'.format(ub,count,perc*100,cumperc*100,s))
+                print (indent+'{:13.3f} {:13.3f}{:6.1f}{:6.1f} {}'.format(ub,count,perc*100,cumperc*100,s))
                  
     def x(self,ex0=False):
         '''
@@ -611,6 +616,8 @@ class MonitorTimestamp(Monitor):
         minimum : float
         '''
         x,duration=self.xduration(ex0=ex0)
+        if len(x)==0:
+            return nan
         return x.min()
         
     def maximum(self,ex0=False):
@@ -627,6 +634,8 @@ class MonitorTimestamp(Monitor):
         maximum : float
         '''
         x,duration=self.xduration(ex0=ex0)
+        if len(x)==0:
+            return nan
         return x.max()   
         
     def median(self,ex0=False):
@@ -817,7 +826,7 @@ class MonitorTimestamp(Monitor):
         '''
         return tuple(reversed(self.xt(ex0=ex0,exnan=exnan)))
             
-    def print_histogram(self,number_of_bins=30,lowerbound=0,bin_width=1,print_header=True,ex0=False):
+    def print_histogram(self,number_of_bins=30,lowerbound=0,bin_width=1,print_header=True,print_legend=True,indent='',ex0=False):
         '''
         print timestamped monitor statistics and histogram
         
@@ -837,10 +846,14 @@ class MonitorTimestamp(Monitor):
             if True (default), the text 'Histogram of' followed by the name of the timestamed monitor will be printed {n}
             if False, no header            
 
+        print_legend : bool
+            if True (default), the legend will be printed {n}
+            if False, no legend
+                        
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
         '''
-        super().print_histogram(number_of_bins,lowerbound,bin_width,print_header,ex0)
+        super().print_histogram(number_of_bins,lowerbound,bin_width,print_header,print_legend,indent,ex0)
                         
 if Pythonista:
         
@@ -1098,6 +1111,29 @@ class Queue(object):
                 mx=mx.successor
         return '\n'.join(lines)
             
+    def print_statistics(self):
+        '''
+        prints a summary of statistics of a queue
+        ''' 
+        print('Info on {} @ {:13.3f}'.format(self._name,self.env._now))
+        if (self.length.duration()==0) and (self.length_of_stay.number_of_entries()==0):
+            print('    no data collected')
+            return
+        
+        print('                            all    excl.zero         zero')
+        print('    -------------- ------------ ------------ ------------')                
+        print('Length')
+        if self.length.duration()==0:
+            print('    no data collected')
+        else:
+            self.length.print_histogram(number_of_bins=0,print_header=False,print_legend=False,indent='    ')
+        print()
+        print('Length of stay')
+        if self.length_of_stay.number_of_entries()==0:
+            print('    no data collected')
+        else:
+            self.length_of_stay.print_histogram(number_of_bins=0,print_header=False,print_legend=False,indent='    ')
+                                                       
     def name(self,txt=None):
         '''
         Parameters
@@ -5517,7 +5553,46 @@ class Resource(object):
         self.capacity.reset(monitor)
         self.available_quantity.reset(monitor)
         self.claimed_quantity.reset(monitor)
-         
+
+    def print_statistics(self):
+        '''
+        prints a summary of statistics of a resource
+        ''' 
+        print('Info on {} @ {:13.3f}'.format(self._name,self.env._now))
+        if (self.requesters().length.duration()==0) and \
+          (self.requesters().length_of_stay.number_entries()==0) and \
+          (self.claimers().length.duration()==0) and \
+          (self.claimers().length_of_stay.number_entries()==0) and \
+          (self.capacity.length.duration()==0) and \
+          (self.available_quantity.length.duration()==0) and \
+          (self.claimed_quantity.length.duration()==0) :
+            print('    no data collected')
+            return
+        
+        print('                            all    excl.zero         zero')
+        print('    -------------- ------------ ------------ ------------')                
+        for q in [self.requesters(),self.claimers()]: 
+            print('Length of '+q._name)
+            if q.length.duration()==0:
+                print('    no data collected')
+            else:
+                q.length.print_histogram(number_of_bins=0,print_header=False,print_legend=False,indent='    ')
+            print()
+            print('Length of stay of '+q._name)
+            if q.length_of_stay.number_of_entries()==0:
+                print('    no data collected')
+            else:
+                q.length_of_stay.print_histogram(number_of_bins=0,print_header=False,print_legend=False,indent='    ')
+            print()
+                
+        for m in [self.capacity,self.available_quantity,self.claimed_quantity]:
+            print(m._name)
+            if m.duration()==0:
+                print('    no data collected')
+            else:
+                m.print_histogram(number_of_bins=0,print_header=False,print_legend=False,indent='    ')
+            print()
+
     def monitor(self,value=None):
         '''
         enables/disables the resource monitors  and timestamped monitors

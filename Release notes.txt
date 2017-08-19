@@ -1,5 +1,10 @@
 Salabim release notes
 
+version 2.1.1  2017-08-19
+=========================
+Method Queue.print_statistics() now shows more information.
+New: Resource.print_statistics()
+ 
 version 2.1.0  2017-08-18
 =========================
 At creation of a component, it is now possible to specify a process other than self.process to start.
