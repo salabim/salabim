@@ -1795,6 +1795,7 @@ class Environment(object):
                     next(c._process)
                     return
                 except StopIteration:
+                    c.release()
                     self.print_trace('{:10.3f}'.format(self._now),c._name,'ended')
                     c._status=data 
                     c._scheduled_time=inf

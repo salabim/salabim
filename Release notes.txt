@@ -4,6 +4,10 @@ version 2.1.1  2017-08-19
 =========================
 Method Queue.print_statistics() now shows more information.
 New: Resource.print_statistics()
+
+If a component now terminates (no more events), all claimed resources are now
+automatically released.
+Note, that this does not hold cancellation of a component.
  
 version 2.1.0  2017-08-18
 =========================
