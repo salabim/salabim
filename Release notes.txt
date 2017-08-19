@@ -1,6 +1,6 @@
 Salabim release notes
 
-version 2.1.1  2017-08-19 
+version 2.1.1  2017-08-19
 =========================
 Method Queue.print_statistics() now shows more information.
 New: Resource.print_statistics()
