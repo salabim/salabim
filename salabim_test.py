@@ -6,7 +6,7 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test26() 
+    test26()  
     
 def test27():
     m1=sim.Monitor('m1')
