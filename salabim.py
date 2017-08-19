@@ -1,7 +1,7 @@
 '''
 salabim  discrete event simulation module
 
-The MIT License (MIT)
+The MIT License (MIT) 
 
 Copyright (c) 2017 Ruud van der Ham, ruud@salabim.org
 
