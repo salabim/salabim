@@ -1,7 +1,7 @@
 '''
 salabim  discrete event simulation module
 
-The MIT License (MIT) 
+The MIT License (MIT)
 
 Copyright (c) 2017 Ruud van der Ham, ruud@salabim.org
 
@@ -72,7 +72,7 @@ except:
     inf=float('inf')
     nan=float('nan')
 
-__version__='2.1.0'
+__version__='2.1.1'
 
 class SalabimException(Exception):
     def __init__(self,value):
@@ -198,6 +198,8 @@ class Monitor(object):
         minimum : float
         '''
         x=self.x(ex0=ex0)
+        if len(x)==0:
+            return nan
         return x.min()
         
     def maximum(self,ex0=False):
@@ -215,6 +217,8 @@ class Monitor(object):
         '''
 
         x=self.x(ex0=ex0)
+        if len(x)==0:
+            return nan
         return x.max()   
         
     def median(self,ex0=False):
