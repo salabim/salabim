@@ -1,5 +1,33 @@
 Salabim release notes
 
+version 2.1.2. 2017-08-21
+=========================
+New functionality:
+When a Component, Queue or Reseource is created, and the name ends with a period to
+signify auto serializing, the first created object with that name does not get serialized.
+So after
+  wait0=sim.Queue('wait.')
+, the name of wait0 is 'wait' .
+When a second object with that name is created, the first object is serialized as yet.
+So after
+  wait0=sim.Queue('wait.')
+  wait1=sim.Queue('wait.')
+, the name of wait0 is 'wait..............0'
+This also holds for Components that are named after their class, like after
+  class TrafficLight(sim.Component):
+      pass
+  t=TrafficLight()
+, the name of t is 'trafficlight'
+When more traffic lights are created, the name of t will become
+'trafficlight.......0'
+  
+
+Name changes for a Component, Queue and Resource are now traced.
+
+Creation of a Component, Queue and Resource is now traced.
+
+Bug in Component.hold() fixed.
+
 version 2.1.1  2017-08-19
 =========================
 Method Queue.print_statistics() now shows more information.
@@ -7,7 +35,7 @@ New: Resource.print_statistics()
 
 If a component now terminates (no more events), all claimed resources are now
 automatically released.
-Note, that this does not hold cancellation of a component.
+Note, that this does not hold for cancellation of a component.
  
 version 2.1.0  2017-08-18
 =========================

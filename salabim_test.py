@@ -6,7 +6,14 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test26() 
+    test28() 
+    
+def test28():
+    de=sim.Environment(trace=True)
+    wait={}
+    for i in range(3):
+        wait[i]=sim.Queue('wait.')
+
     
 def test27():
     m1=sim.Monitor('m1')

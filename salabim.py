@@ -72,7 +72,7 @@ except:
     inf=float('inf')
     nan=float('nan')
 
-__version__='2.1.1'
+__version__='2.1.2'
 
 class SalabimException(Exception):
     def __init__(self,value):
@@ -1031,17 +1031,22 @@ class Queue(object):
     env : Environment
         environment where the queue is defined |n|
         if omitted, default_env will be used
+        
+    _requesters_resource : Resource
+        for internal use only
+        
+    _claimers_resource : Resource
+        for internal use only        
     '''
    
-    def __init__(self,name=None,monitor=True,env=None):
+    def __init__(self,name=None,monitor=True,env=None,_requesters_resource=None,_claimers_resource=None):
         if env is None:
             self.env=_default_env
         else:
             self.env = env
         if name is None:
             name='queue.'
-        self._name,self._base_name,self._sequence_number=\
-          _reformatname(name,self.env._nameserializeQueue)
+        self.name(name)
         self._head=Qmember()
         self._tail=Qmember()
         self._head.successor=self._tail
@@ -1052,12 +1057,14 @@ class Queue(object):
         self._tail.component=None
         self._head.priority=0
         self._tail.priority=0
-        self._resource=None #used to reorder request queues, if req'd
+        self._requesters_resource=_requesters_resource #used to reorder request queues, if req'd
         self._length=0
         self._iter_sequence=0
         self._iter_touched={}
         self.length=MonitorTimestamp('Length of '+self._name,getter=self._getlength,monitor=monitor,env=self.env)
         self.length_of_stay=Monitor('Length of stay in '+self._name,monitor=monitor)
+        if (_requesters_resource==None) and (_claimers_resource==None):
+            self.env.print_trace('','',self.name()+' created')        
 
     def _getlength(self):
         return self._length
@@ -1153,8 +1160,7 @@ class Queue(object):
         '''
         
         if txt is not None:
-            self._name,self._base_name,self._sequence_number=\
-              _reformatname(txt,self.env._nameserializeQueue)
+            _set_name(txt,self.env._nameserializeQueue,self)
         return self._name
 
     def base_name(self):
@@ -1710,7 +1716,7 @@ class Environment(object):
     '''
     global an_env
     
-    _name_serialize={}
+    _nameserialize={}
     an_env=None
           
     def __init__(self,trace=False,random_seed='',name=None,is_default_env=True): 
@@ -1725,8 +1731,7 @@ class Environment(object):
         self._trace=trace
         if random_seed != '':
             random.seed(random_seed)
-        self._name,self._base_name,self._sequence_number=\
-          _reformatname(name,Environment._name_serialize)
+        self.name(name)
         self.env=self 
         self._nameserializeComponent={} # just to allow main to be created; will be reset later
         self._now=0 
@@ -2435,8 +2440,7 @@ class Environment(object):
         '''
         
         if txt is not None:
-            self._name,self._base_name,self._sequence_number=\
-              _reformatname(txt,Environment._nameserialize)
+            _set_name(txt,Environment._nameserialize,self)
         return self._name
 
     def base_name(self):
@@ -2476,11 +2480,12 @@ class Environment(object):
             
         Notes
         -----
-        if suppress_srace is True, nothing is printed                                   
+        if the current component's suppress_trace is True, nothing is printed                                   
         '''
         if self._trace:
-             if not self._current_component._suppress_trace:
-                 print(pad(s1,10)+' '+pad(s2,20)+' '+pad(s3,35)+' '+s4)    
+            if hasattr(self,'_current_component'):
+                if not self._current_component._suppress_trace:
+                    print(pad(s1,10)+' '+pad(s2,20)+' '+pad(s3,max(len(s3),35))+' '+s4.strip())    
     
 class Animate(object):
     '''
@@ -3739,8 +3744,7 @@ class Component(object):
             self.env=env
         if name is None:
             name=str(type(self)).split('.')[-1].split("'")[0].lower()+'.'
-        self._name,self._base_name,\
-          self._sequence_number = _reformatname(name,self.env._nameserializeComponent)
+        self.name(name)
         self._qmembers={}
         self._process=None
         self._status=data
@@ -3754,6 +3758,7 @@ class Component(object):
         self._suppress_trace=suppress_trace
         self._mode=mode 
         self._mode_time=self.env._now
+        self.env.print_trace('','',self.name()+' created',_modetxt(self._mode))
         if process==None:
             return
         if process=='*':
@@ -3949,7 +3954,7 @@ class Component(object):
             
         self._reschedule(scheduled_time,urgent,'activate',extra)
                                               
-    def hold(self,duration=0,till=None,urgent=False,mode='*'):
+    def hold(self,duration=None,till=None,urgent=False,mode='*'):
         '''
         hold the component
 
@@ -4376,8 +4381,7 @@ class Component(object):
         '''
         
         if txt is not None:
-            self._name,self._base_name,\
-              self._sequence_number=_reformatnameC(txt,self.env._nameserializeComponent)
+            _set_name(txt,self.env._nameserializeComponent,self)
         return self._name
 
     def base_name(self):
@@ -4739,8 +4743,8 @@ class Component(object):
                 mx.priority=priority
                 for iter in q._iter_touched:
                     q._iter_touched[iter]=True
-                if q._resource!=None:
-                   q._resource._claimtry()
+                if q._requesters_resource!=None:
+                   q._requesters_resource._claimtry()
         return mx.priority
         
     def successor(self,q):
@@ -5522,11 +5526,9 @@ class Resource(object):
         if name is None:
             name='resource.'            
         self._capacity=capacity
-        self._name,self._base_name,self._sequence_number = \
-          _reformatname(name,self.env._nameserializeResource)
-        self._requesters=Queue(name='requesters of '+name,monitor=monitor,env=self.env)
-        self._requesters._resource=self
-        self._claimers=Queue(name='claimers of '+name,monitor=monitor,env=self.env)
+        self.name(name)
+        self._requesters=Queue(name='requesters of '+name,monitor=monitor,env=self.env,_requesters_resource=self)
+        self._claimers=Queue(name='claimers of '+name,monitor=monitor,env=self.env,_claimers_resource=self)
         self._pendingclaimed_quantity=0
         self._claimed_quantity=0
         self._anonymous=anonymous
@@ -5537,6 +5539,8 @@ class Resource(object):
           'Claimed quantity of '+self._name,getter=self._get_claimed_quantity,monitor=monitor,env=self.env)
         self.available_quantity=MonitorTimestamp(
           'Available quantity of '+self._name,getter=self._get_available_quantity,monitor=monitor,env=self.env)
+        self.env.print_trace('','',self.name()+' created',
+          'capacity='+str(self._capacity)+(' anonymous' if self._anonymous else ''))
 
     def reset(monitor=None):
         '''
@@ -5819,8 +5823,7 @@ class Resource(object):
         Name of the resource : str
         '''
         if txt is not None:
-            self._name,self._base_name,self._sequence_number=\
-              _reformatname(txt,self.env._nameserializeResource)
+            _set_name(txt,self.env._nameserializeResource,self)
         return self._name
 
     def base_name(self):
@@ -6082,22 +6085,41 @@ def tracetext():
         return 'Trace off'
     else:
         return 'Trace on'
-            
-def _reformatname(name,_nameserialize):
-    L=20
+        
+def _namer(name,i,l):
+    return ('{:.<'+str(l)+'}').format(name)[:l-len(str(i))]+str(i)
+              
+def _set_name(name,_nameserialize,object):
+    l=20
+    oldname=getattr(object,'_base_name',None)
+    auto=(('*'+name)[-1]=='.') # * added to allow for null string
+        
     if name in _nameserialize:
-        next=_nameserialize[name]+1
+        sequence_number,object0=_nameserialize[name]
+        sequence_number+=1
+        _nameserialize[name]=sequence_number,None
     else: 
-        next=0
-    _nameserialize[name]=next        
-    if (len(name)!=0) and (name[len(name)-1]=='.'):
-        nextstring='{:d}'.format(next)
-        if len(name)+len(nextstring)>L:
-            name=name[0:L-len(nextstring)]
-        return name+(L-len(name)-len(nextstring))*'.'+nextstring,name,next
+        sequence_number=0
+        _nameserialize[name]=sequence_number,(object if auto else None)
+        
+    if auto:       
+        if sequence_number==0:
+            newname=name[:-1][:l]
+        else:
+            if sequence_number==1:
+                if object0._base_name==name:
+                    newname0=_namer(name,0,l)
+                    object0.env.print_trace('','',object0._name+' rename to '+newname0)
+                    object0._name=newname0
+            newname=_namer(name,sequence_number,l)
     else:
-        return name,name,next    
-
+        newname=name[:l]
+    if (oldname is not None) and (_nameserialize!=Environment._nameserialize):
+        object.env.print_trace('','',oldname+' rename to',newname)        
+    object._name=newname
+    object._base_name=name
+    object._sequence_number=sequence_number
+                    
 def pad(txt,n):
     return txt.ljust(n)[:n]
     
