@@ -24,12 +24,11 @@ class Source(sim.Component):
 class Customer(sim.Component):
     """Customer arrives, is served and leaves."""
     def process(self):
-        arrive=de.now()
         de.print_trace('',self.name(),'arrrived')
     
         patience = sim.Uniform(MIN_PATIENCE, MAX_PATIENCE).sample()
         yield self.request(counter,fail_delay=patience)
-        wait = de.now() - arrive
+        wait = de.now() - self.creation_time()
     
         if self.request_failed(): 
             # We reneged
@@ -42,7 +41,7 @@ class Customer(sim.Component):
             # auto release counter
 
 # Setup and start the simulation
-print('Bank renege')
+
 de = sim.Environment(trace=True)
 
 # Start processes and run

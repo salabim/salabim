@@ -1,5 +1,36 @@
 Salabim release notes
 
+version 2.1.3  2017-08-24
+=========================
+Upto now it was a requirement to build an __init__ method with a call
+to super().__init__ if the component had to be initialized in some way.
+This is a rather awkward construction and difficult to grasp for beginners.
+Although this construction is still accepted, there is now a more elegant
+method: setup.
+If this method is present in the definition of a component, it will be called 
+after salabim has done all its initialization and even after the activate 
+statement, if applicable.
+The method may have arguments. If so, whencreating the component, it is
+required to use keyword arguments.
+
+salabim any version                    salabim>=2.1.3
+--------------------------------------------------------------------
+class Car(sim.Component):              class Car(sim.Component):
+    def __init__(self,name,color):         def setup(self,color):                 
+        super().__init__(name=name)            self.color=color                    
+        self.color=color               Car(name='BMW',color='red')
+Car(name='BMW',color=red)     
+                              
+Note that the __init__ construction is still available.
+
+All examples that used the __init__ construction have been updated
+accordingly.     
+
+Both salabim and all examples now conform to PEP8 (with the exception
+of requirements on line length and visual indent).
+    
+Bug in print_statistics when monitoring was False fixed.
+
 version 2.1.2. 2017-08-21
 =========================
 New functionality:
