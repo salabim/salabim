@@ -178,7 +178,8 @@ def do_animation():
         vmin=0, vmax=400, resolution=25, v=load_n_0, label='Load n->0', action=set_load_n_0)
 
     if make_video:
-        sim.animation_parameters(modelname='Elevator',speed=32,video='Elevator.mp4')
+        sim.animation_parameters(modelname='Elevator',speed=32,video='Elevator.mp4',
+            show_speed=False,show_fps=False)
     else:
         sim.animation_parameters(modelname='Elevator', speed=32)
 
@@ -427,12 +428,12 @@ while True:
         thiscar = Car(name='car ' + str(icar), capacity=capacity)
         cars.append(thiscar)
 
-    make_video=True
+    make_video=False
     
     do_animation()
 
     if make_video:
-        de.run(500)
+        de.run(1000)
         break
     else:
         de.run()
