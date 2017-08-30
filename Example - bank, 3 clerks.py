@@ -29,14 +29,14 @@ class Clerk(sim.Component):
             self.customer.activate()
 
 
-de = sim.Environment(random_seed=1234567, trace=False)
+env = sim.Environment(trace=False)
 CustomerGenerator()
 clerks = sim.Queue('clerks')
 for i in range(3):
     Clerk().enter(clerks)
 waitingline = sim.Queue('waitingline')
 
-de.run(till=50000)
+env.run(till=50000)
 waitingline.length.print_histogram(30, 1, 0)
 print()
 waitingline.length_of_stay.print_histogram(30, 10, 0)

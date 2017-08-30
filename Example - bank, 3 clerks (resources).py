@@ -16,11 +16,11 @@ class Customer(sim.Component):
         self.release()
 
 
-de = sim.Environment(random_seed=1234567, trace=False)
+env = sim.Environment(trace=False)
 CustomerGenerator()
 clerks = sim.Resource('clerk', 3)
 
-de.run(till=50000)
+env.run(till=50000)
 clerks.requesters().length.print_histogram(30, 1, 0)
 print()
 clerks.requesters().length_of_stay.print_histogram(30, 10, 0)

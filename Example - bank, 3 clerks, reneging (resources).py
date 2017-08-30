@@ -12,28 +12,28 @@ class CustomerGenerator(sim.Component):
 class Customer(sim.Component):
     def process(self):
         if len(clerks.requesters()) >= 5:
-            de.number_balked += 1
-            de.print_trace('', '', 'balked')
+            env.number_balked += 1
+            env.print_trace('', '', 'balked')
             yield self.cancel()
         yield self.request(clerks, fail_delay=50)
-        if self.request_failed():
-            de.number_reneged += 1
-            de.print_trace('', '', 'reneged')
+        if self.failed():
+            env.number_reneged += 1
+            env.print_trace('', '', 'reneged')
         else:
             yield self.hold(30)
             self.release()
 
 
-de = sim.Environment(random_seed=1234567, trace=False)
+env = sim.Environment(trace=False)
 CustomerGenerator()
-de.number_balked = 0
-de.number_reneged = 0
+env.number_balked = 0
+env.number_reneged = 0
 clerks = sim.Resource('clerk', 3)
 
-de.run(till=50000)
+env.run(till=50000)
 
 clerks.requesters().length.print_histogram(30, 0, 1)
 print()
 clerks.requesters().length_of_stay.print_histogram(30, 0, 10)
-print('number reneged', de.number_reneged)
-print('number balked', de.number_balked)
+print('number reneged', env.number_reneged)
+print('number balked', env.number_balked)

@@ -17,7 +17,7 @@ class Philosopher(sim.Component):
             self.release()
 
 
-de = sim.Environment(random_seed=1234567, trace=True)
+env = sim.Environment(trace=True)
 eatingtime_mean = 20
 thinkingtime_mean = 20
 nphilosophers = 8
@@ -33,4 +33,4 @@ for i in range(nphilosophers):
 
 philosopher[0].leftfork = fork[nphilosophers - 1]
 
-de.run(500)
+env.run(500)

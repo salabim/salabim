@@ -203,9 +203,9 @@ def do_animation():
         fontsize0=15, font='DejaVuSansMono', anchor='w')
     a.text = lambda t: '  nr waiting right: {:3d}'.format(wait[right].length())
 
-    sim.AnimateSlider(x=520, y=de.height, width=100, height=20,
+    sim.AnimateSlider(x=520, y=env.height, width=100, height=20,
           vmin=16, vmax=60, resolution=4, v=iat, label='iat', action=set_iat)
-    sim.AnimateSlider(x=660, y=de.height, width=100, height=20,
+    sim.AnimateSlider(x=660, y=env.height, width=100, height=20,
           vmin=10, vmax=60, resolution=5, v=meanlength, label='mean length', action=set_meanlength)
 
 
@@ -266,7 +266,7 @@ class Lock(sim.Component):
                 yield self.passivate('Wait for sail out')
 
 
-de = sim.Environment(random_seed=1234567)
+env = sim.Environment()
 
 locklength = 60
 switchtime = 10
@@ -288,4 +288,4 @@ lock = Lock('Lock')
 lock.side = left
 
 do_animation()
-de.run()
+env.run()

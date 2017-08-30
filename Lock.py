@@ -22,7 +22,7 @@ class Shipgenerator(sim.Component):
 
 class Ship(sim.Component):
     def process(self):
-        self.arrivaltime = de.now()
+        self.arrivaltime = env.now()
         self.enter(wait[self.side])
         yield self.passivate(mode='Wait')
         yield self.hold(intime, mode='Sail in')
@@ -33,7 +33,7 @@ class Ship(sim.Component):
         yield self.hold(outtime, mode='Sail out')
         self.leave(lockqueue)
         lock.activate()
-        lock.monitor_time_in_complex.tally(de.now() - self.arrivaltime)
+        lock.monitor_time_in_complex.tally(env.now() - self.arrivaltime)
 
 
 class Lock(sim.Component):
@@ -69,7 +69,7 @@ class Lock(sim.Component):
                 self.monitor_usedlength.tally()
 
 
-de = sim.Environment(random_seed=1234567, trace=False)
+env = sim.Environment(trace=False)
 locklength = 60
 switchtime = 10
 intime = 2
@@ -89,7 +89,7 @@ for side in (left, right):
 
 lock = Lock('Lock')
 
-de.run(50000)
+env.run(50000)
 
 lockqueue.length.print_histogram(5, 0, 1)
 lockqueue.length_of_stay.print_histogram(10, 10, 1)

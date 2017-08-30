@@ -41,18 +41,22 @@ import functools
 import glob
 import os
 import inspect
+import numpy as np
+from numpy import inf, nan
 
 try:
-    import numpy as np
     import cv2
-    numpy_and_cv2_installed = True
+    cv2_installed = True
 except:
-    numpy_and_cv2_installed = False
+    cv2_installed = False
 
 try:
     from PIL import Image
     from PIL import ImageDraw
     from PIL import ImageFont
+    if not Pythonista:
+        from PIL import ImageTk
+        import tkinter
     pil_installed = True
 except:
     pil_installed = False
@@ -61,17 +65,8 @@ if Pythonista:
     import scene
     import ui
     import objc_util
-else:
-    import tkinter
-    from PIL import ImageTk
 
-try:
-    from numpy import inf, nan
-except:
-    inf = float('inf')
-    nan = float('nan')
-
-__version__ = '2.1.3'
+__version__ = '2.2.0'
 
 
 class SalabimException(Exception):
@@ -440,7 +435,7 @@ class Monitor(object):
 
                 print(indent + '{:13.3f} {:13.3f}{:6.1f}{:6.1f} {}'.
                       format(ub, count, perc * 100, cumperc * 100, s))
-
+                      
     def x(self, ex0=False):
         '''
         array of tallied values
@@ -455,7 +450,8 @@ class Monitor(object):
         all tallied values : array
         '''
 
-        x = np.array(self._x)
+        x = list_to_numeric_array(self._x)
+
         if ex0:
             return x[np.where(x != 0)]
         else:
@@ -707,7 +703,7 @@ class MonitorTimestamp(Monitor):
 
     def bin_count(self, lowerbound, upperbound, ex0=False):
         '''
-        count of the number of tallied values, 
+        count of the number of tallied values,
         weighted with the duration in range (lowerbound,upperbound]
 
         Parameters
@@ -776,7 +772,7 @@ class MonitorTimestamp(Monitor):
         -------
         array with x-values and array with durations : tuple
         '''
-        x = np.array(self._x)
+        x = list_to_numeric_array(self._x)
         duration = np.zeros(len(self._x))
         for i, t in enumerate(self._t):
             if i != 0:
@@ -814,7 +810,7 @@ class MonitorTimestamp(Monitor):
         -----
         The value nan is stored when monitoring is turned off
         '''
-        x = np.array(self._x)
+        x = list_to_numeric_array(self._x)
         t = np.array(self._t)
         if ex0:
             filter_ex0 = np.where(x != 0)
@@ -836,7 +832,7 @@ class MonitorTimestamp(Monitor):
             if False (default), include zeroes. if True, exclude zeroes
 
         exnan : bool
-            if False (default), include nan. if True, exclude nans            
+            if False (default), include nan. if True, exclude nans
 
         Returns
         -------
@@ -865,8 +861,9 @@ class MonitorTimestamp(Monitor):
             width of the bins
 
         print_header : bool
-            if True (default), the text 'Histogram of' followed by the name of the timestamed monitor will be printed {n}
-            if False, no header            
+            if True (default), the text 'Histogram of' followed by the name of the
+            timestamed monitor will be printed |n|
+            if False, no header
 
         print_legend : bool
             if True (default), the legend will be printed {n}
@@ -1059,14 +1056,11 @@ class Queue(object):
         environment where the queue is defined |n|
         if omitted, default_env will be used
 
-    _requesters_resource : Resource
-        for internal use only
-
-    _claimers_resource : Resource
+    _isinternal : bool
         for internal use only
     '''
 
-    def __init__(self, name=None, monitor=True, env=None, _requesters_resource=None, _claimers_resource=None):
+    def __init__(self, name=None, monitor=True, env=None, _isinternal=False):
         if env is None:
             self.env = _default_env
         else:
@@ -1084,8 +1078,6 @@ class Queue(object):
         self._tail.component = None
         self._head.priority = 0
         self._tail.priority = 0
-        # used to reorder request queues, if req'd
-        self._requesters_resource = _requesters_resource
         self._length = 0
         self._iter_sequence = 0
         self._iter_touched = {}
@@ -1093,7 +1085,7 @@ class Queue(object):
             'Length of ' + self._name, getter=self._getlength, monitor=monitor, env=self.env)
         self.length_of_stay = Monitor(
             'Length of stay in ' + self._name, monitor=monitor)
-        if (_requesters_resource is None) and (_claimers_resource is None):
+        if not _isinternal:
             self.env.print_trace('', '', self.name() + ' created')
 
     def _getlength(self):
@@ -1136,20 +1128,21 @@ class Queue(object):
         self.length_of_stay.monitor(value=value)
 
     def __repr__(self):
-        lines = []
-        lines.append('Queue ' + hex(id(self)))
-        lines.append('  name=' + self._name)
+        return 'Queue('+self._name+')'
+
+    def print_info(self):
+        print('Queue ' + hex(id(self)))
+        print('  name=' + self._name)
         if self._length == 0:
-            lines.append('  no components')
+            print('  no components')
         else:
-            lines.append('  component(s):')
+            print('  component(s):')
             mx = self._head.successor
             while mx != self._tail:
-                lines.append('    ' + pad(mx.component._name, 20) +
-                             ' enter_time' + time_to_string(mx.enter_time) +
-                             ' priority=' + str(mx.priority))
+                print('    ' + pad(mx.component._name, 20) +
+                    ' enter_time' + time_to_string(mx.enter_time) +
+                    ' priority=' + str(mx.priority))
                 mx = mx.successor
-        return '\n'.join(lines)
 
     def print_statistics(self):
         '''
@@ -1288,6 +1281,7 @@ class Queue(object):
         Notes
         -----
         the priority of component will be set to the priority of poscomponent 
+        
         '''
         component.enter_behind(self, poscomponent)
 
@@ -1566,7 +1560,10 @@ class Queue(object):
         -----
         the priority will be set to 0 for all components in the
         resulting  queue |n|
-        the order of the resulting queue is not specified
+        the order of the resulting queue is as follows: |n|
+        first all components of self, in that order,
+        followed by all components in q that are not in self,
+        in that order.
         '''
         save_trace = self.env._trace
         self.env._trace = False
@@ -1602,7 +1599,8 @@ class Queue(object):
         are in self and q |n|
         the priority will be set to 0 for all components in the
         resulting  queue |n|
-        the order of the resulting queue is not specified
+        the order of the resulting queue is as follows: |n|
+        in the same order as in self.
         '''
         save_trace = self.env._trace
         self.env._trace = False
@@ -1744,15 +1742,18 @@ class Environment(object):
 
     Notes
     -----
-    The trace may be switched on/off later with trace
-    The seed may be later set with random_seed()
+    The trace may be switched on/off later with trace |n|
+    The seed may be later set with random_seed() |n|
+    Initially, the random stream will be seeded with the value 1234567.
+    If required to be purely, not not reproducable, values, use
+    random_seed=None.
     '''
     global an_env
 
     _nameserialize = {}
     an_env = None
 
-    def __init__(self, trace=False, random_seed='', name=None, is_default_env=True):
+    def __init__(self, trace=False, random_seed=1234567, name=None, is_default_env=True):
         global _default_env
         if is_default_env:
             _default_env = self
@@ -1778,6 +1779,7 @@ class Environment(object):
         self._nameserializeQueue = {}
         self._nameserializeComponent = {}
         self._nameserializeResource = {}
+        self._nameserializeState = {}
         self._seq = 0
         self._event_list = []
         self._standbylist = []
@@ -1812,14 +1814,15 @@ class Environment(object):
         return self.serial
 
     def __repr__(self):
-        lines = []
-        lines.append('Environment ' + hex(id(self)))
-        lines.append('  name=' + self._name +
-                     (' (animation environment)' if self == an_env else ''))
-        lines.append('  now=' + time_to_string(self._now))
-        lines.append('  current_component=' + self._current_component._name)
-        lines.append('  trace=' + str(self._trace))
-        return '\n'.join(lines)
+        return 'Environment('+self._name+')'
+
+    def print_info(self):
+        print('Environment ' + hex(id(self)))
+        print('  name=' + self._name +
+            (' (animation environment)' if self == an_env else ''))
+        print('  now=' + time_to_string(self._now))
+        print('  current_component=' + self._current_component._name)
+        print('  trace=' + str(self._trace))
 
     def step(self):
         '''
@@ -1912,15 +1915,15 @@ class Environment(object):
         height : int
             height of the animation in screen coordinates |n|
             if omitted, no change. At init of the environment, the height will be
-            set to 768 for CPython and the current screen height for Pythonista.   
+            set to 768 for CPython and the current screen height for Pythonista.
 
         x0 : float
             user x-coordinate of the lower left corner |n|
-            if omitted, no change. At init of the environment, x0 will be set to 0.     
+            if omitted, no change. At init of the environment, x0 will be set to 0.
 
         y0 : float
             user y_coordinate of the lower left corner |n|
-            if omitted, no change. At init of the environment, y0 will be set to 0. 
+            if omitted, no change. At init of the environment, y0 will be set to 0.
 
         x1 : float
             user x-coordinate of the lower right corner |n|
@@ -2060,7 +2063,7 @@ class Environment(object):
         Note
         ----
         If you want to test the status, always include parentheses, like |n|
-            if de.trace():
+            if env.trace():
         '''
         if value is not None:
             self._trace = value
@@ -2111,7 +2114,7 @@ class Environment(object):
 
         if self.animate:
             if not pil_installed:
-                raise AssertionError('PIL is required for animation')
+                raise AssertionError('PIL and tkinter is required for animation')
 
             self.t = self._now  # for the call to set_start_animation
             self.set_start_animation()
@@ -2155,9 +2158,9 @@ class Environment(object):
                 self.dovideo = False
             else:
                 self.dovideo = True
-                if not numpy_and_cv2_installed:
+                if not cv2_installed:
                     raise AssertionError(
-                        'numpy and cv2 required for video production')
+                        'cv2 required for video production')
 
             if self.dovideo:
                 self.video_sequence = 0
@@ -2515,13 +2518,13 @@ class Environment(object):
 
         Notes
         -----
-        if the current component's suppress_trace is True, nothing is printed                     
+        if the current component's suppress_trace is True, nothing is printed  
         '''
         if self._trace:
             if hasattr(self, '_current_component'):
                 if not self._current_component._suppress_trace:
                     print(pad(s1, 10) + ' ' + pad(s2, 20) + ' ' +
-                          pad(s3, max(len(s3), 35)) + ' ' + s4.strip())
+                          pad(s3, max(len(s3), 36)) + ' ' + s4.strip())
 
 
 class Animate(object):
@@ -2702,9 +2705,9 @@ class Animate(object):
     Permitted parameters
 
     ======================  ========= ========= ========= ========= ========= =========
-    parameter               circle    image     line      polygon   rectangle text  
+    parameter               circle    image     line      polygon   rectangle text
     ======================  ========= ========= ========= ========= ========= =========
-    parent                  -         -         -         -         -         -  
+    parent                  -         -         -         -         -         -##
     layer                   -         -         -         -         -         -
     keep                    -         -         -         -         -         -
     scree_coordinates       -         -         -         -         -         -
@@ -2721,7 +2724,7 @@ class Animate(object):
     text                                                                      -
     font
     anchor                            -                                       -
-    linewidth0,linewidth1    -                  -         -         -                
+    linewidth0,linewidth1    -                  -         -         -
     fillcolor0,fillcolor1    -                            -         -
     linecolor0,linecolor1    -                  -         -         -
     textcolor0,textcolor1.                                                    -
@@ -3798,17 +3801,17 @@ class Component(object):
         self._process = None
         self._status = data
         self._requests = {}
-        self._pendingclaims = []
         self._claims = {}
+        self._waits = []
         self._on_event_list = False
         self._scheduled_time = inf
-        self._request_failed = False
+        self._failed = False
         self._creation_time = self.env._now
         self._suppress_trace = suppress_trace
         self._mode = mode
         self._mode_time = self.env._now
         self.env.print_trace('', '', self.name() +
-                             ' created', _modetxt(self._mode))
+            ' created', _modetxt(self._mode))
         if process == '*':
             if self.hasprocess():
                 process = 'process'
@@ -3822,44 +3825,46 @@ class Component(object):
         pass
 
     def __repr__(self):
-        lines = []
-        lines.append('Component ' + hex(id(self)))
-        lines.append('  name=' + self._name)
-        lines.append('  class=' + str(type(self)).split('.')[-1].split("'")[0])
-        lines.append('  suppress_trace=' + str(self._suppress_trace))
-        lines.append('  status=' + self._status())
-        lines.append('  mode=' + _modetxt(self._mode).strip())
-        lines.append('  mode_time=' + time_to_string(self._mode_time))
-        lines.append('  creation_time=' + time_to_string(self._creation_time))
-        lines.append('  scheduled_time=' +
+        return 'Component('+self._name+')'
+    
+    def print_info(self):
+        print('Component ' + hex(id(self)))
+        print('  name=' + self._name)
+        print('  class=' + str(type(self)).split('.')[-1].split("'")[0])
+        print('  suppress_trace=' + str(self._suppress_trace))
+        print('  status=' + self._status())
+        print('  mode=' + _modetxt(self._mode).strip())
+        print('  mode_time=' + time_to_string(self._mode_time))
+        print('  creation_time=' + time_to_string(self._creation_time))
+        print('  scheduled_time=' +
                      time_to_string(self._scheduled_time))
         if len(self._qmembers) > 0:
-            lines.append('  member of queue(s):')
+            print('  member of queue(s):')
             for q in sorted(self._qmembers, key=lambda obj: obj._name.lower()):
-                lines.append('    ' + pad(q._name, 20) + ' enter_time=' +
+                print('    ' + pad(q._name, 20) + ' enter_time=' +
                              time_to_string(self._qmembers[q].enter_time) +
                              ' priority=' + str(self._qmembers[q].priority))
         if len(self._requests) > 0:
-            if self._greedy:
-                lines.append('  greedy requesting resource(s):')
-            else:
-                lines.append('  requesting resource(s):')
+            print('  requesting resource(s):')
 
             for r in sorted(list(self._requests),
-                            key=lambda obj: obj._name.lower()):
-                if r in self._pendingclaims:
-                    lines.append('    ' + pad(r._name, 20) + ' quantity=' +
-                        str(self._requests[r]) + ' provisionally claimed')
-                else:
-                    lines.append('    ' + pad(r._name, 20) + ' quantity=' +
-                        str(self._requests[r]))
+                key=lambda obj: obj._name.lower()):
+                print('    ' + pad(r._name, 20) + ' quantity=' +
+                    str(self._requests[r]))
         if len(self._claims) > 0:
-            lines.append('  claiming resource(s):')
+            print('  claiming resource(s):')
 
             for r in sorted(list(self._claims), key=lambda obj: obj._name.lower()):
-                lines.append('    ' + pad(r._name, 20) +
+                print('    ' + pad(r._name, 20) +
                     ' quantity=' + str(self._claims[r]))
-        return '\n'.join(lines)
+        if len(self._waits) > 0:
+            if self._wait_all:
+                print('  waiting for all of state(s):')
+            else:
+                print('  waiting for any of state(s):')
+            for s,value in self._waits:
+                print('    ' + pad(s._name, 20) +
+                    ' value=' + str(value))
 
     def hasprocess(self):
         try:
@@ -3879,7 +3884,6 @@ class Component(object):
         heapq.heappush(self.env._event_list, (t, seq, self))
 
     def _remove(self):
-
         if self._on_event_list:
             for i in range(len(self.env._event_list)):
                 if self.env._event_list[i][2] == self:
@@ -3900,14 +3904,19 @@ class Component(object):
             self.env.print_trace('', '', self._name, 'request failed')
             for r in list(self._requests.keys()):
                 self._leave(r._requesters)
-            for r in self._pendingclaims:
-                r._pendingclaimed_quantity -= self._requests[r]
+                if r._requesters._length == 0:
+                    r._minq = inf
             self._requests = {}
-            for r in self._pendingclaims:
-                r._claimtry()
-            self._pendingclaims = []
-            self._request_failed = True
-
+            self._failed = True
+            
+        if len(self._waits) != 0:
+            self.env.print_trace('', '', self._name, 'wait failed')
+            for state, _ in self._waits:
+                if self in state._waiters:  # there might be more values for this state
+                    self._leave(state._waiters)
+            self._waits = []
+            self._failed = True
+            
     def _reschedule(self, scheduled_time, urgent, caller, extra=''):
         if scheduled_time < self.env._now:
             raise AssertionError(
@@ -4157,7 +4166,7 @@ class Component(object):
             self._mode_time = self.env._now
         self._status = standby
 
-    def request(self, *args, greedy=False, fail_at=None, fail_delay=None, mode='*'):
+    def request(self, *args, fail_at=None, fail_delay=None, mode='*'):
         '''
         request from a resource or resources
 
@@ -4171,29 +4180,19 @@ class Component(object):
                 for the resources be added to the tail of
                 the requesters queue |n|
 
-        greedy : bool
-            greedy indicator |n|
-            if False (default), the request will be honoured
-            at once when all requested quantities of the
-            resources are available |n|
-            if True, the components puts a pending claim
-            already when sufficient capacity is available. |n|
-            When the requests cannot be honoured finally,
-            all pending requests will be released.
-
         fail_at : float
             time out |n|
-            if the request is not honoured before fail_at,
+            if the request is not honored before fail_at,
             the request will be cancelled and the
-            parameter request_failed will be set. |n|
+            parameter failed will be set. |n|
             if not specified, the request will not time out.
 
         fail_delay : float
             time out |n|
-            if the request is not honoured before now+fail_delay,
+            if the request is not honored before now+fail_delay,
             the request will be cancelled and the
-            parameter request_failed will be set. |n|
-            if not specified, the request will not time out.           
+            parameter failed will be set. |n|
+            if not specified, the request will not time out.
 
         mode : str preferred
             mode |n|
@@ -4211,7 +4210,7 @@ class Component(object):
 
         it is not allowed to claim a resource more than once by the same component |n|
         the requested quantity may exceed the current capacity of a resource |n|
-        the parameter request_failed will be reset by a calling request
+        the parameter failed will be reset by a calling request
 
         Example
         -------
@@ -4244,13 +4243,8 @@ class Component(object):
             else:
                 raise AssertionError('both fail_at and fail_delay specified')
 
-        self._greedy = greedy
-
-        self._request_failed = False
+        self._failed = False
         i = 0
-        if mode != '*':
-            self._mode = mode
-            self._mode_time = self.env._now
         for i in range(len(args)):
             q = 1
             priority = None
@@ -4271,10 +4265,9 @@ class Component(object):
             if q <= 0:
                 raise AssertionError('quantity ' + str(q) + ' <=0')
             self._requests[r] = q
-            if self._greedy:
-                addstring = ' greedy'
-            else:
-                addstring = ''
+            if q<r._minq:
+                r._minq=q
+            addstring=''
             if priority is None:
                 self._enter(r._requesters)
             else:
@@ -4285,17 +4278,40 @@ class Component(object):
                 'request for ' + str(q) + ' from ' + r._name + addstring +
                 ' ' + _modetxt(self._mode))
 
-        for r in list(self._requests):
-            r._claimtry()
-            break  # no need to check for other resources
+        self._tryrequest()
 
         if len(self._requests) != 0:
             self._reschedule(scheduled_time, False, 'request')
 
+    def _tryrequest(self):
+        honored = True
+        for r in self._requests:
+            if self._requests[r] > (r._capacity - r._claimed_quantity + 1e-8):
+                honored = False
+                break
+        if honored:
+            for r in list(self._requests):
+                r._claimed_quantity += self._requests[r]
+
+                if not r._anonymous:
+                    if r in self._claims:
+                        self._claims[r] += self._requests[r]
+                    else:
+                        self._claims[r] = self._requests[r]
+                    self._enter(r._claimers)
+                self._leave(r._requesters)
+                if r._requesters._length == 0:
+                    r._minq = inf
+                r.claimed_quantity.tally()
+                r.available_quantity.tally()
+            self._requests = {}
+            self._remove()
+            self._reschedule(self.env._now, False, 'request honored')
+                
     def _release(self, r, q):
         if r not in self._claims:
             raise AssertionError(self._name +
-                                 ' not claiming from resource ' + r._name)
+                ' not claiming from resource ' + r._name)
         if q is None:
             q = self._claims[r]
         if q > self._claims[r]:
@@ -4310,8 +4326,8 @@ class Component(object):
         r.claimed_quantity.tally()
         r.available_quantity.tally()
         self.env.print_trace('', '', self._name,
-                             'release ' + str(q) + ' from ' + r._name)
-        r._claimtry()
+            'release ' + str(q) + ' from ' + r._name)
+        r._tryrequest()
 
     def release(self, *args):
         '''
@@ -4364,9 +4380,160 @@ class Component(object):
                     raise AssertionError(
                         'not possible to release anonymous resources ' + r.name())
                 self._release(r, q)
-
-    def claimed_quantity(self, resource):
+                
+    def wait(self, *args, fail_at=None, fail_delay=None, all=False, mode='*'):
         '''
+        wait for any or all of the given state values are met
+
+        Parameters
+        ----------
+        args : sequence
+            - sequence of states, where value=True, priority=tail of waiters queue)
+            - sequence of tuples/lists containing
+                state, a value and optionally a priority.
+                if the priority is not specified, this component will
+                be added to the tail of
+                the waiters queue |n|
+
+        fail_at : float
+            time out |n|
+            if the waitfor is not honored before fail_at,
+            the wait will be cancelled and the
+            parameter failed will be set. |n|
+            if not specified, the wait will not time out.
+
+        fail_delay : float
+            time out |n|
+            if the waitfor is not honored before now+fail_delay,
+            the request will be cancelled and the
+            parameter failed will be set. |n|
+            if not specified, the wait will not time out.
+            
+        all : bool
+            if False (default), continue, if any of the given state/values are met |n|
+            if True, continue if all of the given state/values are met
+
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations |n|
+            if nothing specified, the mode will be unchanged. |n|
+            also mode_time will be set to now, if mode is set.
+
+        Notes
+        -----
+        Not allowed for data components or main.
+
+        If to be used for the current component
+        (which will be nearly always the case),
+        use `yield self.wait(...)``.
+
+        It is allowed to wait for more than one value of a state |n|
+        the parameter failed will be reset by a calling wait
+        
+        If you want to check for all components to meet a value (and clause),
+        use Component.wait(..., all=True)
+
+        Example
+        -------
+        yield self.wait(s1) |n|
+        --> waits for s1.value()==True |n|
+        yield self.wait(s1,s2) |n|
+        --> waits for s1.value()==True or s2.value==True |n|
+        yield self.wait((s1,False,100),(s2,'on'),s3) |n|
+        --> waits for s1.value()==False or s2.value=='on' or s3.value()==True
+        s1 is at the tail of waiters, because of the set priority
+        yield self.wait(s1,s2,all=True) |n|
+        --> waits for s1.value()==True and s2.value==True |n|            
+        '''
+        if self._status != current:
+            self._checkisnotdata()
+            self._checkisnotmain()
+            self._remove()
+            self._check_fail()
+            
+        self._wait_all = all
+        self._fail = False
+        
+        if fail_at is None:
+            if fail_delay is None:
+                scheduled_time = inf
+            else:
+                if fail_delay == inf:
+                    scheduled_time = inf
+                else:
+                    scheduled_time = self.env._now + fail_delay
+        else:
+            if fail_delay is None:
+                scheduled_time = fail_at
+            else:
+                raise AssertionError('both fail_at and fail_delay specified')
+                
+        if mode != '*':
+            self._mode = mode
+            self._mode_time = self.env._now
+
+        for i in range(len(args)):
+            value = True
+            priority = None
+            argsi = args[i]
+            if isinstance(argsi, State):
+                state = argsi
+            elif isinstance(argsi, (tuple, list)):
+                state = argsi[0]
+                if len(argsi) >= 2:
+                    value = argsi[1]
+                if len(argsi) >= 3:
+                    priority = argsi[2]
+            else:
+                raise AssertionError('incorrect specifier', args)
+                
+            addstring = ''
+            for (statex, _) in self._waits:
+                if statex == state:
+                    break
+            else:
+                if priority is None:
+                    self._enter(state._waiters)
+                else:
+                    addstring = addstring + ' priority=' + str(priority)
+                    self._enter_sorted(state._waiters, priority)
+
+            self._waits.append((state, value))
+            
+        if len(self._waits)==0:
+            raise AssertionError ('no states specified')
+        self._trywait()
+                            
+        if len(self._waits) != 0:
+            self._reschedule(scheduled_time, False, 'wait')
+
+    def _trywait(self):
+        if self._wait_all:
+            honored = True
+            for s, value in self._waits:
+                if value != s._value:
+                    honored = False
+                    break
+        else:
+            honored = False
+            for s, value in self._waits:
+                if value == s._value:
+                    honored = True
+                    break
+                
+        if honored:
+            for s, _ in self._waits:
+                if self in s._waiters:  # there might be more values for this state
+                    self._leave(s._waiters)
+            self._waits = []
+            self._remove()
+            self._reschedule(self.env._now, False, 'wait honored')
+            
+        return honored
+
+        
+    def claimed_quanity(self):
+        ''''
         Parameters
         ----------
         resource : Resoure
@@ -4407,7 +4574,7 @@ class Component(object):
 
         Returns
         -------
-        the requested (not yet honoured) quantity from a resource : float or int
+        the requested (not yet honored) quantity from a resource : float or int
             if there is no request for the resource, 0 will be returned
         '''
         if resource in self._requests:
@@ -4415,14 +4582,14 @@ class Component(object):
         else:
             return 0
 
-    def request_failed(self):
+    def failed(self):
         '''
         Returns
         -------
         True, if the latest request has failed (either by timeout or external) : bool
         False, otherwise
         '''
-        return self._request_failed
+        return self._failed
 
     def name(self, txt=None):
         '''
@@ -4548,6 +4715,18 @@ class Component(object):
         '''
         return len(self._requests) != 0
 
+    def iswaiting(self):
+        '''
+        Returns
+        -------
+        True if status is waiting, False otherwise : bool
+
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True!
+        '''
+        return len(self._requests) != 0
+        
     def isscheduled(self):
         '''
         Returns
@@ -4788,11 +4967,11 @@ class Component(object):
                 # leave.sort is not possible, because statistics will be affected
                 mx.predecessor.successor = mx.successor
                 mx.successor.predecessor = mx.predecessor
-
+    
                 m2 = q._head.successor
                 while (m2 != q._tail) and (m2.priority <= priority):
                     m2 = m2.successor
-
+    
                 m1 = m2.predecessor
                 m1.successor = mx
                 m2.predecessor = mx
@@ -4801,8 +4980,6 @@ class Component(object):
                 mx.priority = priority
                 for iter in q._iter_touched:
                     q._iter_touched[iter] = True
-                if q._requesters_resource is not None:
-                    q._requesters_resource._claimtry()
         return mx.priority
 
     def successor(self, q):
@@ -4893,10 +5070,11 @@ class Component(object):
         - standby
         '''
 
-        if len(self._requests) == 0:
-            return self._status
-        else:
+        if len(self._requests) > 0:
             return requesting
+        if len(self._waits) > 0 :
+            return waiting
+        return self._status
 
     def _member(self, q):
         try:
@@ -4962,11 +5140,12 @@ class Exponential(_Distribution):
             self.randomstream = randomstream
 
     def __repr__(self):
-        lines = []
-        lines.append('Exponential distribution ' + hex(id(self)))
-        lines.append('  mean=' + str(self._mean))
-        lines.append('  randomstream=' + hex(id(self.randomstream)))
-        return '\n'.join(lines)
+        return('Exponential')
+
+    def print_info(self):
+        print('Exponential distribution ' + hex(id(self)))
+        print('  mean=' + str(self._mean))
+        print('  randomstream=' + hex(id(self.randomstream)))
 
     def sample(self):
         '''
@@ -5019,12 +5198,13 @@ class Normal(_Distribution):
             self.randomstream = randomstream
 
     def __repr__(self):
-        lines = []
-        lines.append('Normal distribution ' + hex(id(self)))
-        lines.append('  mean=' + str(self._mean))
-        lines.append('  standard_deviation=' + str(self._standard_deviation))
-        lines.append('  randomstream=' + hex(id(self.randomstream)))
-        return '\n'.join(lines)
+        return 'Normal'
+        
+    def print_info(self):
+        print('Normal distribution ' + hex(id(self)))
+        print('  mean=' + str(self._mean))
+        print('  standard_deviation=' + str(self._standard_deviation))
+        print('  randomstream=' + hex(id(self.randomstream)))
 
     def sample(self):
         '''
@@ -5078,12 +5258,13 @@ class Uniform(_Distribution):
         self._mean = (self._lowerbound + self._upperbound) / 2
 
     def __repr__(self):
-        lines = []
-        lines.append('Uniform distribution ' + hex(id(self)))
-        lines.append('  lowerbound=' + str(self._lowerbound))
-        lines.append('  upperbound=' + str(self._upperbound))
-        lines.append('  randomstream=' + hex(id(self.randomstream)))
-        return '\n'.join(lines)
+        return 'Uniform'
+        
+    def print_info(self):
+        print('Uniform distribution ' + hex(id(self)))
+        print('  lowerbound=' + str(self._lowerbound))
+        print('  upperbound=' + str(self._upperbound))
+        print('  randomstream=' + hex(id(self.randomstream)))
 
     def sample(self):
         '''
@@ -5150,13 +5331,14 @@ class Triangular(_Distribution):
         self._mean = (self._low + self._mode + self._high) / 3
 
     def __repr__(self):
-        lines = []
-        lines.append('Triangular distribution ' + hex(id(self)))
-        lines.append('  low=' + str(self._low))
-        lines.append('  high=' + str(self._high))
-        lines.append('  mode=' + str(self._mode))
-        lines.append('  randomstream=' + hex(id(self.randomstream)))
-        return '\n'.join(lines)
+        return 'Triangular'
+        
+    def print_info(self):
+        print('Triangular distribution ' + hex(id(self)))
+        print('  low=' + str(self._low))
+        print('  high=' + str(self._high))
+        print('  mode=' + str(self._mode))
+        print('  randomstream=' + hex(id(self.randomstream)))
 
     def sample(self):
         '''
@@ -5201,11 +5383,12 @@ class Constant(_Distribution):
         self._mean = value
 
     def __repr__(self):
-        lines = []
-        lines.append('Constant distribution ' + hex(id(self)))
-        lines.append('  value=' + str(self._value))
-        lines.append('  randomstream=' + hex(id(self.randomstream)))
-        return '\n'.join(lines)
+        return 'Constant'
+        
+    def print_info(self):
+        print('Constant distribution ' + hex(id(self)))
+        print('  value=' + str(self._value))
+        print('  randomstream=' + hex(id(self.randomstream)))
 
     def sample(self):
         '''
@@ -5288,10 +5471,11 @@ class Cdf(_Distribution):
                 (self._cum[i + 1] - self._cum[i])
 
     def __repr__(self):
-        lines = []
-        lines.append('Cdf distribution ' + hex(id(self)))
-        lines.append('  randomstream=' + hex(id(self.randomstream)))
-        return '\n'.join(lines)
+        return 'Cdf'
+        
+    def print_info(self):
+        print('Cdf distribution ' + hex(id(self)))
+        print('  randomstream=' + hex(id(self.randomstream)))
 
     def sample(self):
         '''
@@ -5418,10 +5602,11 @@ class Pdf(_Distribution):
             self._mean = nan
 
     def __repr__(self):
-        lines = []
-        lines.append('Pdf distribution ' + hex(id(self)))
-        lines.append('  randomstream=' + hex(id(self.randomstream)))
-        return '\n'.join(lines)
+        return 'Pdf'
+        
+    def print_info(self):
+        print('Pdf distribution ' + hex(id(self)))
+        print('  randomstream=' + hex(id(self.randomstream)))
 
     def sample(self):
         '''
@@ -5473,7 +5658,7 @@ class Distribution(_Distribution):
     -----
     The randomstream in the specifying string is ignored. |n|
     It is possible to use expressions in the specification, as long these
-    are valid within the context of the salabim module, which usually implies 
+    are valid within the context of the salabim module, which usually implies
     a global variable of the salabim package.
 
     Examples
@@ -5535,7 +5720,10 @@ class Distribution(_Distribution):
 
     def __repr__(self):
         return self._distribution.__repr__()
-
+        
+    def print_info(self):
+        self._distribution.print_info()        
+        
     def sample(self):
         '''
         Returns
@@ -5552,6 +5740,275 @@ class Distribution(_Distribution):
         mean of the distribution : float
         '''
         return self._mean
+
+        
+class State(object):
+    '''
+    State
+
+    Parameters
+    ----------
+    name : str
+        name of the state |n|
+        if the name ends with a period (.),
+        auto serializing will be applied |n|
+        if omitted, the name state will be used
+
+    value : any, preferably printable
+        initial value of the state |n|
+        if omitted, False
+
+    monitor : bool
+        if True (default) , the waiters queue and the value are monitored |n|
+        if False, monitoring is disabled.
+        
+    env : Environment
+        environment to be used |n|
+        if omitted, _default_env is used
+    '''
+    def __init__(self, name=None, value=False, env=None, monitor=True):
+        if env is None:
+            self.env = _default_env
+        else:
+            self.env = env
+        if name is None:
+            name = 'state.'
+        self.name(name)
+        self._value = value
+        self._waiters = Queue(
+            name='waiters of '+name,
+            monitor=monitor, env=self.env, _isinternal=True)
+        self.value = MonitorTimestamp(
+            'Value of ' + self._name,
+            getter=self._get_value, monitor=monitor, env=self.env)
+        self.env.print_trace(
+            '', '', self.name() + ' created',
+            'value= --> ' + str(self._value))
+            
+    def __repr__(self):
+        return 'State('+self._name+')'
+
+    def print_info(self):
+        print('State ' + hex(id(self)))
+        print('  name=' + self._name)
+        print('  value=' + str(self._value))
+        if len(self._waiters) == 0:
+            print('  no waiting components')
+        else:
+            print('  waiting component(s):')
+            mx = self._waiters._head.successor
+            while mx != self._waiters._tail:
+                c = mx.component
+                mx = mx.successor
+                values = ''
+                for s, value in c._waits:
+                    if s == self:
+                        if values != '':
+                            values = values + ', '
+                        values = values + str(value)
+                print('    ' + pad(c._name, 20),' value(s): '+values)
+            
+    def __call__(self):
+        return self._value
+                  
+    def get(self):
+        '''
+        get value of the state
+        
+        Returns
+        -------
+        value of the state : any
+        '''
+        return self._value
+        
+    def set(self, value=True):
+        '''
+        set the value of the state
+        
+        Parameters
+        ----------
+        value : any (preferably printable)
+            if omitted, True |n|
+            if there is a change, the waiters queue will be checked
+            to see whether there are waiting components to be honored
+            
+        Notes
+        -----
+        This method is identical to reset, except the default value is True.
+        '''
+        self.env.print_trace('', '', self.name(), 'value --> '+str(value))
+        if self._value != value:
+            self._value = value
+            self.value.tally()
+            self._trywait()
+        
+    def reset(self, value=False):
+        '''
+        reset the value of the state
+        
+        Parameters
+        ----------
+        value : any (preferably printable)
+            if omitted, False |n|
+            if there is a change, the waiters queue will be checked
+            to see whether there are waiting components to be honored
+            
+        Notes
+        -----
+        This method is identical to set, except the default value is False.
+        '''
+        self.set(value)
+        
+    def trigger(self, value=True, value_after=None, max=inf):
+        '''
+        triggers the value of the state
+        
+        Parameters
+        ----------
+        value : any (preferably printable)
+            if omitted, True |n|
+            
+        value_after : any (preferably printable)
+            after the trigger, this will be the new value. |n|
+            if omitted, return to the the before the trigger.
+        
+        max : int
+            maximum number of components to be honored for the trigger value |n|
+            default: inf
+            
+        Notes
+        -----
+        The value of the state will be set to value, then at most
+            max waiting components fir this state  will be honored and next
+            the value will be set to value_after and abain checked for possible
+            honors.
+        '''
+        if value_after is None:
+            value_after = self._value
+        self.env.print_trace('', '', self._name,
+            ' triggered --> ' + str(value) + ' --> ' + str(value_after) +
+            ' allow ' + str(max) + ' components')
+        self._value = value
+        self.value.tally()  # strictly speaking, not required
+        self._trywait(max)
+        self._value = value_after
+        self.value.tally()
+        self._trywait()
+        
+    def _trywait(self, max=inf):
+        mx = self._waiters._head.successor
+        while mx != self._waiters._tail:
+            c = mx.component
+            mx = mx.successor
+            if c._trywait():
+                max -= 1
+                if max == 0:
+                    return
+
+    def monitor(self, value=None):
+        '''
+        enables/disables the state monitors and timestamped monitors
+
+        Parameters
+        ----------
+        value : bool
+            if True, monitoring will be on. |n|
+            if False, monitoring is disabled |n|
+            if not specified, no change
+
+        Notes
+        -----
+        it is possible to individually control requesters().monitor(),
+            value.monitor()
+        '''
+        self.requesters().monitor(value)
+        self.value.monitor(value)
+
+    def _get_value(self):
+        return self._value
+        
+    def name(self, txt=None):
+        '''
+        Parameters
+        ----------
+        txt : str
+            name of the state |n|
+            if txt ends with a period, the name will be serialized |n|
+            if omittted, no change
+
+        Returns
+        -------
+        Name of the state : str
+        '''
+        if txt is not None:
+            _set_name(txt, self.env._nameserializeState, self)
+        return self._name
+
+    def base_name(self):
+        '''
+        Returns
+        -------
+        base name of the state (the name used at init or name): str
+        '''
+        return self._base_name
+
+    def sequence_number(self):
+        '''
+        Returns
+        -------
+        sequence_number of the state : int
+            (the sequence number at init or name) |n|
+            normally this will be the integer value of a serialized name,
+            but also non serialized names (without a dot at the end)
+            will be numbered)
+        '''
+        return self._sequence_number
+
+    def print_statistics(self):
+        '''
+        prints a summary of statistics of the state
+        '''
+        print('Info on {} @ {:13.3f}'.format(self._name, self.env._now))
+        if (self.waiters().length.duration() == 0) and \
+            (self.waiters().length_of_stay.number_of_entries() == 0) and \
+            (self.value.duration() == 0):
+            print('    no data collected')
+            return
+
+        print('                            all    excl.zero         zero')
+        print('    -------------- ------------ ------------ ------------')
+        for q in [self.waiters()]:
+            print('Length of ' + q._name)
+            if q.length.duration() == 0:
+                print('    no data collected')
+            else:
+                q.length.print_histogram(
+                    number_of_bins=0, print_header=False, print_legend=False, indent='    ')
+            print()
+            print('Length of stay of ' + q._name)
+            if q.length_of_stay.number_of_entries() == 0:
+                print('    no data collected')
+            else:
+                q.length_of_stay.print_histogram(
+                    number_of_bins=0, print_header=False, print_legend=False, indent='    ')
+            print()
+
+        for m in [self.value]:
+            print(m._name)
+            if m.duration() == 0:
+                print('    no data collected')
+            else:
+                m.print_histogram(
+                    number_of_bins=0, print_header=False, print_legend=False, indent='    ')
+            print()
+            
+    def waiters(self):
+        '''
+        Returns
+        -------
+        queue containing all components waiting for this state
+        '''
+        return self._waiters
 
 
 class Resource(object):
@@ -5570,14 +6027,6 @@ class Resource(object):
         capacity of the resouce |n|
         if omitted, 1
 
-    strict_order : bool
-        strict_order specifier |n|
-        if False, requests can be honoured for components that requested 
-        from the resource later |n|
-        if True, requests can only honoured in the order of the claim request.
-        note that this may lead to deadlock when components request from more
-        than one resource, in strict order.
-
     anonymous : bool
         anonymous specifier |n|
         if True, claims are not related to any component. This is useful
@@ -5587,11 +6036,16 @@ class Resource(object):
     env : Environment
         environment to be used |n|
         if omitted, _default_env is used
+        
+    monitor : bool
+        if True (default) , the requesters queue, the claimers queue,
+        the capacity, the available_quantity and the claimed_quantity are monitored |n|
+        if False, monitoring is disabled.
     '''
 
-    def __init__(self, name=None, capacity=1, strict_order=False,
+    def __init__(self, name=None, capacity=1,
                  anonymous=False, monitor=True, env=None):
-        if (env is None):
+        if env is None:
             self.env = _default_env
         else:
             self.env = env
@@ -5601,14 +6055,13 @@ class Resource(object):
         self.name(name)
         self._requesters = Queue(
             name='requesters of ' + name,
-            monitor=monitor, env=self.env, _requesters_resource=self)
+            monitor=monitor, env=self.env, _isinternal=True)
         self._claimers = Queue(
             name='claimers of ' + name,
-            monitor=monitor, env=self.env, _claimers_resource=self)
-        self._pendingclaimed_quantity = 0
+            monitor=monitor, env=self.env, _isinternal=True)
         self._claimed_quantity = 0
         self._anonymous = anonymous
-        self._strict_order = strict_order
+        self._minq=inf
         self.capacity = MonitorTimestamp(
             'Capacity of ' + self._name,
             getter=self._get_capacity, monitor=monitor, env=self.env)
@@ -5709,84 +6162,45 @@ class Resource(object):
         self.claimed_quantity.monitor(value)
 
     def __repr__(self):
-        lines = []
-        lines.append('Resource ' + hex(id(self)))
-        lines.append('  name=' + self._name)
-        lines.append('  capacity=' + str(self._capacity))
-        if self._requesters.length == 0:
-            lines.append('  no requests')
+        return 'Resource('+self._name+')'
+    
+    def print_info(self):
+        print('Resource ' + hex(id(self)))
+        print('  name=' + self._name)
+        print('  capacity=' + str(self._capacity))
+        if len(self._requesters) == 0:
+            print('  no requesting components')
         else:
-            lines.append('  requesting component(s):')
+            print('  requesting component(s):')
             mx = self._requesters._head.successor
             while mx != self._requesters._tail:
                 c = mx.component
                 mx = mx.successor
-                if self in c._pendingclaims:
-                    lines.append('    ' + pad(c._name, 20) +
-                                 ' quantity=' + str(c._requests[self]) +
-                                 ' provisionally claimed')
-                else:
-                    lines.append('    ' + pad(c._name, 20) +
-                                 ' quantity=' + str(c._requests[self]))
+                print('    ' + pad(c._name, 20) +
+                    ' quantity=' + str(c._requests[self]))
 
-        lines.append('  claimed_quantity=' + str(self._claimed_quantity))
+        print('  claimed_quantity=' + str(self._claimed_quantity))
         if self._claimed_quantity >= 0:
             if self._anonymous:
-                lines.append('  not claimed by any components,' +
-                             ' because the resource is anonymous')
+                print('  not claimed by any components,' +
+                    ' because the resource is anonymous')
             else:
-                lines.append('  claimed by:')
+                print('  claimed by:')
                 mx = self._claimers._head.successor
                 while mx != self._claimers._tail:
                     c = mx.component
                     mx = mx.successor
-                    lines.append('    ' + pad(c._name, 20) +
-                                 ' quantity=' + str(c._claims[self]))
+                    print('    ' + pad(c._name, 20) +
+                        ' quantity=' + str(c._claims[self]))
 
-        return '\n'.join(lines)
-
-    def _claimtry(self):
+    def _tryrequest(self):
         mx = self._requesters._head.successor
         while mx != self._requesters._tail:
+            if self._minq > (self._capacity - self._claimed_quantity + 1e-8):
+                break  # inpossible to honor any more requests
             c = mx.component
             mx = mx.successor
-            if c._greedy:
-                if self not in c._pendingclaims:
-                    if c._requests[self] <=\
-                        self._capacity - self._claimed_quantity -\
-                            self._pendingclaimed_quantity + 1e-8:
-                        c._pendingclaims.append(self)
-                        self._pendingclaimed_quantity += c._requests[self]
-            claimed = True
-            for r in c._requests:
-                if r not in c._pendingclaims:
-                    if c._requests[r] > r._capacity - r._claimed_quantity -\
-                            r._pendingclaimed_quantity + 1e-8:
-                        claimed = False
-                        break
-            if claimed:
-                for r in list(c._requests):
-                    r._claimed_quantity += c._requests[r]
-                    if r in c._pendingclaims:
-                        r._pendingclaimed_quantity -= c._requests[r]
-
-                    if not r._anonymous:
-                        if r in c._claims:
-                            c._claims[r] += c._requests[r]
-                        else:
-                            c._claims[r] = c._requests[r]
-                        c._enter(r._claimers)
-                    c._leave(r._requesters)
-                    r.claimed_quantity.tally()
-                    r.available_quantity.tally()
-                c._requests = {}
-                c._pendingclaims = []
-                c._remove()
-                c._reschedule(self.env._now, False, 'request honoured')
-
-            else:
-                if self._strict_order:
-                    return
+            c._tryrequest()
 
     def release(self, quantity=None):
         '''
@@ -5816,7 +6230,7 @@ class Resource(object):
                 self._claimed_quantity = 0
             self.claimed_quantity.tally()
             self.available_quantity.tally()
-            self._claimtry()
+            self._tryrequest()
 
         else:
             if quantity is not None:
@@ -5833,7 +6247,7 @@ class Resource(object):
         '''
         Return
         ------
-        queue containing all components with not yet honoured requests.
+        queue containing all components with not yet honored requests.
         '''
         return self._requesters
 
@@ -5861,35 +6275,17 @@ class Resource(object):
         ----------
         cap : float or int
             capacity of the resource |n|
-            this may lead to honouring one or more requests.|n|
+            this may lead to honoring one or more requests.|n|
             if omitted, no change
 
         Returns
         -------
-        the capacity : float orvint
+        the capacity : float or int
         '''
         self._capacity = cap
         self.capacity.tally()
         self.available_quantity.tally()
-        self._claimtry()
-
-    def strict_order(self, strict_order):
-        '''
-        Parameters
-        ----------
-        strict_order : bool
-            determines whether strict_order is applicable |n|
-            this may lead to honouring one or more requests.|n|
-            if omitted, no change
-
-        Returns
-        -------
-        The strict_order value : bool
-        '''
-        if strict_order is not None:
-            self._strict_order = strict_order
-            self._claimtry()
-        return self._strict_order
+        self._tryrequest()
 
     def name(self, txt=None):
         '''
@@ -6222,8 +6618,26 @@ def pad(txt, n):
 
 def rpad(txt, n):
     return txt.rjust(n)[:n]
+    
 
-
+def list_to_numeric_array(l):
+    x = np.array(l)
+    if x.dtype not in (np.float, np.int):
+        x=[]
+        for v in l:
+            try:
+                v = float(v)
+            except ValueError:
+                v = 0
+            vint = int(v)
+            if v == vint:
+                x.append(vint)
+            else:
+                x.append(v)
+        x = np.array(x)
+    return x
+    
+    
 def normalize(s):
     res = ''
     for c in s.upper():
@@ -6276,6 +6690,10 @@ def scheduled():
 
 def requesting():
     return 'requesting'
+    
+
+def waiting():
+    return 'waiting'
 
 
 def random_seed(seed, randomstream=None):
@@ -6286,7 +6704,6 @@ def random_seed(seed, randomstream=None):
         the seed for random, equivalent to random.seed() |n|
         if None, a purely random value (based on the current time) will be used
         (not reproducable) |n|
-        if omitted, the no action on random is taken
 
     randomstream: randomstream
         randomstream to be used |n|
@@ -6535,7 +6952,7 @@ def _std_fonts():
             'stylu': 'Stylus BT Roman', 'supef___': 'SuperFrench',
             'swiss': 'Swis721 BT Roman', 'swissb': 'Swis721 BT Bold',
             'swissbi': 'Swis721 BT Bold Italic', 'swissbo': 'Swis721 BdOul BT Bold',
-            'swissc': 'Swis721 Cn BT Roman', 'swisscb': 'Swis721 Cn BT Bold',
+            'swiu': 'Swis721 Cn BT Roman', 'swisscb': 'Swis721 Cn BT Bold',
             'swisscbi': 'Swis721 Cn BT Bold Italic',
             'swisscbo': 'Swis721 BdCnOul BT Bold Outline',
             'swissci': 'Swis721 Cn BT Italic', 'swissck': 'Swis721 BlkCn BT Black',
@@ -6707,7 +7124,7 @@ def trace(value=None):
     Note
     ----
     If you want to test the status, always include parentheses, like |n|
-    if de.trace():
+    if env.trace():
     '''
     if value is not None:
         self._default_env._trace = value

@@ -93,7 +93,7 @@ class Other(sim.Component):
 
 # Setup and start the simulation
 print('Machine shop')
-de = sim.Environment()
+env = sim.Environment()
 random.seed(RANDOM_SEED)  # This helps reproducing the results
 
 repairman = sim.Resource('repairman', monitor=True)
@@ -102,7 +102,7 @@ machines = [Machine() for i in range(NUM_MACHINES)]
 other = Other()
 
 # Execute!
-de.run(till=SIM_TIME)
+env.run(till=SIM_TIME)
 # Analyis/results
 print('Machine shop results after %s weeks' % WEEKS)
 for machine in machines:

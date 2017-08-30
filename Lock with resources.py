@@ -54,7 +54,7 @@ class Lock(sim.Component):
             yield self.request((key_out, 1, 1000), mode=None)
 
 
-de = sim.Environment(random_seed=1234567, trace=False)
+env = sim.Environment(trace=True)
 
 locklength = 60
 switchtime = 10
@@ -66,7 +66,7 @@ iat = 30
 lockmeters = {}
 key_in = {}
 lockqueue = sim.Queue('lockqueue')
-key_out = sim.Resource(name=' key_out')
+key_out = sim.Resource(name='key_out')
 
 for side in (left, right):
     lockmeters[side] = sim.Resource(capacity=locklength, name=sidename(
@@ -78,7 +78,7 @@ for side in (left, right):
 lock = Lock('Lock')
 lock.side = left
 
-de.run(50000)
+env.run(100)
 
 for side in (left, right):
     lockmeters[side].print_statistics()

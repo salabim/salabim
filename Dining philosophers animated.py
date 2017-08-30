@@ -47,17 +47,17 @@ class AnimateFork(sim.Animate):
 def do_animation():
     global nphilosophers, eatingtime_mean, thinkingtime_mean
     global nphilosophers_last
-    sim.animation_parameters(x0=-50 * de.width / de.height, y0=-50, x1=+50 * de.width / de.height,
+    sim.animation_parameters(x0=-50 * env.width / env.height, y0=-50, x1=+50 * env.width / env.height,
                              modelname='Dining philosophers',
                              speed=8)
     for i in philosopher:
         AnimatePhilosopher(i=i)
         AnimateFork(i=i)
-    sim.AnimateSlider(x=520, y=de.height, width=100, height=20,
+    sim.AnimateSlider(x=520, y=env.height, width=100, height=20,
                       vmin=10, vmax=40, resolution=5, v=eatingtime_mean, label='eating time', action=set_eatingtime_mean)
-    sim.AnimateSlider(x=660, y=de.height, width=100, height=20,
+    sim.AnimateSlider(x=660, y=env.height, width=100, height=20,
                       vmin=10, vmax=40, resolution=5, v=thinkingtime_mean, label='thinking time', action=set_thinkingtime_mean)
-    sim.AnimateSlider(x=520 + 50, y=de.height - 50, width=200, height=20,
+    sim.AnimateSlider(x=520 + 50, y=env.height - 50, width=200, height=20,
                       vmin=3, vmax=40, resolution=1, v=nphilosophers, label='# philosophers', action=set_nphilosophers)
     nphilosophers_last = nphilosophers
 
@@ -101,7 +101,7 @@ nphilosophers = 8
 sim.random_seed(1234567)
 
 while True:
-    de = sim.Environment()
+    env = sim.Environment()
 
     philosopher = {}
     fork = {}
@@ -116,4 +116,4 @@ while True:
 
     do_animation()
 
-    de.run()
+    env.run()

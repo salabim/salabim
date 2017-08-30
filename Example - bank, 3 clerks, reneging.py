@@ -12,8 +12,8 @@ class CustomerGenerator(sim.Component):
 class Customer(sim.Component):
     def process(self):
         if len(waitingline) >= 5:
-            de.number_balked += 1
-            de.print_trace('', '', 'balked')
+            env.number_balked += 1
+            env.print_trace('', '', 'balked')
             yield self.cancel()
         self.enter(waitingline)
         for clerk in clerks:
@@ -23,8 +23,8 @@ class Customer(sim.Component):
         yield self.hold(50)  # if not serviced within this time, renege
         if self in waitingline:
             self.leave(waitingline)
-            de.number_reneged += 1
-            de.print_trace('', '', 'reneged')
+            env.number_reneged += 1
+            env.print_trace('', '', 'reneged')
         else:
             yield self.passivate()  # wait for service to be completed
 
@@ -40,24 +40,24 @@ class Clerk(sim.Component):
             self.customer.activate()
 
 
-de = sim.Environment(random_seed=1234567, trace=False)
+env = sim.Environment(trace=False)
 CustomerGenerator()
-de.number_balked = 0
-de.number_reneged = 0
+env.number_balked = 0
+env.number_reneged = 0
 clerks = sim.Queue('clerks')
 for i in range(3):
     Clerk().enter(clerks)
 
 waitingline = sim.Queue('waitingline')
 waitingline.length.monitor(False)
-de.run(duration=1500)
+env.run(duration=1500)
 waitingline.length.monitor(True)
-de.run(duration=1500)
+env.run(duration=1500)
 waitingline.length.print_histogram(30, 0, 1)
 print()
 waitingline.length_of_stay.print_histogram(30, 0, 10)
-print('number reneged', de.number_reneged)
-print('number balked', de.number_balked)
+print('number reneged', env.number_reneged)
+print('number balked', env.number_balked)
 import matplotlib.pyplot as plt
 plt.plot(*waitingline.length.tx(), 'bo')
 plt.ylabel('length of ' + waitingline.name())

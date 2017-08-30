@@ -39,10 +39,10 @@ class MachineBarAnimate(sim.Animate):
         super().__init__(rectangle0=(0, 0, 0, 0), linewidth0=0)
 
     def rectangle(self, t):
-        if self.machine.mode() == 'work':
-            d = self.machine.scheduled_time() - t
+        if self.machine.scheduled_time()==sim.inf:
+            d = self.machine.remaining_time    
         else:
-            d = self.machine.remaining_time
+            d = self.machine.scheduled_time() - t
         return(
             100, 100 + self.machine.n * 30,
             100 + d * SCALE, 100 + self.machine.n * 30 + 20)
@@ -157,7 +157,7 @@ def xrepairman(i, t):
 
 def do_animation():
 
-    de.animation_parameters(modelname='Machine shop', speed=4)
+    env.animation_parameters(modelname='Machine shop', speed=4)
     for machine in machines:
         MachineBarAnimate(machine)
         MachineTextAnimate(machine)
@@ -248,7 +248,7 @@ class Other(sim.Component):
 
 # Setup and start the simulation
 print('Machine shop')
-de = sim.Environment()
+env = sim.Environment()
 random.seed(RANDOM_SEED)  # This helps reproducing the results
 
 repairman = sim.Resource('repairman')
@@ -258,7 +258,7 @@ other = Other()
 
 # Execute!
 do_animation()
-de.run(till=SIM_TIME)
+env.run(till=SIM_TIME)
 
 # Analyis/results
 print('Machine shop results after %s weeks' % WEEKS)

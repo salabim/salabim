@@ -6,7 +6,88 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test28() 
+    test31() 
+    
+def test31():
+    class X(sim.Component):
+        def process(self):
+            
+            yield self.hold(1)
+            s1.set()
+            yield self.hold(2)
+            s1.reset()
+            yield self.hold(2)
+            y.print_info()
+#            s1.trigger()
+            
+    class Y(sim.Component):
+        def process(self):
+            while True:
+                yield self.wait(s1,(s2,'red'),(s2,'green'),s3)
+                yield self.hold(1.5)
+                
+            
+    env=sim.Environment(trace=True)
+    env.print_info()
+    s1=sim.State(name='s.')
+    s2=sim.State(name='s.')
+    s3=sim.State(name='s.')
+    q=sim.Queue('q.')
+    x=X()
+    y=Y()
+    sim.run(10)
+    print('value at ',env.now(),s1.get())
+    print (s1.value.xduration())
+    print(s1.value.tx())
+    print(env)
+    print(y)
+    print(q)
+    print(s1)
+    s1.print_info()
+    s2.print_info()
+    
+def test30():
+    env=sim.Environment()
+    m=sim.Monitor('m')
+    print (m.x(ex0=True))
+    m.tally(1)
+    m.tally(2)
+    m.tally(3)
+    m.tally(0)
+    m.tally('0')
+    m.tally('12')
+    m.tally('abc')
+    print (m.x(ex0=True))
+    
+    
+def test29():
+    global light
+    class Light(sim.Component):
+        def setup(self):
+            self.green=sim.State(name='green')
+            
+        def process(self):
+            while True:
+                yield self.hold(1)
+                self.green.trigger(max=2)
+                yield self.hold(1)
+                self.green.reset()
+                
+    class Car(sim.Component):
+        def process(self):
+            while True:
+                yield self.wait((light.green,True,1),(light.green,True,1),fail_delay=8,all=True)
+                yield self.hold(sim.Uniform(1,3).sample())
+    
+    de=sim.Environment(trace=True)
+    for i in range(10):
+        car=Car()
+    light=Light()
+    de.run(10)
+    light.green.print_statistics()
+    print(light.green.value.xt())
+    print(light.green.waiters())
+    
     
 def test28():
     de=sim.Environment(trace=True)

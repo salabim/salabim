@@ -59,7 +59,7 @@ class CarGenerator(sim.Component):
 
 
 # Setup and start the simulation
-de = sim.Environment()
+env = sim.Environment()
 print('Gas Station refuelling')
 
 # Create environment and start processes
@@ -69,7 +69,7 @@ fuel_pump = sim.Resource(
 tank_truck = TankTruck()
 CarGenerator()
 
-de.run(SIM_TIME)
+env.run(SIM_TIME)
 
 fuel_pump.capacity.print_histogram()
 fuel_pump.claimed_quantity.print_histogram()

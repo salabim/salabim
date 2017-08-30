@@ -8,6 +8,6 @@ class Car(sim.Component):
             yield self.hold(1)
 
 
-de = sim.Environment(trace=True)
+env = sim.Environment(trace=True)
 Car()
-sim.run(till=5)
+env.run(till=5)

@@ -117,7 +117,7 @@ def do_animation():
     xcar = {}
     xled = {}
 
-    x = de.width
+    x = env.width
     for car in cars:
         x -= (capacity + 1) * xvisitor_dim
         xcar[car] = x
@@ -157,24 +157,24 @@ def do_animation():
             x += xvisitor_dim
 
     ncars_last = ncars
-    ui_ncars = sim.AnimateSlider(x=540, y=de.height, width=90, height=20,
+    ui_ncars = sim.AnimateSlider(x=540, y=env.height, width=90, height=20,
         vmin=1, vmax=5, resolution=1, v=ncars, label='#elevators', action=set_ncars)
 
     topfloor_last = topfloor
-    ui_topfloor = sim.AnimateSlider(x=640, y=de.height, width=90, height=20,
+    ui_topfloor = sim.AnimateSlider(x=640, y=env.height, width=90, height=20,
         vmin=5, vmax=20, resolution=1, v=topfloor, label='top floor', action=set_topfloor)
 
     capacity_last = capacity
-    ui_capacity = sim.AnimateSlider(x=740, y=de.height, width=90, height=20,
+    ui_capacity = sim.AnimateSlider(x=740, y=env.height, width=90, height=20,
         vmin=2, vmax=6, resolution=1, v=capacity, label='capacity', action=set_capacity)
 
-    ui_load_0_n = sim.AnimateSlider(x=540, y=de.height - 50, width=90, height=25,
+    ui_load_0_n = sim.AnimateSlider(x=540, y=env.height - 50, width=90, height=25,
         vmin=0, vmax=400, resolution=25, v=load_0_n, label='Load 0->n', action=set_load_0_n)
 
-    ui_load_n_n = sim.AnimateSlider(x=640, y=de.height - 50, width=90, height=25,
+    ui_load_n_n = sim.AnimateSlider(x=640, y=env.height - 50, width=90, height=25,
         vmin=0, vmax=400, resolution=25, v=load_n_n, label='Load n->n', action=set_load_n_n)
 
-    ui_load_n_0 = sim.AnimateSlider(x=740, y=de.height - 50, width=90, height=25,
+    ui_load_n_0 = sim.AnimateSlider(x=740, y=env.height - 50, width=90, height=25,
         vmin=0, vmax=400, resolution=25, v=load_n_0, label='Load n->0', action=set_load_n_0)
 
     if make_video:
@@ -405,10 +405,9 @@ load_n_0 = 100
 capacity = 4
 ncars = 3
 topfloor = 15
-sim.random_seed(1234567)
 
 while True:
-    de = sim.Environment()
+    env = sim.Environment()
 
     vg_0_n = VisitorGenerator(
         from_=(0, 0), to=(1, topfloor), id='0_n', name='vg_0_n')
@@ -433,7 +432,7 @@ while True:
     do_animation()
 
     if make_video:
-        de.run(1000)
+        env.run(1000)
         break
     else:
-        de.run()
+        env.run()

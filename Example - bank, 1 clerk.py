@@ -27,9 +27,9 @@ class Clerk(sim.Component):
             self.customer.activate()
 
 
-de = sim.Environment(random_seed=1234567, trace=True)
+env = sim.Environment(trace=True)
 CustomerGenerator()
 clerk = Clerk()
 waitingline = sim.Queue('waitingline')
 
-de.run(till=50)
+env.run(till=50)
