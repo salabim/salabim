@@ -66,7 +66,7 @@ if Pythonista:
     import ui
     import objc_util
 
-__version__ = '2.2.0'
+__version__ = '2.2.1'
 
 
 class SalabimException(Exception):
@@ -4243,6 +4243,10 @@ class Component(object):
             else:
                 raise AssertionError('both fail_at and fail_delay specified')
 
+        if mode != '*':
+            self._mode = mode
+            self._mode_time = self.env._now
+            
         self._failed = False
         i = 0
         for i in range(len(args)):

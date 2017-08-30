@@ -38,6 +38,18 @@ class MachineBarAnimate(sim.Animate):
         self.machine = machine
         super().__init__(rectangle0=(0, 0, 0, 0), linewidth0=0)
 
+    def rectanglex(self, t):
+        if self.machine.mode() == 'work':
+            if self.machine.scheduled_time()==sim.inf:
+                d = self.machine.remaining_time    
+            else:
+                d = self.machine.scheduled_time() - t
+        else:
+            d = self.machine.remaining_time
+        return(
+            100, 100 + self.machine.n * 30,
+            100 + d * SCALE, 100 + self.machine.n * 30 + 20)
+            
     def rectangle(self, t):
         if self.machine.scheduled_time()==sim.inf:
             d = self.machine.remaining_time    

@@ -1,5 +1,11 @@
 salabim  changelog
 
+version 2.2.1  2017-08-31
+=========================
+Bug in Component.request() corrected.
+This prevented Machine shop animated to work properly.
+
+
 version 2.2.0  2017-08-30 
 =========================
 Introduced a new process control method: wait.
@@ -12,7 +18,7 @@ this state are checked.
 The class State has a number of methods, which allow to control the state:
   set(value) sets the value. Normally used without argument, in which
           case True will be used.
-  reset() resets the value to False
+  reset() resets the value to False=
   trigger(value) sets the value (default True), triggers any components waiting, 
     and then immediately resets to a given value (default False).
     optionally, the number of components to be honored with the trigger
