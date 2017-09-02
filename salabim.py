@@ -51,22 +51,29 @@ except:
     cv2_installed = False
 
 try:
-    from PIL import Image
-    from PIL import ImageDraw
-    from PIL import ImageFont
     if not Pythonista:
-        from PIL import ImageTk
-        import tkinter
+        from PIL import Image
+        from PIL import ImageDraw
+        from PIL import ImageFont
     pil_installed = True
 except:
     pil_installed = False
+
+try:
+    if not Pythonista:
+        from PIL import ImageTk
+        import tkinter
+    tkinter_installed = True
+except:
+    tkinter_installed = False
+
 
 if Pythonista:
     import scene
     import ui
     import objc_util
 
-__version__ = '2.2.1'
+__version__ = '2.2.2'
 
 
 class SalabimException(Exception):
@@ -2114,7 +2121,10 @@ class Environment(object):
 
         if self.animate:
             if not pil_installed:
-                raise AssertionError('PIL and tkinter is required for animation')
+                raise AssertionError('PIL is required for animation. Run pip install Pillow.')
+                raise AssertionError('PIL is required for animation. Run pip install Pillow.')
+            if not tkinter_installed:
+                raise AssertionError('tkinter is required for animation. Run pip install tkinter.')
 
             self.t = self._now  # for the call to set_start_animation
             self.set_start_animation()
@@ -2159,8 +2169,12 @@ class Environment(object):
             else:
                 self.dovideo = True
                 if not cv2_installed:
-                    raise AssertionError(
-                        'cv2 required for video production')
+                    if Pythonista:
+                        raise AssertionError(
+                            'video production is not supported under Pythonista.')
+                    else:    
+                        raise AssertionError(
+                            'cv2 required for video production. Run pip install opencv_python.')
 
             if self.dovideo:
                 self.video_sequence = 0
@@ -3862,7 +3876,7 @@ class Component(object):
                 print('  waiting for all of state(s):')
             else:
                 print('  waiting for any of state(s):')
-            for s,value in self._waits:
+            for s, value, _ in self._waits:
                 print('    ' + pad(s._name, 20) +
                     ' value=' + str(value))
 
@@ -3911,7 +3925,7 @@ class Component(object):
             
         if len(self._waits) != 0:
             self.env.print_trace('', '', self._name, 'wait failed')
-            for state, _ in self._waits:
+            for state, _,  _ in self._waits:
                 if self in state._waiters:  # there might be more values for this state
                     self._leave(state._waiters)
             self._waits = []
@@ -3931,7 +3945,8 @@ class Component(object):
             'scheduled for {:10.3f}'.format(scheduled_time) + extra +
             _urgenttxt(urgent) + _modetxt(self._mode))
 
-    def activate(self, at=None, delay=0, urgent=False, process=None, keep_request=False, mode='*'):
+    def activate(self, at=None, delay=0, urgent=False, process=None,
+        keep_request=False, keep_wait=False, mode='*'):
         '''
         activate component
 
@@ -3968,6 +3983,11 @@ class Component(object):
             if True, the requests will be kept and thus the status will remain requesting |n|
             if False (the default), the request(s) will be canceled and the status will become scheduled
 
+        keep_wait : bool
+            this affects only components that are waiting. |n|
+            if True, the waits will be kept and thus the status will remain waiting |n|
+            if False (the default), the wait(s) will be canceled and the status will become scheduled
+
         mode : str preferred
             mode |n|
             will be used in trace and can be used in animations|n|
@@ -3978,7 +3998,7 @@ class Component(object):
         -----
         if to be applied for the current component, use yield self.activate(). |n|
         if both at and delay are specified, the component becomes current at the sum
-        of the two values.
+        ofw the two values.
         '''
         p = None
         if process is None:
@@ -4003,7 +4023,10 @@ class Component(object):
 
         if self._status != current:
             self._remove()
-            if not keep_request:
+            if p is None:
+                if  not (keep_request or keep_wait):
+                    self._check_fail()
+            else:
                 self._check_fail()
 
         if mode != '*':
@@ -4393,8 +4416,8 @@ class Component(object):
         ----------
         args : sequence
             - sequence of states, where value=True, priority=tail of waiters queue)
-            - sequence of tuples/lists containing
-                state, a value and optionally a priority.
+            - sequence of tuples/lists containing |n|
+                state, a value and optionally a priority. |n|
                 if the priority is not specified, this component will
                 be added to the tail of
                 the waiters queue |n|
@@ -4436,6 +4459,23 @@ class Component(object):
         
         If you want to check for all components to meet a value (and clause),
         use Component.wait(..., all=True)
+
+        The value may be specified in three different ways:
+            
+        * constant, that value is just compared to state.value() |n|
+          yield self.wait((light,'red'))
+        * an expression, containg one or more $-signs
+          the $ is replaced by state.value(), eaxch time the condition is tesetd. |n|
+          self refers to the component under test, state refers to the state
+          under test. |n|
+          yield self.wait((light,'"$" in ("red","yellow")')) |n|
+          yield self.wait((level,'$<30')) |n|
+        * a function. In that case the parameter should function that
+          accepts a tuple, with the value, the component and the state under test. |n|
+          usually the function will be a lambda function, but that's not
+          a requirement. |n|
+          yield self.wait((light,lambda t: t[0] in ('red','yellow'))) |n|
+          yield self.wait((level,lambda t: t[0] < 30)) |n|
 
         Example
         -------
@@ -4492,7 +4532,7 @@ class Component(object):
                 raise AssertionError('incorrect specifier', args)
                 
             addstring = ''
-            for (statex, _) in self._waits:
+            for (statex, _, _) in self._waits:
                 if statex == state:
                     break
             else:
@@ -4501,9 +4541,13 @@ class Component(object):
                 else:
                     addstring = addstring + ' priority=' + str(priority)
                     self._enter_sorted(state._waiters, priority)
-
-            self._waits.append((state, value))
-            
+            if inspect.isfunction(value):
+                self._waits.append((state, value, 2))
+            elif '$' in str(value):
+                self._waits.append((state, value, 1))
+            else:
+                self._waits.append((state, value, 0))
+                
         if len(self._waits)==0:
             raise AssertionError ('no states specified')
         self._trywait()
@@ -4514,19 +4558,38 @@ class Component(object):
     def _trywait(self):
         if self._wait_all:
             honored = True
-            for s, value in self._waits:
-                if value != s._value:
-                    honored = False
-                    break
+            for state, value, valuetype in self._waits:
+                if valuetype == 0:
+                    if value != state._value:
+                        honored = False
+                        break
+                elif valuetype == 1:
+                    if eval(value.replace('$',str(state._value))):
+                        honored = False
+                        break
+                elif valuetype == 2:
+                    if not value((state._value,self,state)):
+                        honored = False
+                        break
+
         else:
             honored = False
-            for s, value in self._waits:
-                if value == s._value:
-                    honored = True
-                    break
+            for state, value, valuetype in self._waits:
+                if valuetype == 0:
+                    if value == state._value:
+                        honored = True
+                        break
+                elif valuetype == 1:
+                    if eval(value.replace('$',str(state._value))):
+                        honored = True
+                        break
+                elif valuetype == 2:
+                    if value((state._value,self,state)):
+                        honored = True
+                        break
                 
         if honored:
-            for s, _ in self._waits:
+            for s, _, _ in self._waits:
                 if self in s._waiters:  # there might be more values for this state
                     self._leave(s._waiters)
             self._waits = []
@@ -5805,11 +5868,12 @@ class State(object):
                 c = mx.component
                 mx = mx.successor
                 values = ''
-                for s, value in c._waits:
+                for s, value, valuetype in c._waits:
                     if s == self:
                         if values != '':
                             values = values + ', '
                         values = values + str(value)
+
                 print('    ' + pad(c._name, 20),' value(s): '+values)
             
     def __call__(self):
@@ -7128,7 +7192,7 @@ def trace(value=None):
     Note
     ----
     If you want to test the status, always include parentheses, like |n|
-    if env.trace():
+    if sim.trace():
     '''
     if value is not None:
         self._default_env._trace = value

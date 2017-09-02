@@ -6,7 +6,108 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test31() 
+    test34() 
+    
+
+def test34():
+    class X(sim.Component):
+        def process(self):
+            
+            yield self.hold(1)
+            s1.set(1)
+            yield self.hold(1)
+            s1.set(2)
+            s2.set('red')
+            yield self.hold(2)
+            s1.set(30)
+                        
+    class Y(sim.Component):
+        def process(self):
+            while True:
+                yield self.wait((s1,'$==2'))
+                yield self.hold(1.5)
+
+    class Z(sim.Component):
+        def process(self):
+            while True:
+                yield self.wait((s2,'"$" in ("red","yellow")'),all=True)
+                yield self.hold(1.5)
+                
+            
+    env=sim.Environment(trace=True)
+    env.print_info()
+    s1=sim.State(name='s.',value=0)
+    s2=sim.State(name='s.',value='green')
+    s3=sim.State(name='s.')
+    q=sim.Queue('q.')
+    x=X()
+    y=Y()
+    z=Z()
+    sim.run(10)
+
+
+def test33():
+    class X(sim.Component):
+        def process(self):
+            
+            yield self.hold(1)
+            s1.set(1)
+            yield self.hold(1)
+            s1.set(2)
+            s2.set('red')
+            yield self.hold(2)
+            s1.set(30)
+                        
+    class Y(sim.Component):
+        def process(self):
+            while True:
+                yield self.wait((s1,lambda x: x[0]/2>self.env.now()))
+                yield self.hold(1.5)
+
+    class Z(sim.Component):
+        def process(self):
+            while True:
+                yield self.wait((s2,lambda x: x[0] in ("red","yellow")))
+                yield self.hold(1.5)
+                
+            
+    env=sim.Environment(trace=True)
+    env.print_info()
+    s1=sim.State(name='s.',value=0)
+    s2=sim.State(name='s.',value='green')
+    s3=sim.State(name='s.')
+    q=sim.Queue('q.')
+    x=X()
+    y=Y()
+    z=Z()
+    sim.run(10)
+
+
+def test32():
+    class X(sim.Component):
+        def process(self):
+            yield self.wait(go)
+            print('X after wait')
+            yield self.hold(10)
+            
+        def p1(self):
+            print('X in p1')
+            yield self.passivate()
+            
+    class Y(sim.Component):
+        def process(self):
+            yield self.hold(2)
+            x.activate(keep_wait=True,at=20)
+            
+            
+            
+            
+    env=sim.Environment(trace=True)
+    go=sim.State()
+    x=X()
+    y=Y()
+    sim.run()
+    
     
 def test31():
     class X(sim.Component):

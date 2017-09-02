@@ -32,6 +32,7 @@ class Street(sim.Component):
     def process(self):
         while True:
             self.nextarrival=sim.now()+street_iat.sample()
+            wakeup.trigger()
             yield self.hold(till=self.nextarrival)
          
 class Car(sim.Component):
@@ -45,7 +46,7 @@ class Car(sim.Component):
         # arrives in cross traffic, it will signal us to check the new
         # next arrival time
         while sim.now()+time_to_exit >= street.nextarrival:
-            yield self.standby()
+            yield self.wait(wakeup,mode='wait for wakeup')
         yield self.hold(time_to_exit,mode='exit')
         self.release(bufferfront)
         self.release(buffer)
@@ -57,6 +58,7 @@ class CarWash(sim.Component):
             Car()
 
 env=sim.Environment(trace=True)
+wakeup=sim.State(name='wakeup')
 wash_time=sim.Pdf((1.0,0.7, 2.0,0.3))     
 street_iat=sim.Exponential(1)
 wash_iat=sim.Exponential(1)

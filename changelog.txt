@@ -1,5 +1,32 @@
 salabim  changelog
 
+version 2.2.2  2017-09- 
+=========================
+Component.wait() now allows to check for":
+- a value
+  yield self.wait((light,'red'))
+- an expresssion to be evaluated. the value has to be $ which is replaced by
+  str(state.value()), each time the condition is checked
+  yield self.wait((light,'$in ("red","ýellow")'))
+  yield self.wait((level,'<30'))
+  it is possible to use state for the state under test and self for the
+  component under test
+- a function to be called each time the condition is checked.
+  the function is called with one argument, being
+  a tuple of state.value(), component, state
+  yield self.wait((light,lambda x: x[0] in ('red,ýellow'))
+  yield self.wait((level,lambda x: x[0]<30))
+  
+
+Component.activate() has an additional parameter keep_wait, which controls whether
+waits are to be kept upon an activate, thus allowing an update of a timeout.
+
+When salabim detects that PIL or tkinter is not installed when trying to animate,
+the error message now provided instructions on how to install the relevant package.
+
+When salabim detects that cv2 is not installed when trying to produce a video,
+the error message now provided instructions on how to install the relevant package.
+
 version 2.2.1  2017-08-31
 =========================
 Bug in Component.request() corrected.
