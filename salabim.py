@@ -51,10 +51,9 @@ except:
     cv2_installed = False
 
 try:
-    if not Pythonista:
-        from PIL import Image
-        from PIL import ImageDraw
-        from PIL import ImageFont
+    from PIL import Image
+    from PIL import ImageDraw
+    from PIL import ImageFont
     pil_installed = True
 except:
     pil_installed = False
@@ -73,7 +72,7 @@ if Pythonista:
     import ui
     import objc_util
 
-__version__ = '2.2.2'
+__version__ = '2.2.3'
 
 
 class SalabimException(Exception):
@@ -2454,7 +2453,10 @@ class Environment(object):
         if not screen_coordinates:
             fontsize = fontsize * self.scale
         f = self.getfont(font, fontsize)
-        thiswidth, thisheight = f.getsize(text)
+        if text == '': # necessary because of bug in PIL >= 4.2.1
+            thiswidth, thisheight = (0, 0)
+        else:
+            thiswidth, thisheight = f.getsize(text)
         if screen_coordinates:
             return thiswidth
         else:
@@ -3402,23 +3404,26 @@ class Animate(object):
                     text, self.font, fontsize, angle, textcolor)
                 if self._image_ident != self._image_ident_prev:
                     font = self.env.getfont(self.font, fontsize)
-
-                    width, height = font.getsize(text)
-                    im = Image.new(
-                        'RGBA', (int(width), int(height)), (0, 0, 0, 0))
-                    imwidth, imheight = im.size
-                    draw = ImageDraw.Draw(im)
-                    draw.text(xy=(0, 0), text=text, font=font, fill=textcolor)
-                    # this code is to correct a bug in the rendering of text,
-                    # leaving a kind of shadow around the text
-                    textcolor3 = textcolor[0:3]
-                    if textcolor3 != (0, 0, 0):  # black is ok
-                        for y in range(imheight):
-                            for x in range(imwidth):
-                                c = im.getpixel((x, y))
-                                if not c[0:3] in (textcolor3, (0, 0, 0)):
-                                    im.putpixel((x, y), (*textcolor3, c[3]))
-                    # end of code to correct bug
+                    if text == '':  # this code is a workarond for a bug in PIL >= 4.2.1
+                        im = Image.new(
+                        'RGBA', (0,0), (0, 0, 0, 0))
+                    else:
+                        width, height = font.getsize(text)
+                        im = Image.new(
+                            'RGBA', (int(width), int(height)), (0, 0, 0, 0))
+                        imwidth, imheight = im.size
+                        draw = ImageDraw.Draw(im)
+                        draw.text(xy=(0, 0), text=text, font=font, fill=textcolor)
+                        # this code is to correct a bug in the rendering of text,
+                        # leaving a kind of shadow around the text
+                        textcolor3 = textcolor[0:3]
+                        if textcolor3 != (0, 0, 0):  # black is ok
+                            for y in range(imheight):
+                                for x in range(imwidth):
+                                    c = im.getpixel((x, y))
+                                    if not c[0:3] in (textcolor3, (0, 0, 0)):
+                                        im.putpixel((x, y), (*textcolor3, c[3]))
+                        # end of code to correct bug
 
                     self.imwidth, self.imheight = im.size
 

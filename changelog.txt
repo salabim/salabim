@@ -1,6 +1,15 @@
 salabim  changelog
 
-version 2.2.2  2017-09- 
+vareion 2.2.3  2017-09-05
+=========================
+PIL 4.2.1 (shipped with the latest WinPython distribution), has a bug when
+trying to animate text with the null string.
+Therefore, salabim now has special code to handle null strings correctly.
+
+Minor bug with imporing PIL under Pythonista fixed.
+
+
+version 2.2.2  2017-09-02 
 =========================
 Component.wait() now allows to check for":
 - a value
