@@ -1,13 +1,31 @@
 salabim  changelog
 
-vareion 2.2.3  2017-09-05
+version 2.2.4  2017-09-12 
+=========================
+Automatic naming of components, queues, etc. results in shorter names now.
+E.g., instead of 'client............11' the name is now 'client.11'.
+Also the name is not shortened anymore (was: 20 characters).
+
+The methods Monitor.print_statistics(), MonitorTimestamp.print_statistics(), 
+Queue.print_statistics, State.print_statistics and Resource.print_statistics()
+have an improved layout.
+
+The method Monitor.print_histogram() and MonitorTimestamp.print_histogram()
+have an improved layout.
+
+Monitor and MonitorTimestamp names are now serialized.
+
+Please have a look at the much improved manual.
+
+Salabim development is powered by Wing IDE (www.wingware.com).
+
+version 2.2.3  2017-09-05
 =========================
 PIL 4.2.1 (shipped with the latest WinPython distribution), has a bug when
 trying to animate text with the null string.
 Therefore, salabim now has special code to handle null strings correctly.
 
-Minor bug with imporing PIL under Pythonista fixed.
-
+Minor bug with importing PIL under Pythonista fixed.
 
 version 2.2.2  2017-09-02 
 =========================

@@ -25,8 +25,6 @@ SOFTWARE.
 
 see www.salabim.org for more information, the manual and updates.
 '''
-from __future__ import print_function  # compatibility with Python 2.x
-from __future__ import division  # compatibility with Python 2.x
 
 import platform
 Pythonista = (platform.system() == 'Darwin')
@@ -90,17 +88,30 @@ class Monitor(object):
     Parameters
     ----------
     name : str
-        name to be used at print_histogram
-
+        name of the monitor|n|
+        if the name ends with a period (.),
+        auto serializing will be applied |n|
+        if omitted, the name monitor (serialized)
+        
     monitor : bool
         if True (default}, monitoring will be on. |n|
         if False, monitoring is disabled |n|
         it is possible to control monitoring later,
         with the monitor method
+        
+    env : Environment
+        environment where the monitor is defined |n|
+        if omitted, default_env will be used    
     '''
 
-    def __init__(self, name, monitor=True):
-        self._name = name
+    def __init__(self, name, monitor=True, env=None):
+        if env is None:
+            self.env = _default_env
+        else:
+            self.env = env
+        if name is None:
+            name = 'monitor.'
+        self.name(name)
         self._timestamp = False
         self.reset(monitor)
 
@@ -143,11 +154,29 @@ class Monitor(object):
         '''
         Parameters
         ----------
-        x : float or int
+        x : any, preferably int, float or translatable into int or float
             value to be tallied
         '''
         if self._monitor:
             self._x.append(x)
+
+    def name(self, txt=None):
+        '''
+        Parameters
+        ----------
+        txt : str
+            name of the monitor |n|
+            if txt ends with a period, the name will be serialized |n|
+            if omittted, no change
+
+        Returns
+        -------
+        Name of the monitor : str
+        '''
+
+        if txt is not None:
+            _set_name(txt, self.env._nameserializeMonitor, self)
+        return _decode_name(self._name)
 
     def mean(self, ex0=False):
         '''
@@ -338,60 +367,53 @@ class Monitor(object):
         '''
         return np.histogram(self.x(ex0=ex0), bins=bins, range=range)
 
-    def print_histogram(self, number_of_bins=30, lowerbound=0, bin_width=1,
-                        print_header=True, print_legend=True, indent='', ex0=False):
+    def print_statistics(self, show_header=True, show_legend=True, do_indent=False):
         '''
-        print monitor statistics and histogram
-
+        print monitor statistics
+        
         Parameters
         ----------
-        number_of_bins : int
-            number of bins |n|
-            if 0, also the header of the histogram will be surpressed
-
-        lowerbound: float
-            first bin
-
-        bin_width : float
-            width of the bins
-
-        print_header : bool
-            if True (default), the text 'Histogram of' followed by the name of
-            the monitor will be printed {n}
-            if False, no header
-
-        print_legend : bool
-            if True (default), the legend will be printed {n}
-            if False, no legend
-
-        ex0 : bool
-            if False (default), include zeroes. if True, exclude zeroes
+        show_header: bool
+            primarily for internal use
+            
+        show_legend: bool
+            primarily for internal use
+            
+        do_indent: bool
+            primarily for internal use
         '''
-
-        if self._timestamp:
-            x, weights = self.xduration(ex0=ex0)
+        if do_indent:
+            l=45
         else:
-            x = self.x(ex0=ex0)
-            weights = np.ones(len(x))
+            l=0
+        indent=pad('',l)
 
-        if print_header:
-            print('Histogram of', self._name)
+        if show_header:
+            print(indent+'Statistics of {} at {:13.3f}'.format(self.name(), self.env._now))
 
-        if print_legend:
+        if show_legend:
             print(
                 indent + '                        all    excl.zero         zero')
             print(
-                indent + '-------------- ------------ ------------ ------------')
+                pad('-' * (l-1)+' ',l) + '-------------- ------------ ------------ ------------')
 
         if self._timestamp:
-            print(indent + 'duration      {:13.3f}{:13.3f}{:13.3f}'.
-                  format(self.duration(),
-                         self.duration(ex0=True), self.duration_zero()))
+            if self.duration()==0:
+                print(pad(self.name(),l)+'no data')
+                return
+            else:
+                print(pad(self.name(),l) + 'duration      {:13.3f}{:13.3f}{:13.3f}'.
+                    format(self.duration(),
+                    self.duration(ex0=True), self.duration_zero()))
         else:
-            print(indent + 'entries       {:13d}{:13d}{:13d}'.
-                  format(self.number_of_entries(),
-                         self.number_of_entries(ex0=True), self.number_of_entries_zero()))
-
+            if self.number_of_entries() == 0:
+                print(pad(self.name(),l)+'no entries')
+                return
+            else:
+                print(pad(self.name(),l) + 'entries       {:13d}{:13d}{:13d}'.
+                    format(self.number_of_entries(),
+                    self.number_of_entries(ex0=True), self.number_of_entries_zero()))
+            
         print(indent + 'mean          {:13.3f}{:13.3f}'.
               format(self.mean(), self.mean(ex0=True)))
         print(indent + 'std.deviation {:13.3f}{:13.3f}'.
@@ -407,12 +429,50 @@ class Monitor(object):
               format(self.percentile(95), self.percentile(95, ex0=True)))
         print(indent + 'maximum       {:13.3f}{:13.3f}'.
               format(self.maximum(), self.maximum(ex0=True)))
+
+
+    def print_histogram(self, number_of_bins=30, lowerbound=0, bin_width=1, ex0=False):
+        '''
+        print monitor statistics and histogram
+
+        Parameters
+        ----------
+        number_of_bins : int
+            number of bins |n|
+            if 0, also the header of the histogram will be surpressed
+
+        lowerbound: float
+            first bin
+
+        bin_width : float
+            width of the bins
+
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+        '''
+        if self._timestamp:
+            x, weights = self.xduration(ex0=ex0)
+        else:
+            x = self.x(ex0=ex0)
+            weights = np.ones(len(x))
+        weight_total = np.sum(weights)            
+
+        print('Histogram of', self.name())
+        if weight_total==0:
+            print()
+            if self._timestamp:
+                print('no data')
+            else:
+                print('no entries')
+            return
+                   
+        self.print_statistics(show_header=False, show_legend=True, do_indent=False)
         if number_of_bins > 0:
             print()
             if self._timestamp:
-                print(indent + '           <=      duration     %  cum%')
+                print('           <=      duration     %  cum%')
             else:
-                print(indent + '           <=       entries     %  cum%')
+                print('           <=       entries     %  cum%')
 
             cumperc = 0
             for i in range(-1, number_of_bins + 1):
@@ -425,7 +485,6 @@ class Monitor(object):
                 else:
                     ub = lowerbound + (i + 1) * bin_width
                 count = self.bin_count(lb, ub)
-                weight_total = np.sum(weights)
                 if weight_total == 0:
                     perc = nan
                     cumperc = nan
@@ -439,7 +498,7 @@ class Monitor(object):
                     s = ('*' * n) + (' ' * (scale - n))
                     s = s[:ncum - 1] + '|' + s[ncum + 1:]
 
-                print(indent + '{:13.3f} {:13.3f}{:6.1f}{:6.1f} {}'.
+                print('{:13.3f} {:13.3f}{:6.1f}{:6.1f} {}'.
                       format(ub, count, perc * 100, cumperc * 100, s))
                       
     def x(self, ex0=False):
@@ -510,11 +569,13 @@ class MonitorTimestamp(Monitor):
     '''
 
     def __init__(self, name, getter, monitor=True, env=None):
-        self._name = name
+        if name is None:
+            name = 'monitortimestamp.'
         if env is None:
             self.env = _default_env
         else:
             self.env = env
+        self.name(name)
         self._timestamp = True
         self._getter = getter
         self.reset(monitor=monitor)
@@ -585,6 +646,23 @@ class MonitorTimestamp(Monitor):
         else:
             self._x.append(nan)
             self._t.append(t)
+
+    def name(self, txt=None):
+        '''
+        Parameters
+        ----------
+        txt : str
+            name of the monitor |n|
+            if txt ends with a period, the name will be serialized |n|
+            if omittted, no change
+
+        Returns
+        -------
+        Name of the monitor : str
+        '''
+        if txt is not None:
+            _set_name(txt, self.env._nameserializeMonitorTimestamp, self)
+        return _decode_name(self._name)
 
     def mean(self, ex0=False):
         '''
@@ -850,7 +928,26 @@ class MonitorTimestamp(Monitor):
         '''
         return tuple(reversed(self.xt(ex0=ex0, exnan=exnan)))
 
-    def print_histogram(self, number_of_bins=30, lowerbound=0, bin_width=1, print_header=True, print_legend=True, indent='', ex0=False):
+
+    def print_statistics(self, show_header=True, show_legend=True, do_indent=False):
+        '''
+        print timestamp monitor statistics
+        
+        Parameters
+        ----------
+        show_header: bool
+            primarily for internal use
+            
+        show_legend: bool
+            primarily for internal use
+            
+        do_indent: bool
+            primarily for internal use
+        '''
+
+        super().print_statistics(show_header, show_legend, do_indent)
+        
+    def print_histogram(self, number_of_bins=30, lowerbound=0, bin_width=1, ex0=False):
         '''
         print timestamped monitor statistics and histogram
 
@@ -866,20 +963,10 @@ class MonitorTimestamp(Monitor):
         bin_width : float
             width of the bins
 
-        print_header : bool
-            if True (default), the text 'Histogram of' followed by the name of the
-            timestamed monitor will be printed |n|
-            if False, no header
-
-        print_legend : bool
-            if True (default), the legend will be printed {n}
-            if False, no legend
-
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
         '''
-        super().print_histogram(number_of_bins, lowerbound,
-                                bin_width, print_header, print_legend, indent, ex0)
+        super().print_histogram(number_of_bins, lowerbound, bin_width, ex0)
 
 
 if Pythonista:
@@ -927,7 +1014,7 @@ if Pythonista:
                     if an_env._current_component == an_env._main:
                         an_env.print_trace(
                             '{:10.3f}'.format(an_env._now),
-                            an_env._main._name, 'current')
+                            an_env._main.name(), 'current')
                         an_env._main._scheduled_time = inf
                         an_env._main._status = current
                         an_env.an_quit()
@@ -1038,7 +1125,7 @@ class Qmember():
         for iter in q._iter_touched:
             q._iter_touched[iter] = True
         c._qmembers[q] = self
-        q.env.print_trace('', '', c._name, 'enter ' + q._name)
+        q.env.print_trace('', '', c.name(), 'enter ' + q.name())
         q.length.tally()
 
 
@@ -1088,11 +1175,11 @@ class Queue(object):
         self._iter_sequence = 0
         self._iter_touched = {}
         self.length = MonitorTimestamp(
-            'Length of ' + self._name, getter=self._getlength, monitor=monitor, env=self.env)
+            ('Length of ',self), getter=self._getlength, monitor=monitor, env=self.env)
         self.length_of_stay = Monitor(
-            'Length of stay in ' + self._name, monitor=monitor)
+            ('Length of stay in ',self), monitor=monitor)
         if not _isinternal:
-            self.env.print_trace('', '', self.name() + ' created')
+            self.env.print_trace('', '', self.name() + ' create')
 
     def _getlength(self):
         return self._length
@@ -1134,18 +1221,18 @@ class Queue(object):
         self.length_of_stay.monitor(value=value)
 
     def __repr__(self):
-        return 'Queue('+self._name+')'
+        return 'Queue('+self.name()+')'
 
     def print_info(self):
         print('Queue ' + hex(id(self)))
-        print('  name=' + self._name)
+        print('  name=' + self.name())
         if self._length == 0:
             print('  no components')
         else:
             print('  component(s):')
             mx = self._head.successor
             while mx != self._tail:
-                print('    ' + pad(mx.component._name, 20) +
+                print('    ' + pad(mx.component.name(), 20) +
                     ' enter_time' + time_to_string(mx.enter_time) +
                     ' priority=' + str(mx.priority))
                 mx = mx.successor
@@ -1154,26 +1241,13 @@ class Queue(object):
         '''
         prints a summary of statistics of a queue
         '''
-        print('Info on {} @ {:13.3f}'.format(self._name, self.env._now))
-        if (self.length.duration() == 0) and (self.length_of_stay.number_of_entries() == 0):
-            print('    no data collected')
-            return
+        print('Statistics of {} at {:13.3f}'.format(self.name(), self.env._now))
+        self.length.print_statistics(
+            show_header=False, show_legend=True, do_indent=True)
 
-        print('                            all    excl.zero         zero')
-        print('    -------------- ------------ ------------ ------------')
-        print('Length')
-        if self.length.duration() == 0:
-            print('    no data collected')
-        else:
-            self.length.print_histogram(
-                number_of_bins=0, print_header=False, print_legend=False, indent='    ')
         print()
-        print('Length of stay')
-        if self.length_of_stay.number_of_entries() == 0:
-            print('    no data collected')
-        else:
-            self.length_of_stay.print_histogram(
-                number_of_bins=0, print_header=False, print_legend=False, indent='    ')
+        self.length_of_stay.print_statistics(
+            show_header=False, show_legend=False, do_indent=True)
 
     def name(self, txt=None):
         '''
@@ -1191,7 +1265,7 @@ class Queue(object):
 
         if txt is not None:
             _set_name(txt, self.env._nameserializeQueue, self)
-        return self._name
+        return _decode_name(self._name)
 
     def base_name(self):
         '''
@@ -1199,7 +1273,7 @@ class Queue(object):
         -------
         base name of the queue (the name used at init or name): str
         '''
-        return self._base_name
+        return _decode_base_name(self._base_name)
 
     def sequence_number(self):
         '''
@@ -1515,7 +1589,7 @@ class Queue(object):
         mx = self._head.successor
         while mx != self._tail:
 
-            if mx.component._name == txt:
+            if mx.component.name() == txt:
                 return mx.component
             mx = mx.successor
         return None
@@ -1786,6 +1860,8 @@ class Environment(object):
         self._nameserializeComponent = {}
         self._nameserializeResource = {}
         self._nameserializeState = {}
+        self._nameserializeMonitor = {}
+        self._nameserializeMonitorTimestamp = {}
         self._seq = 0
         self._event_list = []
         self._standbylist = []
@@ -1820,14 +1896,14 @@ class Environment(object):
         return self.serial
 
     def __repr__(self):
-        return 'Environment('+self._name+')'
+        return 'Environment('+self.name()+')'
 
     def print_info(self):
         print('Environment ' + hex(id(self)))
-        print('  name=' + self._name +
+        print('  name=' + self.name() +
             (' (animation environment)' if self == an_env else ''))
         print('  now=' + time_to_string(self._now))
-        print('  current_component=' + self._current_component._name)
+        print('  current_component=' + self._current_component.name())
         print('  trace=' + str(self._trace))
 
     def step(self):
@@ -1842,7 +1918,7 @@ class Environment(object):
                 c._status = current
                 c._scheduled_time = inf
                 self.env._current_component = c
-                self.print_trace('{:10.3f}'.format(self._now), c._name,
+                self.print_trace('{:10.3f}'.format(self._now), c.name(),
                                  'current (standby)')
                 try:
                     next(c._process)
@@ -1850,7 +1926,7 @@ class Environment(object):
                 except StopIteration:
                     c.release()
                     self.print_trace('{:10.3f}'.format(
-                        self._now), c._name, 'ended')
+                        self._now), c.name(), 'ended')
                     c._status = data
                     c._scheduled_time = inf
                     c._process = None
@@ -1873,7 +1949,7 @@ class Environment(object):
                 return
 
             c._status = current
-            self.print_trace('{:10.3f}'.format(self._now), c._name,
+            self.print_trace('{:10.3f}'.format(self._now), c.name(),
                              'current')
             c._check_fail()
             c._scheduled_time = inf
@@ -1881,7 +1957,7 @@ class Environment(object):
             return
         except StopIteration:
             c.release()
-            self.print_trace('{:10.3f}'.format(self._now), c._name, 'ended')
+            self.print_trace('{:10.3f}'.format(self._now), c.name(), 'ended')
             c._status = data
             c._scheduled_time = inf
             c._process = None
@@ -2199,7 +2275,7 @@ class Environment(object):
             self.env.step()
             if self.env._current_component == self._main:
                 self.print_trace('{:10.3f}'.format(
-                    self._now), self._main._name, 'current')
+                    self._now), self._main.name(), 'current')
                 self._scheduled_time = inf
                 self._status = current
                 return
@@ -2223,7 +2299,7 @@ class Environment(object):
                 self.step()
                 if self._current_component == self._main:
                     self.print_trace('{:10.3f}'.format(self._now),
-                                     self._main._name, 'current')
+                                     self._main.name(), 'current')
                     self._scheduled_time = inf
                     self._status = current
                     self.running = False
@@ -2496,13 +2572,13 @@ class Environment(object):
 
         if txt is not None:
             _set_name(txt, Environment._nameserialize, self)
-        return self._name
+        return _decode_name(self._name)
 
     def base_name(self):
         '''
         returns the base name of the environment (the name used at init or name)
         '''
-        return self._base_name
+        return _decode_base_name(self._base_name)
 
     def sequence_number(self):
         '''
@@ -2800,7 +2876,7 @@ class Animate(object):
             self.image_serial0 = self.env.serialize()
             self.width0 = self.image0.size[0] if width0 is None else width0
 
-        self.font = font
+        self.font0 = font
         self.anchor0 = anchor
 
         self.x0 = x0
@@ -3026,7 +3102,7 @@ class Animate(object):
             self.width0 = self.image0.size[0] if width0 is None else width0
 
         if font is not None:
-            self.font = font
+            self.font0 = font
         if anchor is not None:
             self.anchor0 = anchor
 
@@ -3154,6 +3230,9 @@ class Animate(object):
 
     def layer(self, t=None):
         return self.layer0
+        
+    def font(self, t=None):
+        return self.font0
 
     def visible(self, t=None):
         return self.visible0
@@ -3388,6 +3467,7 @@ class Animate(object):
                 fontsize = self.fontsize(t)
                 angle = self.angle(t)
                 anchor = self.anchor(t)
+                fontname=self.font(t)
 
                 text = self.text(t)
                 if self.screen_coordinates:
@@ -3401,9 +3481,9 @@ class Animate(object):
                     offsety = offsety * self.env.scale
 
                 self._image_ident = (
-                    text, self.font, fontsize, angle, textcolor)
+                    text, fontname, fontsize, angle, textcolor)
                 if self._image_ident != self._image_ident_prev:
-                    font = self.env.getfont(self.font, fontsize)
+                    font = self.env.getfont(fontname, fontsize)
                     if text == '':  # this code is a workarond for a bug in PIL >= 4.2.1
                         im = Image.new(
                         'RGBA', (0,0), (0, 0, 0, 0))
@@ -3830,7 +3910,7 @@ class Component(object):
         self._mode = mode
         self._mode_time = self.env._now
         self.env.print_trace('', '', self.name() +
-            ' created', _modetxt(self._mode))
+            ' create', _modetxt(self._mode))
         if process == '*':
             if self.hasprocess():
                 process = 'process'
@@ -3844,11 +3924,11 @@ class Component(object):
         pass
 
     def __repr__(self):
-        return 'Component('+self._name+')'
+        return 'Component('+self.name()+')'
     
     def print_info(self):
         print('Component ' + hex(id(self)))
-        print('  name=' + self._name)
+        print('  name=' + self.name())
         print('  class=' + str(type(self)).split('.')[-1].split("'")[0])
         print('  suppress_trace=' + str(self._suppress_trace))
         print('  status=' + self._status())
@@ -3859,22 +3939,22 @@ class Component(object):
                      time_to_string(self._scheduled_time))
         if len(self._qmembers) > 0:
             print('  member of queue(s):')
-            for q in sorted(self._qmembers, key=lambda obj: obj._name.lower()):
-                print('    ' + pad(q._name, 20) + ' enter_time=' +
+            for q in sorted(self._qmembers, key=lambda obj: obj.name().lower()):
+                print('    ' + pad(q.name(), 20) + ' enter_time=' +
                              time_to_string(self._qmembers[q].enter_time) +
                              ' priority=' + str(self._qmembers[q].priority))
         if len(self._requests) > 0:
             print('  requesting resource(s):')
 
             for r in sorted(list(self._requests),
-                key=lambda obj: obj._name.lower()):
-                print('    ' + pad(r._name, 20) + ' quantity=' +
+                key=lambda obj: obj.name().lower()):
+                print('    ' + pad(r.name(), 20) + ' quantity=' +
                     str(self._requests[r]))
         if len(self._claims) > 0:
             print('  claiming resource(s):')
 
-            for r in sorted(list(self._claims), key=lambda obj: obj._name.lower()):
-                print('    ' + pad(r._name, 20) +
+            for r in sorted(list(self._claims), key=lambda obj: obj.name().lower()):
+                print('    ' + pad(r.name(), 20) +
                     ' quantity=' + str(self._claims[r]))
         if len(self._waits) > 0:
             if self._wait_all:
@@ -3882,7 +3962,7 @@ class Component(object):
             else:
                 print('  waiting for any of state(s):')
             for s, value, _ in self._waits:
-                print('    ' + pad(s._name, 20) +
+                print('    ' + pad(s.name(), 20) +
                     ' value=' + str(value))
 
     def hasprocess(self):
@@ -3920,7 +4000,7 @@ class Component(object):
 
     def _check_fail(self):
         if len(self._requests) != 0:
-            self.env.print_trace('', '', self._name, 'request failed')
+            self.env.print_trace('', '', self.name(), 'request failed')
             for r in list(self._requests.keys()):
                 self._leave(r._requesters)
                 if r._requesters._length == 0:
@@ -3929,7 +4009,7 @@ class Component(object):
             self._failed = True
             
         if len(self._waits) != 0:
-            self.env.print_trace('', '', self._name, 'wait failed')
+            self.env.print_trace('', '', self.name(), 'wait failed')
             for state, _,  _ in self._waits:
                 if self in state._waiters:  # there might be more values for this state
                     self._leave(state._waiters)
@@ -3946,7 +4026,7 @@ class Component(object):
             self._push(scheduled_time, urgent)
         self._status = scheduled
         self.env.print_trace(
-            '', '', self._name + ' ' + caller,
+            '', '', self.name() + ' ' + caller,
             'scheduled for {:10.3f}'.format(scheduled_time) + extra +
             _urgenttxt(urgent) + _modetxt(self._mode))
 
@@ -4123,7 +4203,7 @@ class Component(object):
             self._checkisnotdata()
             self._remove()
             self._check_fail()
-        self.env.print_trace('', '', self._name +
+        self.env.print_trace('', '', self.name() +
                              ' passivate', _modetxt(self._mode))
         self._scheduled_time = inf
         if mode != '*':
@@ -4153,7 +4233,7 @@ class Component(object):
             self._remove()
             self._check_fail()
         self.env.print_trace('', '', 'cancel ' +
-                             self._name + ' ' + _modetxt(self._mode))
+                             self.name() + ' ' + _modetxt(self._mode))
         self._process = None
         self._scheduled_time = inf
         if mode != '*':
@@ -4293,7 +4373,7 @@ class Component(object):
                 raise AssertionError('incorrect specifier', argsi)
 
             if r in self._requests:
-                raise AssertionError(resource._name + ' requested twice')
+                raise AssertionError(resource.name() + ' requested twice')
             if q <= 0:
                 raise AssertionError('quantity ' + str(q) + ' <=0')
             self._requests[r] = q
@@ -4306,8 +4386,8 @@ class Component(object):
                 addstring = addstring + ' priority=' + str(priority)
                 self._enter_sorted(r._requesters, priority)
             self.env.print_trace(
-                '', '', self._name,
-                'request for ' + str(q) + ' from ' + r._name + addstring +
+                '', '', self.name(),
+                'request for ' + str(q) + ' from ' + r.name() + addstring +
                 ' ' + _modetxt(self._mode))
 
         self._tryrequest()
@@ -4338,12 +4418,12 @@ class Component(object):
                 r.available_quantity.tally()
             self._requests = {}
             self._remove()
-            self._reschedule(self.env._now, False, 'request honored')
+            self._reschedule(self.env._now, False, 'request honour')
                 
     def _release(self, r, q):
         if r not in self._claims:
-            raise AssertionError(self._name +
-                ' not claiming from resource ' + r._name)
+            raise AssertionError(self.name() +
+                ' not claiming from resource ' + r.name())
         if q is None:
             q = self._claims[r]
         if q > self._claims[r]:
@@ -4357,8 +4437,8 @@ class Component(object):
             del self._claims[r]
         r.claimed_quantity.tally()
         r.available_quantity.tally()
-        self.env.print_trace('', '', self._name,
-            'release ' + str(q) + ' from ' + r._name)
+        self.env.print_trace('', '', self.name(),
+            'release ' + str(q) + ' from ' + r.name())
         r._tryrequest()
 
     def release(self, *args):
@@ -4599,7 +4679,7 @@ class Component(object):
                     self._leave(s._waiters)
             self._waits = []
             self._remove()
-            self._reschedule(self.env._now, False, 'wait honored')
+            self._reschedule(self.env._now, False, 'wait honor')
             
         return honored
 
@@ -4679,7 +4759,7 @@ class Component(object):
 
         if txt is not None:
             _set_name(txt, self.env._nameserializeComponent, self)
-        return self._name
+        return _decode_name(self._name)
 
     def base_name(self):
         '''
@@ -4687,7 +4767,7 @@ class Component(object):
         -------
         base name of the component (the name used at init or name): str
         '''
-        return self._base_name
+        return _decode_base_name(self._base_name)
 
     def sequence_number(self):
         '''
@@ -5006,7 +5086,7 @@ class Component(object):
         # signal for components method that member is not in the queue
         q._length -= 1
         del self._qmembers[q]
-        self.env.print_trace('', '', self._name, 'leave ' + q._name)
+        self.env.print_trace('', '', self.name(), 'leave ' + q.name())
         length_of_stay = self.env._now - mx.enter_time
         q.length_of_stay.tally(length_of_stay)
         q.length.tally()
@@ -5160,22 +5240,22 @@ class Component(object):
             pass
         else:
             raise AssertionError(
-                self._name + ' is already member of ' + q._name)
+                self.name() + ' is already member of ' + q.name())
 
     def _checkinqueue(self, q):
         mx = self._member(q)
         if mx is None:
-            raise AssertionError(self._name + ' is not member of ' + q._name)
+            raise AssertionError(self.name() + ' is not member of ' + q.name())
         else:
             return mx
 
     def _checkisnotdata(self):
         if self._status == data:
-            raise AssertionError(self._name + ' data component not allowed')
+            raise AssertionError(self.name() + ' data component not allowed')
 
     def _checkisnotmain(self):
         if self == self.env._main:
-            raise AssertionError(self._name + ' main component not allowed')
+            raise AssertionError(self.name() + ' main component not allowed')
 
 
 class _Distribution():
@@ -5848,21 +5928,21 @@ class State(object):
         self.name(name)
         self._value = value
         self._waiters = Queue(
-            name='waiters of '+name,
+            name=('waiters of ',self),
             monitor=monitor, env=self.env, _isinternal=True)
         self.value = MonitorTimestamp(
-            'Value of ' + self._name,
+            name=('Value of ',self),
             getter=self._get_value, monitor=monitor, env=self.env)
         self.env.print_trace(
-            '', '', self.name() + ' created',
-            'value= --> ' + str(self._value))
+            '', '', self.name() + ' create',
+            'value= ' + str(self._value))
             
     def __repr__(self):
-        return 'State('+self._name+')'
+        return 'State('+self.name()+')'
 
     def print_info(self):
         print('State ' + hex(id(self)))
-        print('  name=' + self._name)
+        print('  name=' + self.name())
         print('  value=' + str(self._value))
         if len(self._waiters) == 0:
             print('  no waiting components')
@@ -5879,7 +5959,7 @@ class State(object):
                             values = values + ', '
                         values = values + str(value)
 
-                print('    ' + pad(c._name, 20),' value(s): '+values)
+                print('    ' + pad(c.name(), 20),' value(s): '+values)
             
     def __call__(self):
         return self._value
@@ -5909,7 +5989,7 @@ class State(object):
         -----
         This method is identical to reset, except the default value is True.
         '''
-        self.env.print_trace('', '', self.name(), 'value --> '+str(value))
+        self.env.print_trace('', '', self.name()+' set', 'value = ' + str(value))
         if self._value != value:
             self._value = value
             self.value.tally()
@@ -5930,7 +6010,11 @@ class State(object):
         -----
         This method is identical to set, except the default value is False.
         '''
-        self.set(value)
+        self.env.print_trace('', '', self.name()+' reset', 'value = ' + str(value))
+        if self._value != value:
+            self._value = value
+            self.value.tally()
+            self._trywait()
         
     def trigger(self, value=True, value_after=None, max=inf):
         '''
@@ -5952,14 +6036,14 @@ class State(object):
         Notes
         -----
         The value of the state will be set to value, then at most
-            max waiting components fir this state  will be honored and next
-            the value will be set to value_after and abain checked for possible
+            max waiting components for this state  will be honored and next
+            the value will be set to value_after and again checked for possible
             honors.
         '''
         if value_after is None:
             value_after = self._value
-        self.env.print_trace('', '', self._name,
-            ' triggered --> ' + str(value) + ' --> ' + str(value_after) +
+        self.env.print_trace('', '', self.name() + ' trigger',
+            ' value = ' + str(value) + ' --> ' + str(value_after) +
             ' allow ' + str(max) + ' components')
         self._value = value
         self.value.tally()  # strictly speaking, not required
@@ -6015,7 +6099,7 @@ class State(object):
         '''
         if txt is not None:
             _set_name(txt, self.env._nameserializeState, self)
-        return self._name
+        return _decode_name(self._name)
 
     def base_name(self):
         '''
@@ -6041,40 +6125,13 @@ class State(object):
         '''
         prints a summary of statistics of the state
         '''
-        print('Info on {} @ {:13.3f}'.format(self._name, self.env._now))
-        if (self.waiters().length.duration() == 0) and \
-            (self.waiters().length_of_stay.number_of_entries() == 0) and \
-            (self.value.duration() == 0):
-            print('    no data collected')
-            return
-
-        print('                            all    excl.zero         zero')
-        print('    -------------- ------------ ------------ ------------')
-        for q in [self.waiters()]:
-            print('Length of ' + q._name)
-            if q.length.duration() == 0:
-                print('    no data collected')
-            else:
-                q.length.print_histogram(
-                    number_of_bins=0, print_header=False, print_legend=False, indent='    ')
-            print()
-            print('Length of stay of ' + q._name)
-            if q.length_of_stay.number_of_entries() == 0:
-                print('    no data collected')
-            else:
-                q.length_of_stay.print_histogram(
-                    number_of_bins=0, print_header=False, print_legend=False, indent='    ')
-            print()
-
-        for m in [self.value]:
-            print(m._name)
-            if m.duration() == 0:
-                print('    no data collected')
-            else:
-                m.print_histogram(
-                    number_of_bins=0, print_header=False, print_legend=False, indent='    ')
-            print()
-            
+        print('Statistics of {} at {:13.3f}'.format(self.name(), self.env._now))
+        self.waiters().length.print_statistics(show_header=False, show_legend=True, do_indent=True)
+        print()
+        self.waiters().length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True)
+        print()
+        self.value.print_statistics(show_header=False, show_legend=False, do_indent=True)
+                            
     def waiters(self):
         '''
         Returns
@@ -6136,16 +6193,16 @@ class Resource(object):
         self._anonymous = anonymous
         self._minq=inf
         self.capacity = MonitorTimestamp(
-            'Capacity of ' + self._name,
+            ('Capacity of ',self),
             getter=self._get_capacity, monitor=monitor, env=self.env)
         self.claimed_quantity = MonitorTimestamp(
-            'Claimed quantity of ' + self._name,
+            ('Claimed quantity of ',self),
             getter=self._get_claimed_quantity, monitor=monitor, env=self.env)
         self.available_quantity = MonitorTimestamp(
-            'Available quantity of ' + self._name,
+            ('Available quantity of ',self),
             getter=self._get_available_quantity, monitor=monitor, env=self.env)
         self.env.print_trace(
-            '', '', self.name() + ' created',
+            '', '', self.name() + ' create',
             'capacity=' + str(self._capacity) + (' anonymous' if self._anonymous else ''))
 
     def reset(monitor=None):
@@ -6174,42 +6231,17 @@ class Resource(object):
         '''
         prints a summary of statistics of a resource
         '''
-        print('Info on {} @ {:13.3f}'.format(self._name, self.env._now))
-        if (self.requesters().length.duration() == 0) and \
-            (self.requesters().length_of_stay.number_of_entries() == 0) and \
-            (self.claimers().length.duration() == 0) and \
-            (self.claimers().length_of_stay.number_of_entries() == 0) and \
-            (self.capacity.duration() == 0) and \
-            (self.available_quantity.duration() == 0) and \
-                (self.claimed_quantity.duration() == 0):
-            print('    no data collected')
-            return
-
-        print('                            all    excl.zero         zero')
-        print('    -------------- ------------ ------------ ------------')
+        print('Statistics of {} at {:13.3f}'.format(self.name(), self.env._now))
+        show_legend=True
         for q in [self.requesters(), self.claimers()]:
-            print('Length of ' + q._name)
-            if q.length.duration() == 0:
-                print('    no data collected')
-            else:
-                q.length.print_histogram(
-                    number_of_bins=0, print_header=False, print_legend=False, indent='    ')
+            q.length.print_statistics(show_header=False, show_legend=show_legend, do_indent=True)
+            show_legend=False
             print()
-            print('Length of stay of ' + q._name)
-            if q.length_of_stay.number_of_entries() == 0:
-                print('    no data collected')
-            else:
-                q.length_of_stay.print_histogram(
-                    number_of_bins=0, print_header=False, print_legend=False, indent='    ')
+            q.length_of_stay.print_statistics(show_header=False, show_legend=show_legend, do_indent=True)
             print()
 
         for m in [self.capacity, self.available_quantity, self.claimed_quantity]:
-            print(m._name)
-            if m.duration() == 0:
-                print('    no data collected')
-            else:
-                m.print_histogram(
-                    number_of_bins=0, print_header=False, print_legend=False, indent='    ')
+            m.print_statistics(show_header=False, show_legend=show_legend, do_indent=True)
             print()
 
     def monitor(self, value=None):
@@ -6235,11 +6267,11 @@ class Resource(object):
         self.claimed_quantity.monitor(value)
 
     def __repr__(self):
-        return 'Resource('+self._name+')'
+        return 'Resource('+self.name()+')'
     
     def print_info(self):
         print('Resource ' + hex(id(self)))
-        print('  name=' + self._name)
+        print('  name=' + self.name())
         print('  capacity=' + str(self._capacity))
         if len(self._requesters) == 0:
             print('  no requesting components')
@@ -6249,7 +6281,7 @@ class Resource(object):
             while mx != self._requesters._tail:
                 c = mx.component
                 mx = mx.successor
-                print('    ' + pad(c._name, 20) +
+                print('    ' + pad(c.name(), 20) +
                     ' quantity=' + str(c._requests[self]))
 
         print('  claimed_quantity=' + str(self._claimed_quantity))
@@ -6263,7 +6295,7 @@ class Resource(object):
                 while mx != self._claimers._tail:
                     c = mx.component
                     mx = mx.successor
-                    print('    ' + pad(c._name, 20) +
+                    print('    ' + pad(c.name(), 20) +
                         ' quantity=' + str(c._claims[self]))
 
     def _tryrequest(self):
@@ -6375,7 +6407,7 @@ class Resource(object):
         '''
         if txt is not None:
             _set_name(txt, self.env._nameserializeResource, self)
-        return self._name
+        return _decode_name(self._name)
 
     def base_name(self):
         '''
@@ -6383,7 +6415,7 @@ class Resource(object):
         -------
         base name of the resource (the name used at init or name): str
         '''
-        return self._base_name
+        return _decode_base_name(self._base_name)
 
     def sequence_number(self):
         '''
@@ -6648,14 +6680,12 @@ def tracetext():
         return 'Trace on'
 
 
-def _namer(name, i, l):
-    return ('{:.<' + str(l) + '}').format(name)[:l - len(str(i))] + str(i)
-
-
 def _set_name(name, _nameserialize, object):
-    l = 20
     oldname = getattr(object, '_base_name', None)
-    auto = (('*' + name)[-1] == '.')  # * added to allow for null string
+    if isinstance(name,tuple):
+        auto=False
+    else:
+        auto = (('*' + name)[-1] == '.')  # * added to allow for null string
 
     if name in _nameserialize:
         sequence_number, object0 = _nameserialize[name]
@@ -6667,26 +6697,41 @@ def _set_name(name, _nameserialize, object):
 
     if auto:
         if sequence_number == 0:
-            newname = name[:-1][:l]
+            newname = name[:-1]
         else:
             if sequence_number == 1:
                 if object0._base_name == name:
-                    newname0 = _namer(name, 0, l)
+                    newname0 = name + str(0)
                     object0.env.print_trace(
                         '', '', object0._name + ' rename to ' + newname0)
                     object0._name = newname0
-            newname = _namer(name, sequence_number, l)
+            newname = name + str(sequence_number)
     else:
-        newname = name[:l]
+        newname = name
     if (oldname is not None) and (_nameserialize != Environment._nameserialize):
         object.env.print_trace('', '', oldname + ' rename to', newname)
     object._name = newname
     object._base_name = name
     object._sequence_number = sequence_number
+    
+def _decode_name(name):
+    if isinstance(name,tuple):
+        return name[0]+name[1].name()
+    else:
+        return name
+        
+def _decode_base_name(basename):
+    if isinstance(name,tuple):
+        return basename[0]+basename[1].basename()
+    else:
+        return basename    
 
 
 def pad(txt, n):
-    return txt.ljust(n)[:n]
+    if n <= 0:
+        return ''
+    else:
+        return txt.ljust(n)[:n]
 
 
 def rpad(txt, n):

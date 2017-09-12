@@ -426,7 +426,7 @@ while True:
     for icar in range(ncars):
         thiscar = Car(name='car ' + str(icar), capacity=capacity)
         cars.append(thiscar)
-
+        
     make_video=False
     
     do_animation()

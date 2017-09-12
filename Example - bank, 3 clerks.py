@@ -35,8 +35,13 @@ clerks = sim.Queue('clerks')
 for i in range(3):
     Clerk().enter(clerks)
 waitingline = sim.Queue('waitingline')
-
+waitingline.print_statistics()
+waitingline.length.print_histogram(30,1,0)
 env.run(till=50000)
+
+waitingline.print_statistics()
+
 waitingline.length.print_histogram(30, 1, 0)
 print()
 waitingline.length_of_stay.print_histogram(30, 10, 0)
+

@@ -39,11 +39,13 @@ def test34():
     s1=sim.State(name='s.',value=0)
     s2=sim.State(name='s.',value='green')
     s3=sim.State(name='s.')
+    s1.name('piet')
     q=sim.Queue('q.')
     x=X()
     y=Y()
     z=Z()
     sim.run(10)
+    s1.print_statistics()
 
 
 def test33():
@@ -119,7 +121,7 @@ def test31():
             s1.reset()
             yield self.hold(2)
             y.print_info()
-#            s1.trigger()
+            s1.trigger()
             
     class Y(sim.Component):
         def process(self):

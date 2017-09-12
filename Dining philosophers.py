@@ -4,10 +4,8 @@ from math import sin, cos, pi, radians
 
 
 class Philosopher(sim.Component):
-
     def process(self):
         while True:
-
             thinkingtime = sim.Uniform(0.5, 1.5).sample() * thinkingtime_mean
             eatingtime = sim.Uniform(0.5, 1.5).sample() * eatingtime_mean
 
