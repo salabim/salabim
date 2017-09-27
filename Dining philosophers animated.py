@@ -47,8 +47,7 @@ class AnimateFork(sim.Animate):
 def do_animation():
     global nphilosophers, eatingtime_mean, thinkingtime_mean
     global nphilosophers_last
-    a=1/0
-    sim.animation_parameters(x0=-50 * env.width / env.height, y0=-50, x1=+50 * env.width / env.height,
+    env.animation_parameters(x0=-50 * env.width / env.height, y0=-50, x1=+50 * env.width / env.height,
                              modelname='Dining philosophers',
                              speed=8)
     for i in philosopher:
@@ -79,7 +78,7 @@ def set_nphilosophers(val):
     nphilosophers = int(val)
     if nphilosophers != nphilosophers_last:
         nphilosophers_last = nphilosophers
-        sim.main().activate()
+        env.main().activate()
 
 
 class Philosopher(sim.Component):

@@ -26,13 +26,11 @@ SOFTWARE.
 see www.salabim.org for more information, the manual and updates.
 '''
 
-import platform
-Pythonista = (platform.system() == 'Darwin')
-
 import heapq
 import random
 import time
 import math
+import array
 import collections
 import itertools
 import functools
@@ -41,6 +39,9 @@ import os
 import inspect
 import numpy as np
 from numpy import inf, nan
+
+import platform
+Pythonista = (platform.system() == 'Darwin')
 
 try:
     import cv2
@@ -64,13 +65,12 @@ try:
 except:
     tkinter_installed = False
 
-
 if Pythonista:
     import scene
     import ui
     import objc_util
 
-__version__ = '2.2.4'
+__version__ = '2.2.5'
 
 
 class SalabimException(Exception):
@@ -99,12 +99,29 @@ class Monitor(object):
         it is possible to control monitoring later,
         with the monitor method
         
+    type : str
+        specifies how tallied values are to be stored
+            - 'any' (default) stores values in a list. This allows
+               non numeric values. In calculations the values are
+               forced to a numeric value (0 if not possible)
+            - 'bool' (True, False) Actually integer >= 0 <= 255 1 byte
+            - 'uint8' integer >= 0 <= 255 1 byte
+            - 'int16' integer >= -32768 <= 32767 2 bytes
+            - 'uint16' integer >= 0 <= 65535 2 bytes
+            - 'int32' integer >= -2147483648<= 2147483647 4 bytes
+            - 'uint32' integer >= 0 <= 4294967295 4 bytes
+            - 'int64' integer >= -9223372036854775808 <= 9223372036854775807 8 bytes
+            - 'uint64' integer >= 0 <= 18446744073709551615 8 bytes
+            - 'float' float 8 bytes
+        
     env : Environment
         environment where the monitor is defined |n|
-        if omitted, default_env will be used    
+        if omitted, default_env will be used
     '''
 
-    def __init__(self, name, monitor=True, env=None):
+    cached_x = [(0, 0), (0, 0)]  # index=ex0, value=[hash,x]
+    
+    def __init__(self, name, monitor=True, type='any', env=None):
         if env is None:
             self.env = _default_env
         else:
@@ -112,6 +129,10 @@ class Monitor(object):
         if name is None:
             name = 'monitor.'
         self.name(name)
+        if type in _lookup_arraytype:
+            self._type = type
+        else:
+            raise AssertionError('type (' + type + ') not recognized')
         self._timestamp = False
         self.reset(monitor)
 
@@ -128,7 +149,10 @@ class Monitor(object):
 
         if monitor is None:
             monitor = self._monitor
-        self._x = []
+        if self._type == 'any':
+            self._x = []
+        else:
+            self._x = array.array(_lookup_arraytype[self._type])
         self.monitor(monitor)
 
     def monitor(self, value=None):
@@ -360,8 +384,8 @@ class Monitor(object):
         -------
         numpy histogram : see numpy documentation
 
-        Notes
-        -----
+        Note
+        ----
         The numpy definition of a histogram is different from the salabim
         print_histogram!
         '''
@@ -383,9 +407,9 @@ class Monitor(object):
             primarily for internal use
         '''
         if do_indent:
-            l=45
+            l = 45
         else:
-            l=0
+            l = 0
         indent=pad('',l)
 
         if show_header:
@@ -398,37 +422,37 @@ class Monitor(object):
                 pad('-' * (l-1)+' ',l) + '-------------- ------------ ------------ ------------')
 
         if self._timestamp:
-            if self.duration()==0:
-                print(pad(self.name(),l)+'no data')
+            if self.duration() == 0:
+                print(pad(self.name(), l)+'no data')
                 return
             else:
-                print(pad(self.name(),l) + 'duration      {:13.3f}{:13.3f}{:13.3f}'.
-                    format(self.duration(),
-                    self.duration(ex0=True), self.duration_zero()))
+                print(pad(self.name(),l) + 'duration      {}{}{}'.
+                    format(fn(self.duration(),13,3),
+                    fn(self.duration(ex0=True),13,3), fn(self.duration_zero(),13,3)))
         else:
             if self.number_of_entries() == 0:
-                print(pad(self.name(),l)+'no entries')
+                print(pad(self.name(), l)+'no entries')
                 return
             else:
-                print(pad(self.name(),l) + 'entries       {:13d}{:13d}{:13d}'.
-                    format(self.number_of_entries(),
-                    self.number_of_entries(ex0=True), self.number_of_entries_zero()))
+                print(pad(self.name(), l) + 'entries       {}{}{}'.
+                    format(fn(self.number_of_entries(),13,3),
+                    fn(self.number_of_entries(ex0=True),13,3), fn(self.number_of_entries_zero(),13,3)))
             
-        print(indent + 'mean          {:13.3f}{:13.3f}'.
-              format(self.mean(), self.mean(ex0=True)))
-        print(indent + 'std.deviation {:13.3f}{:13.3f}'.
-              format(self.std(), self.std(ex0=True)))
+        print(indent + 'mean          {}{}'.
+              format(fn(self.mean(),13,3), fn(self.mean(ex0=True),13,3)))
+        print(indent + 'std.deviation {}{}'.
+              format(fn(self.std(),13,3), fn(self.std(ex0=True),13,3)))
         print()
-        print(indent + 'minimum       {:13.3f}{:13.3f}'.
-              format(self.minimum(), self.minimum(ex0=True)))
-        print(indent + 'median        {:13.3f}{:13.3f}'.
-              format(self.percentile(50), self.percentile(50, ex0=True)))
-        print(indent + '90% percentile{:13.3f}{:13.3f}'.
-              format(self.percentile(90), self.percentile(90, ex0=True)))
-        print(indent + '95% percentile{:13.3f}{:13.3f}'.
-              format(self.percentile(95), self.percentile(95, ex0=True)))
-        print(indent + 'maximum       {:13.3f}{:13.3f}'.
-              format(self.maximum(), self.maximum(ex0=True)))
+        print(indent + 'minimum       {}{}'.
+              format(fn(self.minimum(),13,3), fn(self.minimum(ex0=True),13,3)))
+        print(indent + 'median        {}{}'.
+              format(fn(self.percentile(50),13,3),fn(self.percentile(50, ex0=True),13,3)))
+        print(indent + '90% percentile{}{}'.
+              format(fn(self.percentile(90),13,3), fn(self.percentile(90, ex0=True),13,3)))
+        print(indent + '95% percentile{}{}'.
+              format(fn(self.percentile(95),13,3), fn(self.percentile(95, ex0=True),13,3)))
+        print(indent + 'maximum       {}{}'.
+              format(fn(self.maximum(),13,3), fn(self.maximum(ex0=True),13,3)))
 
 
     def print_histogram(self, number_of_bins=30, lowerbound=0, bin_width=1, ex0=False):
@@ -455,10 +479,10 @@ class Monitor(object):
         else:
             x = self.x(ex0=ex0)
             weights = np.ones(len(x))
-        weight_total = np.sum(weights)            
+        weight_total = np.sum(weights)
 
         print('Histogram of', self.name())
-        if weight_total==0:
+        if weight_total == 0:
             print()
             if self._timestamp:
                 print('no data')
@@ -498,10 +522,10 @@ class Monitor(object):
                     s = ('*' * n) + (' ' * (scale - n))
                     s = s[:ncum - 1] + '|' + s[ncum + 1:]
 
-                print('{:13.3f} {:13.3f}{:6.1f}{:6.1f} {}'.
-                      format(ub, count, perc * 100, cumperc * 100, s))
+                print('{} {}{}{} {}'.
+                      format(fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s))
                       
-    def x(self, ex0=False):
+    def x(self, ex0=False, force_numeric=True):
         '''
         array of tallied values
 
@@ -510,17 +534,41 @@ class Monitor(object):
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
 
+        convert_to_numeric : bool
+            if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
+            if False, do not interpret x-values, return as list if type is list
+            
         Returns
         -------
-        all tallied values : array
+        all tallied values : array/list
         '''
-
-        x = list_to_numeric_array(self._x)
+        thishash = hash((tuple(self._x), force_numeric))
+        
+        if Monitor.cached_x[ex0][0] == thishash:
+            return Monitor.cached_x[ex0][1]
+                    
+        if self._type == 'any':
+            if force_numeric:
+                x = list_to_numeric_array(self._x)
+            else:
+                if ex0:
+                    x = []
+                    for el in self._x:
+                        if el != 0:
+                            x.append(el)
+                    return x
+                else:
+                    x = self._x
+                Monitor.cached_x[ex0] = (hash, x)
+                return x
+        else:
+            x = np.array(self._x)
 
         if ex0:
-            return x[np.where(x != 0)]
-        else:
-            return x
+            x = x[np.where(x != 0)]
+
+        Monitor.cached_x[ex0] = (hash, x)
+        return x
 
 
 class MonitorTimestamp(Monitor):
@@ -541,13 +589,32 @@ class MonitorTimestamp(Monitor):
         if False, monitoring is disabled |n|
         it is possible to control monitoring later,
         with the monitor method
-
+        
+    type : str
+        specifies how tallied values are to be stored
+        Using a int, uint of float type results in less memory usage and better
+        performance. Note that the getter should never return the number not to use
+        as this is used to indicate 'off'
+        
+            - 'any' (default) stores values in a list. This allows for
+               non numeric values. In calculations the values are
+               forced to a numeric value (0 if not possible) do not use -inf
+            - 'bool' bool (False, True). Actually integer >= 0 <= 254 1 byte do not use 255
+            - 'uint8' integer >= 0 <= 254 1 byte do not use 255
+            - 'int16' integer >= -32767 <= 32767 2 bytes do not use -32768
+            - 'uint16' integer >= 0 <= 65534 2 bytes do not use 65535
+            - 'int32' integer >= -2147483647 <= 2147483647 4 bytes do not use -2147483648
+            - 'uint32' integer >= 0 <= 4294967294 4 bytes do not use 4294967295
+            - 'int64' integer >= -9223372036854775807 <= 9223372036854775807 8 bytes do not use -9223372036854775808
+            - 'uint64' integer >= 0 <= 18446744073709551614 8 bytes do not use 18446744073709551615
+            - 'float' float 8 bytes do not use -inf
+            
     env : Environment
         environment where the monitor is defined |n|
         if omitted, default_env will be used
 
-    Notes
-    -----
+    Note
+    ----
     A MonitorTimestamp collects both the value and the time.
     All statistics are based on the durations as weights.
 
@@ -568,13 +635,20 @@ class MonitorTimestamp(Monitor):
         And thus a mean of (10*50+11*20+12*10+10*20)/(50+20+10+20)
     '''
 
-    def __init__(self, name, getter, monitor=True, env=None):
+    cached_xduration = [(0, ()), (0, ())]  # index=ex0, value=[hash,(x,duration)]
+    
+    def __init__(self, name, getter, monitor=True, type='any', env=None):
         if name is None:
             name = 'monitortimestamp.'
         if env is None:
             self.env = _default_env
         else:
             self.env = env
+        if type in _lookup_arraytype:
+            self._type = type
+        else:
+            raise AssertionError('type (' + str(type) + ') nor recognized')
+        self.off = _lookup_off[_lookup_arraytype[type]]
         self.name(name)
         self._timestamp = True
         self._getter = getter
@@ -596,11 +670,16 @@ class MonitorTimestamp(Monitor):
         '''
         if monitor is not None:
             self._monitor = monitor
-        if self._monitor:
-            self._x = [self._getter()]
+        if self._type == 'any':
+            self._x = []
         else:
-            self._x = [nan]
-        self._t = [self.env._now]
+            self._x = array.array(_lookup_arraytype[self._type])
+        if self._monitor:
+            self._x.append(self._getter())
+        else:
+            self._x.append(self.off)
+        self._t = array.array('d')
+        self._t.append(self.env._now)
 
     def monitor(self, value=None):
         '''
@@ -623,7 +702,7 @@ class MonitorTimestamp(Monitor):
             if self._monitor:
                 self.tally()
             else:
-                self._tally_nan()
+                self._tally_off()
         return self.monitor
 
     def tally(self):
@@ -639,12 +718,12 @@ class MonitorTimestamp(Monitor):
                 self._x.append(x)
                 self._t.append(t)
 
-    def _tally_nan(self):
+    def _tally_off(self):
         t = self.env._now
         if self._t[-1] == t:
-            self._x[-1] = nan
+            self._x[-1] = self.off
         else:
-            self._x.append(nan)
+            self._x.append(self.off)
             self._t.append(t)
 
     def name(self, txt=None):
@@ -835,7 +914,7 @@ class MonitorTimestamp(Monitor):
         -------
         numpy histogram : see numpy documentation
 
-        Notes
+        Note
         -----
         The numpy definition of a histogram is different from the salabim print_histogram!
 
@@ -843,7 +922,7 @@ class MonitorTimestamp(Monitor):
         x, duration = self.xduration(ex0=ex0)
         return np.histogram(x, bins=bins, range=range, weights=duration)
 
-    def xduration(self, ex0=False):
+    def xduration(self, ex0=False, force_numeric=True):
         '''
         tuple of array with x-values and array with durations
 
@@ -852,86 +931,136 @@ class MonitorTimestamp(Monitor):
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
 
+        force_numeric : bool
+            if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
+            if False, do not interpret x-values, return as list if type is list
+            
         Returns
         -------
-        array with x-values and array with durations : tuple
+        array/list with x-values and array with durations : tuple
         '''
-        x = list_to_numeric_array(self._x)
-        duration = np.zeros(len(self._x))
+        
+        thishash = hash((tuple(self._x), tuple(self._t), force_numeric))
+        
+        if MonitorTimestamp.cached_xduration[ex0][0] == thishash:
+            return MonitorTimestamp.cached_xduration[ex0][1]
+            
+        duration = np.zeros(len(self._t))
         for i, t in enumerate(self._t):
             if i != 0:
                 duration[i - 1] = t - lastt
             lastt = t
 
         duration[-1] = self.env._now - lastt
-        filter_not_isnan = np.where(~np.isnan(x))
-        duration = duration[filter_not_isnan]
-        x = x[filter_not_isnan]
+        
+        if self._type == 'any':
+            if force_numeric:
+                x = list_to_numeric_array(self._x)
+            else:
+                x = []
+                duration = array.array('d')
+                
+                for thisx, thisduration in zip(self._x, duration):
+                    if (not ex0) or (thisx != 0):
+                        x.append(thisx)
+                        duration.append(thisduration)
+                MonitorTimestamp.cached_xduration[ex0] = (thishash, (x, duration))
+                return x, duration
+                        
+        else:
+            x = np.array(self._x)
+        filter_not_off = np.where(x != self.off)
+        duration = duration[filter_not_off]
+        x = x[filter_not_off]
 
         if ex0:
             filter_ex0 = np.where(x != 0)
-            return x[filter_ex0], duration[filter_ex0]
-        else:
-            return x, duration
+            x = x[filter_ex0]
+            duration = duration[filter_ex0]
 
-    def xt(self, ex0=False, exnan=False):
+        MonitorTimestamp.cached_xduration[ex0] = (thishash, (x, duration))
+        return x, duration
+
+    def xt(self, ex0=False, exoff=False, force_numeric=True):
         '''
-        tuple of array with x-values and array with timestamps
+        tuple of array/list with x-values and array with timestamp
 
         Parameters
         ----------
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
 
-        exnan : bool
-            if False (default), include nan. if True, exclude nans
-
+        exoff : bool
+            if False (default), include self.off. if True, exclude self.off's
+            
+        force_numeric : bool
+            if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
+            if False, do not interpret x-values, return as list if type is list
+                               
         Returns
         -------
-        array with x-values and array with timestamps : tuple
+        array/list with x-values and array with timestamps : tuple
 
-        Notes
-        -----
-        The value nan is stored when monitoring is turned off
+        Note
+        ----
+        The value self.off is stored when monitoring is turned off
         '''
-        x = list_to_numeric_array(self._x)
+        if self._type == 'any':
+            if force_numeric:
+                x = list_to_numeric_array(self._x)
+            else:
+                x = []
+                t = array.array('d')
+                for thisx, thist in zip(self._x, self._t):
+                    if (not ex0) or (thisx != 0):
+                        if (not exoff) or (thisx != self.off):
+                            x.append(thisx)
+                            t.appent(thist)
+                return x, t
+        else:
+            x = np.array(self._x)
+            
         t = np.array(self._t)
         if ex0:
             filter_ex0 = np.where(x != 0)
             x = x[filter_ex0]
             t = t[filter_ex0]
-        if exnan:
-            filter_exnan = np.where(~np.isnan(x))
-            x = x[filter_exnan]
-            t = t[filter_exnan]
+        if exoff:
+            filter_exoff = np.where(x != self.off)
+            x = x[filter_exoff]
+            t = t[filter_exoff]
         return x, t
 
-    def tx(self, ex0=False, exnan=False):
+    def tx(self, ex0=False, exoff=False, force_numeric=False):
         '''
-        tuple of array with timestamps and array with x-values
+        tuple of array with timestamps and array/list with x-values
 
         Parameters
         ----------
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
 
-        exnan : bool
-            if False (default), include nan. if True, exclude nans
-
+        exoff : bool
+            if False (default), include self.off. if True, exclude self.off's
+            
+        force_numeric : bool
+            if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
+            if False, do not interpret x-values, return as list if type is list      
+                        
         Returns
         -------
-        array with timestamps and array with x-values : tuple
+        array with timestamps and array/list with x-values : tuple
 
-        Notes
-        -----
-        The value nan is stored when monitoring is turned off
+        Note
+        ----
+        The value self.off is stored when monitoring is turned off
         '''
-        return tuple(reversed(self.xt(ex0=ex0, exnan=exnan)))
+        return tuple(reversed(self.xt(ex0=ex0, exoff=exoff, force_numeric=force_numeric)))
 
 
     def print_statistics(self, show_header=True, show_legend=True, do_indent=False):
         '''
-        print timestamp monitor statistics
+        print timestamped monitor statistics
         
         Parameters
         ----------
@@ -1028,15 +1157,15 @@ if Pythonista:
                 touchvalues = self.touches.values()
 
                 capture_image = Image.new('RGB',
-                                          (an_env.width, an_env.height), colorspec_to_tuple(an_env.background_color))
+                    (an_env.width, an_env.height), colorspec_to_tuple(an_env.background_color))
 
                 for ao in an_env.an_objects:
                     ao.make_pil_image(an_env.t)
                     if ao._image_visible:
                         capture_image.paste(ao._image,
-                                            (int(ao._image_x),
-                                             int(an_env.height - ao._image_y - ao._image.size[1])),
-                                            ao._image)
+                            (int(ao._image_x),
+                            int(an_env.height - ao._image_y - ao._image.size[1])),
+                            ao._image)
 
                 ims = scene.load_pil_image(capture_image)
                 scene.image(ims, 0, 0, *capture_image.size)
@@ -1175,18 +1304,18 @@ class Queue(object):
         self._iter_sequence = 0
         self._iter_touched = {}
         self.length = MonitorTimestamp(
-            ('Length of ',self), getter=self._getlength, monitor=monitor, env=self.env)
+            ('Length of ',self), getter=self._getlength, monitor=monitor, type='uint32', env=self.env)
         self.length_of_stay = Monitor(
-            ('Length of stay in ',self), monitor=monitor)
+            ('Length of stay in ', self), monitor=monitor, type='float')
         if not _isinternal:
             self.env.print_trace('', '', self.name() + ' create')
 
     def _getlength(self):
         return self._length
 
-    def reset(self, monitor=None):
+    def reset_monitors(self, monitor=None):
         '''
-        resets queue monitor length_of_stay and time stamped monitr length
+        resets queue monitor length_of_stay and time stamped monitor length
 
         Parameters
         ----------
@@ -1194,8 +1323,8 @@ class Queue(object):
             if True (default}, monitoring will be on. |n|
             if False, monitoring is disabled
 
-        Notes
-        -----
+        Note
+        ----
         it is possible to reset individual monitoring with length_of_stay.reset() and length.reset()
         '''
         self.length.reset(monitor=monitor)
@@ -1212,8 +1341,8 @@ class Queue(object):
             if False, monitoring is disabled |n|
             if not specified, no change
 
-        Notes
-        -----
+        Note
+        ----
         it is possible to individually control monitoring with length_of_stay.monitor() and length.monitor()
         '''
 
@@ -1297,8 +1426,8 @@ class Queue(object):
             component to be added to the tail of the queue |n|
             may not be member of the queue yet
 
-        Notes
-        -----
+        Note
+        ----
         the priority will be set to
         the priority of the tail of the queue, if any
         or 0 if queue is empty
@@ -1316,8 +1445,8 @@ class Queue(object):
             component to be added to the head of the queue |n|
             may not be member of the queue yet
 
-        Notes
-        -----
+        Note
+        ----
         the priority will be set to
         the priority of the head of the queue, if any
         or 0 if queue is empty
@@ -1338,8 +1467,8 @@ class Queue(object):
             component in front of which component will be inserted |n|
             must be member of the queue
 
-        Notes
-        -----
+        Note
+        ----
         the priority of component will be set to the priority of poscomponent
         '''
         component.enter_in_front_off(self, poscomponent)
@@ -1358,9 +1487,9 @@ class Queue(object):
             component behind which component will be inserted |n|
             must be member of the queue
 
-        Notes
-        -----
-        the priority of component will be set to the priority of poscomponent 
+        Note
+        ----
+        the priority of component will be set to the priority of poscomponent
         
         '''
         component.enter_behind(self, poscomponent)
@@ -1378,8 +1507,8 @@ class Queue(object):
         priority : float
             priority of the component|n|
 
-        Notes
-        -----
+        Note
+        ----
         component will be placed just after the last component with
         a priority <= priority
         '''
@@ -1403,8 +1532,8 @@ class Queue(object):
         -------
         the head component of the queue, if any. None otherwise : Component
 
-        Notes
-        -----
+        Note
+        ----
         q[0] is a more Pythonic way to access the head of the queue
         '''
         return self._head.successor.component
@@ -1415,7 +1544,7 @@ class Queue(object):
         -------
         the tail component of the queue, if any. None otherwise : Component
 
-        Notes
+        Note
         -----
         q[-1] is a more Pythonic way to access the tail of the queue
         '''
@@ -1636,8 +1765,8 @@ class Queue(object):
         -------
         queue containing all elements of self and q : Queue
 
-        Notes
-        -----
+        Note
+        ----
         the priority will be set to 0 for all components in the
         resulting  queue |n|
         the order of the resulting queue is as follows: |n|
@@ -1807,7 +1936,8 @@ class Environment(object):
         the seed for random, equivalent to random.seed() |n|
         if None, a purely random value (based on the current time) will be used
         (not reproducable) |n|
-        if omitted, the no action on random is taken
+        if the null string (''), no action on random is taken |n|
+        if omitted, 1234567 will be used.
 
     name : str
         name of the environment |n|
@@ -1820,8 +1950,8 @@ class Environment(object):
         if False, no change |n|
         if omitted, this environment becomes the default environment |n|
 
-    Notes
-    -----
+    Note
+    ----
     The trace may be switched on/off later with trace |n|
     The seed may be later set with random_seed() |n|
     Initially, the random stream will be seeded with the value 1234567.
@@ -1855,7 +1985,6 @@ class Environment(object):
         self._current_component = self._main
         self.ui_objects = []
         self.print_trace('{:10.3f}'.format(self._now), 'main', 'current')
-        self.font_cache = {}
         self._nameserializeQueue = {}
         self._nameserializeComponent = {}
         self._nameserializeResource = {}
@@ -2050,8 +2179,8 @@ class Environment(object):
             The video has to have a .mp4 etension |n|
             This requires installation of numpy and opencv (cv2).
 
-        Notes
-        -----
+        Note
+        ----
         The y-coordinate of the upper right corner is determined automatically
         in such a way that the x and scaling are the same. |n|
 
@@ -2144,8 +2273,10 @@ class Environment(object):
 
         Note
         ----
-        If you want to test the status, always include parentheses, like |n|
-            if env.trace():
+        If you want to test the status, always include
+        parentheses, like
+        
+            ``if env.trace():``
         '''
         if value is not None:
             self._trace = value
@@ -2247,7 +2378,7 @@ class Environment(object):
                     if Pythonista:
                         raise AssertionError(
                             'video production is not supported under Pythonista.')
-                    else:    
+                    else:
                         raise AssertionError(
                             'cv2 required for video production. Run pip install opencv_python.')
 
@@ -2439,7 +2570,7 @@ class Environment(object):
         may be overridden to change the standard behaviour.
         '''
         ao = Animate(x0=self.width, y0=self.height - 5, fillcolor0='black',
-                     text='', fontsize0=15, font='DejaVuSansMono', anchor='ne',
+                     text='', fontsize0=15, font='narrow', anchor='ne',
                      screen_coordinates=True, env=self)
         self.system_an_objects.append(ao)
         ao.text = clocktext
@@ -2492,44 +2623,11 @@ class Environment(object):
         self.start_animation_time = self.t
         self.start_animation_clocktime = time.time()
 
-    @functools.lru_cache()
-    def fonts(self):
-        return _fonts()
-
-    @functools.lru_cache()
-    def getfont(self, fontname, fontsize):  # fontsize in screen_coordinates!
-        '''
-        internal funtion to get and cache fonts
-        '''
-        if isinstance(fontname, str):
-            fontlist = (fontname,)
-        else:
-            fontlist = fontname
-
-        font = None
-        for ifont in itertools.chain(fontlist, ('calibri', 'arial', 'arialmt')):
-            try:
-                font = ImageFont.truetype(font=ifont, size=int(fontsize))
-                break
-            except:
-                pass
-            ifont = self.fonts().get(normalize(ifont))
-            if ifont is not None:
-                try:
-                    font = ImageFont.truetype(font=ifont, size=int(fontsize))
-                    break
-                except:
-                    pass
-
-        if font is None:
-            raise AssertionError('no matching fonts found for ', fontname)
-        return font
-
     def getwidth(self, text, font='', fontsize=20, screen_coordinates=False):
         if not screen_coordinates:
             fontsize = fontsize * self.scale
         f = self.getfont(font, fontsize)
-        if text == '': # necessary because of bug in PIL >= 4.2.1
+        if text == '':  # necessary because of bug in PIL >= 4.2.1
             thiswidth, thisheight = (0, 0)
         else:
             thiswidth, thisheight = f.getsize(text)
@@ -2555,7 +2653,7 @@ class Environment(object):
             return fontsize
         else:
             return fontsize / self.scale
-
+            
     def name(self, txt=None):
         '''
         Parameters
@@ -2608,9 +2706,9 @@ class Environment(object):
         s4 : str
             part 4 (usually formatted  now)
 
-        Notes
-        -----
-        if the current component's suppress_trace is True, nothing is printed  
+        Note
+        ----
+        if the current component's suppress_trace is True, nothing is printed
         '''
         if self._trace:
             if hasattr(self, '_current_component'):
@@ -2773,8 +2871,8 @@ class Animate(object):
     width1 : float
        width of the image to be displayed at time t1 (default: width0) |n|
 
-    Notes
-    -----
+    Note
+    ----
     one (and only one) of the following parameters is required:
          - circle0
          - image
@@ -2792,14 +2890,14 @@ class Animate(object):
     hexnames may be either 3 of 4 bytes long (RGB or RGBA)
     both colornames and hexnames may be given as a tuple with an
     additional alpha between 0 and 255,
-    e.g. ``('red',127)`` or ``('#ff00ff',128)``
+    e.g. ``(255,0,255,128)``, ('red',127)`` or ``('#ff00ff',128)``
 
     Permitted parameters
 
     ======================  ========= ========= ========= ========= ========= =========
     parameter               circle    image     line      polygon   rectangle text
     ======================  ========= ========= ========= ========= ========= =========
-    parent                  -         -         -         -         -         -##
+    parent                  -         -         -         -         -         -
     layer                   -         -         -         -         -         -
     keep                    -         -         -         -         -         -
     scree_coordinates       -         -         -         -         -         -
@@ -3065,11 +3163,10 @@ class Animate(object):
         width1 : float
            width of the image to be displayed at time t1 (default: width0) |n|
 
-        Notes
-        -----
-        the type of the animation cannot be changed with this method.
-
-        the default value of most of the paramaters is the current value (at time now)
+        Note
+        ----
+        The type of the animation cannot be changed with this method. |n|
+        The default value of most of the parameters is the current value (at time now)
         '''
 
         t = self.env._now
@@ -3152,17 +3249,31 @@ class Animate(object):
 
     def remove(self):
         '''
-        removes the animation object
+        removes the animation object from the animation queue,
+        so effectively ending this animation.
 
-        the animation object is removed from the animation queue,
-        so effectively ending this animation
-
-        note that it might be still updated, if required
+        Note
+        ----
+        The animation object might be still updated, if required
         '''
         if self in self.env.an_objects:
             self.env.an_objects.remove(self)
 
     def x(self, t=None):
+        '''
+        x-position of an animate object. May be overridden.
+        
+        Parameters
+        ----------
+        t : float
+            current time
+            
+        Returns
+        -------
+        x : float
+            default behaviour: linear interpolation betwen self.x0 and self.x1
+            
+        '''
         return interpolate((self.env._now if t is None else t),
                            self.t0, self.t1, self.x0, self.x1)
 
@@ -3241,7 +3352,7 @@ class Animate(object):
         '''
         returns image and a serial number at time t
         use the function spec_to_image to change the image here |n|
-        if there's a change in the image, a new serial numbder should be returned
+        if there's a change in the image, a new serial number should be returned
         if there's no change, do not update the serial number
         '''
         return self.image0, self.image_serial0
@@ -3467,7 +3578,7 @@ class Animate(object):
                 fontsize = self.fontsize(t)
                 angle = self.angle(t)
                 anchor = self.anchor(t)
-                fontname=self.font(t)
+                fontname = self.font(t)
 
                 text = self.text(t)
                 if self.screen_coordinates:
@@ -3483,10 +3594,10 @@ class Animate(object):
                 self._image_ident = (
                     text, fontname, fontsize, angle, textcolor)
                 if self._image_ident != self._image_ident_prev:
-                    font = self.env.getfont(fontname, fontsize)
+                    font = getfont(fontname, fontsize)
                     if text == '':  # this code is a workarond for a bug in PIL >= 4.2.1
                         im = Image.new(
-                        'RGBA', (0,0), (0, 0, 0, 0))
+                            'RGBA', (0, 0), (0, 0, 0, 0))
                     else:
                         width, height = font.getsize(text)
                         im = Image.new(
@@ -3594,10 +3705,10 @@ class AnimateButton(object):
         executed when the button is pressed (default None)
         the function should have no arguments |n|
 
-    Notes
-    -----
-    On CPython platforms, the tkinter functionality is used,
-    on Pythonista, this is emulated by salabim
+    Note
+    ----
+    On CPython platforms, the tkinter functionality is used.
+    On Pythonista, this is emulated by salabim
     '''
 
     def __init__(self, x=0, y=0, width=80, height=30,
@@ -3650,8 +3761,7 @@ class AnimateButton(object):
 
     def remove(self):
         '''
-        removes the button object
-
+        removes the button object. |n|
         the ui object is removed from the ui queue,
         so effectively ending this ui
         '''
@@ -3716,16 +3826,16 @@ class AnimateSlider(object):
     fontsize : int
          fontsize of the text (default 12)
 
-    action ; function
+    action : function
          function executed when the slider value is changed (default None) |n|
          the function should one arguments, being the new value |n|
          if None (default), no action
 
-    Notes
-    -----
+    Note
+    ----
     The current value of the slider is the v attibute of the slider. |n|
-    On CPython platforms, the tkinter functionality is used,
-    on Pythonista, this is emulated by salabim
+    On CPython platforms, the tkinter functionality is used. |n|
+    On Pythonista, this is emulated by salabim
     '''
 
     def __init__(self, layer=0, x=0, y=0, width=100, height=20,
@@ -3818,9 +3928,8 @@ class AnimateSlider(object):
 
     def remove(self):
         '''
-        removes the slider object
-
-        the ui object is removed from the ui queue,
+        removes the slider object |n|
+        The ui object is removed from the ui queue,
         so effectively ending this ui
         '''
         if self in self.env.ui_objects:
@@ -3888,7 +3997,7 @@ class Component(object):
     '''
 
     def __init__(self, name=None, at=None, delay=0, urgent=False,
-                 process='*', suppress_trace=False, mode=None, env=None, *args, **kwargs):
+        process='*', suppress_trace=False, mode=None, env=None, *args, **kwargs):
         if env is None:
             self.env = _default_env
         else:
@@ -3899,8 +4008,8 @@ class Component(object):
         self._qmembers = {}
         self._process = None
         self._status = data
-        self._requests = {}
-        self._claims = {}
+        self._requests = collections.defaultdict(float)
+        self._claims = collections.defaultdict(float)
         self._waits = []
         self._on_event_list = False
         self._scheduled_time = inf
@@ -3921,6 +4030,23 @@ class Component(object):
         self.setup(*args, **kwargs)
 
     def setup(self, *args, **kwargs):
+        '''
+        called immediately after initialization of a component.
+        
+        by default this is a dummy method, but it can be overridden.
+        
+        Example
+        -------
+            class Car(sim.Component):
+                def setup(self, color):
+                    self.color = color
+                    
+                def process(self):
+                    ...
+            
+            redcar=Car(color='red') |n|
+            bluecar=Car(color='blue')
+        '''
         pass
 
     def __repr__(self):
@@ -4005,7 +4131,7 @@ class Component(object):
                 self._leave(r._requesters)
                 if r._requesters._length == 0:
                     r._minq = inf
-            self._requests = {}
+            self._requests = collections.defaultdict(float)
             self._failed = True
             
         if len(self._waits) != 0:
@@ -4079,11 +4205,11 @@ class Component(object):
             if nothing specified, the mode will be unchanged.|n|
             also mode_time will be set to now, if mode is set.
 
-        Notes
-        -----
+        Note
+        ----
         if to be applied for the current component, use yield self.activate(). |n|
         if both at and delay are specified, the component becomes current at the sum
-        ofw the two values.
+        of the two values.
         '''
         p = None
         if process is None:
@@ -4109,7 +4235,7 @@ class Component(object):
         if self._status != current:
             self._remove()
             if p is None:
-                if  not (keep_request or keep_wait):
+                if not (keep_request or keep_wait):
                     self._check_fail()
             else:
                 self._check_fail()
@@ -4156,9 +4282,9 @@ class Component(object):
             if nothing specified, the mode will be unchanged.|n|
             also mode_time will be set to now, if mode is set.
 
-        Notes
+        Note
         ----
-        if to be used for the current component, use `yield self.hold(...)``. |n|
+        if to be used for the current component, use ``yield self.hold(...)``. |n|
 
         if both duration and till are specified, the component will become current at the sum of
         these two.
@@ -4191,13 +4317,13 @@ class Component(object):
 
         mode : str preferred
             mode |n|
-            will be used in trace and can be used in animations|n|
-            if nothing specified, the mode will be unchanged.|n|
+            will be used in trace and can be used in animations |n|
+            if nothing is specified, the mode will be unchanged.|n|
             also mode_time will be set to now, if mode is set.
 
         Note
         ----
-        if to be used for the current component (nearly always the case), use `yield self.passivate(...)`.
+        if to be used for the current component (nearly always the case), use ``yield self.passivate(...)``.
         '''
         if self._status != current:
             self._checkisnotdata()
@@ -4226,7 +4352,7 @@ class Component(object):
 
         Note
         ----
-        if to be used for the current component, use `yield self.cancel(...)`.
+        if to be used for the current component, use ``yield self.cancel(...)``.
         '''
         if self._status != current:
             self._checkisnotdata()
@@ -4253,13 +4379,13 @@ class Component(object):
             if nothing specified, the mode will be unchanged.|n|
             also mode_time will be set to now, if mode is set.
 
-        Notes
-        -----
+        Note
+        ----
         Not allowed for data components or main.
 
         if to be used for the current component
         (which will be nearly always the case),
-        use `yield self.standby(...)`.
+        use ``yield self.standby(...)``.
         '''
         if self._status != current:
             self._checkisnotdata()
@@ -4308,17 +4434,19 @@ class Component(object):
             if nothing specified, the mode will be unchanged. |n|
             also mode_time will be set to now, if mode is set.
 
-        Notes
-        -----
+        Note
+        ----
         Not allowed for data components or main.
 
-        if to be used for the current component
+        If to be used for the current component
         (which will be nearly always the case),
-        use `yield self.request(...)``.
+        use ``yield self.request(...)``.
 
-        it is not allowed to claim a resource more than once by the same component |n|
-        the requested quantity may exceed the current capacity of a resource |n|
-        the parameter failed will be reset by a calling request
+        If the same resource is specified more that once, the quantities are summed |n|
+        
+        The requested quantity may exceed the current capacity of a resource |n|
+        
+        The parameter failed will be reset by a calling request or wait
 
         Example
         -------
@@ -4372,14 +4500,10 @@ class Component(object):
             else:
                 raise AssertionError('incorrect specifier', argsi)
 
-            if r in self._requests:
-                raise AssertionError(resource.name() + ' requested twice')
             if q <= 0:
                 raise AssertionError('quantity ' + str(q) + ' <=0')
-            self._requests[r] = q
-            if q<r._minq:
-                r._minq=q
-            addstring=''
+            self._requests[r] += q  # is same resource is specified several times, just add them up
+            addstring = ''
             if priority is None:
                 self._enter(r._requesters)
             else:
@@ -4390,6 +4514,10 @@ class Component(object):
                 'request for ' + str(q) + ' from ' + r.name() + addstring +
                 ' ' + _modetxt(self._mode))
 
+        for r, q in self._requests.items():
+            if q < r._minq:
+                r._minq = q
+            
         self._tryrequest()
 
         if len(self._requests) != 0:
@@ -4406,17 +4534,14 @@ class Component(object):
                 r._claimed_quantity += self._requests[r]
 
                 if not r._anonymous:
-                    if r in self._claims:
-                        self._claims[r] += self._requests[r]
-                    else:
-                        self._claims[r] = self._requests[r]
+                    self._claims[r] += self._requests[r]
                     self._enter(r._claimers)
                 self._leave(r._requesters)
                 if r._requesters._length == 0:
                     r._minq = inf
                 r.claimed_quantity.tally()
                 r.available_quantity.tally()
-            self._requests = {}
+            self._requests = collections.defaultdict(float)
             self._remove()
             self._reschedule(self.env._now, False, 'request honour')
                 
@@ -4451,8 +4576,8 @@ class Component(object):
             - sequence of resources, where quantity=current claimed quantity
             - sequence of tuples/lists containing the resource and the quantity.
 
-        Notes
-        -----
+        Note
+        ----
         It is not possible to release from an anonymous resource, this way.
         Use Resource.release() in that case.
 
@@ -4531,13 +4656,13 @@ class Component(object):
             if nothing specified, the mode will be unchanged. |n|
             also mode_time will be set to now, if mode is set.
 
-        Notes
-        -----
+        Note
+        ----
         Not allowed for data components or main.
 
         If to be used for the current component
         (which will be nearly always the case),
-        use `yield self.wait(...)``.
+        use ``yield self.wait(...)``.
 
         It is allowed to wait for more than one value of a state |n|
         the parameter failed will be reset by a calling wait
@@ -4550,17 +4675,18 @@ class Component(object):
         * constant, that value is just compared to state.value() |n|
           yield self.wait((light,'red'))
         * an expression, containg one or more $-signs
-          the $ is replaced by state.value(), eaxch time the condition is tesetd. |n|
+          the $ is replaced by state.value(), each time the condition is tested. |n|
           self refers to the component under test, state refers to the state
           under test. |n|
-          yield self.wait((light,'"$" in ("red","yellow")')) |n|
+          yield self.wait((light,'$ in ("red","yellow")')) |n|
           yield self.wait((level,'$<30')) |n|
         * a function. In that case the parameter should function that
-          accepts a tuple, with the value, the component and the state under test. |n|
+          should accept three arguments: the value, the component under test and the
+          state under test. |n|
           usually the function will be a lambda function, but that's not
           a requirement. |n|
-          yield self.wait((light,lambda t: t[0] in ('red','yellow'))) |n|
-          yield self.wait((level,lambda t: t[0] < 30)) |n|
+          yield self.wait((light,lambda t, comp, state: t in ('red','yellow'))) |n|
+          yield self.wait((level,lambda t, comp, state: t < 30)) |n|
 
         Example
         -------
@@ -4572,7 +4698,7 @@ class Component(object):
         --> waits for s1.value()==False or s2.value=='on' or s3.value()==True
         s1 is at the tail of waiters, because of the set priority
         yield self.wait(s1,s2,all=True) |n|
-        --> waits for s1.value()==True and s2.value==True |n|            
+        --> waits for s1.value()==True and s2.value==True |n|
         '''
         if self._status != current:
             self._checkisnotdata()
@@ -4633,8 +4759,8 @@ class Component(object):
             else:
                 self._waits.append((state, value, 0))
                 
-        if len(self._waits)==0:
-            raise AssertionError ('no states specified')
+        if len(self._waits) == 0:
+            raise AssertionError('no states specified')
         self._trywait()
                             
         if len(self._waits) != 0:
@@ -4649,11 +4775,11 @@ class Component(object):
                         honored = False
                         break
                 elif valuetype == 1:
-                    if eval(value.replace('$',str(state._value))):
+                    if eval(value.replace('$', 'state.value()')):
                         honored = False
                         break
                 elif valuetype == 2:
-                    if not value((state._value,self,state)):
+                    if not value(state._value, self, state):
                         honored = False
                         break
 
@@ -4665,11 +4791,11 @@ class Component(object):
                         honored = True
                         break
                 elif valuetype == 1:
-                    if eval(value.replace('$',str(state._value))):
+                    if eval(value.replace('$', str(state._value))):
                         honored = True
                         break
                 elif valuetype == 2:
-                    if value((state._value,self,state)):
+                    if value(state._value, self, state):
                         honored = True
                         break
                 
@@ -4683,9 +4809,8 @@ class Component(object):
             
         return honored
 
-        
-    def claimed_quanity(self):
-        ''''
+    def claimed_quantity(self):
+        '''
         Parameters
         ----------
         resource : Resoure
@@ -4696,10 +4821,7 @@ class Component(object):
         the claimed quantity from a resource : float or int
             if the resource is not claimed, 0 will be returned
         '''
-        if resource in self._claims:
-            return self._claims[resource]
-        else:
-            return 0
+        return self._claims.get(resource, 0)
 
     def claimed_resources(self):
         '''
@@ -4729,16 +4851,13 @@ class Component(object):
         the requested (not yet honored) quantity from a resource : float or int
             if there is no request for the resource, 0 will be returned
         '''
-        if resource in self._requests:
-            return self._requests[resource]
-        else:
-            return 0
+        return self._requests.get(resource, 0)
 
     def failed(self):
         '''
         Returns
         -------
-        True, if the latest request has failed (either by timeout or external) : bool
+        True, if the latest request/wait has failed (either by timeout or external) : bool
         False, otherwise
         '''
         return self._failed
@@ -4821,7 +4940,7 @@ class Component(object):
 
         Returns
         -------
-        mode of the component. any, usually str
+        mode of the component : any, usually str
             the mode is useful for tracing and animations. |n|
             Usually the mode will be set in a call to passivate, hold, activate, request or standby.
         '''
@@ -4954,8 +5073,8 @@ class Component(object):
         q : Queue
             queue to enter
 
-        Notes
-        -----
+        Note
+        ----
         the priority will be set to
         the priority of the tail component of the queue, if any
         or 0 if queue is empty
@@ -4973,8 +5092,8 @@ class Component(object):
         q : Queue
             queue to enter
 
-        Notes
-        -----
+        Note
+        ----
         the priority will be set to
         the priority of the head component of the queue, if any
         or 0 if queue is empty
@@ -4996,8 +5115,8 @@ class Component(object):
         poscomponent : Component
             component to be entered in front of
 
-        Notes
-        -----
+        Note
+        ----
         the priority will be set to the priority of poscomponent
         '''
 
@@ -5018,8 +5137,8 @@ class Component(object):
         poscomponent : Component
             component to be entered behind
 
-        Notes
-        -----
+        Note
+        ----
         the priority will be set to the priority of poscomponent
         '''
 
@@ -5040,8 +5159,8 @@ class Component(object):
         priority: float
             priority in the queue
 
-        Notes
-        -----
+        Note
+        ----
         The component is placed just before the first component with a priority > given priority
         '''
 
@@ -5072,8 +5191,8 @@ class Component(object):
         q : Queue
             queue to leave
 
-        Notes
-        -----
+        Note
+        ----
         statistics are updated accordingly
         '''
 
@@ -5093,7 +5212,7 @@ class Component(object):
 
     def priority(self, q, priority=None):
         '''
-        gest/sets the priority of a component in a queue
+        gets/sets the priority of a component in a queue
 
         Parameters
         ----------
@@ -5106,10 +5225,10 @@ class Component(object):
 
         Returns
         -------
-        the priority of the component in the queue
+        the priority of the component in the queue : float
 
-        Notes
-        -----
+        Note
+        ----
         if you change the priority, the order of the queue may change
         '''
 
@@ -5214,25 +5333,22 @@ class Component(object):
         returns the status of a component
 
         possible values are
-        - data
-        - passive
-        - scheduled
-        - requesting
-        - current
-        - standby
+            - data
+            - passive
+            - scheduled
+            - requesting
+            - current
+            - standby
         '''
 
         if len(self._requests) > 0:
             return requesting
-        if len(self._waits) > 0 :
+        if len(self._waits) > 0:
             return waiting
         return self._status
 
     def _member(self, q):
-        try:
-            return self._qmembers[q]
-        except:
-            return None
+        return self._qmembers.get(q,None)
 
     def _checknotinqueue(self, q):
         mx = self._member(q)
@@ -5565,20 +5681,21 @@ class Cdf(_Distribution):
     ----------
     spec : list or tuple
         list with x-values and corresponding cumulative density
-        (x1,c1,x2,c2, ...xn,cn)
-
+        (x1,c1,x2,c2, ...xn,cn) |n|
+        Requirements:
+        
+            x1<=x2<= ...<=xn |n|
+            c1<=c2<=cn |n|
+            c1=0 |n|
+            cn>0 |n|
+            all cumulative densities are auto scaled according to cn,
+            so no need to set cn to 1 or 100.
+        
     randomstream: randomstream
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it defines a new stream with the specified seed
 
-    requirements:
-        x1<=x2<= ...<=xn |n|
-        c1<=c2<=cn |n|
-        c1=0 |n|
-        cn>0 |n|
-        all cumulative densities are auto scaled according to cn,
-        so no need to set cn to 1 or 100.
     '''
 
     def __init__(self, spec, randomstream=None):
@@ -5654,21 +5771,22 @@ class Pdf(_Distribution):
     '''
     Probability distribution function
 
-    Pdf(spec,spec2,seed)
+    Pdf(spec,probabilities,seed)
 
     Parameters
     ----------
     spec : list or tuple
-        list with x-values and corresponding probability |n|
-        (x1,p1,x2,p2, ...xn,pn) |n|
-        |n|
-        or, if spec2 is present: |n|
-        |n|
-        list with x-values
+        either
+        
+        -   if no possibilities specified: |n|
+            list with x-values and corresponding probability
+            (x0, p0, x1, p1, ...xn,pn) |n|
+        -   if probabilities is specified: |n|
+            list with x-values
 
-    spec2 : list, tuple or float
+    probabilities : list, tuple or float
         if omitted, spec contains the probabilities |n|
-        the list contains the probabilities of the corresponding
+        the list (p0, p1, ...pn) contains the probabilities of the corresponding
         x-values from spec. |n|
         alternatively, if a float is given (e.g. 1), all x-values
         have equal probability. The value is not important.
@@ -5678,16 +5796,17 @@ class Pdf(_Distribution):
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
 
-    requirements:
-        p1+p2=...+pn>0 |n|
-        all densities are auto scaled according to the sum of p1 to pn,
-        so no need to have p1 to pn add up to 1 or 100. |n|
-        the x-values may be any type. If it is a salabim distribution,
-        not the distribution, but a sample will be returned when
-        calling sample.
+    Note
+    ----
+    p0+p1=...+pn>0 |n|
+    all densities are auto scaled according to the sum of p0 to pn,
+    so no need to have p0 to pn add up to 1 or 100. |n|
+    The x-values may be any type. |n|
+    If it is a salabim distribution, not the distribution,
+    but a sample will be returned when calling sample.
     '''
 
-    def __init__(self, spec1, spec2=None, randomstream=None):
+    def __init__(self, spec1, probabilities=None, randomstream=None):
         self._x = [0]  # just a place holder
         self._cum = [0]
         if randomstream is None:
@@ -5794,20 +5913,20 @@ class Distribution(_Distribution):
     ----------
     spec : str
         - string containing a valid salabim distribution, where only the first
-            letters are relevant and casing is not important
+          letters are relevant and casing is not important
         - string containing one float (c1), resulting in Constant(c1)
         - string containing two floats seperated by a comma (c1,c2),
-            resulting in a Uniform(c1,c2)
+          resulting in a Uniform(c1,c2)
         - string containing three floats, separated by commas (c1,c2,c3),
-            resulting in a Triangular(c1,c2,c3)
+          resulting in a Triangular(c1,c2,c3)
 
     randomstream : randomstream
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it assigns a new stream with the specified seed |n|
 
-    Notes
-    -----
+    Note
+    ----
     The randomstream in the specifying string is ignored. |n|
     It is possible to use expressions in the specification, as long these
     are valid within the context of the salabim module, which usually implies
@@ -5874,7 +5993,7 @@ class Distribution(_Distribution):
         return self._distribution.__repr__()
         
     def print_info(self):
-        self._distribution.print_info()        
+        self._distribution.print_info()
         
     def sample(self):
         '''
@@ -5914,11 +6033,30 @@ class State(object):
         if True (default) , the waiters queue and the value are monitored |n|
         if False, monitoring is disabled.
         
+    type : str
+        specifies how the state values are monitored. Using a
+        int, uint of float type results in less memory usage and better
+        performance. Note that you avoid the number not to use
+        as this is used to indicate 'off'
+        
+        -   'any' (default) stores values in a list. This allows for
+            non numeric values. In calculations the values are
+            forced to a numeric value (0 if not possible) do not use -inf
+        -  'bool' bool (False, True). Actually integer >= 0 <= 254 1 byte do not use 255
+        -  'uint8' integer >= 0 <= 254 1 byte do not use 255
+        -  'int16' integer >= -32767 <= 32767 2 bytes do not use -32768
+        -  'uint16' integer >= 0 <= 65534 2 bytes do not use 65535
+        -  'int32' integer >= -2147483647 <= 2147483647 4 bytes do not use -2147483648
+        -  'uint32' integer >= 0 <= 4294967294 4 bytes do not use 4294967295
+        -  'int64' integer >= -9223372036854775807 <= 9223372036854775807 8 bytes do not use -9223372036854775808
+        -  'uint64' integer >= 0 <= 18446744073709551614 8 bytes do not use 18446744073709551615
+        -  'float' float 8 bytes do not use -inf
+            
     env : Environment
         environment to be used |n|
         if omitted, _default_env is used
     '''
-    def __init__(self, name=None, value=False, env=None, monitor=True):
+    def __init__(self, name=None, value=False, type='any', monitor=True, env=None):
         if env is None:
             self.env = _default_env
         else:
@@ -5928,11 +6066,11 @@ class State(object):
         self.name(name)
         self._value = value
         self._waiters = Queue(
-            name=('waiters of ',self),
+            name=('waiters of ', self),
             monitor=monitor, env=self.env, _isinternal=True)
         self.value = MonitorTimestamp(
-            name=('Value of ',self),
-            getter=self._get_value, monitor=monitor, env=self.env)
+            name=('Value of ', self),
+            getter=self._get_value, monitor=monitor, type=type, env=self.env)
         self.env.print_trace(
             '', '', self.name() + ' create',
             'value= ' + str(self._value))
@@ -5959,7 +6097,7 @@ class State(object):
                             values = values + ', '
                         values = values + str(value)
 
-                print('    ' + pad(c.name(), 20),' value(s): '+values)
+                print('    ' + pad(c.name(), 20), ' value(s): '+values)
             
     def __call__(self):
         return self._value
@@ -5985,8 +6123,8 @@ class State(object):
             if there is a change, the waiters queue will be checked
             to see whether there are waiting components to be honored
             
-        Notes
-        -----
+        Note
+        ----
         This method is identical to reset, except the default value is True.
         '''
         self.env.print_trace('', '', self.name()+' set', 'value = ' + str(value))
@@ -6006,8 +6144,8 @@ class State(object):
             if there is a change, the waiters queue will be checked
             to see whether there are waiting components to be honored
             
-        Notes
-        -----
+        Note
+        ----
         This method is identical to set, except the default value is False.
         '''
         self.env.print_trace('', '', self.name()+' reset', 'value = ' + str(value))
@@ -6033,9 +6171,9 @@ class State(object):
             maximum number of components to be honored for the trigger value |n|
             default: inf
             
-        Notes
-        -----
-        The value of the state will be set to value, then at most
+        Note
+        ----
+            The value of the state will be set to value, then at most
             max waiting components for this state  will be honored and next
             the value will be set to value_after and again checked for possible
             honors.
@@ -6073,13 +6211,29 @@ class State(object):
             if False, monitoring is disabled |n|
             if not specified, no change
 
-        Notes
-        -----
+        Note
+        ----
         it is possible to individually control requesters().monitor(),
             value.monitor()
         '''
         self.requesters().monitor(value)
         self.value.monitor(value)
+        
+    def reset_monitors(monitor=None):
+        '''
+        resets the timestamped monitor for the state’s value
+    
+        Parameters
+        ----------
+        monitor : bool
+        if True (default}, monitoring will be on. |n|
+            if False, monitoring is disabled
+            
+        Note
+        ----
+        Equivalent to ``state.value.reset()``
+        '''
+        self.value.reset()
 
     def _get_value(self):
         return self._value
@@ -6136,7 +6290,7 @@ class State(object):
         '''
         Returns
         -------
-        queue containing all components waiting for this state
+        queue containing all components waiting for this state : Queue
         '''
         return self._waiters
 
@@ -6163,14 +6317,14 @@ class Resource(object):
         if the resource is actually just a level. |n|
         if False, claims belong to a component.
 
-    env : Environment
-        environment to be used |n|
-        if omitted, _default_env is used
-        
     monitor : bool
         if True (default) , the requesters queue, the claimers queue,
         the capacity, the available_quantity and the claimed_quantity are monitored |n|
         if False, monitoring is disabled.
+        
+    env : Environment
+        environment to be used |n|
+        if omitted, _default_env is used
     '''
 
     def __init__(self, name=None, capacity=1,
@@ -6191,21 +6345,21 @@ class Resource(object):
             monitor=monitor, env=self.env, _isinternal=True)
         self._claimed_quantity = 0
         self._anonymous = anonymous
-        self._minq=inf
+        self._minq = inf
         self.capacity = MonitorTimestamp(
-            ('Capacity of ',self),
-            getter=self._get_capacity, monitor=monitor, env=self.env)
+            ('Capacity of ', self),
+            getter=self._get_capacity, monitor=monitor, type='float', env=self.env)
         self.claimed_quantity = MonitorTimestamp(
-            ('Claimed quantity of ',self),
-            getter=self._get_claimed_quantity, monitor=monitor, env=self.env)
+            ('Claimed quantity of ', self),
+            getter=self._get_claimed_quantity, monitor=monitor, type='float', env=self.env)
         self.available_quantity = MonitorTimestamp(
-            ('Available quantity of ',self),
-            getter=self._get_available_quantity, monitor=monitor, env=self.env)
+            ('Available quantity of ', self),
+            getter=self._get_available_quantity, monitor=monitor, type='float', env=self.env)
         self.env.print_trace(
             '', '', self.name() + ' create',
             'capacity=' + str(self._capacity) + (' anonymous' if self._anonymous else ''))
 
-    def reset(monitor=None):
+    def reset_monitors(monitor=None):
         '''
         resets the resource monitors  and timestamped monitors
 
@@ -6215,14 +6369,18 @@ class Resource(object):
             if True (default}, monitoring will be on. |n|
             if False, monitoring is disabled
 
-        Notes
-        -----
-        it is possible to reset individual monitoring with claimers().reset() and requesters().reset,
-            capacity.reset(), available_quantity.reset() or claimed_quantity.reset()
+        Note
+        ----
+            it is possible to reset individual monitoring with
+            claimers().reset_monitors(),
+            requesters().reset_monitors,
+            capacity.reset(),
+            available_quantity.reset() or
+            claimed_quantity.reset()
         '''
 
-        self.requesters().reset(monitor)
-        self.claimers().reset(monitor)
+        self.requesters().reset_monitors(monitor)
+        self.claimers().reset_monitors(monitor)
         self.capacity.reset(monitor)
         self.available_quantity.reset(monitor)
         self.claimed_quantity.reset(monitor)
@@ -6255,10 +6413,11 @@ class Resource(object):
             if False, monitoring is disabled |n|
             if not specified, no change
 
-        Notes
-        -----
-        it is possible to individually control monitoring with claimers().monitor() and requesters().monitor(),
-            capacity.monitor(), available_quantity.monitor) or claimed_quantity.monitor()
+        Note
+        ----
+        it is possible to individually control monitoring with claimers().monitor()
+        and requesters().monitor(), capacity.monitor(), available_quantity.monitor)
+        or claimed_quantity.monitor()
         '''
         self.requesters().monitor(value)
         self.claimers().monitor(value)
@@ -6319,8 +6478,8 @@ class Resource(object):
             for non-anonymous resources, all components claiming from this resource
             will be released.
 
-        Notes
-        -----
+        Note
+        ----
         quantity may not be specified for a non-anomymous resoure
         '''
 
@@ -6352,7 +6511,7 @@ class Resource(object):
         '''
         Return
         ------
-        queue containing all components with not yet honored requests.
+        queue containing all components with not yet honored requests: Queue
         '''
         return self._requesters
 
@@ -6360,8 +6519,8 @@ class Resource(object):
         '''
         Returns
         -------
-        queue with all components claiming from the resource. |n|
-        will be an empty queue for an anonymous resource
+        queue with all components claiming from the resource: Queue
+            will be an empty queue for an anonymous resource
         '''
         return self._claimers
 
@@ -6579,8 +6738,8 @@ def colorinterpolate(t, t0, t1, v0, v1):
     -------
     f(t) : float
 
-    Notes
-    -----
+    Note
+    ----
     Note that no extrapolation is done, i.e f(t)=v0 for t<t0 and f(t)=v1 for
     t>t1. |n|
     This function is heavily used during animation.
@@ -6615,8 +6774,8 @@ def interpolate(t, t0, t1, v0, v1):
     -------
     f(t) : float
 
-    Notes
-    -----
+    Note
+    ----
     Note that no extrapolation is done, i.e f(t)=v0 for t<t0 and f(t)=v1 for
     t>t1. |n|
     This function is heavily used during animation.
@@ -6682,8 +6841,8 @@ def tracetext():
 
 def _set_name(name, _nameserialize, object):
     oldname = getattr(object, '_base_name', None)
-    if isinstance(name,tuple):
-        auto=False
+    if isinstance(name, tuple):
+        auto = False
     else:
         auto = (('*' + name)[-1] == '.')  # * added to allow for null string
 
@@ -6714,17 +6873,19 @@ def _set_name(name, _nameserialize, object):
     object._base_name = name
     object._sequence_number = sequence_number
     
+    
 def _decode_name(name):
-    if isinstance(name,tuple):
+    if isinstance(name, tuple):
         return name[0]+name[1].name()
     else:
         return name
         
+        
 def _decode_base_name(basename):
-    if isinstance(name,tuple):
-        return basename[0]+basename[1].basename()
+    if isinstance(name, tuple):
+        return basename[0] + basename[1].basename()
     else:
-        return basename    
+        return basename
 
 
 def pad(txt, n):
@@ -6736,25 +6897,66 @@ def pad(txt, n):
 
 def rpad(txt, n):
     return txt.rjust(n)[:n]
+
+
+def fn(x, l, d):
+    if math.isnan(x):
+        return ('{:' + str(l) + 's}').format('')
+    if x >= 10**(l - d - 1):
+        return ('{:' + str(l) + '.' + str(l-d-3)+'e}').format(x)
+    if x == int(x):
+        return ('{:' + str(l-d-1) + 'd}{:' + str(d+1) + 's}').format(int(x), '')
+    return ('{:' + str(l) + '.' + str(d) + 'f}').format(x)
+    
+_lookup_arraytype = {
+    'bool': 'B',
+    'int8': 'b',
+    'uint8': 'B',
+    'int16': 'h',
+    'uint16': 'H',
+    'int32': 'i',
+    'uint32': 'I',
+    'int64': 'l',
+    'uint64': 'L',
+    'float': 'd',
+    'double': 'd',
+    'any': 'any'
+    }
+        
+_lookup_off = {
+    'b': -128,
+    'B': 255,
+    'h': -32768,
+    'H': 65535,
+    'i': -2147483648,
+    'I': 4294967295,
+    'l': -9223372036854775808,
+    'L': 18446744073709551615,
+    'd': -np.inf,
+    'any': -np.inf
+    }
     
 
 def list_to_numeric_array(l):
     x = np.array(l)
-    if x.dtype not in (np.float, np.int):
-        x=[]
+    if not str(x.dtype) in _lookup_arraytype:
+        x = []
         for v in l:
             try:
-                v = float(v)
-            except ValueError:
-                v = 0
-            vint = int(v)
-            if v == vint:
+                vint = int(v)
+            except:
+                vint = 0
+            try:
+                vfloat = float(v)
+            except:
+                vfloat = 0
+            if vint == vfloat:
                 x.append(vint)
             else:
-                x.append(v)
+                x.append(vfloat)
         x = np.array(x)
     return x
-    
+
     
 def normalize(s):
     res = ''
@@ -7152,11 +7354,60 @@ def _pythonista_fonts():
     return font_dict
 
 
-def _fonts():
+@functools.lru_cache()
+def fonts():
     if Pythonista:
         return _pythonista_fonts()
     else:
         return _ttf_fonts()
+
+
+@functools.lru_cache()
+def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
+    '''
+    internal funtion to get and cache fonts
+    '''
+    standardfonts={
+        '': 'calibri',
+        'std': 'calibri',
+        'mono': 'DejaVuSansMono',
+        'narrow': 'mplus-1m-regular'}  
+    if fontname.lower() in standardfonts:
+        fontname = standardfonts[fontname.lower()]
+        
+    salabim_dir = os.path.dirname(__file__) + os.sep
+
+    if isinstance(fontname, str):
+        fontlist = (fontname,)
+    else:
+        fontlist = fontname
+            
+    font = None
+    for ifont in itertools.chain(fontlist, ('calibri', 'arial', 'arialmt')):
+        try:
+            font = ImageFont.truetype(font=ifont, size=int(fontsize))
+            break
+        except:
+            pass
+        try:
+            font = ImageFont.truetype(font=salabim_dir + ifont +'.ttf',
+                size=int(fontsize))
+            break
+        except:
+            pass
+        
+        ifont = fonts().get(normalize(ifont))
+        if ifont is not None:
+            try:
+                font = ImageFont.truetype(font=ifont, size=int(fontsize))
+                break
+            except:
+                pass
+
+    if font is None:  # last resort
+        font = ImageFont.load_default()
+
+    return font
 
 
 def _show_pythonista_fonts():
@@ -7179,7 +7430,7 @@ def _show_ttf_fonts():
 
 def show_fonts():
     '''
-    show (prints) all available fonts on this machine
+    show (print) all available fonts on this machine
     '''
 
     if Pythonista:
@@ -7190,7 +7441,7 @@ def show_fonts():
 
 def show_colornames():
     '''
-    show (prints) all available colours and their value
+    show (print) all available color names and their value.
     '''
 
     names = sorted(colornames().keys())
@@ -7205,170 +7456,6 @@ def default_env():
     default environment : Environment
     '''
     return _default_env
-
-
-def main():
-    '''
-    Returns
-    -------
-    main component of the default environment : Component
-    '''
-    return _default_env._main
-
-
-def now():
-    '''
-    Returns
-    -------
-    the current simulation time of the default environment : float
-    '''
-    return _default_env._now
-
-
-def trace(value=None):
-    '''
-    trace status of the default environment
-
-    Parameters
-    ----------
-    value : bool
-        new trace status |n|
-        if omitted, no change
-
-    Returns
-    -------
-    trace status : bool
-
-    Note
-    ----
-    If you want to test the status, always include parentheses, like |n|
-    if sim.trace():
-    '''
-    if value is not None:
-        self._default_env._trace = value
-    return _default_env._trace
-
-
-def current_component():
-    '''
-    Returns
-    -------
-    the current_component of the default environment : Component
-    '''
-    return _default_env._current_component
-
-
-def run(*args, **kwargs):
-    '''
-    start execution of the simulation for the default environment
-
-    Parameters
-    ----------
-    duration : float
-        schedule with a delay of duration |n|
-        if 0, now is used
-
-    till : float
-        schedule time |n|
-        if omitted, 0 is assumed
-
-    Note
-    ----
-    only issue run() from the main level    run for the default environment
-    '''
-    _default_env.run(*args, **kwargs)
-
-
-def animation_parameters(*args, **kwargs):
-    '''
-    set animation_parameters for the default environment
-
-    Parameters
-    ----------
-    animate : bool
-        animate indicator |n|
-        if omitted, True, i.e. animation |n|
-        Installation of PIL is required for animation.
-
-    speed : float
-        speed |n|
-        specifies how much faster or slower than real time the animation will run.
-        e.g. if 2, 2 simulation time units will be displayed per second.
-
-    width : int
-        width of the animation in screen coordinates |n|
-        if omitted, no change. At init of the environment, the width will be
-        set to 1024 for CPython and the current screen width for Pythonista.
-
-    height : int
-        height of the animation in screen coordinates |n|
-        if omitted, no change. At init of the environment, the height will be
-        set to 768 for CPython and the current screen height for Pythonista.
-
-    x0 : float
-        user x-coordinate of the lower left corner |n|
-        if omitted, no change. At init of the environment, x0 will be set to 0.
-
-    y0 : float
-        user y_coordinate of the lower left corner |n|
-        if omitted, no change. At init of the environment, y0 will be set to 0.
-
-    x1 : float
-        user x-coordinate of the lower right corner |n|
-        if omitted, no change. At init of the environment, x1 will be set to 1024
-        for CPython and the current screen width for Pythonista.
-
-    background_color : colorspec
-        color of the background |n|
-        if omitted, no change. At init of the environment, this will be set to white.
-
-    fps : float
-        number of frames per second
-
-    modelname : str
-        name of model to be shown in upper left corner,
-        along with text 'a salabim model' |n|
-        if omitted, no change. At init of the environment, this will be set
-        to the null string, which implies suppression of this feature.
-
-    use_toplevel : bool
-        if salabim animation is used in parallel with
-        other modules using tkinter, it might be necessary to
-        initialize the root with tkinter.TopLevel().
-        In that case, set this parameter to True. |n|
-        if False (default), the root will be initialized with tkinter.Tk()
-
-    show_fps : bool
-        if True, show the number of frames per second (default)|n|
-        if False, do not show the number of frames per second
-
-    show_speed: bool
-        if True, show the animation speed (default)|n|
-        if False, do not show the animation speed
-
-    show_time: bool
-        if True, show the time (default)|n|
-        if False, do not show the time
-
-    video : str
-        if video is not omitted, a mp4 format video with the name video
-        will be created. |n|
-        The video has to have a .mp4 etension |n|
-        This requires installation of numpy and opencv (cv2).
-
-    Notes
-    -----
-    The y-coordinate of the upper right corner is determined automatically
-    in such a way that the x and scaling are the same. |n|
-
-    Note that changing the parameters x0, x1, y0, width, height, background_color, modelname,
-    use_toplevelmand video, animate has no effect on the current animation.
-    So to avoid confusion, do not use change these parameters when an animation is running. |n|
-    On the other hand, changing speed, show_fps, show_time, show_speed and fps can be useful in
-    a running animation.
-    '''
-    _default_env.animation_parameters(*args, **kwargs)
-
 
 if __name__ == '__main__':
     try:

@@ -1,5 +1,72 @@
 salabim  changelog
 
+version 2.2.5  2017-09-27
+=========================
+Queue.reset() has been renamed to Queue.reset_monitors()
+Resource.reset() has been renamed to Resource.reset_monitors()
+New method: State.reset_monitors()
+
+In Component.wait(), if the test value contains a $, the $ 
+sign is now replaced by state.value() instead of str(state.value())
+This means that you can now say
+    self.wait('light','$ in ("green","yellow")')
+    
+Monitor can now store the tallied values in an array instead of a list. 
+this results in less memory usage and faster execution speed.
+The array may be either integer, unsigned integer or float.
+Integer and unsigned integer is available in 1, 2, 4 or 8 byte versions.
+When type='any' is given (default), the tallied values will be stored in a list.
+Note that the monitor for Queue.length_of_stay is a float array now.
+For list monitors the x-value in x() returns a numpy array
+where the values are converted to a numeric (value 0 if not possible)
+unless overridden with force_numeric=False.
+
+MonitorTimestamp will now store the timestamps in a float array.
+The tallied values can be stored in an array instead of a list. This results in less memory usage and
+faster execution speed.
+The array may be either integer, unsigned integer or float.
+Integer and unsigned integer is available in 1, 2, 4 or 8 byte versions.
+When type='any' is given, the tallied values will be stored in a list.
+Monitor off is now tallied now with the attribute off of the timestamped monitor,
+which is dependent on the type.
+Note that the tallied values for Queue.length are in an uint32 array.
+The tallied values for Resource.capacity, Resource.claimed_quantity and 
+Resource.available_quantity are in a float array,
+The tallied values for State.value are in a list, unless a type is specified at init time.
+The MonitorTimestamp.x() method returns a numpy array for integer and float monitors.
+For 'any' timestamped monitors the x-value in xduration() is a numpy array
+where the values are converted to a numeric (value 0 if not possible)
+unless overridden with force_numeric=False.
+
+The Monitor.x() and MonitorTimestamped.xduration() methods now uses caching to impove performance.
+
+The function type in Component.wait now uses three arguments instead of a tuple of value, 
+component and state.
+
+Redesigned font searching in order to support animation on Linux and to guarantee a consistent
+appearance over different platforms.
+Therefore, a small set of ttf fonts is included in the distribution. These should reside in 
+the same directory where salabim.py is located (PyPI automatically takes care of that).
+These fonts will be first searched. As of this moment, salabim is shipped with:
+- calibri.ttf           The preferred proportional font. Also accessible with font='std' or font='' 
+- arial.ttf 
+- cour.ttf
+- DejaVuSansMono.ttf    The preferred monospaced font. Also accessible with font='mono'
+- mplus-1m-regular.ttf  The preferred narrow monospaced font. Also accessible with font='narrow'
+If salabim is not able to find any matching font, the PIL.ImageFont.load_default() will be called, now.
+
+Internal optimizations by using defaultdict instead of dict where useful.
+
+Outphased:
+  salabim.run()
+  salabim.main()
+  salabim.trace()
+  salabim.now()
+  salabim.animation_parameters()
+  salabim.current_component()
+Use the equivalent default environment method instead, like
+  env.run()
+
 version 2.2.4  2017-09-12 
 =========================
 Automatic naming of components, queues, etc. results in shorter names now.
@@ -16,8 +83,6 @@ have an improved layout.
 Monitor and MonitorTimestamp names are now serialized.
 
 Please have a look at the much improved manual.
-
-Salabim development is powered by Wing IDE (www.wingware.com).
 
 version 2.2.3  2017-09-05
 =========================
@@ -357,7 +422,7 @@ Component.activate() has an additional parameter keep_request, which controls wh
 pending requests are to be kept upon an activate.
 
 Environment.stop_run() and stop_run() has been phased out. 
-Use the much more logical Environment.main().activate() or sim.main().activate() instead. 
+Use the much more logical Environment.main().activate() or env.main().activate() instead. 
 This allows the user to specify the time (including inf) of the main reactivation.
 The models 'Dining philosophers animated.py' and 'Elevator animated.py' have been
 updated accordingly.
@@ -531,7 +596,7 @@ or just one method or class by (e.g.)
     import salabim as sim
     help(Animate)
     help(Component.enter)
-    help(sim.now)
+    help(env.now)
     
 Bug fixes.
         
@@ -568,7 +633,7 @@ All sample programs are defined in such a way that they give reproducible result
 
 main is no longer a global variable. You can use either the main
 property in Component or Environment classes or just main() from the
-salabim module, e.g. with sim.main()
+salabim module, e.g. with env.main()
 
 The default environment can be queried with the function default_env(),
 e.g. de=sim.default_env().
@@ -617,7 +682,7 @@ The attribute passive_reason has been phased out, as mode offers similar functio
 When the mode is set, either by an assignment or one of the above methods, the property mode_time is
 set to now. This is particularly useful for hold, in order to assess when the component started the 
 hold, like in
-  fraction=sim.interpolate(sim.now,comp.mode_time,comp.scheduled_time,0,1)
+  fraction=sim.interpolate(env.now,comp.mode_time,comp.scheduled_time,0,1)
 This technique is used in the sample models 'Lock animated' and 'Elevator animated'.
 
 A bug in PIL caused non black texts to have a kind of outline around the characters in Animate(text=...).
@@ -835,7 +900,7 @@ instead of
 In all examples, we now use
   import salabim as sim
 If you use the latter form, all salabim items have to be preceeded by sim. ,
-like sim.Component, sim.Resource, sim.main, sim.passive, sim.now(), sim.inf.
+like sim.Component, sim.Resource, env.main, sim.passive, env.now(), sim.inf.
 If you want to use a salabim item without prefixing, use something like
   from salabim import inf,main
 along with

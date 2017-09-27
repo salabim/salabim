@@ -190,7 +190,7 @@ env.trace(True)
 env.run(1000)
 env.trace(False)
 for floor in floors.values():
-    floor.visitors.reset()
+    floor.visitors.reset_monitors()
 env.run(50000)
 
 print('Floor    n         length length_of_stay')

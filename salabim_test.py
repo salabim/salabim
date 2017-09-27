@@ -6,7 +6,11 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test34() 
+    test35()
+    
+def test35():
+    env=sim.Environment()
+    sim.getfont('cour',10)
     
 
 def test34():
@@ -44,7 +48,7 @@ def test34():
     x=X()
     y=Y()
     z=Z()
-    sim.run(10)
+    env.run(10)
     s1.print_statistics()
 
 
@@ -63,13 +67,13 @@ def test33():
     class Y(sim.Component):
         def process(self):
             while True:
-                yield self.wait((s1,lambda x: x[0]/2>self.env.now()))
+                yield self.wait((s1,lambda x, component, state: x/2>self.env.now()))
                 yield self.hold(1.5)
 
     class Z(sim.Component):
         def process(self):
             while True:
-                yield self.wait((s2,lambda x: x[0] in ("red","yellow")))
+                yield self.wait((s2,lambda x, component, state: x in ("red","yellow")))
                 yield self.hold(1.5)
                 
             
@@ -82,7 +86,9 @@ def test33():
     x=X()
     y=Y()
     z=Z()
-    sim.run(10)
+    env.run(10)
+    sim.show_fonts()
+    print(sim.fonts())
 
 
 def test32():
@@ -108,7 +114,7 @@ def test32():
     go=sim.State()
     x=X()
     y=Y()
-    sim.run()
+    env.run()
     
     
 def test31():
@@ -138,7 +144,7 @@ def test31():
     q=sim.Queue('q.')
     x=X()
     y=Y()
-    sim.run(10)
+    env.run(10)
     print('value at ',env.now(),s1.get())
     print (s1.value.xduration())
     print(s1.value.tx())
@@ -215,10 +221,10 @@ def test26():
         def _now(self):
             return self.env._now
            
-
         def process(self):
-            
+            m2.tally()
             yield self.hold(1)
+            self.a=4
             m2.tally()
             m2.monitor(True)
             print('3',m2.xt())
@@ -236,21 +242,24 @@ def test26():
         
     
     de=sim.Environment()
-    m1=sim.Monitor('m1')
+    m1=sim.Monitor('m1',type='uint8')
     print (m1.mean())    
     m1.tally(10)
     m1.tally(15)
     m1.tally(20)
-    m1.tally(20)
+    m1.tally(92)
     m1.tally(0)
+    m1.tally(12)
+    m1.tally(0)
+    print ('m1.x()',m1.x(force_numeric=False))
         
     print ('m1',m1.mean(),m1.std(),m1.percentile(50))
     print ('m1 ex0',m1.mean(ex0=True),m1.std(ex0=True),m1.percentile(50,ex0=True))
     x=X()
     x.a=10
-    m2=sim.MonitorTimestamp('m2',getter=x._get_a)
+    m2=sim.MonitorTimestamp('m2',getter=x._get_a,type='int8')
     print('1',m2.xt())
-    m2.monitor(False)
+    m2.monitor(True)
     m2.tally()
     print('a',m2.xt())
 #    m2.monitor(True)
@@ -367,7 +376,7 @@ def test1():
             
     class Monitor(sim.Component):
         def process(self):
-            while sim.now()<30:
+            while env.now()<30:
                 yield self.standby()
                         
     de=sim.Environment(trace=True)
@@ -391,7 +400,7 @@ def test1():
         
     y=Y(name='y')
 #    y.activate(at=20)
-    sim.run(till=35)
+    env.run(till=35)
 
 #    env.run(4)
     
@@ -523,7 +532,7 @@ def test4():
         y.append(c)
 
     z=Z(name='z')
-    sim.run(till=1000)
+    env.run(till=1000)
     
 def test5():
     print('test5')
@@ -582,7 +591,7 @@ def test5():
 
         
     y=Y(name='y')
-    sim.run(till=21)    
+    env.run(till=21)    
     
 def test6():
     print('test6')
@@ -598,9 +607,9 @@ def test6():
     q.name('Rij.')
     print (q.name())
     q.clear()
-    sim.run(till=10)
+    env.run(till=10)
     x.reactivate()
-    sim.run()
+    env.run()
     
 def test7():
     print('test7')
@@ -647,9 +656,9 @@ def test7():
     
     
         
-    sim.run(10)
+    env.run(10)
     r2.capacity(2)
-    sim.run(20)
+    env.run(20)
 
     print(sim.default_env)
 
@@ -794,9 +803,9 @@ def test8():
 #    assert False
 
     height=768
-    sim.animation_parameters(modelname='Salabim test')
-    sim.run(15) 
-    sim.run(till=30)
+    env.animation_parameters(modelname='Salabim test')
+    env.run(15) 
+    env.run(till=30)
     print('THE END')
 
 
@@ -822,7 +831,7 @@ def test9():
     de=sim.Environment(trace=True)
     x=X()
     y=Y()
-    sim.run(till=6)
+    env.run(till=6)
     
     
 def test10():
@@ -909,7 +918,7 @@ def test11():
     print('---')
 
 
-    sim.run(till=100)
+    env.run(till=100)
 
 def test12():
         
@@ -921,7 +930,7 @@ def test12():
                 yield self.hold(1)
            
     de=sim.Environment(trace=True)
-    sim.animation_parameters(speed=1)
+    env.animation_parameters(speed=1)
     a=sim.Environment(name='piet.')
     b=sim.Environment(name='piet.')
     c=sim.Environment(name='piet.')
@@ -933,10 +942,10 @@ def test12():
     X(auto_start=False)
     X(auto_start=False)
     X()       
-    sim.animation_parameters(speed=0.1,video='x.mp4')
-    sim.run(4)
-    sim.run(2)
-    sim.run(4)
+    env.animation_parameters(speed=0.1,video='x.mp4')
+    env.run(4)
+    env.run(2)
+    env.run(4)
 
 
 def test13():
@@ -978,10 +987,10 @@ def test15():
         
 def test16():
     de=sim.Environment()
-    sim.animation_parameters()
+    env.animation_parameters()
     a=sim.Animate(text='Test',x0=100,y0=100,fontsize0=30,fillcolor0='red')
     a=sim.Animate(line0=(0,0,500,500),linecolor0='white',linewidth0=6)
-    sim.run()
+    env.run()
     
     
 def test17():
@@ -1001,11 +1010,11 @@ def test17():
     sl=sim.AnimateSlider(x=300,y=700,width=300)  
     sim.Animate(text='Text',x0=700,y0=750,font='Times NEWRomian Italic',fontsize0=30)    
     de.animation_parameters(animate=True)
-    sim.run(5)
-    sim.animation_parameters(animate=False)
-    sim.run(100)
-    sim.animation_parameters(animate=True,background_color='yellow')
-    sim.run(10)
+    env.run(5)
+    env.animation_parameters(animate=False)
+    env.run(100)
+    env.animation_parameters(animate=True,background_color='yellow')
+    env.run(10)
     
 def test18():
     for j in range(2):
@@ -1036,7 +1045,7 @@ def test20():
             y=y-50
         
     de.animation_parameters(animate=True)
-    sim.run()
+    env.run()
     
     
 def test21():
@@ -1057,13 +1066,13 @@ def test22():
         def process(self):
             while True:
                 yield self.hold(1)
-                print('status of x=',sim.now(),x.status()())
+                print('status of x=',env.now(),x.status()())
         
     de=sim.Environment()
     x=X()
     Y()
 
-    sim.run(12)
+    env.run(12)
     
 def test23():
     sim.a=100

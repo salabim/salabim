@@ -15,12 +15,12 @@ class AnimateMovingText(sim.Animate):
         return '{:0.1f}'.format(t)
         
 
-1env=sim.Environment()
+env=sim.Environment()
 
 env.animation_parameters()
 
 AnimateMovingText()
 
-sim.run()
+env.run()
 
 

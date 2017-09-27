@@ -7,7 +7,6 @@ class Car(sim.Component):
         while True:
             yield self.hold(1)
 
-
 env = sim.Environment(trace=True)
 Car()
 env.run(till=5)

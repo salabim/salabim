@@ -47,5 +47,5 @@ for direction in directions:
 
 TrafficLight()
 CarGenerator()
-sim.run(500)
+env.run(500)
 

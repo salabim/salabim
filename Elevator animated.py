@@ -157,31 +157,31 @@ def do_animation():
             x += xvisitor_dim
 
     ncars_last = ncars
-    ui_ncars = sim.AnimateSlider(x=540, y=env.height, width=90, height=20,
+    ui_ncars = sim.AnimateSlider(x=510, y=env.height, width=90, height=20,
         vmin=1, vmax=5, resolution=1, v=ncars, label='#elevators', action=set_ncars)
 
     topfloor_last = topfloor
-    ui_topfloor = sim.AnimateSlider(x=640, y=env.height, width=90, height=20,
+    ui_topfloor = sim.AnimateSlider(x=610, y=env.height, width=90, height=20,
         vmin=5, vmax=20, resolution=1, v=topfloor, label='top floor', action=set_topfloor)
 
     capacity_last = capacity
-    ui_capacity = sim.AnimateSlider(x=740, y=env.height, width=90, height=20,
+    ui_capacity = sim.AnimateSlider(x=710, y=env.height, width=90, height=20,
         vmin=2, vmax=6, resolution=1, v=capacity, label='capacity', action=set_capacity)
 
-    ui_load_0_n = sim.AnimateSlider(x=540, y=env.height - 50, width=90, height=25,
+    ui_load_0_n = sim.AnimateSlider(x=510, y=env.height - 50, width=90, height=25,
         vmin=0, vmax=400, resolution=25, v=load_0_n, label='Load 0->n', action=set_load_0_n)
 
-    ui_load_n_n = sim.AnimateSlider(x=640, y=env.height - 50, width=90, height=25,
+    ui_load_n_n = sim.AnimateSlider(x=610, y=env.height - 50, width=90, height=25,
         vmin=0, vmax=400, resolution=25, v=load_n_n, label='Load n->n', action=set_load_n_n)
 
-    ui_load_n_0 = sim.AnimateSlider(x=740, y=env.height - 50, width=90, height=25,
+    ui_load_n_0 = sim.AnimateSlider(x=710, y=env.height - 50, width=90, height=25,
         vmin=0, vmax=400, resolution=25, v=load_n_0, label='Load n->0', action=set_load_n_0)
 
     if make_video:
-        sim.animation_parameters(modelname='Elevator',speed=32,video='Elevator.mp4',
+        env.animation_parameters(modelname='Elevator',speed=32,video='Elevator.mp4',
             show_speed=False,show_fps=False)
     else:
-        sim.animation_parameters(modelname='Elevator', speed=32)
+        env.animation_parameters(modelname='Elevator', speed=32)
 
 
 def set_load_0_n(val):
@@ -211,7 +211,7 @@ def set_capacity(val):
     capacity = int(val)
     if capacity != capacity_last:
         capacity_last = capacity
-        sim.main().activate()
+        env.main().activate()
 
 
 def set_ncars(val):
@@ -220,7 +220,7 @@ def set_ncars(val):
     ncars = int(val)
     if ncars != ncars_last:
         ncars_last = ncars
-        sim.main().activate()
+        env.main().activate()
 
 
 def set_topfloor(val):
@@ -229,7 +229,7 @@ def set_topfloor(val):
     topfloor = int(val)
     if topfloor != topfloor_last:
         topfloor_last = topfloor
-        sim.main().activate()
+        env.main().activate()
 
 
 def direction_color(direction):

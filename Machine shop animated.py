@@ -59,7 +59,7 @@ class MachineBarAnimate(sim.Animate):
 class MachineTextAnimate(sim.Animate):
     def __init__(self, machine):
         self.machine = machine
-        super().__init__(x0=10, y0=100 + self.machine.n * 30, text='', anchor='sw')
+        super().__init__(x0=10, y0=100 + self.machine.n * 30, text='', anchor='sw', font='narrow', fontsize0=15)
 
     def text(self, t):
         return '{} {:4d}'.format(self.machine.ident, self.machine.parts_made)
@@ -126,7 +126,7 @@ class RepairTextAnimate(sim.Animate):
     def __init__(self, i):
         self.i = i
         super().__init__(y0=10 + 3, text='',
-            textcolor0='white', fontsize0=20, anchor='sw')
+            textcolor0='white', font='narrow', fontsize0=15, anchor='sw')
 
     def x(self, t):
         return xrepairman(self.i, t) + 2

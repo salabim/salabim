@@ -19,9 +19,14 @@ class Customer(sim.Component):
 env = sim.Environment(trace=False)
 CustomerGenerator()
 clerks = sim.Resource('clerk', 3)
-clerks.name('piet')
+
 env.run(till=50000)
-clerks.requesters().length.print_histogram(30, 1, 0)
+
+clerks.requesters().length.print_histogram(30, 0, 1)
 print()
-clerks.requesters().length_of_stay.print_histogram(30, 10, 0)
+clerks.requesters().length_of_stay.print_histogram(30, 0, 10)
+
 clerks.print_statistics()
+clerks.print_info()
+print(clerks.claimed_quantity())
+
