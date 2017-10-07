@@ -1,7 +1,6 @@
 import salabim as sim
-import random
 
-from math import sin, cos, pi, radians
+from math import sin, cos, radians
 
 
 class AnimatePhilosopher(sim.Animate):
@@ -10,7 +9,7 @@ class AnimatePhilosopher(sim.Animate):
         r1 = 25
         r2 = r1 * sin(radians(alpha) / 4)
         angle = i * alpha
-        super().__init__(x0=r1 * cos(radians(angle)), y0=r1 * sin(radians(angle)),
+        sim.Animate.__init__(self, x0=r1 * cos(radians(angle)), y0=r1 * sin(radians(angle)),
             circle0=(r2,), linewidth0=0)
         self.i = i
 
@@ -28,7 +27,7 @@ class AnimateFork(sim.Animate):
         r1 = 25
         r2 = r1 * sin(radians(alpha) / 4)
         angle = (i + 0.5) * alpha
-        super().__init__(x0=0, y0=0,
+        sim.Animate.__init__(self, x0=0, y0=0,
             line0=(r1 - r2, 0, r1 + r2, 0), linewidth0=r2 / 4, linecolor0='green')
         self.i = i
         self.angle_mid = angle
@@ -37,7 +36,7 @@ class AnimateFork(sim.Animate):
 
     def angle(self, t):
         claimer = fork[self.i].claimers().head()
-        if claimer == None:
+        if claimer is None:
             return self.angle_mid
         if claimer == philosopher[self.i]:
             return self.angle_left
@@ -54,11 +53,11 @@ def do_animation():
         AnimatePhilosopher(i=i)
         AnimateFork(i=i)
     sim.AnimateSlider(x=520, y=env.height, width=100, height=20,
-                      vmin=10, vmax=40, resolution=5, v=eatingtime_mean, label='eating time', action=set_eatingtime_mean)
+        vmin=10, vmax=40, resolution=5, v=eatingtime_mean, label='eating time', action=set_eatingtime_mean)
     sim.AnimateSlider(x=660, y=env.height, width=100, height=20,
-                      vmin=10, vmax=40, resolution=5, v=thinkingtime_mean, label='thinking time', action=set_thinkingtime_mean)
+        vmin=10, vmax=40, resolution=5, v=thinkingtime_mean, label='thinking time', action=set_thinkingtime_mean)
     sim.AnimateSlider(x=520 + 50, y=env.height - 50, width=200, height=20,
-                      vmin=3, vmax=40, resolution=1, v=nphilosophers, label='# philosophers', action=set_nphilosophers)
+        vmin=3, vmax=40, resolution=1, v=nphilosophers, label='# philosophers', action=set_nphilosophers)
     nphilosophers_last = nphilosophers
 
 

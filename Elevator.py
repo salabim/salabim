@@ -15,7 +15,7 @@ class VisitorGenerator(sim.Component):
                 if from_ != to:
                     break
 
-            visitor = Visitor(from_=from_, to=to)
+            Visitor(from_=from_, to=to)
             if self.id == '0_n':
                 load = load_0_n
             elif self.id == 'n_0':
@@ -118,13 +118,6 @@ class Car(sim.Component):
         n = 0
         for visitor in self.visitors:
             if visitor.tofloor == tofloor:
-                n += 1
-        return n
-
-    def count_from_floor(self, fromfloor):
-        n = 0
-        for visitor in self.visitors:
-            if visitor.fromfloor == tofloor:
                 n += 1
         return n
 

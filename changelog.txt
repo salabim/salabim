@@ -1,5 +1,22 @@
 salabim  changelog
 
+version 2.2.6  2017-10-07
+=========================
+Salabim now supports Python 2.7. The biggest advantage of this is, that models can
+now be run under PyPy.
+
+The module numpy is no longer required (although still required for video production).
+This makes it easier to run under PyPy, where installing numpy can be complicated.
+When PIL is installed, even animation is now supported under PyPy.
+
+All animated examples were updated to support Python 2.7, particularly by changing
+super().proc(...) into sim.Component.proc(self,...) and sim.Animate.proc(self, ...)
+
+Internal: font searching and build up of font tables improved.
+Now salabim also searches the current directory for any .ttf files.
+
+Several bug fixes.
+
 version 2.2.5  2017-09-27
 =========================
 Queue.reset() has been renamed to Queue.reset_monitors()
@@ -99,7 +116,7 @@ Component.wait() now allows to check for":
   yield self.wait((light,'red'))
 - an expresssion to be evaluated. the value has to be $ which is replaced by
   str(state.value()), each time the condition is checked
-  yield self.wait((light,'$in ("red","ýellow")'))
+  yield self.wait((light,'$in ("red","yellow")'))
   yield self.wait((level,'<30'))
   it is possible to use state for the state under test and self for the
   component under test

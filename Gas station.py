@@ -1,12 +1,12 @@
 import salabim as sim
 
-GAS_STATION_SIZE = 200     # liters
-THRESHOLD = 25             # Threshold for calling the tank truck (in %)
-FUEL_TANK_SIZE = 50        # liters
+GAS_STATION_SIZE = 200.     # liters
+THRESHOLD = 25.             # Threshold for calling the tank truck (in %)
+FUEL_TANK_SIZE = 50.        # liters
 # Min/max levels of fuel tanks (in liters)
 FUEL_TANK_LEVEL = sim.Uniform(5, 25)
-REFUELING_SPEED = 2        # liters / second
-TANK_TRUCK_TIME = 300      # Seconds it takes the tank truck to arrive
+REFUELING_SPEED = 2.        # liters / second
+TANK_TRUCK_TIME = 300.      # Seconds it takes the tank truck to arrive
 T_INTER = sim.Uniform(10, 100)  # Create a car every [min, max] seconds
 SIM_TIME = 200000           # Simulation time in seconds
 

@@ -1,3 +1,6 @@
+from __future__ import print_function  # compatibility with Python 2.x
+from __future__ import division  # compatibility with Python 2.x
+
 import salabim as sim
 import random
 
@@ -13,7 +16,7 @@ class AnimateLED(sim.Animate):
         else:
             polygon = (-0.5 * b, b, 0.5 * b, b, 0, 0)
 
-        super().__init__(x0=x, y0=y, polygon0=polygon)
+        sim.Animate.__init__(self, x0=x, y0=y, polygon0=polygon)
 
     def fillcolor(self, t):
         if (self.floor, self.direction) in requests:
@@ -28,11 +31,11 @@ class AnimateFloorVisitor(sim.Animate):
         self.index = index
         b = 0.1 * xvisitor_dim
         if part == 0:
-            super().__init__(
+            sim.Animate.__init__(self,
                 rectangle0=(b, 2, xvisitor_dim - b, yvisitor_dim - b),
                 x0=x, y0=y, linewidth0=0)
         else:
-            super().__init__(
+            sim.Animate.__init__(self,
                 text='', fontsize0=xvisitor_dim * 0.7,
                 anchor='center', offsetx0=5 * b, offsety0=2 + 4 * b,
                 textcolor0='white',
@@ -55,7 +58,7 @@ class AnimateFloorVisitor(sim.Animate):
 class AnimateCar(sim.Animate):
     def __init__(self, x, car):
         self.car = car
-        super().__init__(x0=x,
+        sim.Animate.__init__(self, x0=x,
            rectangle0=(0, 0, capacity * xvisitor_dim, yvisitor_dim), fillcolor0='lightblue')
 
     def y(self, t):
@@ -74,11 +77,11 @@ class AnimateCarVisitor(sim.Animate):
         self.index = index
         b = 0.1 * xvisitor_dim
         if part == 0:
-            super().__init__(
+            sim.Animate.__init__(self,
                 rectangle0=(b, 2, xvisitor_dim - b, yvisitor_dim - b),
                 x0=x, linewidth0=0)
         else:
-            super().__init__(text='', fontsize0=xvisitor_dim * 0.7,
+            sim.Animate.__init__(self, text='', fontsize0=xvisitor_dim * 0.7,
                 anchor='center', offsetx0=5 * b, offsety0=2 + 4 * b,
                 textcolor0='white', x0=x, linewidth0=0)
 
@@ -157,29 +160,29 @@ def do_animation():
             x += xvisitor_dim
 
     ncars_last = ncars
-    ui_ncars = sim.AnimateSlider(x=510, y=env.height, width=90, height=20,
+    sim.AnimateSlider(x=510, y=env.height, width=90, height=20,
         vmin=1, vmax=5, resolution=1, v=ncars, label='#elevators', action=set_ncars)
 
     topfloor_last = topfloor
-    ui_topfloor = sim.AnimateSlider(x=610, y=env.height, width=90, height=20,
+    sim.AnimateSlider(x=610, y=env.height, width=90, height=20,
         vmin=5, vmax=20, resolution=1, v=topfloor, label='top floor', action=set_topfloor)
 
     capacity_last = capacity
-    ui_capacity = sim.AnimateSlider(x=710, y=env.height, width=90, height=20,
+    sim.AnimateSlider(x=710, y=env.height, width=90, height=20,
         vmin=2, vmax=6, resolution=1, v=capacity, label='capacity', action=set_capacity)
 
-    ui_load_0_n = sim.AnimateSlider(x=510, y=env.height - 50, width=90, height=25,
+    sim.AnimateSlider(x=510, y=env.height - 50, width=90, height=25,
         vmin=0, vmax=400, resolution=25, v=load_0_n, label='Load 0->n', action=set_load_0_n)
 
-    ui_load_n_n = sim.AnimateSlider(x=610, y=env.height - 50, width=90, height=25,
+    sim.AnimateSlider(x=610, y=env.height - 50, width=90, height=25,
         vmin=0, vmax=400, resolution=25, v=load_n_n, label='Load n->n', action=set_load_n_n)
 
-    ui_load_n_0 = sim.AnimateSlider(x=710, y=env.height - 50, width=90, height=25,
+    sim.AnimateSlider(x=710, y=env.height - 50, width=90, height=25,
         vmin=0, vmax=400, resolution=25, v=load_n_0, label='Load n->0', action=set_load_n_0)
 
     if make_video:
-        env.animation_parameters(modelname='Elevator',speed=32,video='Elevator.mp4',
-            show_speed=False,show_fps=False)
+        env.animation_parameters(modelname='Elevator', speed=32, video='Elevator.mp4',
+            show_speed=False, show_fps=False)
     else:
         env.animation_parameters(modelname='Elevator', speed=32)
 
@@ -254,7 +257,7 @@ class VisitorGenerator(sim.Component):
                 if from_ != to:
                     break
 
-            visitor = Visitor(from_=from_, to=to)
+            Visitor(from_=from_, to=to)
             if self.id == '0_n':
                 load = load_0_n
             elif self.id == 'n_0':
@@ -360,13 +363,6 @@ class Car(sim.Component):
                 n += 1
         return n
 
-    def count_from_floor(self, fromfloor):
-        n = 0
-        for visitor in self.visitors:
-            if visitor.fromfloor == tofloor:
-                n += 1
-        return n
-
 
 class Floor():
     def __init__(self, n):
@@ -426,9 +422,9 @@ while True:
     for icar in range(ncars):
         thiscar = Car(name='car ' + str(icar), capacity=capacity)
         cars.append(thiscar)
-        
-    make_video=False
-    
+
+    make_video = False
+
     do_animation()
 
     if make_video:

@@ -15,7 +15,7 @@ class Shipgenerator(sim.Component):
             yield self.hold(sim.Exponential(iat).sample())
             ship = Ship(name=sidename(self.side) + 'ship.')
             ship.side = self.side
-            ship.length = meanlength * sim.Uniform(2 / 3, 4 / 3).sample()
+            ship.length = meanlength * sim.Uniform(2. / 3, 4. / 3).sample()
             if lock.mode() == 'Idle':
                 lock.activate()
 
@@ -37,8 +37,7 @@ class Ship(sim.Component):
 
 
 class Lock(sim.Component):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setup(self):
         self.usedlength = 0
         self.side = left
         self.monitor_usedlength = sim.MonitorTimestamp(

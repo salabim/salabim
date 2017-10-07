@@ -37,7 +37,8 @@ for i in range(3):
 waitingline = sim.Queue('waitingline')
 
 env.run(till=50000)
-
+waitingline.length.print_histogram(30, 0, 1)
+print()
 waitingline.print_info()
 waitingline.print_statistics()
 

@@ -24,7 +24,7 @@ def shipcolor(side):
 
 
 def ship_polygon(ship):
-    return (ship.side * (ship.length - 2), 0, ship.side * 3, 0, 
+    return (ship.side * (ship.length - 2), 0, ship.side * 3, 0,
         ship.side * 2, 3, ship.side * (ship.length - 2), 3)
 
 
@@ -35,10 +35,10 @@ class AnimateWaitShip(sim.Animate):
         else:
             anchor = 'sw'
         if part == 0:
-            super().__init__(polygon0=(), x0=x, y0=y,
+            sim.Animate.__init__(self, polygon0=(), x0=x, y0=y,
                 fillcolor0=shipcolor(side), anchor=anchor, linewidth0=0)
         elif part == 1:
-            super().__init__(text='', x0=x, y0=y, textcolor0='white',
+            sim.Animate.__init__(self, text='', x0=x, y0=y, textcolor0='white',
                 anchor=anchor, fontsize0=2.5, offsetx0=side * 5)
         self.index = index
         self.side = side
@@ -62,9 +62,9 @@ class AnimateLockShip(sim.Animate):
     def __init__(self, part, y, index):
         self.part = part
         if part == 0:
-            super().__init__(polygon0=(), x0=0, y0=y, fillcolor0='', linewidth0=0)
+            sim.Animate.__init__(self, polygon0=(), x0=0, y0=y, fillcolor0='', linewidth0=0)
         elif part == 1:
-            super().__init__(text='', x0=0, y0=y, textcolor0='white', fontsize0=2.5)
+            sim.Animate.__init__(self, text='', x0=0, y0=y, textcolor0='white', fontsize0=2.5)
         self.index = index
         self.side = side
 
@@ -100,7 +100,7 @@ class AnimateLockShip(sim.Animate):
             else:
                 return (0, 0, 0, 0)
         else:
-            return super().fillcolor(t)
+            return sim.Animate.fillcolor(self, t)
 
     def x(self, t):
         ship = lockqueue[self.index]
@@ -226,7 +226,7 @@ class Shipgenerator(sim.Component):
             yield self.hold(sim.Exponential(iat).sample())
             ship = Ship(name=sidename(self.side) + 'ship.')
             ship.side = self.side
-            ship.length = meanlength * sim.Uniform(2 / 3, 4 / 3).sample()
+            ship.length = meanlength * sim.Uniform(2. / 3, 4. / 3).sample()
             if lock.mode() == 'Idle':
                 lock.activate()
 

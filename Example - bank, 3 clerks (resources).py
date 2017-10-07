@@ -29,4 +29,3 @@ clerks.requesters().length_of_stay.print_histogram(30, 0, 10)
 clerks.print_statistics()
 clerks.print_info()
 print(clerks.claimed_quantity())
-

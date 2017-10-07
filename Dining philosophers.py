@@ -1,7 +1,5 @@
 import salabim as sim
 
-from math import sin, cos, pi, radians
-
 
 class Philosopher(sim.Component):
     def process(self):

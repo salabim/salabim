@@ -25,6 +25,10 @@ SOFTWARE.
 
 see www.salabim.org for more information, the manual and updates.
 '''
+from __future__ import print_function  # compatibility with Python 2.x
+from __future__ import division  # compatibility with Python 2.x
+
+__version__ = '2.2.6'
 
 import heapq
 import random
@@ -32,45 +36,52 @@ import time
 import math
 import array
 import collections
-import itertools
-import functools
 import glob
 import os
 import inspect
-import numpy as np
-from numpy import inf, nan
-
 import platform
-Pythonista = (platform.system() == 'Darwin')
+import sys
+
+Pythonista = (sys.platform == 'ios')
+Windows = (sys.platform.startswith('win'))
+
+try:
+    import numpy as np
+except ImportError:
+    pass
 
 try:
     import cv2
-    cv2_installed = True
-except:
-    cv2_installed = False
+except ImportError:
+    pass
 
 try:
+    import PIL  # NOQA
     from PIL import Image
     from PIL import ImageDraw
     from PIL import ImageFont
-    pil_installed = True
-except:
-    pil_installed = False
-
-try:
     if not Pythonista:
         from PIL import ImageTk
-        import tkinter
-    tkinter_installed = True
-except:
-    tkinter_installed = False
+except ImportError:
+    pass
+
+try:
+    import tkinter
+except ImportError:
+    pass
+
+try:
+    import Tkinter as tkinter  # NOQA
+except ImportError:
+    pass
 
 if Pythonista:
     import scene
     import ui
     import objc_util
 
-__version__ = '2.2.5'
+inf = float('inf')
+nan = float('nan')
 
 
 class SalabimException(Exception):
@@ -92,13 +103,13 @@ class Monitor(object):
         if the name ends with a period (.),
         auto serializing will be applied |n|
         if omitted, the name monitor (serialized)
-        
+
     monitor : bool
         if True (default}, monitoring will be on. |n|
         if False, monitoring is disabled |n|
         it is possible to control monitoring later,
         with the monitor method
-        
+
     type : str
         specifies how tallied values are to be stored
             - 'any' (default) stores values in a list. This allows
@@ -113,14 +124,14 @@ class Monitor(object):
             - 'int64' integer >= -9223372036854775808 <= 9223372036854775807 8 bytes
             - 'uint64' integer >= 0 <= 18446744073709551615 8 bytes
             - 'float' float 8 bytes
-        
+
     env : Environment
         environment where the monitor is defined |n|
         if omitted, default_env will be used
     '''
 
     cached_x = [(0, 0), (0, 0)]  # index=ex0, value=[hash,x]
-    
+
     def __init__(self, name, monitor=True, type='any', env=None):
         if env is None:
             self.env = _default_env
@@ -219,7 +230,7 @@ class Monitor(object):
         x = self.x(ex0=ex0)
         if len(x) == 0:
             return nan
-        return np.mean(x)
+        return sum(x) / len(x)
 
     def std(self, ex0=False):
         '''
@@ -237,8 +248,12 @@ class Monitor(object):
         x = self.x(ex0=ex0)
         if len(x) == 0:
             return nan
-        else:
-            return np.std(x)
+        wmean = self.mean(ex0)
+        ssum = 0
+        for vx in x:
+            ssum += ((vx - wmean)**2)
+        wvar = ssum / len(x)
+        return math.sqrt(wvar)
 
     def minimum(self, ex0=False):
         '''
@@ -256,7 +271,7 @@ class Monitor(object):
         x = self.x(ex0=ex0)
         if len(x) == 0:
             return nan
-        return x.min()
+        return min(x)
 
     def maximum(self, ex0=False):
         '''
@@ -275,7 +290,7 @@ class Monitor(object):
         x = self.x(ex0=ex0)
         if len(x) == 0:
             return nan
-        return x.max()
+        return max(x)
 
     def median(self, ex0=False):
         '''
@@ -310,11 +325,30 @@ class Monitor(object):
         q-th percentile: float
             0 returns the minimum, 50 the median and 100 the maximum
         '''
-        x = self.x(ex0=ex0)
+
         assert (q >= 0) and (q <= 100)
-        if len(x) == 0:
+        if self._timestamp:
+            x, duration = self.xduration(ex0=ex0)
+        else:
+            x = self.x(ex0=ex0)
+            duration = [1] * len(x)
+        if len(x) == 1:
+            return x[0]
+        dtot = sum(duration)
+        if dtot == 0:
             return nan
-        return np.percentile(x, q)
+
+        xd = sorted(zip(x, duration), key=lambda v: v[0])
+        x_sorted, duration_sorted = zip(*xd)
+        duration_sorted = [0] + list(duration_sorted)
+        threshold = dtot * q / 100
+        vcum_imin1 = 0
+        for i, v in enumerate(duration_sorted):
+            vcum_i = vcum_imin1 + v
+            if vcum_i > threshold:
+                break
+            vcum_imin1 = vcum_i
+        return interpolate(threshold, vcum_imin1, vcum_i, x_sorted[i - 1], x_sorted[min(i, len(x_sorted) - 1)])
 
     def bin_count(self, lowerbound, upperbound, ex0=False):
         '''
@@ -336,8 +370,11 @@ class Monitor(object):
         number of values >lowerbound and <=upperbound : int
         '''
         x = self.x(ex0=ex0)
-        x_in_class = (x > lowerbound) * (x <= upperbound)
-        return x_in_class.sum()
+        n = 0
+        for vx in x:
+            if (vx > lowerbound) and (vx <= upperbound):
+                n += 1
+        return n
 
     def number_of_entries(self, ex0=False):
         '''
@@ -365,44 +402,18 @@ class Monitor(object):
         '''
         return self.number_of_entries() - self.number_of_entries(ex0=True)
 
-    def histogram(self, bins=10, range=None, ex0=False):
-        '''
-        numpy histogram of tallied values
-
-        Parameters
-        ----------
-        bins : int
-            number of bins
-
-        range : float
-            see numpy documentation
-
-        ex0 : bool
-            if False (default), include zeroes. if True, exclude zeroes
-
-        Returns
-        -------
-        numpy histogram : see numpy documentation
-
-        Note
-        ----
-        The numpy definition of a histogram is different from the salabim
-        print_histogram!
-        '''
-        return np.histogram(self.x(ex0=ex0), bins=bins, range=range)
-
     def print_statistics(self, show_header=True, show_legend=True, do_indent=False):
         '''
         print monitor statistics
-        
+
         Parameters
         ----------
         show_header: bool
             primarily for internal use
-            
+
         show_legend: bool
             primarily for internal use
-            
+
         do_indent: bool
             primarily for internal use
         '''
@@ -410,50 +421,49 @@ class Monitor(object):
             l = 45
         else:
             l = 0
-        indent=pad('',l)
+        indent = pad('', l)
 
         if show_header:
-            print(indent+'Statistics of {} at {:13.3f}'.format(self.name(), self.env._now))
+            print(indent + 'Statistics of {} at {:13.3f}'.format(self.name(), self.env._now))
 
         if show_legend:
             print(
                 indent + '                        all    excl.zero         zero')
             print(
-                pad('-' * (l-1)+' ',l) + '-------------- ------------ ------------ ------------')
+                pad('-' * (l - 1) + ' ', l) + '-------------- ------------ ------------ ------------')
 
         if self._timestamp:
             if self.duration() == 0:
-                print(pad(self.name(), l)+'no data')
+                print(pad(self.name(), l) + 'no data')
                 return
             else:
-                print(pad(self.name(),l) + 'duration      {}{}{}'.
-                    format(fn(self.duration(),13,3),
-                    fn(self.duration(ex0=True),13,3), fn(self.duration_zero(),13,3)))
+                print(pad(self.name(), l) + 'duration      {}{}{}'.
+                    format(fn(self.duration(), 13, 3),
+                    fn(self.duration(ex0=True), 13, 3), fn(self.duration_zero(), 13, 3)))
         else:
             if self.number_of_entries() == 0:
-                print(pad(self.name(), l)+'no entries')
+                print(pad(self.name(), l) + 'no entries')
                 return
             else:
                 print(pad(self.name(), l) + 'entries       {}{}{}'.
-                    format(fn(self.number_of_entries(),13,3),
-                    fn(self.number_of_entries(ex0=True),13,3), fn(self.number_of_entries_zero(),13,3)))
-            
+                    format(fn(self.number_of_entries(), 13, 3),
+                    fn(self.number_of_entries(ex0=True), 13, 3), fn(self.number_of_entries_zero(), 13, 3)))
+
         print(indent + 'mean          {}{}'.
-              format(fn(self.mean(),13,3), fn(self.mean(ex0=True),13,3)))
+              format(fn(self.mean(), 13, 3), fn(self.mean(ex0=True), 13, 3)))
         print(indent + 'std.deviation {}{}'.
-              format(fn(self.std(),13,3), fn(self.std(ex0=True),13,3)))
+              format(fn(self.std(), 13, 3), fn(self.std(ex0=True), 13, 3)))
         print()
         print(indent + 'minimum       {}{}'.
-              format(fn(self.minimum(),13,3), fn(self.minimum(ex0=True),13,3)))
+              format(fn(self.minimum(), 13, 3), fn(self.minimum(ex0=True), 13, 3)))
         print(indent + 'median        {}{}'.
-              format(fn(self.percentile(50),13,3),fn(self.percentile(50, ex0=True),13,3)))
+              format(fn(self.percentile(50), 13, 3), fn(self.percentile(50, ex0=True), 13, 3)))
         print(indent + '90% percentile{}{}'.
-              format(fn(self.percentile(90),13,3), fn(self.percentile(90, ex0=True),13,3)))
+              format(fn(self.percentile(90), 13, 3), fn(self.percentile(90, ex0=True), 13, 3)))
         print(indent + '95% percentile{}{}'.
-              format(fn(self.percentile(95),13,3), fn(self.percentile(95, ex0=True),13,3)))
+              format(fn(self.percentile(95), 13, 3), fn(self.percentile(95, ex0=True), 13, 3)))
         print(indent + 'maximum       {}{}'.
-              format(fn(self.maximum(),13,3), fn(self.maximum(ex0=True),13,3)))
-
+              format(fn(self.maximum(), 13, 3), fn(self.maximum(ex0=True), 13, 3)))
 
     def print_histogram(self, number_of_bins=30, lowerbound=0, bin_width=1, ex0=False):
         '''
@@ -476,10 +486,10 @@ class Monitor(object):
         '''
         if self._timestamp:
             x, weights = self.xduration(ex0=ex0)
+            weight_total = sum(weights)
         else:
             x = self.x(ex0=ex0)
-            weights = np.ones(len(x))
-        weight_total = np.sum(weights)
+            weight_total = len(x)
 
         print('Histogram of', self.name())
         if weight_total == 0:
@@ -489,7 +499,7 @@ class Monitor(object):
             else:
                 print('no entries')
             return
-                   
+
         self.print_statistics(show_header=False, show_legend=True, do_indent=False)
         if number_of_bins > 0:
             print()
@@ -524,7 +534,7 @@ class Monitor(object):
 
                 print('{} {}{}{} {}'.
                       format(fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s))
-                      
+
     def x(self, ex0=False, force_numeric=True):
         '''
         array of tallied values
@@ -537,16 +547,16 @@ class Monitor(object):
         convert_to_numeric : bool
             if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
             if False, do not interpret x-values, return as list if type is list
-            
+
         Returns
         -------
         all tallied values : array/list
         '''
         thishash = hash((tuple(self._x), force_numeric))
-        
+
         if Monitor.cached_x[ex0][0] == thishash:
             return Monitor.cached_x[ex0][1]
-                    
+
         if self._type == 'any':
             if force_numeric:
                 x = list_to_numeric_array(self._x)
@@ -562,10 +572,14 @@ class Monitor(object):
                 Monitor.cached_x[ex0] = (hash, x)
                 return x
         else:
-            x = np.array(self._x)
+            x = self. _x
 
         if ex0:
-            x = x[np.where(x != 0)]
+            xex = array.array(x.typecode)
+            for v in x:
+                if v != 0:
+                    xex.append(v)
+            x = xex
 
         Monitor.cached_x[ex0] = (hash, x)
         return x
@@ -589,13 +603,13 @@ class MonitorTimestamp(Monitor):
         if False, monitoring is disabled |n|
         it is possible to control monitoring later,
         with the monitor method
-        
+
     type : str
         specifies how tallied values are to be stored
         Using a int, uint of float type results in less memory usage and better
         performance. Note that the getter should never return the number not to use
         as this is used to indicate 'off'
-        
+
             - 'any' (default) stores values in a list. This allows for
                non numeric values. In calculations the values are
                forced to a numeric value (0 if not possible) do not use -inf
@@ -608,7 +622,7 @@ class MonitorTimestamp(Monitor):
             - 'int64' integer >= -9223372036854775807 <= 9223372036854775807 8 bytes do not use -9223372036854775808
             - 'uint64' integer >= 0 <= 18446744073709551614 8 bytes do not use 18446744073709551615
             - 'float' float 8 bytes do not use -inf
-            
+
     env : Environment
         environment where the monitor is defined |n|
         if omitted, default_env will be used
@@ -636,7 +650,7 @@ class MonitorTimestamp(Monitor):
     '''
 
     cached_xduration = [(0, ()), (0, ())]  # index=ex0, value=[hash,(x,duration)]
-    
+
     def __init__(self, name, getter, monitor=True, type='any', env=None):
         if name is None:
             name = 'monitortimestamp.'
@@ -757,9 +771,13 @@ class MonitorTimestamp(Monitor):
         mean : float
         '''
         x, duration = self.xduration(ex0=ex0)
-        if duration.sum() == 0:
+        sumduration = sum(duration)
+        if sumduration == 0:
             return nan
-        return np.average(x, weights=duration)
+        sumxduration = 0
+        for vx, vduration in zip(x, duration):
+            sumxduration += (vx * vduration)
+        return sumxduration / sumduration
 
     def std(self, ex0=False):
         '''
@@ -775,12 +793,15 @@ class MonitorTimestamp(Monitor):
         standard deviation : float
         '''
         x, duration = self.xduration(ex0=ex0)
-        dtot = duration.sum()
-        if dtot == 0:
+        sumduration = sum(duration)
+        if sumduration == 0:
             return nan
-        wmean = (duration * x).sum() / dtot
-        wvar = (duration * (x - wmean)**2).sum() / dtot
-        return np.sqrt(wvar)
+        wmean = self.mean(ex0)
+        ssum = 0
+        for vx, vduration in zip(x, duration):
+            ssum += (vduration * (vx - wmean)**2)
+        wvar = ssum / sumduration
+        return math.sqrt(wvar)
 
     def minimum(self, ex0=False):
         '''
@@ -798,7 +819,7 @@ class MonitorTimestamp(Monitor):
         x, duration = self.xduration(ex0=ex0)
         if len(x) == 0:
             return nan
-        return x.min()
+        return min(x)
 
     def maximum(self, ex0=False):
         '''
@@ -816,7 +837,7 @@ class MonitorTimestamp(Monitor):
         x, duration = self.xduration(ex0=ex0)
         if len(x) == 0:
             return nan
-        return x.max()
+        return max(x)
 
     def median(self, ex0=False):
         '''
@@ -851,18 +872,7 @@ class MonitorTimestamp(Monitor):
         q-th percentile: float
             0 returns the minimum, 50 the median and 100 the maximum
         '''
-        x, duration = self.xduration(ex0=ex0)
-        if len(x) == 1:
-            return x[0]
-        dtot = duration.sum()
-        if dtot == 0:
-            return nan
-        ind_sorted = np.argsort(x)
-        x_sorted = x[ind_sorted]
-        duration_sorted = duration[ind_sorted]
-        duration_cum = np.cumsum(duration_sorted)
-        p = (duration_cum - duration[0]) / (dtot - duration[0])
-        return np.interp(q / 100, p, x_sorted)
+        return Monitor.percentile(self, q, ex0=ex0)
 
     def bin_count(self, lowerbound, upperbound, ex0=False):
         '''
@@ -885,42 +895,18 @@ class MonitorTimestamp(Monitor):
         number of values >lowerbound and <=upperbound: int
         '''
         x, duration = self.xduration(ex0=ex0)
-        x_in_class = np.where((x > lowerbound) * (x <= upperbound))
-        return sum(duration[x_in_class])
+        n = 0
+        for vx, vduration in zip(x, duration):
+            if (vx > lowerbound) and (vx <= upperbound):
+                n += vduration
+        return n
 
     def duration(self, ex0=False):
         x, duration = self.xduration(ex0=ex0)
-        return duration.sum()
+        return sum(duration)
 
     def duration_zero(self):
         return self.duration() - self.duration(ex0=True)
-
-    def histogram(self, bins=10, range=None, ex0=False):
-        '''
-        numpy histogram of tallied values, weighted with their durations
-
-        Parameters
-        ----------
-        bins : int
-            number of bins
-
-        range : float
-            see numpy documentation
-
-        ex0 : bool
-            if False (default), include zeroes. if True, exclude zeroes
-
-        Returns
-        -------
-        numpy histogram : see numpy documentation
-
-        Note
-        -----
-        The numpy definition of a histogram is different from the salabim print_histogram!
-
-        '''
-        x, duration = self.xduration(ex0=ex0)
-        return np.histogram(x, bins=bins, range=range, weights=duration)
 
     def xduration(self, ex0=False, force_numeric=True):
         '''
@@ -934,52 +920,53 @@ class MonitorTimestamp(Monitor):
         force_numeric : bool
             if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
             if False, do not interpret x-values, return as list if type is list
-            
+
         Returns
         -------
         array/list with x-values and array with durations : tuple
         '''
-        
+
         thishash = hash((tuple(self._x), tuple(self._t), force_numeric))
-        
+
         if MonitorTimestamp.cached_xduration[ex0][0] == thishash:
             return MonitorTimestamp.cached_xduration[ex0][1]
-            
-        duration = np.zeros(len(self._t))
+
+        durationall = array.array('d')
         for i, t in enumerate(self._t):
             if i != 0:
-                duration[i - 1] = t - lastt
+                durationall.append(t - lastt)  # NOQA
             lastt = t
 
-        duration[-1] = self.env._now - lastt
-        
+        durationall.append(self.env._now - lastt)
+
         if self._type == 'any':
             if force_numeric:
                 x = list_to_numeric_array(self._x)
             else:
                 x = []
                 duration = array.array('d')
-                
-                for thisx, thisduration in zip(self._x, duration):
-                    if (not ex0) or (thisx != 0):
-                        x.append(thisx)
-                        duration.append(thisduration)
+
+                for vx, vduration in zip(self._x, durationall):
+                    if (not ex0) or (vx != 0):
+                        x.append(vx)
+                        duration.append(vduration)
                 MonitorTimestamp.cached_xduration[ex0] = (thishash, (x, duration))
                 return x, duration
-                        
+
         else:
-            x = np.array(self._x)
-        filter_not_off = np.where(x != self.off)
-        duration = duration[filter_not_off]
-        x = x[filter_not_off]
+            x = self._x
 
-        if ex0:
-            filter_ex0 = np.where(x != 0)
-            x = x[filter_ex0]
-            duration = duration[filter_ex0]
+        xex = array.array(x.typecode)
+        durationex = array.array('d')
 
-        MonitorTimestamp.cached_xduration[ex0] = (thishash, (x, duration))
-        return x, duration
+        for vx, vduration in zip(x, durationall):
+            if vx != self.off:
+                if (not ex0) or (vx != 0):
+                    xex.append(vx)
+                    durationex.append(vduration)
+
+        MonitorTimestamp.cached_xduration[ex0] = (thishash, (xex, durationex))
+        return xex, durationex
 
     def xt(self, ex0=False, exoff=False, force_numeric=True):
         '''
@@ -992,11 +979,11 @@ class MonitorTimestamp(Monitor):
 
         exoff : bool
             if False (default), include self.off. if True, exclude self.off's
-            
+
         force_numeric : bool
             if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
             if False, do not interpret x-values, return as list if type is list
-                               
+
         Returns
         -------
         array/list with x-values and array with timestamps : tuple
@@ -1015,20 +1002,32 @@ class MonitorTimestamp(Monitor):
                     if (not ex0) or (thisx != 0):
                         if (not exoff) or (thisx != self.off):
                             x.append(thisx)
-                            t.appent(thist)
+                            t.append(thist)
                 return x, t
         else:
-            x = np.array(self._x)
-            
-        t = np.array(self._t)
+            x = self._x
+
+        t = self._t
         if ex0:
-            filter_ex0 = np.where(x != 0)
-            x = x[filter_ex0]
-            t = t[filter_ex0]
+            xex = array.array(x.typecode)
+            tex = array.array(t.typecode)
+            for vx, vt in zip(x, t):
+                if vx != 0:
+                    xex.append(vx)
+                    tex.append(vt)
+            x = xex
+            t = tex
+
         if exoff:
-            filter_exoff = np.where(x != self.off)
-            x = x[filter_exoff]
-            t = t[filter_exoff]
+            xex = array.array(x.typecode)
+            tex = array.array(t.typecode)
+            for vx, vt in zip(x, t):
+                if vx != self.off:
+                    xex.append(vx)
+                    tex.append(vt)
+            x = xex
+            t = tex
+
         return x, t
 
     def tx(self, ex0=False, exoff=False, force_numeric=False):
@@ -1042,11 +1041,11 @@ class MonitorTimestamp(Monitor):
 
         exoff : bool
             if False (default), include self.off. if True, exclude self.off's
-            
+
         force_numeric : bool
             if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
-            if False, do not interpret x-values, return as list if type is list      
-                        
+            if False, do not interpret x-values, return as list if type is list
+
         Returns
         -------
         array with timestamps and array/list with x-values : tuple
@@ -1057,25 +1056,24 @@ class MonitorTimestamp(Monitor):
         '''
         return tuple(reversed(self.xt(ex0=ex0, exoff=exoff, force_numeric=force_numeric)))
 
-
     def print_statistics(self, show_header=True, show_legend=True, do_indent=False):
         '''
         print timestamped monitor statistics
-        
+
         Parameters
         ----------
         show_header: bool
             primarily for internal use
-            
+
         show_legend: bool
             primarily for internal use
-            
+
         do_indent: bool
             primarily for internal use
         '''
 
-        super().print_statistics(show_header, show_legend, do_indent)
-        
+        Monitor.print_statistics(self, show_header, show_legend, do_indent)
+
     def print_histogram(self, number_of_bins=30, lowerbound=0, bin_width=1, ex0=False):
         '''
         print timestamped monitor statistics and histogram
@@ -1095,7 +1093,7 @@ class MonitorTimestamp(Monitor):
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
         '''
-        super().print_histogram(number_of_bins, lowerbound, bin_width, ex0)
+        Monitor.print_histogram(self, number_of_bins, lowerbound, bin_width, ex0)
 
 
 if Pythonista:
@@ -1304,7 +1302,7 @@ class Queue(object):
         self._iter_sequence = 0
         self._iter_touched = {}
         self.length = MonitorTimestamp(
-            ('Length of ',self), getter=self._getlength, monitor=monitor, type='uint32', env=self.env)
+            ('Length of ', self), getter=self._getlength, monitor=monitor, type='uint32', env=self.env)
         self.length_of_stay = Monitor(
             ('Length of stay in ', self), monitor=monitor, type='float')
         if not _isinternal:
@@ -1350,7 +1348,7 @@ class Queue(object):
         self.length_of_stay.monitor(value=value)
 
     def __repr__(self):
-        return 'Queue('+self.name()+')'
+        return 'Queue(' + self.name() + ')'
 
     def print_info(self):
         print('Queue ' + hex(id(self)))
@@ -1402,7 +1400,7 @@ class Queue(object):
         -------
         base name of the queue (the name used at init or name): str
         '''
-        return _decode_base_name(self._base_name)
+        return self._base_namee
 
     def sequence_number(self):
         '''
@@ -1490,7 +1488,7 @@ class Queue(object):
         Note
         ----
         the priority of component will be set to the priority of poscomponent
-        
+
         '''
         component.enter_behind(self, poscomponent)
 
@@ -2025,7 +2023,7 @@ class Environment(object):
         return self.serial
 
     def __repr__(self):
-        return 'Environment('+self.name()+')'
+        return 'Environment(' + self.name() + ')'
 
     def print_info(self):
         print('Environment ' + hex(id(self)))
@@ -2177,7 +2175,7 @@ class Environment(object):
             if video is not omitted, a mp4 format video with the name video
             will be created. |n|
             The video has to have a .mp4 etension |n|
-            This requires installation of numpy and opencv (cv2).
+            This requires installation of opencv (cv2) and numpy.
 
         Note
         ----
@@ -2275,7 +2273,7 @@ class Environment(object):
         ----
         If you want to test the status, always include
         parentheses, like
-        
+
             ``if env.trace():``
         '''
         if value is not None:
@@ -2326,11 +2324,26 @@ class Environment(object):
         self._main._reschedule(scheduled_time, False, 'run')
 
         if self.animate:
-            if not pil_installed:
-                raise AssertionError('PIL is required for animation. Run pip install Pillow.')
-                raise AssertionError('PIL is required for animation. Run pip install Pillow.')
-            if not tkinter_installed:
-                raise AssertionError('tkinter is required for animation. Run pip install tkinter.')
+            if 'PIL' not in sys.modules:
+                raise AssertionError('PIL is required for animation. Install with pip install Pillow.')
+            if not (('tkinter' in sys.modules) or ('Tkinter' in sys.modules) or Pythonista):
+                raise AssertionError('tkinter is required for animation.')
+            if self.video == '':
+                self.dovideo = False
+            else:
+                self.dovideo = True
+                if Pythonista:
+                    raise AssertionError(
+                        'video production is not supported under Pythonista.')
+                if platform.python_implementation == 'PyPy':
+                    raise AssertionError(
+                        'video production is not supported under PyPy.')
+                if 'cv2' not in sys.modules:
+                    raise AssertionError(
+                        'cv2 required for video production. Install with pip install opencv-python.')
+                if 'numpy' not in sys.modules:
+                    raise AssertionError(
+                        'numpy required for video production. Install with pip install numpy.')
 
             self.t = self._now  # for the call to set_start_animation
             self.set_start_animation()
@@ -2342,8 +2355,7 @@ class Environment(object):
 
             if Pythonista:
                 try:
-                    scene.run(MyScene(), frame_interval=60 / self.fps,
-                              show_fps=False)
+                    scene.run(MyScene(), frame_interval=60 / self.fps, show_fps=False)
                 except:
                     pass
             else:
@@ -2351,9 +2363,8 @@ class Environment(object):
                     self.root = tkinter.Toplevel()
                 else:
                     self.root = tkinter.Tk()
-                self.canvas = \
-                    tkinter.Canvas(self.root, width=self.width,
-                                   height=self.height)
+                self.canvas = tkinter.Canvas(
+                    self.root, width=self.width, height=self.height)
                 self.canvas.configure(background=colorspec_to_hex(
                     self.background_color, False))
                 self.canvas.pack()
@@ -2369,18 +2380,6 @@ class Environment(object):
             self.an_system_modelname()
             self.an_system_buttons()
             self.an_system_clocktext()
-
-            if self.video == '':
-                self.dovideo = False
-            else:
-                self.dovideo = True
-                if not cv2_installed:
-                    if Pythonista:
-                        raise AssertionError(
-                            'video production is not supported under Pythonista.')
-                    else:
-                        raise AssertionError(
-                            'cv2 required for video production. Run pip install opencv_python.')
 
             if self.dovideo:
                 self.video_sequence = 0
@@ -2430,7 +2429,7 @@ class Environment(object):
                 self.step()
                 if self._current_component == self._main:
                     self.print_trace('{:10.3f}'.format(self._now),
-                                     self._main.name(), 'current')
+                        self._main.name(), 'current')
                     self._scheduled_time = inf
                     self._status = current
                     self.running = False
@@ -2485,9 +2484,8 @@ class Environment(object):
 
                     if self.dovideo:
                         capture_image.paste(ao._image,
-                                            (int(ao._image_x),
-                                             int(self.height - ao._image_y - ao._image.size[1])),
-                                            ao._image)
+                            (int(ao._image_x), int(self.height - ao._image_y - ao._image.size[1])),
+                            ao._image)
                 else:
                     ao.canvas_object = None
 
@@ -2507,9 +2505,6 @@ class Environment(object):
                         uio.button.config(text=thistext)
 
             if self.dovideo:
-                open_cv_image = np.array(capture_image)
-                # Convert RGB to BGR
-                open_cv_image = open_cv_image[:, :, ::-1].copy()
                 open_cv_image = cv2.cvtColor(
                     np.array(capture_image), cv2.COLOR_RGB2BGR)
                 self.out.write(open_cv_image)
@@ -2653,7 +2648,7 @@ class Environment(object):
             return fontsize
         else:
             return fontsize / self.scale
-            
+
     def name(self, txt=None):
         '''
         Parameters
@@ -2676,7 +2671,7 @@ class Environment(object):
         '''
         returns the base name of the environment (the name used at init or name)
         '''
-        return _decode_base_name(self._base_name)
+        return self._base_namee
 
     def sequence_number(self):
         '''
@@ -3262,17 +3257,17 @@ class Animate(object):
     def x(self, t=None):
         '''
         x-position of an animate object. May be overridden.
-        
+
         Parameters
         ----------
         t : float
             current time
-            
+
         Returns
         -------
         x : float
             default behaviour: linear interpolation betwen self.x0 and self.x1
-            
+
         '''
         return interpolate((self.env._now if t is None else t),
                            self.t0, self.t1, self.x0, self.x1)
@@ -3341,7 +3336,7 @@ class Animate(object):
 
     def layer(self, t=None):
         return self.layer0
-        
+
     def font(self, t=None):
         return self.font0
 
@@ -3613,7 +3608,7 @@ class Animate(object):
                                 for x in range(imwidth):
                                     c = im.getpixel((x, y))
                                     if not c[0:3] in (textcolor3, (0, 0, 0)):
-                                        im.putpixel((x, y), (*textcolor3, c[3]))
+                                        im.putpixel((x, y), (textcolor3[0], textcolor3[1], textcolor3[2], c[3]))
                         # end of code to correct bug
 
                     self.imwidth, self.imheight = im.size
@@ -3997,7 +3992,7 @@ class Component(object):
     '''
 
     def __init__(self, name=None, at=None, delay=0, urgent=False,
-        process='*', suppress_trace=False, mode=None, env=None, *args, **kwargs):
+      process='*', suppress_trace=False, mode=None, env=None, *args, **kwargs):
         if env is None:
             self.env = _default_env
         else:
@@ -4032,26 +4027,26 @@ class Component(object):
     def setup(self, *args, **kwargs):
         '''
         called immediately after initialization of a component.
-        
+
         by default this is a dummy method, but it can be overridden.
-        
+
         Example
         -------
             class Car(sim.Component):
                 def setup(self, color):
                     self.color = color
-                    
+
                 def process(self):
                     ...
-            
+
             redcar=Car(color='red') |n|
             bluecar=Car(color='blue')
         '''
         pass
 
     def __repr__(self):
-        return 'Component('+self.name()+')'
-    
+        return 'Component(' + self.name() + ')'
+
     def print_info(self):
         print('Component ' + hex(id(self)))
         print('  name=' + self.name())
@@ -4062,18 +4057,18 @@ class Component(object):
         print('  mode_time=' + time_to_string(self._mode_time))
         print('  creation_time=' + time_to_string(self._creation_time))
         print('  scheduled_time=' +
-                     time_to_string(self._scheduled_time))
+            time_to_string(self._scheduled_time))
         if len(self._qmembers) > 0:
             print('  member of queue(s):')
             for q in sorted(self._qmembers, key=lambda obj: obj.name().lower()):
                 print('    ' + pad(q.name(), 20) + ' enter_time=' +
-                             time_to_string(self._qmembers[q].enter_time) +
-                             ' priority=' + str(self._qmembers[q].priority))
+                    time_to_string(self._qmembers[q].enter_time) +
+                    ' priority=' + str(self._qmembers[q].priority))
         if len(self._requests) > 0:
             print('  requesting resource(s):')
 
             for r in sorted(list(self._requests),
-                key=lambda obj: obj.name().lower()):
+              key=lambda obj: obj.name().lower()):
                 print('    ' + pad(r.name(), 20) + ' quantity=' +
                     str(self._requests[r]))
         if len(self._claims) > 0:
@@ -4092,11 +4087,11 @@ class Component(object):
                     ' value=' + str(value))
 
     def hasprocess(self):
-        try:
-            p = self.process()
-            return True
-        except AttributeError:
-            pass
+        if hasattr(self, 'process'):
+            if inspect.isgeneratorfunction(self.process):
+                return True
+            else:
+                raise AssertionError('process has no yield statement')
         return False
 
     def _push(self, t, urgent):
@@ -4133,15 +4128,15 @@ class Component(object):
                     r._minq = inf
             self._requests = collections.defaultdict(float)
             self._failed = True
-            
+
         if len(self._waits) != 0:
             self.env.print_trace('', '', self.name(), 'wait failed')
-            for state, _,  _ in self._waits:
+            for state, _, _ in self._waits:
                 if self in state._waiters:  # there might be more values for this state
                     self._leave(state._waiters)
             self._waits = []
             self._failed = True
-            
+
     def _reschedule(self, scheduled_time, urgent, caller, extra=''):
         if scheduled_time < self.env._now:
             raise AssertionError(
@@ -4157,7 +4152,7 @@ class Component(object):
             _urgenttxt(urgent) + _modetxt(self._mode))
 
     def activate(self, at=None, delay=0, urgent=False, process=None,
-        keep_request=False, keep_wait=False, mode='*'):
+      keep_request=False, keep_wait=False, mode='*'):
         '''
         activate component
 
@@ -4400,7 +4395,7 @@ class Component(object):
             self._mode_time = self.env._now
         self._status = standby
 
-    def request(self, *args, fail_at=None, fail_delay=None, mode='*'):
+    def request(self, *args, **kwargs):
         '''
         request from a resource or resources
 
@@ -4443,9 +4438,9 @@ class Component(object):
         use ``yield self.request(...)``.
 
         If the same resource is specified more that once, the quantities are summed |n|
-        
+
         The requested quantity may exceed the current capacity of a resource |n|
-        
+
         The parameter failed will be reset by a calling request or wait
 
         Example
@@ -4460,6 +4455,11 @@ class Component(object):
         --> requests 1 from r1, 2 from r2 |n|
 
         '''
+        fail_at = kwargs.pop('fail_at', None)
+        fail_delay = kwargs.pop('fail_delay', None)
+        mode = kwargs.pop('mode', '*')
+        assert not kwargs
+
         if self._status != current:
             self._checkisnotdata()
             self._checkisnotmain()
@@ -4482,7 +4482,7 @@ class Component(object):
         if mode != '*':
             self._mode = mode
             self._mode_time = self.env._now
-            
+
         self._failed = False
         i = 0
         for i in range(len(args)):
@@ -4517,7 +4517,7 @@ class Component(object):
         for r, q in self._requests.items():
             if q < r._minq:
                 r._minq = q
-            
+
         self._tryrequest()
 
         if len(self._requests) != 0:
@@ -4544,7 +4544,7 @@ class Component(object):
             self._requests = collections.defaultdict(float)
             self._remove()
             self._reschedule(self.env._now, False, 'request honour')
-                
+
     def _release(self, r, q):
         if r not in self._claims:
             raise AssertionError(self.name() +
@@ -4617,8 +4617,8 @@ class Component(object):
                     raise AssertionError(
                         'not possible to release anonymous resources ' + r.name())
                 self._release(r, q)
-                
-    def wait(self, *args, fail_at=None, fail_delay=None, all=False, mode='*'):
+
+    def wait(self, *args, **kwargs):
         '''
         wait for any or all of the given state values are met
 
@@ -4645,7 +4645,7 @@ class Component(object):
             the request will be cancelled and the
             parameter failed will be set. |n|
             if not specified, the wait will not time out.
-            
+
         all : bool
             if False (default), continue, if any of the given state/values are met |n|
             if True, continue if all of the given state/values are met
@@ -4666,12 +4666,12 @@ class Component(object):
 
         It is allowed to wait for more than one value of a state |n|
         the parameter failed will be reset by a calling wait
-        
+
         If you want to check for all components to meet a value (and clause),
         use Component.wait(..., all=True)
 
         The value may be specified in three different ways:
-            
+
         * constant, that value is just compared to state.value() |n|
           yield self.wait((light,'red'))
         * an expression, containg one or more $-signs
@@ -4700,15 +4700,21 @@ class Component(object):
         yield self.wait(s1,s2,all=True) |n|
         --> waits for s1.value()==True and s2.value==True |n|
         '''
+        fail_at = kwargs.pop('fail_at', None)
+        fail_delay = kwargs.pop('fail_delay', None)
+        all = kwargs.pop('all', False)
+        mode = kwargs.pop('mode', '*')
+        assert not kwargs
+
         if self._status != current:
             self._checkisnotdata()
             self._checkisnotmain()
             self._remove()
             self._check_fail()
-            
+
         self._wait_all = all
         self._fail = False
-        
+
         if fail_at is None:
             if fail_delay is None:
                 scheduled_time = inf
@@ -4722,7 +4728,7 @@ class Component(object):
                 scheduled_time = fail_at
             else:
                 raise AssertionError('both fail_at and fail_delay specified')
-                
+
         if mode != '*':
             self._mode = mode
             self._mode_time = self.env._now
@@ -4741,7 +4747,7 @@ class Component(object):
                     priority = argsi[2]
             else:
                 raise AssertionError('incorrect specifier', args)
-                
+
             addstring = ''
             for (statex, _, _) in self._waits:
                 if statex == state:
@@ -4758,11 +4764,11 @@ class Component(object):
                 self._waits.append((state, value, 1))
             else:
                 self._waits.append((state, value, 0))
-                
+
         if len(self._waits) == 0:
             raise AssertionError('no states specified')
         self._trywait()
-                            
+
         if len(self._waits) != 0:
             self._reschedule(scheduled_time, False, 'wait')
 
@@ -4798,7 +4804,7 @@ class Component(object):
                     if value(state._value, self, state):
                         honored = True
                         break
-                
+
         if honored:
             for s, _, _ in self._waits:
                 if self in s._waiters:  # there might be more values for this state
@@ -4806,10 +4812,10 @@ class Component(object):
             self._waits = []
             self._remove()
             self._reschedule(self.env._now, False, 'wait honor')
-            
+
         return honored
 
-    def claimed_quantity(self):
+    def claimed_quantity(self, resource):
         '''
         Parameters
         ----------
@@ -4886,7 +4892,7 @@ class Component(object):
         -------
         base name of the component (the name used at init or name): str
         '''
-        return _decode_base_name(self._base_name)
+        return self._base_namee
 
     def sequence_number(self):
         '''
@@ -4997,7 +5003,7 @@ class Component(object):
         Be sure to always include the parentheses, otherwise the result will be always True!
         '''
         return len(self._requests) != 0
-        
+
     def isscheduled(self):
         '''
         Returns
@@ -5238,11 +5244,11 @@ class Component(object):
                 # leave.sort is not possible, because statistics will be affected
                 mx.predecessor.successor = mx.successor
                 mx.successor.predecessor = mx.predecessor
-    
+
                 m2 = q._head.successor
                 while (m2 != q._tail) and (m2.priority <= priority):
                     m2 = m2.successor
-    
+
                 m1 = m2.predecessor
                 m1.successor = mx
                 m2.predecessor = mx
@@ -5348,7 +5354,7 @@ class Component(object):
         return self._status
 
     def _member(self, q):
-        return self._qmembers.get(q,None)
+        return self._qmembers.get(q, None)
 
     def _checknotinqueue(self, q):
         mx = self._member(q)
@@ -5399,7 +5405,7 @@ class Exponential(_Distribution):
 
     def __init__(self, mean, randomstream=None):
         if mean <= 0:
-            raise AsserionError('mean<=0')
+            raise AssertionError('mean<=0')
         self._mean = mean
         if randomstream is None:
             self.randomstream = random
@@ -5458,7 +5464,7 @@ class Normal(_Distribution):
         else:
             self._standard_deviation = standard_deviation
         if self._standard_deviation < 0:
-            raise AsserionError('standard_deviation<0')
+            raise AssertionError('standard_deviation<0')
         if randomstream is None:
             self.randomstream = random
         else:
@@ -5467,7 +5473,7 @@ class Normal(_Distribution):
 
     def __repr__(self):
         return 'Normal'
-        
+
     def print_info(self):
         print('Normal distribution ' + hex(id(self)))
         print('  mean=' + str(self._mean))
@@ -5527,7 +5533,7 @@ class Uniform(_Distribution):
 
     def __repr__(self):
         return 'Uniform'
-        
+
     def print_info(self):
         print('Uniform distribution ' + hex(id(self)))
         print('  lowerbound=' + str(self._lowerbound))
@@ -5600,7 +5606,7 @@ class Triangular(_Distribution):
 
     def __repr__(self):
         return 'Triangular'
-        
+
     def print_info(self):
         print('Triangular distribution ' + hex(id(self)))
         print('  low=' + str(self._low))
@@ -5652,7 +5658,7 @@ class Constant(_Distribution):
 
     def __repr__(self):
         return 'Constant'
-        
+
     def print_info(self):
         print('Constant distribution ' + hex(id(self)))
         print('  value=' + str(self._value))
@@ -5683,14 +5689,14 @@ class Cdf(_Distribution):
         list with x-values and corresponding cumulative density
         (x1,c1,x2,c2, ...xn,cn) |n|
         Requirements:
-        
+
             x1<=x2<= ...<=xn |n|
             c1<=c2<=cn |n|
             c1=0 |n|
             cn>0 |n|
             all cumulative densities are auto scaled according to cn,
             so no need to set cn to 1 or 100.
-        
+
     randomstream: randomstream
         if omitted, random will be used |n|
         if used as random.Random(12299)
@@ -5741,7 +5747,7 @@ class Cdf(_Distribution):
 
     def __repr__(self):
         return 'Cdf'
-        
+
     def print_info(self):
         print('Cdf distribution ' + hex(id(self)))
         print('  randomstream=' + hex(id(self.randomstream)))
@@ -5777,7 +5783,7 @@ class Pdf(_Distribution):
     ----------
     spec : list or tuple
         either
-        
+
         -   if no possibilities specified: |n|
             list with x-values and corresponding probability
             (x0, p0, x1, p1, ...xn,pn) |n|
@@ -5806,7 +5812,7 @@ class Pdf(_Distribution):
     but a sample will be returned when calling sample.
     '''
 
-    def __init__(self, spec1, probabilities=None, randomstream=None):
+    def __init__(self, spec, probabilities=None, randomstream=None):
         self._x = [0]  # just a place holder
         self._cum = [0]
         if randomstream is None:
@@ -5817,10 +5823,9 @@ class Pdf(_Distribution):
 
         sump = 0
         sumxp = 0
-        lastx = -inf
         hasmean = True
-        if spec2 is None:
-            spec = list(spec1)
+        if probabilities is None:
+            spec = list(spec)
 
             if len(spec) == 0:
                 raise AssertionError('no arguments specified')
@@ -5840,19 +5845,19 @@ class Pdf(_Distribution):
                 except:
                     hasmean = False
         else:
-            spec = list(spec1)
-            if isinstance(spec2, (list, tuple)):
-                spec2 = list(spec2)
+            spec = list(spec)
+            if isinstance(probabilities, (list, tuple)):
+                probabilities = list(probabilities)
             else:
-                spec2 = len(spec) * [1]
-            if len(spec) != len(spec2):
+                probabilities = len(spec) * [1]
+            if len(spec) != len(probabilities):
                 raise AssertionError(
                     'length of x-values does not match length of probabilities')
 
             while len(spec) > 0:
                 x = spec.pop(0)
                 self._x.append(x)
-                p = spec2.pop(0)
+                p = probabilities.pop(0)
                 sump += p
                 self._cum.append(sump)
                 if isinstance(x, _Distribution):
@@ -5874,7 +5879,7 @@ class Pdf(_Distribution):
 
     def __repr__(self):
         return 'Pdf'
-        
+
     def print_info(self):
         print('Pdf distribution ' + hex(id(self)))
         print('  randomstream=' + hex(id(self.randomstream)))
@@ -5991,10 +5996,10 @@ class Distribution(_Distribution):
 
     def __repr__(self):
         return self._distribution.__repr__()
-        
+
     def print_info(self):
         self._distribution.print_info()
-        
+
     def sample(self):
         '''
         Returns
@@ -6012,7 +6017,7 @@ class Distribution(_Distribution):
         '''
         return self._mean
 
-        
+
 class State(object):
     '''
     State
@@ -6032,13 +6037,13 @@ class State(object):
     monitor : bool
         if True (default) , the waiters queue and the value are monitored |n|
         if False, monitoring is disabled.
-        
+
     type : str
         specifies how the state values are monitored. Using a
         int, uint of float type results in less memory usage and better
         performance. Note that you avoid the number not to use
         as this is used to indicate 'off'
-        
+
         -   'any' (default) stores values in a list. This allows for
             non numeric values. In calculations the values are
             forced to a numeric value (0 if not possible) do not use -inf
@@ -6051,7 +6056,7 @@ class State(object):
         -  'int64' integer >= -9223372036854775807 <= 9223372036854775807 8 bytes do not use -9223372036854775808
         -  'uint64' integer >= 0 <= 18446744073709551614 8 bytes do not use 18446744073709551615
         -  'float' float 8 bytes do not use -inf
-            
+
     env : Environment
         environment to be used |n|
         if omitted, _default_env is used
@@ -6074,9 +6079,9 @@ class State(object):
         self.env.print_trace(
             '', '', self.name() + ' create',
             'value= ' + str(self._value))
-            
+
     def __repr__(self):
-        return 'State('+self.name()+')'
+        return 'State(' + self.name() + ')'
 
     def print_info(self):
         print('State ' + hex(id(self)))
@@ -6097,80 +6102,80 @@ class State(object):
                             values = values + ', '
                         values = values + str(value)
 
-                print('    ' + pad(c.name(), 20), ' value(s): '+values)
-            
+                print('    ' + pad(c.name(), 20), ' value(s): ' + values)
+
     def __call__(self):
         return self._value
-                  
+
     def get(self):
         '''
         get value of the state
-        
+
         Returns
         -------
         value of the state : any
         '''
         return self._value
-        
+
     def set(self, value=True):
         '''
         set the value of the state
-        
+
         Parameters
         ----------
         value : any (preferably printable)
             if omitted, True |n|
             if there is a change, the waiters queue will be checked
             to see whether there are waiting components to be honored
-            
+
         Note
         ----
         This method is identical to reset, except the default value is True.
         '''
-        self.env.print_trace('', '', self.name()+' set', 'value = ' + str(value))
+        self.env.print_trace('', '', self.name() + ' set', 'value = ' + str(value))
         if self._value != value:
             self._value = value
             self.value.tally()
             self._trywait()
-        
+
     def reset(self, value=False):
         '''
         reset the value of the state
-        
+
         Parameters
         ----------
         value : any (preferably printable)
             if omitted, False |n|
             if there is a change, the waiters queue will be checked
             to see whether there are waiting components to be honored
-            
+
         Note
         ----
         This method is identical to set, except the default value is False.
         '''
-        self.env.print_trace('', '', self.name()+' reset', 'value = ' + str(value))
+        self.env.print_trace('', '', self.name() + ' reset', 'value = ' + str(value))
         if self._value != value:
             self._value = value
             self.value.tally()
             self._trywait()
-        
+
     def trigger(self, value=True, value_after=None, max=inf):
         '''
         triggers the value of the state
-        
+
         Parameters
         ----------
         value : any (preferably printable)
             if omitted, True |n|
-            
+
         value_after : any (preferably printable)
             after the trigger, this will be the new value. |n|
             if omitted, return to the the before the trigger.
-        
+
         max : int
             maximum number of components to be honored for the trigger value |n|
             default: inf
-            
+
         Note
         ----
             The value of the state will be set to value, then at most
@@ -6189,7 +6194,7 @@ class State(object):
         self._value = value_after
         self.value.tally()
         self._trywait()
-        
+
     def _trywait(self, max=inf):
         mx = self._waiters._head.successor
         while mx != self._waiters._tail:
@@ -6218,17 +6223,17 @@ class State(object):
         '''
         self.requesters().monitor(value)
         self.value.monitor(value)
-        
-    def reset_monitors(monitor=None):
+
+    def reset_monitors(self, monitor=None):
         '''
-        resets the timestamped monitor for the state’s value
-    
+        resets the timestamped monitor for the state's value
+
         Parameters
         ----------
         monitor : bool
         if True (default}, monitoring will be on. |n|
             if False, monitoring is disabled
-            
+
         Note
         ----
         Equivalent to ``state.value.reset()``
@@ -6237,7 +6242,7 @@ class State(object):
 
     def _get_value(self):
         return self._value
-        
+
     def name(self, txt=None):
         '''
         Parameters
@@ -6285,7 +6290,7 @@ class State(object):
         self.waiters().length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True)
         print()
         self.value.print_statistics(show_header=False, show_legend=False, do_indent=True)
-                            
+
     def waiters(self):
         '''
         Returns
@@ -6321,7 +6326,7 @@ class Resource(object):
         if True (default) , the requesters queue, the claimers queue,
         the capacity, the available_quantity and the claimed_quantity are monitored |n|
         if False, monitoring is disabled.
-        
+
     env : Environment
         environment to be used |n|
         if omitted, _default_env is used
@@ -6359,7 +6364,7 @@ class Resource(object):
             '', '', self.name() + ' create',
             'capacity=' + str(self._capacity) + (' anonymous' if self._anonymous else ''))
 
-    def reset_monitors(monitor=None):
+    def reset_monitors(self, monitor=None):
         '''
         resets the resource monitors  and timestamped monitors
 
@@ -6390,10 +6395,10 @@ class Resource(object):
         prints a summary of statistics of a resource
         '''
         print('Statistics of {} at {:13.3f}'.format(self.name(), self.env._now))
-        show_legend=True
+        show_legend = True
         for q in [self.requesters(), self.claimers()]:
             q.length.print_statistics(show_header=False, show_legend=show_legend, do_indent=True)
-            show_legend=False
+            show_legend = False
             print()
             q.length_of_stay.print_statistics(show_header=False, show_legend=show_legend, do_indent=True)
             print()
@@ -6426,8 +6431,8 @@ class Resource(object):
         self.claimed_quantity.monitor(value)
 
     def __repr__(self):
-        return 'Resource('+self.name()+')'
-    
+        return 'Resource(' + self.name() + ')'
+
     def print_info(self):
         print('Resource ' + hex(id(self)))
         print('  name=' + self.name())
@@ -6574,7 +6579,7 @@ class Resource(object):
         -------
         base name of the resource (the name used at init or name): str
         '''
-        return _decode_base_name(self._base_name)
+        return self._base_namee
 
     def sequence_number(self):
         '''
@@ -6591,57 +6596,62 @@ class Resource(object):
 
 def colornames():
     return {'': '#00000000', '10%gray': '#191919', '20%gray': '#333333',
-            '30%gray': '#464646', '40%gray': '#666666', '50%gray': '#7F7F7F',
-            '60%gray': '#999999', '70%gray': '#B2B2B2', '80%gray': '#CCCCCC',
-            '90%gray': '#E6E6E6', 'aliceblue': '#F0F8FF', 'antiquewhite': '#FAEBD7',
-            'aqua': '#00FFFF', 'aquamarine': '#7FFFD4', 'azure': '#F0FFFF',
-            'beige': '#F5F5DC', 'bisque': '#FFE4C4', 'black': '#000000',
-            'blanchedalmond': '#FFEBCD', 'blue': '#0000FF', 'blueviolet': '#8A2BE2',
-            'brown': '#A52A2A', 'burlywood': '#DEB887', 'cadetblue': '#5F9EA0',
-            'chartreuse': '#7FFF00', 'chocolate': '#D2691E', 'coral': '#FF7F50',
-            'cornflowerblue': '#6495ED', 'cornsilk': '#FFF8DC', 'crimson': '#DC143C',
-            'cyan': '#00FFFF', 'darkblue': '#00008B', 'darkcyan': '#008B8B',
-            'darkgoldenrod': '#B8860B', 'darkgray': '#A9A9A9', 'darkgreen': '#006400',
-            'darkkhaki': '#BDB76B', 'darkmagenta': '#8B008B', 'darkolivegreen': '#556B2F',
-            'darkorange': '#FF8C00', 'darkorchid': '#9932CC', 'darkred': '#8B0000',
-            'darksalmon': '#E9967A', 'darkseagreen': '#8FBC8F', 'darkslateblue': '#483D8B',
-            'darkslategray': '#2F4F4F', 'darkturquoise': '#00CED1', 'darkviolet': '#9400D3',
-            'deeppink': '#FF1493', 'deepskyblue': '#00BFFF', 'dimgray': '#696969',
-            'dodgerblue': '#1E90FF', 'firebrick': '#B22222', 'floralwhite': '#FFFAF0',
-            'forestgreen': '#228B22', 'fuchsia': '#FF00FF', 'gainsboro': '#DCDCDC',
-            'ghostwhite': '#F8F8FF', 'gold': '#FFD700', 'goldenrod': '#DAA520',
-            'gray': '#808080', 'green': '#008000', 'greenyellow': '#ADFF2F',
-            'honeydew': '#F0FFF0', 'hotpink': '#FF69B4', 'indianred': '#CD5C5C',
-            'indigo': '#4B0082', 'ivory': '#FFFFF0', 'khaki': '#F0E68C',
-            'lavender': '#E6E6FA', 'lavenderblush': '#FFF0F5', 'lawngreen': '#7CFC00',
-            'lemonchiffon': '#FFFACD', 'lightblue': '#ADD8E6', 'lightcoral': '#F08080',
-            'lightcyan': '#E0FFFF', 'lightgoldenrodyellow': '#FAFAD2',
-            'lightgray': '#D3D3D3', 'lightgreen': '#90EE90', 'lightpink': '#FFB6C1',
-            'lightsalmon': '#FFA07A', 'lightseagreen': '#20B2AA', 'lightskyblue': '#87CEFA',
-            'lightslategray': '#778899', 'lightsteelblue': '#B0C4DE',
-            'lightyellow': '#FFFFE0', 'lime': '#00FF00', 'limegreen': '#32CD32',
-            'linen': '#FAF0E6', 'magenta': '#FF00FF', 'maroon': '#800000',
-            'mediumaquamarine': '#66CDAA', 'mediumblue': '#0000CD',
-            'mediumorchid': '#BA55D3', 'mediumpurple': '#9370DB',
-            'mediumseagreen': '#3CB371', 'mediumslateblue': '#7B68EE',
-            'mediumspringgreen': '#00FA9A', 'mediumturquoise': '#48D1CC',
-            'mediumvioletred': '#C71585', 'midnightblue': '#191970', 'mintcream': '#F5FFFA',
-            'mistyrose': '#FFE4E1', 'moccasin': '#FFE4B5', 'navajowhite': '#FFDEAD',
-            'navy': '#000080', 'none': '#00000000', 'oldlace': '#FDF5E6', 'olive': '#808000',
-            'olivedrab': '#6B8E23', 'orange': '#FFA500', 'orangered': '#FF4500',
-            'orchid': '#DA70D6', 'palegoldenrod': '#EEE8AA', 'palegreen': '#98FB98',
-            'paleturquoise': '#AFEEEE', 'palevioletred': '#DB7093', 'papayawhip': '#FFEFD5',
-            'peachpuff': '#FFDAB9', 'peru': '#CD853F', 'pink': '#FFC0CB', 'plum': '#DDA0DD',
-            'powderblue': '#B0E0E6', 'purple': '#800080', 'red': '#FF0000',
-            'rosybrown': '#BC8F8F', 'royalblue': '#4169E1', 'saddlebrown': '#8B4513',
-            'salmon': '#FA8072', 'sandybrown': '#FAA460', 'seagreen': '#2E8B57',
-            'seashell': '#FFF5EE', 'sienna': '#A0522D', 'silver': '#C0C0C0',
-            'skyblue': '#87CEEB', 'slateblue': '#6A5ACD', 'slategray': '#708090',
-            'snow': '#FFFAFA', 'springgreen': '#00FF7F', 'steelblue': '#4682B4',
-            'tan': '#D2B48C', 'teal': '#008080', 'thistle': '#D8BFD8', 'tomato': '#FF6347',
-            'transparent': '#00000000', 'turquoise': '#40E0D0', 'violet': '#EE82EE',
-            'wheat': '#F5DEB3', 'white': '#FFFFFF', 'whitesmoke': '#F5F5F5',
-            'yellow': '#FFFF00', 'yellowgreen': '#9ACD32'}
+     '30%gray': '#464646', '40%gray': '#666666', '50%gray': '#7F7F7F',
+     '60%gray': '#999999', '70%gray': '#B2B2B2', '80%gray': '#CCCCCC',
+     '90%gray': '#E6E6E6', 'aliceblue': '#F0F8FF', 'antiquewhite': '#FAEBD7',
+     'aqua': '#00FFFF', 'aquamarine': '#7FFFD4', 'azure': '#F0FFFF',
+     'beige': '#F5F5DC', 'bisque': '#FFE4C4', 'black': '#000000',
+     'blanchedalmond': '#FFEBCD', 'blue': '#0000FF', 'blueviolet': '#8A2BE2',
+     'brown': '#A52A2A', 'burlywood': '#DEB887', 'cadetblue': '#5F9EA0',
+     'chartreuse': '#7FFF00', 'chocolate': '#D2691E', 'coral': '#FF7F50',
+     'cornflowerblue': '#6495ED', 'cornsilk': '#FFF8DC', 'crimson': '#DC143C',
+     'cyan': '#00FFFF', 'darkblue': '#00008B', 'darkcyan': '#008B8B',
+     'darkgoldenrod': '#B8860B', 'darkgray': '#A9A9A9',
+     'darkgreen': '#006400', 'darkkhaki': '#BDB76B', 'darkmagenta': '#8B008B',
+     'darkolivegreen': '#556B2F', 'darkorange': '#FF8C00',
+     'darkorchid': '#9932CC', 'darkred': '#8B0000', 'darksalmon': '#E9967A',
+     'darkseagreen': '#8FBC8F', 'darkslateblue': '#483D8B',
+     'darkslategray': '#2F4F4F', 'darkturquoise': '#00CED1',
+     'darkviolet': '#9400D3', 'deeppink': '#FF1493', 'deepskyblue': '#00BFFF',
+     'dimgray': '#696969', 'dodgerblue': '#1E90FF', 'firebrick': '#B22222',
+     'floralwhite': '#FFFAF0', 'forestgreen': '#228B22', 'fuchsia': '#FF00FF',
+     'gainsboro': '#DCDCDC', 'ghostwhite': '#F8F8FF', 'gold': '#FFD700',
+     'goldenrod': '#DAA520', 'gray': '#808080', 'green': '#008000',
+     'greenyellow': '#ADFF2F', 'honeydew': '#F0FFF0', 'hotpink': '#FF69B4',
+     'indianred': '#CD5C5C', 'indigo': '#4B0082', 'ivory': '#FFFFF0',
+     'khaki': '#F0E68C', 'lavender': '#E6E6FA', 'lavenderblush': '#FFF0F5',
+     'lawngreen': '#7CFC00', 'lemonchiffon': '#FFFACD',
+     'lightblue': '#ADD8E6', 'lightcoral': '#F08080', 'lightcyan': '#E0FFFF',
+     'lightgoldenrodyellow': '#FAFAD2', 'lightgray': '#D3D3D3',
+     'lightgreen': '#90EE90', 'lightpink': '#FFB6C1',
+     'lightsalmon': '#FFA07A', 'lightseagreen': '#20B2AA',
+     'lightskyblue': '#87CEFA', 'lightslategray': '#778899',
+     'lightsteelblue': '#B0C4DE', 'lightyellow': '#FFFFE0', 'lime': '#00FF00',
+     'limegreen': '#32CD32', 'linen': '#FAF0E6', 'magenta': '#FF00FF',
+     'maroon': '#800000', 'mediumaquamarine': '#66CDAA',
+     'mediumblue': '#0000CD', 'mediumorchid': '#BA55D3',
+     'mediumpurple': '#9370DB', 'mediumseagreen': '#3CB371',
+     'mediumslateblue': '#7B68EE', 'mediumspringgreen': '#00FA9A',
+     'mediumturquoise': '#48D1CC', 'mediumvioletred': '#C71585',
+     'midnightblue': '#191970', 'mintcream': '#F5FFFA',
+     'mistyrose': '#FFE4E1', 'moccasin': '#FFE4B5', 'navajowhite': '#FFDEAD',
+     'navy': '#000080', 'none': '#00000000', 'oldlace': '#FDF5E6',
+     'olive': '#808000', 'olivedrab': '#6B8E23', 'orange': '#FFA500',
+     'orangered': '#FF4500', 'orchid': '#DA70D6', 'palegoldenrod': '#EEE8AA',
+     'palegreen': '#98FB98', 'paleturquoise': '#AFEEEE',
+     'palevioletred': '#DB7093', 'papayawhip': '#FFEFD5',
+     'peachpuff': '#FFDAB9', 'peru': '#CD853F', 'pink': '#FFC0CB',
+     'plum': '#DDA0DD', 'powderblue': '#B0E0E6', 'purple': '#800080',
+     'red': '#FF0000', 'rosybrown': '#BC8F8F', 'royalblue': '#4169E1',
+     'saddlebrown': '#8B4513', 'salmon': '#FA8072', 'sandybrown': '#FAA460',
+     'seagreen': '#2E8B57', 'seashell': '#FFF5EE', 'sienna': '#A0522D',
+     'silver': '#C0C0C0', 'skyblue': '#87CEEB', 'slateblue': '#6A5ACD',
+     'slategray': '#708090', 'snow': '#FFFAFA', 'springgreen': '#00FF7F',
+     'steelblue': '#4682B4', 'tan': '#D2B48C', 'teal': '#008080',
+     'thistle': '#D8BFD8', 'tomato': '#FF6347', 'transparent': '#00000000',
+     'turquoise': '#40E0D0', 'violet': '#EE82EE', 'wheat': '#F5DEB3',
+     'white': '#FFFFFF', 'whitesmoke': '#F5F5F5', 'yellow': '#FFFF00',
+     'yellowgreen': '#9ACD32'}
 
 
 def colorspec_to_tuple(colorspec):
@@ -6872,20 +6882,13 @@ def _set_name(name, _nameserialize, object):
     object._name = newname
     object._base_name = name
     object._sequence_number = sequence_number
-    
-    
+
+
 def _decode_name(name):
     if isinstance(name, tuple):
-        return name[0]+name[1].name()
+        return name[0] + name[1].name()
     else:
         return name
-        
-        
-def _decode_base_name(basename):
-    if isinstance(name, tuple):
-        return basename[0] + basename[1].basename()
-    else:
-        return basename
 
 
 def pad(txt, n):
@@ -6903,11 +6906,12 @@ def fn(x, l, d):
     if math.isnan(x):
         return ('{:' + str(l) + 's}').format('')
     if x >= 10**(l - d - 1):
-        return ('{:' + str(l) + '.' + str(l-d-3)+'e}').format(x)
+        return ('{:' + str(l) + '.' + str(l - d - 3) + 'e}').format(x)
     if x == int(x):
-        return ('{:' + str(l-d-1) + 'd}{:' + str(d+1) + 's}').format(int(x), '')
+        return ('{:' + str(l - d - 1) + 'd}{:' + str(d + 1) + 's}').format(int(x), '')
     return ('{:' + str(l) + '.' + str(d) + 'f}').format(x)
-    
+
+
 _lookup_arraytype = {
     'bool': 'B',
     'int8': 'b',
@@ -6922,7 +6926,7 @@ _lookup_arraytype = {
     'double': 'd',
     'any': 'any'
     }
-        
+
 _lookup_off = {
     'b': -128,
     'B': 255,
@@ -6932,32 +6936,22 @@ _lookup_off = {
     'I': 4294967295,
     'l': -9223372036854775808,
     'L': 18446744073709551615,
-    'd': -np.inf,
-    'any': -np.inf
+    'd': -inf,
+    'any': -inf
     }
-    
+
 
 def list_to_numeric_array(l):
-    x = np.array(l)
-    if not str(x.dtype) in _lookup_arraytype:
-        x = []
-        for v in l:
-            try:
-                vint = int(v)
-            except:
-                vint = 0
-            try:
-                vfloat = float(v)
-            except:
-                vfloat = 0
-            if vint == vfloat:
-                x.append(vint)
-            else:
-                x.append(vfloat)
-        x = np.array(x)
-    return x
+    result = array.array('d')
+    for v in l:
+        try:
+            vfloat = float(v)
+        except:
+            vfloat = 0
+        result.append(vfloat)
+    return result
 
-    
+
 def normalize(s):
     res = ''
     for c in s.upper():
@@ -7010,7 +7004,7 @@ def scheduled():
 
 def requesting():
     return 'requesting'
-    
+
 
 def waiting():
     return 'waiting'
@@ -7043,407 +7037,430 @@ def pythonistacolor(c):
 def _std_fonts():
     # the names of the standard fonts are generated by ttf fontdict.py on the standard development machine
     return {'18cents': '18thCentury', 'Acme____': 'AcmeFont',
-            'AGENCYB': 'Agency FB Bold', 'AGENCYR': 'Agency FB', 'Alfredo_': 'Alfredo',
-            'ALGER': 'Algerian', 'aliee13': 'Alien Encounters', 'almosnow': 'Almonte Snow',
-            'Ameth___': 'Amethyst', 'ANTIC___': 'AnticFont', 'ANTQUAB': 'Book Antiqua Bold',
-            'ANTQUABI': 'Book Antiqua Bold Italic', 'ANTQUAI': 'Book Antiqua Italic',
-            'ArchitectsDaughter': 'Architects Daughter', 'arial': 'Arial',
-            'arialbd': 'Arial Bold', 'arialbi': 'Arial Bold Italic',
-            'ariali': 'Arial Italic', 'ARIALN': 'Arial Narrow',
-            'ARIALNB': 'Arial Narrow Bold', 'ARIALNBI': 'Arial Narrow Bold Italic',
-            'ARIALNI': 'Arial Narrow Italic', 'ARIALUNI': 'Arial Unicode MS',
-            'ariblk': 'Arial Black', 'ARLRDBD': 'Arial Rounded MT Bold', 'asimov': 'Asimov',
-            'Autumn__': 'Autumn', 'babyk___': 'Baby Kruffy', 'BALTH___': 'Balthazar',
-            'BASKVILL': 'Baskerville Old Face', 'BASTION_': 'Bastion',
-            'BAUHS93': 'Bauhaus 93', 'BELL': 'Bell MT', 'BELLB': 'Bell MT Bold',
-            'BELLI': 'Bell MT Italic', 'BERNHC': 'Bernard MT Condensed',
-            'bgothl': 'BankGothic Lt BT Light', 'bgothm': 'BankGothic Md BT Medium',
-            'BKANT': 'Book Antiqua', 'Blackout-2am': 'Blackout 2 AM', 'bnjinx': 'BN Jinx',
-            'bnmachine': 'BN Machine', 'bobcat': 'Bobcat Normal', 'BOD_B': 'Bodoni MT Bold',
-            'BOD_BI': 'Bodoni MT Bold Italic', 'BOD_BLAI': 'Bodoni MT Black Italic',
-            'BOD_BLAR': 'Bodoni MT Black', 'BOD_CB': 'Bodoni MT Condensed Bold',
-            'BOD_CBI': 'Bodoni MT Condensed Bold Italic',
-            'BOD_CI': 'Bodoni MT Condensed Italic', 'BOD_CR': 'Bodoni MT Condensed',
-            'BOD_I': 'Bodoni MT Italic', 'BOD_PSTC': 'Bodoni MT Poster Compressed',
-            'BOD_R': 'Bodoni MT', 'Bolstbo_': 'BolsterBold Bold',
-            'BOOKOS': 'Bookman Old Style', 'BOOKOSB': 'Bookman Old Style Bold',
-            'BOOKOSBI': 'Bookman Old Style Bold Italic',
-            'BOOKOSI': 'Bookman Old Style Italic', 'Borea___': 'Borealis',
-            'BOUTON_International_symbols': 'BOUTON International Symbols',
-            'BRADHITC': 'Bradley Hand ITC', 'Brand___': 'Brandish',
-            'BRITANIC': 'Britannic Bold', 'BRLNSB': 'Berlin Sans FB Bold',
-            'BRLNSDB': 'Berlin Sans FB Demi Bold', 'BRLNSR': 'Berlin Sans FB',
-            'BROADW': 'Broadway', 'BRUSHSCI': 'Brush Script MT Italic',
-            'Bruss___': 'Brussels', 'BSSYM7': 'Bookshelf Symbol 7',
-            'CabinSketch-Bold': 'CabinSketch Bold', 'calibri': 'Calibri',
-            'calibrib': 'Calibri Bold', 'calibrii': 'Calibri Italic',
-            'calibril': 'Calibri Light', 'calibrili': 'Calibri Light Italic',
-            'calibriz': 'Calibri Bold Italic', 'CALIFB': 'Californian FB Bold',
-            'CALIFI': 'Californian FB Italic', 'CALIFR': 'Californian FB',
-            'CALIST': 'Calisto MT', 'CALISTB': 'Calisto MT Bold',
-            'CALISTBI': 'Calisto MT Bold Italic', 'CALISTI': 'Calisto MT Italic',
-            'CALLI___': 'Calligraphic', 'CALVIN__': 'Calvin', 'cambriab': 'Cambria Bold',
-            'cambriai': 'Cambria Italic', 'cambriaz': 'Cambria Bold Italic',
-            'Candara': 'Candara', 'Candarab': 'Candara Bold', 'Candarai': 'Candara Italic',
-            'Candaraz': 'Candara Bold Italic', 'candles_': 'Candles',
-            'CASTELAR': 'Castellar', 'CENSCBK': 'Century Schoolbook', 'CENTAUR': 'Centaur',
-            'CENTURY': 'Century', 'CHILLER': 'Chiller', 'chinyen': 'Chinyen Normal',
-            'cityb___': 'CityBlueprint', 'CLARE___': 'Clarendon', 'Colbert_': 'Colbert',
-            'COLONNA': 'Colonna MT', 'Comfortaa-Bold': 'Comfortaa Bold',
-            'Comfortaa-Light': 'Comfortaa Light', 'Comfortaa-Regular': 'Comfortaa',
-            'comic': 'Comic Sans MS', 'comicbd': 'Comic Sans MS Bold',
-            'comici': 'Comic Sans MS Italic', 'comicz': 'Comic Sans MS Bold Italic',
-            'COMMONS_': 'Commons', 'compi': 'CommercialPi BT', 'complex_': 'Complex',
-            'comsc': 'CommercialScript BT', 'consola': 'Consolas',
-            'consolab': 'Consolas Bold', 'consolai': 'Consolas Italic',
-            'consolaz': 'Consolas Bold Italic', 'constan': 'Constantia',
-            'constanb': 'Constantia Bold', 'constani': 'Constantia Italic',
-            'constanz': 'Constantia Bold Italic', 'Cools___': 'Coolsville',
-            'COOPBL': 'Cooper Black', 'COPRGTB': 'Copperplate Gothic Bold',
-            'COPRGTL': 'Copperplate Gothic Light', 'corbel': 'Corbel',
-            'corbelb': 'Corbel Bold', 'corbeli': 'Corbel Italic',
-            'corbelz': 'Corbel Bold Italic', 'Corpo___': 'Corporate',
-            'counb___': 'CountryBlueprint', 'cour': 'Courier New',
-            'courbd': 'Courier New Bold', 'courbi': 'Courier New Bold Italic',
-            'couri': 'Courier New Italic', 'cracj___': 'Cracked Johnnie',
-            'creerg__': 'Creepygirl', 'CreteRound-Italic': 'Crete Round Italic',
-            'CreteRound-Regular': 'Crete Round', 'CURLZ___': 'Curlz MT',
-            'DAYTON__': 'Dayton', 'DejaVuSansMono': 'DejaVu Sans Mono Book',
-            'DejaVuSansMono-Bold': 'DejaVu Sans Mono Bold',
-            'DejaVuSansMono-BoldOblique': 'DejaVu Sans Mono Bold Oblique',
-            'DejaVuSansMono-Oblique': 'DejaVu Sans Mono Oblique', 'Deneane_': 'Deneane',
-            'Detente_': 'Detente', 'digifit': 'Digifit Normal',
-            'distant galaxy 2': 'Distant Galaxy', 'DOMIN___': 'Dominican',
-            'dutch': 'Dutch801 Rm BT Roman', 'dutchb': 'Dutch801 Rm BT Bold',
-            'dutchbi': 'Dutch801 Rm BT Bold Italic',
-            'dutcheb': 'Dutch801 XBd BT Extra Bold', 'dutchi': 'Dutch801 Rm BT Italic',
-            'ebrima': 'Ebrima', 'ebrimabd': 'Ebrima Bold', 'ELEPHNT': 'Elephant',
-            'ELEPHNTI': 'Elephant Italic', 'Emmett__': 'Emmett', 'ENGR': 'Engravers MT',
-            'Enliven_': 'Enliven', 'ERASBD': 'Eras Bold ITC', 'ERASDEMI': 'Eras Demi ITC',
-            'ERASLGHT': 'Eras Light ITC', 'ERASMD': 'Eras Medium ITC',
-            'ethnocen': 'Ethnocentric', 'eurro___': 'EuroRoman Oblique',
-            'eurr____': 'EuroRoman', 'FELIXTI': 'Felix Titling', 'fingerpop2': 'Fingerpop',
-            'flubber': 'Flubber', 'FORTE': 'Forte', 'FRABK': 'Franklin Gothic Book',
-            'FRABKIT': 'Franklin Gothic Book Italic', 'FRADM': 'Franklin Gothic Demi',
-            'FRADMCN': 'Franklin Gothic Demi Cond',
-            'FRADMIT': 'Franklin Gothic Demi Italic', 'FRAHV': 'Franklin Gothic Heavy',
-            'FRAHVIT': 'Franklin Gothic Heavy Italic', 'framd': 'Franklin Gothic Medium',
-            'FRAMDCN': 'Franklin Gothic Medium Cond',
-            'framdit': 'Franklin Gothic Medium Italic', 'FREESCPT': 'Freestyle Script',
-            'Frnkvent': 'Frankfurter Venetian TT', 'FRSCRIPT': 'French Script MT',
-            'FTLTLT': 'Footlight MT Light', 'Gabriola': 'Gabriola', 'gadugi': 'Gadugi',
-            'gadugib': 'Gadugi Bold', 'GARA': 'Garamond', 'GARABD': 'Garamond Bold',
-            'GARAIT': 'Garamond Italic', 'gazzarelli': 'Gazzarelli', 'gdt_____': 'GDT',
-            'georgia': 'Georgia', 'georgiab': 'Georgia Bold', 'georgiai': 'Georgia Italic',
-            'georgiaz': 'Georgia Bold Italic', 'Geotype': 'Geotype TT', 'GIGI': 'Gigi',
-            'GILBI___': 'Gill Sans MT Bold Italic', 'GILB____': 'Gill Sans MT Bold',
-            'GILC____': 'Gill Sans MT Condensed', 'GILI____': 'Gill Sans MT Italic',
-            'GILLUBCD': 'Gill Sans Ultra Bold Condensed',
-            'GILSANUB': 'Gill Sans Ultra Bold', 'GIL_____': 'Gill Sans MT',
-            'GLECB': 'Gloucester MT Extra Condensed', 'Glock___': 'Glockenspiel',
-            'GLSNECB': 'Gill Sans MT Ext Condensed Bold', 'goodtime': 'Good Times',
-            'GOTHIC': 'Century Gothic', 'GOTHICB': 'Century Gothic Bold',
-            'GOTHICBI': 'Century Gothic Bold Italic', 'gothice_': 'GothicE',
-            'gothicg_': 'GothicG', 'GOTHICI': 'Century Gothic Italic',
-            'gothici_': 'GothicI', 'GOUDOS': 'Goudy Old Style',
-            'GOUDOSB': 'Goudy Old Style Bold', 'GOUDOSI': 'Goudy Old Style Italic',
-            'GOUDYSTO': 'Goudy Stout', 'greekc__': 'GreekC', 'greeks__': 'GreekS',
-            'Greek_i': 'Greek Diner Inline TT', 'handmeds': 'Hand Me Down S (BRK)',
-            'Hansen__': 'Hansen', 'HARLOWSI': 'Harlow Solid Italic Italic',
-            'HARNGTON': 'Harrington', 'HARVEIT_': 'HarvestItal', 'HARVEST_': 'Harvest',
-            'HATTEN': 'Haettenschweiler', 'Haxton': 'Haxton Logos TT',
-            'heavyhea2': 'Heavy Heap', 'himalaya': 'Microsoft Himalaya',
-            'hollh___': 'Hollywood Hills', 'holomdl2': 'HoloLens MDL2 Assets',
-            'Hombre__': 'Hombre', 'HTOWERT': 'High Tower Text',
-            'HTOWERTI': 'High Tower Text Italic', 'Huxley_Titling': 'Huxley Titling',
-            'impact': 'Impact', 'IMPRISHA': 'Imprint MT Shadow',
-            'inductio': 'Induction Normal', 'INFROMAN': 'Informal Roman',
-            'isocp2__': 'ISOCP2', 'isocp3__': 'ISOCP3', 'isocpeui': 'ISOCPEUR Italic',
-            'isocpeur': 'ISOCPEUR', 'isocp___': 'ISOCP', 'isoct2__': 'ISOCT2',
-            'isoct3__': 'ISOCT3', 'isocteui': 'ISOCTEUR Italic', 'isocteur': 'ISOCTEUR',
-            'isoct___': 'ISOCT', 'italicc_': 'ItalicC', 'italict_': 'ItalicT',
-            'italic__': 'Italic', 'Itali___': 'Italianate', 'ITCBLKAD': 'Blackadder ITC',
-            'ITCEDSCR': 'Edwardian Script ITC', 'ITCKRIST': 'Kristen ITC',
-            'javatext': 'Javanese Text', 'JOKERMAN': 'Jokerman',
-            'JosefinSlab-Bold': 'Josefin Slab Bold',
-            'JosefinSlab-BoldItalic': 'Josefin Slab Bold Italic',
-            'JosefinSlab-Italic': 'Josefin Slab Italic',
-            'JosefinSlab-Light': 'Josefin Slab Light',
-            'JosefinSlab-LightItalic': 'Josefin Slab Light Italic',
-            'JosefinSlab-Regular': 'Josefin Slab',
-            'JosefinSlab-SemiBold': 'Josefin Slab SemiBold',
-            'JosefinSlab-SemiBoldItalic': 'Josefin Slab SemiBold Italic',
-            'JosefinSlab-Thin': 'Josefin Slab Thin',
-            'JosefinSlab-ThinItalic': 'Josefin Slab Thin Italic', 'JUICE___': 'Juice ITC',
-            'KUNSTLER': 'Kunstler Script', 'LATINWD': 'Wide Latin',
-            'Lato-Black': 'Lato Black', 'Lato-BlackItalic': 'Lato Black Italic',
-            'Lato-Bold': 'Lato Bold', 'Lato-BoldItalic': 'Lato Bold Italic',
-            'Lato-Hairline': 'Lato Hairline',
-            'Lato-HairlineItalic': 'Lato Hairline Italic', 'Lato-Italic': 'Lato Italic',
-            'Lato-Light': 'Lato Light', 'Lato-LightItalic': 'Lato Light Italic',
-            'Lato-Regular': 'Lato', 'LBRITE': 'Lucida Bright',
-            'LBRITED': 'Lucida Bright Demibold',
-            'LBRITEDI': 'Lucida Bright Demibold Italic',
-            'LBRITEI': 'Lucida Bright Italic', 'LCALLIG': 'Lucida Calligraphy Italic',
-            'LeelaUIb': 'Leelawadee UI Bold', 'LeelawUI': 'Leelawadee UI',
-            'LeelUIsl': 'Leelawadee UI Semilight', 'LFAX': 'Lucida Fax',
-            'LFAXD': 'Lucida Fax Demibold', 'LFAXDI': 'Lucida Fax Demibold Italic',
-            'LFAXI': 'Lucida Fax Italic', 'LHANDW': 'Lucida Handwriting Italic',
-            'Limou___': 'Limousine', 'littlelo': 'LittleLordFontleroy',
-            'LSANS': 'Lucida Sans', 'LSANSD': 'Lucida Sans Demibold Roman',
-            'LSANSDI': 'Lucida Sans Demibold Italic', 'LSANSI': 'Lucida Sans Italic',
-            'ltromatic': 'LetterOMatic!', 'LTYPE': 'Lucida Sans Typewriter',
-            'LTYPEB': 'Lucida Sans Typewriter Bold',
-            'LTYPEBO': 'Lucida Sans Typewriter Bold Oblique',
-            'LTYPEO': 'Lucida Sans Typewriter Oblique', 'lucon': 'Lucida Console',
-            'l_10646': 'Lucida Sans Unicode', 'mael____': 'Mael',
-            'MAGNETOB': 'Magneto Bold', 'MAIAN': 'Maiandra GD', 'malgun': 'Malgun Gothic',
-            'malgunbd': 'Malgun Gothic Bold', 'malgunsl': 'Malgun Gothic Semilight',
-            'Manorly_': 'Manorly', 'marlett': 'Marlett', 'Martina_': 'Martina',
-            'MATURASC': 'Matura MT Script Capitals', 'Melodbo_': 'MelodBold Bold',
-            'micross': 'Microsoft Sans Serif', 'Minerva_': 'Minerva', 'MISTRAL': 'Mistral',
-            'mmrtext': 'Myanmar Text', 'mmrtextb': 'Myanmar Text Bold',
-            'MOD20': 'Modern No. 20', 'monbaiti': 'Mongolian Baiti',
-            'monos': 'Monospac821 BT Roman', 'monosb': 'Monospac821 BT Bold',
-            'monosbi': 'Monospac821 BT Bold Italic', 'monosi': 'Monospac821 BT Italic',
-            'monotxt_': 'Monotxt', 'MOONB___': 'Moonbeam', 'msyi': 'Microsoft Yi Baiti',
-            'MTCORSVA': 'Monotype Corsiva', 'MTEXTRA': 'MT Extra', 'mtproxy1': 'Proxy 1',
-            'mtproxy2': 'Proxy 2', 'mtproxy3': 'Proxy 3', 'mtproxy4': 'Proxy 4',
-            'mtproxy5': 'Proxy 5', 'mtproxy6': 'Proxy 6', 'mtproxy7': 'Proxy 7',
-            'mtproxy8': 'Proxy 8', 'mtproxy9': 'Proxy 9', 'mvboli': 'MV Boli',
-            'Mycalc__': 'Mycalc', 'narrow': 'PR Celtic Narrow Normal',
-            'nasaliza': 'Nasalization Medium', 'neon2': 'Neon Lights',
-            'NIAGENG': 'Niagara Engraved', 'NIAGSOL': 'Niagara Solid',
-            'Nirmala': 'Nirmala UI', 'NirmalaB': 'Nirmala UI Bold',
-            'NirmalaS': 'Nirmala UI Semilight', 'nobile': 'Nobile',
-            'nobile_bold': 'Nobile Bold', 'nobile_bold_italic': 'Nobile Bold Italic',
-            'nobile_italic': 'Nobile Italic', 'Notram__': 'Notram', 'Novem___': 'November',
-            'ntailu': 'Microsoft New Tai Lue', 'ntailub': 'Microsoft New Tai Lue Bold',
-            'Nunito-Light': 'Nunito Light', 'Nunito-Regular': 'Nunito',
-            'OCRAEXT': 'OCR A Extended', 'OLDENGL': 'Old English Text MT', 'ONYX': 'Onyx',
-            'Opinehe_': 'OpineHeavy', 'ostrich-black': 'Ostrich Sans Black',
-            'ostrich-bold': 'Ostrich Sans Bold',
-            'ostrich-dashed': 'Ostrich Sans Dashed Medium',
-            'ostrich-light': 'Ostrich Sans Condensed Light',
-            'ostrich-regular': 'Ostrich Sans Medium',
-            'ostrich-rounded': 'Ostrich Sans Rounded Medium', 'OUTLOOK': 'MS Outlook',
-            'Pacifico': 'Pacifico', 'pala': 'Palatino Linotype',
-            'palab': 'Palatino Linotype Bold', 'palabi': 'Palatino Linotype Bold Italic',
-            'palai': 'Palatino Linotype Italic', 'PALSCRI': 'Palace Script MT',
-            'panroman': 'PanRoman', 'PAPYRUS': 'Papyrus', 'PARCHM': 'Parchment',
-            'parryhotter': 'Parry Hotter', 'PENLIIT_': 'PenultimateLightItal',
-            'PENULLI_': 'PenultimateLight', 'PENUL___': 'Penultimate',
-            'PERBI___': 'Perpetua Bold Italic', 'PERB____': 'Perpetua Bold',
-            'PERI____': 'Perpetua Italic', 'PermanentMarker': 'Permanent Marker',
-            'PERTIBD': 'Perpetua Titling MT Bold', 'PERTILI': 'Perpetua Titling MT Light',
-            'PER_____': 'Perpetua', 'phagspa': 'Microsoft PhagsPa',
-            'phagspab': 'Microsoft PhagsPa Bold', 'Phrasme_': 'PhrasticMedium',
-            'Pirate__': 'Pirate', 'PLAYBILL': 'Playbill', 'POORICH': 'Poor Richard',
-            'PRISTINA': 'Pristina', 'QUIVEIT_': 'QuiverItal', 'RAGE': 'Rage Italic',
-            'RAVIE': 'Ravie', 'REFSAN': 'MS Reference Sans Serif',
-            'REFSPCL': 'MS Reference Specialty', 'ROCCB___': 'Rockwell Condensed Bold',
-            'ROCC____': 'Rockwell Condensed', 'ROCK': 'Rockwell', 'ROCKB': 'Rockwell Bold',
-            'ROCKBI': 'Rockwell Bold Italic', 'ROCKEB': 'Rockwell Extra Bold',
-            'ROCKI': 'Rockwell Italic', 'Roland__': 'Roland', 'romab___': 'Romantic Bold',
-            'romai___': 'Romantic Italic', 'romanc__': 'RomanC', 'romand__': 'RomanD',
-            'romans__': 'RomanS', 'romantic': 'Romantic', 'romant__': 'RomanT',
-            'RONDALO_': 'Rondalo', 'Rowdyhe_': 'RowdyHeavy', 'Russrite': 'Russel Write TT',
-            'Salina__': 'Salina', 'SamsungIF_Md': 'Samsung InterFace Medium',
-            'SamsungIF_Rg': 'Samsung InterFace', 'sanssbo_': 'SansSerif BoldOblique',
-            'sanssb__': 'SansSerif Bold', 'sansso__': 'SansSerif Oblique',
-            'sanss___': 'SansSerif', 'SCHLBKB': 'Century Schoolbook Bold',
-            'SCHLBKBI': 'Century Schoolbook Bold Italic',
-            'SCHLBKI': 'Century Schoolbook Italic', 'SCRIPTBL': 'Script MT Bold',
-            'scriptc_': 'ScriptC', 'scripts_': 'ScriptS', 'segmdl2': 'Segoe MDL2 Assets',
-            'segoepr': 'Segoe Print', 'segoeprb': 'Segoe Print Bold',
-            'segoesc': 'Segoe Script', 'segoescb': 'Segoe Script Bold',
-            'segoeui': 'Segoe UI', 'segoeuib': 'Segoe UI Bold',
-            'segoeuii': 'Segoe UI Italic', 'segoeuil': 'Segoe UI Light',
-            'segoeuisl': 'Segoe UI Semilight', 'segoeuiz': 'Segoe UI Bold Italic',
-            'seguibl': 'Segoe UI Black', 'seguibli': 'Segoe UI Black Italic',
-            'seguiemj': 'Segoe UI Emoji', 'seguihis': 'Segoe UI Historic',
-            'seguili': 'Segoe UI Light Italic', 'seguisb': 'Segoe UI Semibold',
-            'seguisbi': 'Segoe UI Semibold Italic',
-            'seguisli': 'Segoe UI Semilight Italic', 'seguisym': 'Segoe UI Symbol',
-            'sf movie poster2': 'SF Movie Poster', 'SHOWG': 'Showcard Gothic',
-            'simplex_': 'Simplex', 'simsunb': 'SimSun-ExtB', 'Skinny__': 'Skinny',
-            'SNAP____': 'Snap ITC', 'snowdrft': 'Snowdrift', 'SPLASH__': 'Splash',
-            'STENCIL': 'Stencil', 'Stephen_': 'Stephen', 'Steppes': 'Steppes TT',
-            'stylu': 'Stylus BT Roman', 'supef___': 'SuperFrench',
-            'swiss': 'Swis721 BT Roman', 'swissb': 'Swis721 BT Bold',
-            'swissbi': 'Swis721 BT Bold Italic', 'swissbo': 'Swis721 BdOul BT Bold',
-            'swiu': 'Swis721 Cn BT Roman', 'swisscb': 'Swis721 Cn BT Bold',
-            'swisscbi': 'Swis721 Cn BT Bold Italic',
-            'swisscbo': 'Swis721 BdCnOul BT Bold Outline',
-            'swissci': 'Swis721 Cn BT Italic', 'swissck': 'Swis721 BlkCn BT Black',
-            'swisscki': 'Swis721 BlkCn BT Black Italic',
-            'swisscl': 'Swis721 LtCn BT Light',
-            'swisscli': 'Swis721 LtCn BT Light Italic', 'swisse': 'Swis721 Ex BT Roman',
-            'swisseb': 'Swis721 Ex BT Bold', 'swissek': 'Swis721 BlkEx BT Black',
-            'swissel': 'Swis721 LtEx BT Light', 'swissi': 'Swis721 BT Italic',
-            'swissk': 'Swis721 Blk BT Black', 'swisski': 'Swis721 Blk BT Black Italic',
-            'swissko': 'Swis721 BlkOul BT Black', 'swissl': 'Swis721 Lt BT Light',
-            'swissli': 'Swis721 Lt BT Light Italic', 'Swkeys1': 'SWGamekeys MT',
-            'syastro_': 'Syastro', 'sylfaen': 'Sylfaen', 'symap___': 'Symap',
-            'symath__': 'Symath', 'symbol': 'Symbol', 'symeteo_': 'Symeteo',
-            'symusic_': 'Symusic', 'tahoma': 'Tahoma', 'tahomabd': 'Tahoma Bold',
-            'taile': 'Microsoft Tai Le', 'taileb': 'Microsoft Tai Le Bold',
-            'Tangerine_Bold': 'Tangerine Bold', 'Tangerine_Regular': 'Tangerine',
-            'Tarzan__': 'Tarzan', 'TCBI____': 'Tw Cen MT Bold Italic',
-            'TCB_____': 'Tw Cen MT Bold', 'TCCB____': 'Tw Cen MT Condensed Bold',
-            'TCCEB': 'Tw Cen MT Condensed Extra Bold', 'TCCM____': 'Tw Cen MT Condensed',
-            'TCMI____': 'Tw Cen MT Italic', 'TCM_____': 'Tw Cen MT',
-            'techb___': 'TechnicBold', 'techl___': 'TechnicLite', 'technic_': 'Technic',
-            'TEMPSITC': 'Tempus Sans ITC', 'terminat': 'Terminator Two',
-            'times': 'Times New Roman', 'timesbd': 'Times New Roman Bold',
-            'timesbi': 'Times New Roman Bold Italic', 'timesi': 'Times New Roman Italic',
-            'Toledo__': 'Toledo', 'trebuc': 'Trebuchet MS', 'trebucbd': 'Trebuchet MS Bold',
-            'trebucbi': 'Trebuchet MS Bold Italic', 'trebucit': 'Trebuchet MS Italic',
-            'txt_____': 'Txt', 'umath': 'UniversalMath1 BT', 'VALKEN__': 'Valken',
-            'verdana': 'Verdana', 'verdanab': 'Verdana Bold', 'verdanai': 'Verdana Italic',
-            'verdanaz': 'Verdana Bold Italic', 'VINERITC': 'Viner Hand ITC',
-            'vinet': 'Vineta BT', 'VIVALDII': 'Vivaldi Italic', 'Vivian__': 'Vivian',
-            'VLADIMIR': 'Vladimir Script', 'Vollkorn-Bold': 'Vollkorn Bold',
-            'Vollkorn-BoldItalic': 'Vollkorn Bold Italic',
-            'Vollkorn-Italic': 'Vollkorn Italic', 'Vollkorn-Regular': 'Vollkorn',
-            'Waverly_': 'Waverly', 'webdings': 'Webdings', 'Whimsy': 'Whimsy TT',
-            'wingding': 'Wingdings', 'WINGDNG2': 'Wingdings 2', 'WINGDNG3': 'Wingdings 3',
-            'woodcut': 'Woodcut', 'xfiles': 'X-Files',
-            'yearsupplyoffairycakes': 'Year supply of fairy cakes'}
+     'AGENCYB': 'Agency FB Bold', 'AGENCYR': 'Agency FB',
+     'Alfredo_': 'Alfredo', 'ALGER': 'Algerian',
+     'aliee13': 'Alien Encounters', 'almosnow': 'Almonte Snow',
+     'Ameth___': 'Amethyst', 'ANTIC___': 'AnticFont',
+     'ANTQUAB': 'Book Antiqua Bold', 'ANTQUABI': 'Book Antiqua Bold Italic',
+     'ANTQUAI': 'Book Antiqua Italic',
+     'ArchitectsDaughter': 'Architects Daughter', 'arial': 'Arial',
+     'arialbd': 'Arial Bold', 'arialbi': 'Arial Bold Italic',
+     'ariali': 'Arial Italic', 'ARIALN': 'Arial Narrow',
+     'ARIALNB': 'Arial Narrow Bold', 'ARIALNBI': 'Arial Narrow Bold Italic',
+     'ARIALNI': 'Arial Narrow Italic', 'ARIALUNI': 'Arial Unicode MS',
+     'ariblk': 'Arial Black', 'ARLRDBD': 'Arial Rounded MT Bold',
+     'asimov': 'Asimov', 'Autumn__': 'Autumn', 'babyk___': 'Baby Kruffy',
+     'BALTH___': 'Balthazar', 'BASKVILL': 'Baskerville Old Face',
+     'BASTION_': 'Bastion', 'BAUHS93': 'Bauhaus 93', 'BELL': 'Bell MT',
+     'BELLB': 'Bell MT Bold', 'BELLI': 'Bell MT Italic',
+     'BERNHC': 'Bernard MT Condensed', 'bgothl': 'BankGothic Lt BT Light',
+     'bgothm': 'BankGothic Md BT Medium', 'BKANT': 'Book Antiqua',
+     'Blackout-2am': 'Blackout 2 AM', 'bnjinx': 'BN Jinx',
+     'bnmachine': 'BN Machine', 'bobcat': 'Bobcat Normal',
+     'BOD_B': 'Bodoni MT Bold', 'BOD_BI': 'Bodoni MT Bold Italic',
+     'BOD_BLAI': 'Bodoni MT Black Italic', 'BOD_BLAR': 'Bodoni MT Black',
+     'BOD_CB': 'Bodoni MT Condensed Bold',
+     'BOD_CBI': 'Bodoni MT Condensed Bold Italic',
+     'BOD_CI': 'Bodoni MT Condensed Italic', 'BOD_CR': 'Bodoni MT Condensed',
+     'BOD_I': 'Bodoni MT Italic', 'BOD_PSTC': 'Bodoni MT Poster Compressed',
+     'BOD_R': 'Bodoni MT', 'Bolstbo_': 'BolsterBold Bold',
+     'BOOKOS': 'Bookman Old Style', 'BOOKOSB': 'Bookman Old Style Bold',
+     'BOOKOSBI': 'Bookman Old Style Bold Italic',
+     'BOOKOSI': 'Bookman Old Style Italic', 'Borea___': 'Borealis',
+     'BOUTON_International_symbols': 'BOUTON International Symbols',
+     'BRADHITC': 'Bradley Hand ITC', 'Brand___': 'Brandish',
+     'BRITANIC': 'Britannic Bold', 'BRLNSB': 'Berlin Sans FB Bold',
+     'BRLNSDB': 'Berlin Sans FB Demi Bold', 'BRLNSR': 'Berlin Sans FB',
+     'BROADW': 'Broadway', 'BRUSHSCI': 'Brush Script MT Italic',
+     'Bruss___': 'Brussels', 'BSSYM7': 'Bookshelf Symbol 7',
+     'CabinSketch-Bold': 'CabinSketch Bold', 'calibri': 'Calibri',
+     'calibrib': 'Calibri Bold', 'calibrii': 'Calibri Italic',
+     'calibril': 'Calibri Light', 'calibrili': 'Calibri Light Italic',
+     'calibriz': 'Calibri Bold Italic', 'CALIFB': 'Californian FB Bold',
+     'CALIFI': 'Californian FB Italic', 'CALIFR': 'Californian FB',
+     'CALIST': 'Calisto MT', 'CALISTB': 'Calisto MT Bold',
+     'CALISTBI': 'Calisto MT Bold Italic', 'CALISTI': 'Calisto MT Italic',
+     'CALLI___': 'Calligraphic', 'CALVIN__': 'Calvin',
+     'cambriab': 'Cambria Bold', 'cambriai': 'Cambria Italic',
+     'cambriaz': 'Cambria Bold Italic', 'Candara': 'Candara',
+     'Candarab': 'Candara Bold', 'Candarai': 'Candara Italic',
+     'Candaraz': 'Candara Bold Italic', 'candles_': 'Candles',
+     'CASTELAR': 'Castellar', 'CENSCBK': 'Century Schoolbook',
+     'CENTAUR': 'Centaur', 'CENTURY': 'Century', 'CHILLER': 'Chiller',
+     'chinyen': 'Chinyen Normal', 'cityb___': 'CityBlueprint',
+     'CLARE___': 'Clarendon', 'Colbert_': 'Colbert', 'COLONNA': 'Colonna MT',
+     'Comfortaa-Bold': 'Comfortaa Bold', 'Comfortaa-Light': 'Comfortaa Light',
+     'Comfortaa-Regular': 'Comfortaa', 'comic': 'Comic Sans MS',
+     'comicbd': 'Comic Sans MS Bold', 'comici': 'Comic Sans MS Italic',
+     'comicz': 'Comic Sans MS Bold Italic', 'COMMONS_': 'Commons',
+     'compi': 'CommercialPi BT', 'complex_': 'Complex',
+     'comsc': 'CommercialScript BT', 'consola': 'Consolas',
+     'consolab': 'Consolas Bold', 'consolai': 'Consolas Italic',
+     'consolaz': 'Consolas Bold Italic', 'constan': 'Constantia',
+     'constanb': 'Constantia Bold', 'constani': 'Constantia Italic',
+     'constanz': 'Constantia Bold Italic', 'Cools___': 'Coolsville',
+     'COOPBL': 'Cooper Black', 'COPRGTB': 'Copperplate Gothic Bold',
+     'COPRGTL': 'Copperplate Gothic Light', 'corbel': 'Corbel',
+     'corbelb': 'Corbel Bold', 'corbeli': 'Corbel Italic',
+     'corbelz': 'Corbel Bold Italic', 'Corpo___': 'Corporate',
+     'counb___': 'CountryBlueprint', 'cour': 'Courier New',
+     'courbd': 'Courier New Bold', 'courbi': 'Courier New Bold Italic',
+     'couri': 'Courier New Italic', 'cracj___': 'Cracked Johnnie',
+     'creerg__': 'Creepygirl', 'CreteRound-Italic': 'Crete Round Italic',
+     'CreteRound-Regular': 'Crete Round', 'CURLZ___': 'Curlz MT',
+     'DAYTON__': 'Dayton', 'DejaVuSansMono': 'DejaVu Sans Mono Book',
+     'DejaVuSansMono-Bold': 'DejaVu Sans Mono Bold',
+     'DejaVuSansMono-BoldOblique': 'DejaVu Sans Mono Bold Oblique',
+     'DejaVuSansMono-Oblique': 'DejaVu Sans Mono Oblique',
+     'Deneane_': 'Deneane', 'Detente_': 'Detente',
+     'digifit': 'Digifit Normal', 'distant galaxy 2': 'Distant Galaxy',
+     'DOMIN___': 'Dominican', 'dutch': 'Dutch801 Rm BT Roman',
+     'dutchb': 'Dutch801 Rm BT Bold', 'dutchbi': 'Dutch801 Rm BT Bold Italic',
+     'dutcheb': 'Dutch801 XBd BT Extra Bold',
+     'dutchi': 'Dutch801 Rm BT Italic', 'ebrima': 'Ebrima',
+     'ebrimabd': 'Ebrima Bold', 'ELEPHNT': 'Elephant',
+     'ELEPHNTI': 'Elephant Italic', 'Emmett__': 'Emmett',
+     'ENGR': 'Engravers MT', 'Enliven_': 'Enliven', 'ERASBD': 'Eras Bold ITC',
+     'ERASDEMI': 'Eras Demi ITC', 'ERASLGHT': 'Eras Light ITC',
+     'ERASMD': 'Eras Medium ITC', 'ethnocen': 'Ethnocentric',
+     'eurro___': 'EuroRoman Oblique', 'eurr____': 'EuroRoman',
+     'FELIXTI': 'Felix Titling', 'fingerpop2': 'Fingerpop',
+     'flubber': 'Flubber', 'FORTE': 'Forte', 'FRABK': 'Franklin Gothic Book',
+     'FRABKIT': 'Franklin Gothic Book Italic',
+     'FRADM': 'Franklin Gothic Demi', 'FRADMCN': 'Franklin Gothic Demi Cond',
+     'FRADMIT': 'Franklin Gothic Demi Italic',
+     'FRAHV': 'Franklin Gothic Heavy',
+     'FRAHVIT': 'Franklin Gothic Heavy Italic',
+     'framd': 'Franklin Gothic Medium',
+     'FRAMDCN': 'Franklin Gothic Medium Cond',
+     'framdit': 'Franklin Gothic Medium Italic',
+     'FREESCPT': 'Freestyle Script', 'Frnkvent': 'Frankfurter Venetian TT',
+     'FRSCRIPT': 'French Script MT', 'FTLTLT': 'Footlight MT Light',
+     'Gabriola': 'Gabriola', 'gadugi': 'Gadugi', 'gadugib': 'Gadugi Bold',
+     'GARA': 'Garamond', 'GARABD': 'Garamond Bold',
+     'GARAIT': 'Garamond Italic', 'gazzarelli': 'Gazzarelli',
+     'gdt_____': 'GDT', 'georgia': 'Georgia', 'georgiab': 'Georgia Bold',
+     'georgiai': 'Georgia Italic', 'georgiaz': 'Georgia Bold Italic',
+     'Geotype': 'Geotype TT', 'GIGI': 'Gigi',
+     'GILBI___': 'Gill Sans MT Bold Italic', 'GILB____': 'Gill Sans MT Bold',
+     'GILC____': 'Gill Sans MT Condensed', 'GILI____': 'Gill Sans MT Italic',
+     'GILLUBCD': 'Gill Sans Ultra Bold Condensed',
+     'GILSANUB': 'Gill Sans Ultra Bold', 'GIL_____': 'Gill Sans MT',
+     'GLECB': 'Gloucester MT Extra Condensed', 'Glock___': 'Glockenspiel',
+     'GLSNECB': 'Gill Sans MT Ext Condensed Bold', 'goodtime': 'Good Times',
+     'GOTHIC': 'Century Gothic', 'GOTHICB': 'Century Gothic Bold',
+     'GOTHICBI': 'Century Gothic Bold Italic', 'gothice_': 'GothicE',
+     'gothicg_': 'GothicG', 'GOTHICI': 'Century Gothic Italic',
+     'gothici_': 'GothicI', 'GOUDOS': 'Goudy Old Style',
+     'GOUDOSB': 'Goudy Old Style Bold', 'GOUDOSI': 'Goudy Old Style Italic',
+     'GOUDYSTO': 'Goudy Stout', 'greekc__': 'GreekC', 'greeks__': 'GreekS',
+     'Greek_i': 'Greek Diner Inline TT', 'handmeds': 'Hand Me Down S (BRK)',
+     'Hansen__': 'Hansen', 'HARLOWSI': 'Harlow Solid Italic Italic',
+     'HARNGTON': 'Harrington', 'HARVEIT_': 'HarvestItal',
+     'HARVEST_': 'Harvest', 'HATTEN': 'Haettenschweiler',
+     'Haxton': 'Haxton Logos TT', 'heavyhea2': 'Heavy Heap',
+     'himalaya': 'Microsoft Himalaya', 'hollh___': 'Hollywood Hills',
+     'holomdl2': 'HoloLens MDL2 Assets', 'Hombre__': 'Hombre',
+     'HTOWERT': 'High Tower Text', 'HTOWERTI': 'High Tower Text Italic',
+     'Huxley_Titling': 'Huxley Titling', 'impact': 'Impact',
+     'IMPRISHA': 'Imprint MT Shadow', 'inductio': 'Induction Normal',
+     'INFROMAN': 'Informal Roman', 'isocp2__': 'ISOCP2', 'isocp3__': 'ISOCP3',
+     'isocpeui': 'ISOCPEUR Italic', 'isocpeur': 'ISOCPEUR',
+     'isocp___': 'ISOCP', 'isoct2__': 'ISOCT2', 'isoct3__': 'ISOCT3',
+     'isocteui': 'ISOCTEUR Italic', 'isocteur': 'ISOCTEUR',
+     'isoct___': 'ISOCT', 'italicc_': 'ItalicC', 'italict_': 'ItalicT',
+     'italic__': 'Italic', 'Itali___': 'Italianate',
+     'ITCBLKAD': 'Blackadder ITC', 'ITCEDSCR': 'Edwardian Script ITC',
+     'ITCKRIST': 'Kristen ITC', 'javatext': 'Javanese Text',
+     'JOKERMAN': 'Jokerman', 'JosefinSlab-Bold': 'Josefin Slab Bold',
+     'JosefinSlab-BoldItalic': 'Josefin Slab Bold Italic',
+     'JosefinSlab-Italic': 'Josefin Slab Italic',
+     'JosefinSlab-Light': 'Josefin Slab Light',
+     'JosefinSlab-LightItalic': 'Josefin Slab Light Italic',
+     'JosefinSlab-Regular': 'Josefin Slab',
+     'JosefinSlab-SemiBold': 'Josefin Slab SemiBold',
+     'JosefinSlab-SemiBoldItalic': 'Josefin Slab SemiBold Italic',
+     'JosefinSlab-Thin': 'Josefin Slab Thin',
+     'JosefinSlab-ThinItalic': 'Josefin Slab Thin Italic',
+     'JUICE___': 'Juice ITC', 'KUNSTLER': 'Kunstler Script',
+     'LATINWD': 'Wide Latin', 'Lato-Black': 'Lato Black',
+     'Lato-BlackItalic': 'Lato Black Italic', 'Lato-Bold': 'Lato Bold',
+     'Lato-BoldItalic': 'Lato Bold Italic', 'Lato-Hairline': 'Lato Hairline',
+     'Lato-HairlineItalic': 'Lato Hairline Italic',
+     'Lato-Italic': 'Lato Italic', 'Lato-Light': 'Lato Light',
+     'Lato-LightItalic': 'Lato Light Italic', 'Lato-Regular': 'Lato',
+     'LBRITE': 'Lucida Bright', 'LBRITED': 'Lucida Bright Demibold',
+     'LBRITEDI': 'Lucida Bright Demibold Italic',
+     'LBRITEI': 'Lucida Bright Italic',
+     'LCALLIG': 'Lucida Calligraphy Italic', 'LeelaUIb': 'Leelawadee UI Bold',
+     'LEELAWAD': 'Leelawadee', 'LEELAWDB': 'Leelawadee Bold',
+     'LeelawUI': 'Leelawadee UI', 'LeelUIsl': 'Leelawadee UI Semilight',
+     'LFAX': 'Lucida Fax', 'LFAXD': 'Lucida Fax Demibold',
+     'LFAXDI': 'Lucida Fax Demibold Italic', 'LFAXI': 'Lucida Fax Italic',
+     'LHANDW': 'Lucida Handwriting Italic', 'Limou___': 'Limousine',
+     'littlelo': 'LittleLordFontleroy', 'LSANS': 'Lucida Sans',
+     'LSANSD': 'Lucida Sans Demibold Roman',
+     'LSANSDI': 'Lucida Sans Demibold Italic', 'LSANSI': 'Lucida Sans Italic',
+     'ltromatic': 'LetterOMatic!', 'LTYPE': 'Lucida Sans Typewriter',
+     'LTYPEB': 'Lucida Sans Typewriter Bold',
+     'LTYPEBO': 'Lucida Sans Typewriter Bold Oblique',
+     'LTYPEO': 'Lucida Sans Typewriter Oblique', 'lucon': 'Lucida Console',
+     'l_10646': 'Lucida Sans Unicode', 'mael____': 'Mael',
+     'MAGNETOB': 'Magneto Bold', 'MAIAN': 'Maiandra GD',
+     'malgun': 'Malgun Gothic', 'malgunbd': 'Malgun Gothic Bold',
+     'malgunsl': 'Malgun Gothic Semilight', 'Manorly_': 'Manorly',
+     'marlett': 'Marlett', 'marlett_0': 'Marlett', 'Martina_': 'Martina',
+     'MATURASC': 'Matura MT Script Capitals', 'Melodbo_': 'MelodBold Bold',
+     'micross': 'Microsoft Sans Serif', 'Minerva_': 'Minerva',
+     'MISTRAL': 'Mistral', 'mmrtext': 'Myanmar Text',
+     'mmrtextb': 'Myanmar Text Bold', 'MOD20': 'Modern No. 20',
+     'monbaiti': 'Mongolian Baiti', 'monos': 'Monospac821 BT Roman',
+     'monosb': 'Monospac821 BT Bold', 'monosbi': 'Monospac821 BT Bold Italic',
+     'monosi': 'Monospac821 BT Italic', 'monotxt_': 'Monotxt',
+     'MOONB___': 'Moonbeam', 'mplus-1m-bold': 'M+ 1m bold',
+     'mplus-1m-light': 'M+ 1m light', 'mplus-1m-medium': 'M+ 1m medium',
+     'mplus-1m-regular': 'M+ 1m', 'mplus-1m-thin': 'M+ 1m thin',
+     'MSUIGHUB': 'Microsoft Uighur Bold', 'MSUIGHUR': 'Microsoft Uighur',
+     'msyi': 'Microsoft Yi Baiti', 'MTCORSVA': 'Monotype Corsiva',
+     'MTEXTRA': 'MT Extra', 'mtproxy1': 'Proxy 1', 'mtproxy2': 'Proxy 2',
+     'mtproxy3': 'Proxy 3', 'mtproxy4': 'Proxy 4', 'mtproxy5': 'Proxy 5',
+     'mtproxy6': 'Proxy 6', 'mtproxy7': 'Proxy 7', 'mtproxy8': 'Proxy 8',
+     'mtproxy9': 'Proxy 9', 'mvboli': 'MV Boli', 'Mycalc__': 'Mycalc',
+     'narrow': 'PR Celtic Narrow Normal', 'nasaliza': 'Nasalization Medium',
+     'neon2': 'Neon Lights', 'NIAGENG': 'Niagara Engraved',
+     'NIAGSOL': 'Niagara Solid', 'Nirmala': 'Nirmala UI',
+     'NirmalaB': 'Nirmala UI Bold', 'NirmalaS': 'Nirmala UI Semilight',
+     'nobile': 'Nobile', 'nobile_bold': 'Nobile Bold',
+     'nobile_bold_italic': 'Nobile Bold Italic',
+     'nobile_italic': 'Nobile Italic', 'Notram__': 'Notram',
+     'Novem___': 'November', 'ntailu': 'Microsoft New Tai Lue',
+     'ntailub': 'Microsoft New Tai Lue Bold', 'Nunito-Light': 'Nunito Light',
+     'Nunito-Regular': 'Nunito', 'OCRAEXT': 'OCR A Extended',
+     'OLDENGL': 'Old English Text MT', 'ONYX': 'Onyx',
+     'Opinehe_': 'OpineHeavy', 'ostrich-black': 'Ostrich Sans Black',
+     'ostrich-bold': 'Ostrich Sans Bold',
+     'ostrich-dashed': 'Ostrich Sans Dashed Medium',
+     'ostrich-light': 'Ostrich Sans Condensed Light',
+     'ostrich-regular': 'Ostrich Sans Medium',
+     'ostrich-rounded': 'Ostrich Sans Rounded Medium',
+     'OUTLOOK': 'MS Outlook', 'Pacifico': 'Pacifico',
+     'pala': 'Palatino Linotype', 'palab': 'Palatino Linotype Bold',
+     'palabi': 'Palatino Linotype Bold Italic',
+     'palai': 'Palatino Linotype Italic', 'PALSCRI': 'Palace Script MT',
+     'panroman': 'PanRoman', 'PAPYRUS': 'Papyrus', 'PARCHM': 'Parchment',
+     'parryhotter': 'Parry Hotter', 'PENLIIT_': 'PenultimateLightItal',
+     'PENULLI_': 'PenultimateLight', 'PENUL___': 'Penultimate',
+     'PERBI___': 'Perpetua Bold Italic', 'PERB____': 'Perpetua Bold',
+     'PERI____': 'Perpetua Italic', 'PermanentMarker': 'Permanent Marker',
+     'PERTIBD': 'Perpetua Titling MT Bold',
+     'PERTILI': 'Perpetua Titling MT Light', 'PER_____': 'Perpetua',
+     'phagspa': 'Microsoft PhagsPa', 'phagspab': 'Microsoft PhagsPa Bold',
+     'Phrasme_': 'PhrasticMedium', 'Pirate__': 'Pirate',
+     'PLAYBILL': 'Playbill', 'POORICH': 'Poor Richard',
+     'PRISTINA': 'Pristina', 'QUIVEIT_': 'QuiverItal', 'RAGE': 'Rage Italic',
+     'RAVIE': 'Ravie', 'REFSAN': 'MS Reference Sans Serif',
+     'REFSPCL': 'MS Reference Specialty',
+     'ROCCB___': 'Rockwell Condensed Bold', 'ROCC____': 'Rockwell Condensed',
+     'ROCK': 'Rockwell', 'ROCKB': 'Rockwell Bold',
+     'ROCKBI': 'Rockwell Bold Italic', 'ROCKEB': 'Rockwell Extra Bold',
+     'ROCKI': 'Rockwell Italic', 'Roland__': 'Roland',
+     'romab___': 'Romantic Bold', 'romai___': 'Romantic Italic',
+     'romanc__': 'RomanC', 'romand__': 'RomanD', 'romans__': 'RomanS',
+     'romantic': 'Romantic', 'romant__': 'RomanT', 'RONDALO_': 'Rondalo',
+     'Rowdyhe_': 'RowdyHeavy', 'Russrite': 'Russel Write TT',
+     'Salina__': 'Salina', 'SamsungIF_Md': 'Samsung InterFace Medium',
+     'SamsungIF_Md_0': 'Samsung InterFace Medium',
+     'SamsungIF_Rg': 'Samsung InterFace',
+     'SamsungIF_Rg_0': 'Samsung InterFace',
+     'sanssbo_': 'SansSerif BoldOblique', 'sanssb__': 'SansSerif Bold',
+     'sansso__': 'SansSerif Oblique', 'sanss___': 'SansSerif',
+     'SCHLBKB': 'Century Schoolbook Bold',
+     'SCHLBKBI': 'Century Schoolbook Bold Italic',
+     'SCHLBKI': 'Century Schoolbook Italic', 'SCRIPTBL': 'Script MT Bold',
+     'scriptc_': 'ScriptC', 'scripts_': 'ScriptS',
+     'segmdl2': 'Segoe MDL2 Assets', 'segoepr': 'Segoe Print',
+     'segoeprb': 'Segoe Print Bold', 'segoesc': 'Segoe Script',
+     'segoescb': 'Segoe Script Bold', 'segoeui': 'Segoe UI',
+     'segoeuib': 'Segoe UI Bold', 'segoeuii': 'Segoe UI Italic',
+     'segoeuil': 'Segoe UI Light', 'segoeuisl': 'Segoe UI Semilight',
+     'segoeuiz': 'Segoe UI Bold Italic', 'seguibl': 'Segoe UI Black',
+     'seguibli': 'Segoe UI Black Italic', 'seguiemj': 'Segoe UI Emoji',
+     'seguihis': 'Segoe UI Historic', 'seguili': 'Segoe UI Light Italic',
+     'seguisb': 'Segoe UI Semibold', 'seguisbi': 'Segoe UI Semibold Italic',
+     'seguisli': 'Segoe UI Semilight Italic', 'seguisym': 'Segoe UI Symbol',
+     'sf movie poster2': 'SF Movie Poster', 'SHOWG': 'Showcard Gothic',
+     'simplex_': 'Simplex', 'simsunb': 'SimSun-ExtB', 'Skinny__': 'Skinny',
+     'SNAP____': 'Snap ITC', 'snowdrft': 'Snowdrift', 'SPLASH__': 'Splash',
+     'STENCIL': 'Stencil', 'Stephen_': 'Stephen', 'Steppes': 'Steppes TT',
+     'stylu': 'Stylus BT Roman', 'supef___': 'SuperFrench',
+     'swiss': 'Swis721 BT Roman', 'swissb': 'Swis721 BT Bold',
+     'swissbi': 'Swis721 BT Bold Italic', 'swissbo': 'Swis721 BdOul BT Bold',
+     'swissc': 'Swis721 Cn BT Roman', 'swisscb': 'Swis721 Cn BT Bold',
+     'swisscbi': 'Swis721 Cn BT Bold Italic',
+     'swisscbo': 'Swis721 BdCnOul BT Bold Outline',
+     'swissci': 'Swis721 Cn BT Italic', 'swissck': 'Swis721 BlkCn BT Black',
+     'swisscki': 'Swis721 BlkCn BT Black Italic',
+     'swisscl': 'Swis721 LtCn BT Light',
+     'swisscli': 'Swis721 LtCn BT Light Italic',
+     'swisse': 'Swis721 Ex BT Roman', 'swisseb': 'Swis721 Ex BT Bold',
+     'swissek': 'Swis721 BlkEx BT Black', 'swissel': 'Swis721 LtEx BT Light',
+     'swissi': 'Swis721 BT Italic', 'swissk': 'Swis721 Blk BT Black',
+     'swisski': 'Swis721 Blk BT Black Italic',
+     'swissko': 'Swis721 BlkOul BT Black', 'swissl': 'Swis721 Lt BT Light',
+     'swissli': 'Swis721 Lt BT Light Italic', 'Swkeys1': 'SWGamekeys MT',
+     'syastro_': 'Syastro', 'sylfaen': 'Sylfaen', 'symap___': 'Symap',
+     'symath__': 'Symath', 'symbol': 'Symbol', 'symeteo_': 'Symeteo',
+     'symusic_': 'Symusic', 'tahoma': 'Tahoma', 'tahomabd': 'Tahoma Bold',
+     'taile': 'Microsoft Tai Le', 'taileb': 'Microsoft Tai Le Bold',
+     'Tangerine_Bold': 'Tangerine Bold', 'Tangerine_Regular': 'Tangerine',
+     'Tarzan__': 'Tarzan', 'TCBI____': 'Tw Cen MT Bold Italic',
+     'TCB_____': 'Tw Cen MT Bold', 'TCCB____': 'Tw Cen MT Condensed Bold',
+     'TCCEB': 'Tw Cen MT Condensed Extra Bold',
+     'TCCM____': 'Tw Cen MT Condensed', 'TCMI____': 'Tw Cen MT Italic',
+     'TCM_____': 'Tw Cen MT', 'techb___': 'TechnicBold',
+     'techl___': 'TechnicLite', 'technic_': 'Technic',
+     'TEMPSITC': 'Tempus Sans ITC', 'terminat': 'Terminator Two',
+     'times': 'Times New Roman', 'timesbd': 'Times New Roman Bold',
+     'timesbi': 'Times New Roman Bold Italic',
+     'timesi': 'Times New Roman Italic', 'Toledo__': 'Toledo',
+     'trebuc': 'Trebuchet MS', 'trebucbd': 'Trebuchet MS Bold',
+     'trebucbi': 'Trebuchet MS Bold Italic',
+     'trebucit': 'Trebuchet MS Italic', 'txt_____': 'Txt',
+     'umath': 'UniversalMath1 BT', 'VALKEN__': 'Valken', 'verdana': 'Verdana',
+     'verdanab': 'Verdana Bold', 'verdanai': 'Verdana Italic',
+     'verdanaz': 'Verdana Bold Italic', 'VINERITC': 'Viner Hand ITC',
+     'vinet': 'Vineta BT', 'VIVALDII': 'Vivaldi Italic', 'Vivian__': 'Vivian',
+     'VLADIMIR': 'Vladimir Script', 'Vollkorn-Bold': 'Vollkorn Bold',
+     'Vollkorn-BoldItalic': 'Vollkorn Bold Italic',
+     'Vollkorn-Italic': 'Vollkorn Italic', 'Vollkorn-Regular': 'Vollkorn',
+     'Waverly_': 'Waverly', 'webdings': 'Webdings', 'Whimsy': 'Whimsy TT',
+     'wingding': 'Wingdings', 'WINGDNG2': 'Wingdings 2',
+     'WINGDNG3': 'Wingdings 3', 'woodcut': 'Woodcut', 'xfiles': 'X-Files',
+     'yearsupplyoffairycakes': 'Year supply of fairy cakes'}
 
 
-def _ttf_fonts():
-    # in order to gain speed and avoid problems with calling ImageFont.truetype too often, first we look in _std_fonts().
-    # if not found there, the information from the font file is used.
-    # this function returns a dictionary with references from the normalized filename and the normalized description
-
-    font_dict = {}
-    for file in glob.glob(r'c:\windows\fonts\*.ttf'):
-        fn = os.path.basename(file).split('.')[0]
-        if fn in _std_fonts():
-            font_dict[normalize(fn)] = fn
-            font_dict[normalize(_std_fonts()[fn])] = fn
-        else:
-            f = ImageFont.truetype(file, 12)
-            if f is not None:
-                if str(f.font.style).lower() == 'regular':
-                    fullname = str(f.font.family)
-                else:
-                    fullname = str(f.font.family) + ' ' + str(f.font.style)
-                font_dict[normalize(fn)] = fn
-                font_dict[normalize(fullname)] = fn
-    return font_dict
-
-
-def _pythonista_fonts():
-    # this function returns a dictionary with references from the normalized font name
-    UIFont = objc_util.ObjCClass('UIFont')
-
-    font_dict = {}
-    for family in UIFont.familyNames():
-        family = str(family)
-        try:
-            PIL.ImageFont.truetype(family)
-            font_dict[normalize(family)] = family
-        except:
-            pass
-
-        for name in UIFont.fontNamesForFamilyName_(family):
-            name = str(name)
-            font_dict[normalize(name)] = name
-    return font_dict
-
-
-@functools.lru_cache()
 def fonts():
-    if Pythonista:
-        return _pythonista_fonts()
-    else:
-        return _ttf_fonts()
+    if not hasattr(fonts, 'font_list'):
+        fonts.font_list = []
+        if Pythonista:
+            UIFont = objc_util.ObjCClass('UIFont')
+            for family in UIFont.familyNames():
+                family = str(family)
+                try:
+                    ImageFont.truetype(family)
+                    fonts.font_list.append(((family,), family))
+                except:
+                    pass
+
+                for name in UIFont.fontNamesForFamilyName_(family):
+                    name = str(name)
+                    fonts.font_list.append(((name,), name))
+
+        salabim_dir = os.path.dirname(__file__)
+        cur_dir = os.getcwd()
+        dirs = [salabim_dir]
+        if cur_dir != salabim_dir:
+            dirs.append(cur_dir)
+        if Windows:
+            dirs.append(r'c:\windows\fonts')
+
+        for dir in dirs:
+            for file in glob.glob(dir + os.sep + '*.ttf'):
+                fn = os.path.basename(file).split('.')[0]
+                if fn in _std_fonts():
+                    fullname = _std_fonts()[fn]
+                else:
+                    f = ImageFont.truetype(file, 12)
+                    if f is None:
+                        fullname = ''
+                    else:
+                        if str(f.font.style).lower() == 'regular':
+                            fullname = str(f.font.family)
+                        else:
+                            fullname = str(f.font.family) + ' ' + str(f.font.style)
+                if fullname != '':
+                    if fn.lower() == fullname.lower():
+                        fonts.font_list.append(((fullname,), file))
+                    else:
+                        fonts.font_list.append(((fn, fullname), file))
+    return fonts.font_list
 
 
-@functools.lru_cache()
 def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
     '''
     internal funtion to get and cache fonts
     '''
-    standardfonts={
+    if hasattr(getfont, 'lookup'):
+        if (fontname, fontsize) in getfont.lookup:
+            return getfont.lookup[(fontname, fontsize)]
+    else:
+        getfont.lookup = {}
+
+    standardfonts = {
         '': 'calibri',
         'std': 'calibri',
         'mono': 'DejaVuSansMono',
-        'narrow': 'mplus-1m-regular'}  
-    if fontname.lower() in standardfonts:
-        fontname = standardfonts[fontname.lower()]
-        
-    salabim_dir = os.path.dirname(__file__) + os.sep
+        'narrow': 'mplus-1m-regular'}
 
     if isinstance(fontname, str):
-        fontlist = (fontname,)
+        fontlist1 = (fontname,)
     else:
-        fontlist = fontname
-            
-    font = None
-    for ifont in itertools.chain(fontlist, ('calibri', 'arial', 'arialmt')):
+        fontlist1 = fontname
+
+    fontlist = []
+    for f in fontlist1:
+        fontlist.append(standardfonts.get(f.lower(), f))
+
+    result = None
+
+    for ifont in fontlist:
         try:
-            font = ImageFont.truetype(font=ifont, size=int(fontsize))
+            result = ImageFont.truetype(font=ifont, size=int(fontsize))
             break
         except:
             pass
-        try:
-            font = ImageFont.truetype(font=salabim_dir + ifont +'.ttf',
-                size=int(fontsize))
-            break
-        except:
-            pass
-        
-        ifont = fonts().get(normalize(ifont))
-        if ifont is not None:
+
+        filename = ''
+        for fns, ifilename in fonts():
+            for fn in fns:
+                if normalize(fn) == normalize(ifont):
+                    filename = ifilename
+                    break
+            if filename != '':
+                break
+        if filename != '':
             try:
-                font = ImageFont.truetype(font=ifont, size=int(fontsize))
+                result = ImageFont.truetype(font=filename, size=int(fontsize))
                 break
             except:
                 pass
 
-    if font is None:  # last resort
-        font = ImageFont.load_default()
+    if result is None:
+        result = ImageFont.load_default()  # last resort
 
-    return font
-
-
-def _show_pythonista_fonts():
-    fontnames = sorted(_pythonista_fonts().values(), key=str.lower)
-    for font in fontnames:
-        print(font)
-
-
-def _show_ttf_fonts():
-    for file in glob.glob(r'c:\windows\fonts\*.ttf'):
-        fn = os.path.basename(file).split('.')[0]
-        if fn in _std_fonts():
-            print('{:35s}{}'.format(_std_fonts()[fn], fn))
-        else:
-            f = ImageFont.truetype(file, 12)
-            if f is not None:
-                fullname = str(f.font.family) + ' ' + str(f.font.style)
-                print('{:35s}{}'.format(fullname, fn))
+    getfont.lookup[(fontname, fontsize)] = result
+    return result
 
 
 def show_fonts():
     '''
     show (print) all available fonts on this machine
     '''
-
-    if Pythonista:
-        _show_pythonista_fonts()
-    else:
-        _show_ttf_fonts()
+    fontnames = []
+    for fns, ifilename in fonts():
+        for fn in fns:
+            fontnames.append(fn)
+    last = ''
+    for font in sorted(fontnames, key=normalize):
+        if font != last:  # remove duplicates
+            print(font)
+            last = font
 
 
 def show_colornames():
     '''
     show (print) all available color names and their value.
     '''
-
     names = sorted(colornames().keys())
     for name in names:
         print('{:22s}{}'.format(name, colornames()[name]))
@@ -7456,6 +7473,7 @@ def default_env():
     default environment : Environment
     '''
     return _default_env
+
 
 if __name__ == '__main__':
     try:

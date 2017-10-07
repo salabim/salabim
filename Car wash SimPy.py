@@ -4,15 +4,15 @@
 # is served at a time; at the exit there is a buffer space where cars
 # wait to go out onto the street; cross traffic does not stop, so a car
 # must wait for a large enough gap in the traffic in order to move out
-# onto the street 
+# onto the street
 
-# usage:  
+# usage:
 
 # python CarWash.py ArrRate PropMostlyClean BufSize CrossRate ExitTime MaxSimTime
 
 # where:
 
-#    ArrRate = rate of arrivals of calls to carwash (reciprocal of mean 
+#    ArrRate = rate of arrivals of calls to carwash (reciprocal of mean
 #              time between arrivals)
 #    PropMostlyClean = proportion of cars that opt for the MostlyClean wash
 #    BufSize = number of cars that can fit in the exit buffer
@@ -28,13 +28,13 @@
 import salabim as sim
 
 class Street(sim.Component):
-    
+
     def process(self):
         while True:
             self.nextarrival=env.now()+street_iat.sample()
             wakeup.trigger()
             yield self.hold(till=self.nextarrival)
-         
+
 class Car(sim.Component):
     def process(self):
         yield self.request(bay,mode='wait for bay')
@@ -59,7 +59,7 @@ class CarWash(sim.Component):
 
 env=sim.Environment(trace=True)
 wakeup=sim.State(name='wakeup')
-wash_time=sim.Pdf((1.0,0.7, 2.0,0.3))     
+wash_time=sim.Pdf((1.0,0.7, 2.0,0.3))
 street_iat=sim.Exponential(1)
 wash_iat=sim.Exponential(1)
 buffer=sim.Resource(capacity=4)

@@ -36,11 +36,11 @@ SCALE = 10
 class MachineBarAnimate(sim.Animate):
     def __init__(self, machine):
         self.machine = machine
-        super().__init__(rectangle0=(0, 0, 0, 0), linewidth0=0)
+        sim.Animate.__init__(self, rectangle0=(0, 0, 0, 0), linewidth0=0)
 
     def rectangle(self, t):
         if self.machine.scheduled_time() == sim.inf:
-            d = self.machine.remaining_time    
+            d = self.machine.remaining_time
         else:
             d = self.machine.scheduled_time() - t
         return(
@@ -59,7 +59,8 @@ class MachineBarAnimate(sim.Animate):
 class MachineTextAnimate(sim.Animate):
     def __init__(self, machine):
         self.machine = machine
-        super().__init__(x0=10, y0=100 + self.machine.n * 30, text='', anchor='sw', font='narrow', fontsize0=15)
+        sim.Animate.__init__(self,
+            x0=10, y0=100 + self.machine.n * 30, text='', anchor='sw', font='narrow', fontsize0=15)
 
     def text(self, t):
         return '{} {:4d}'.format(self.machine.ident, self.machine.parts_made)
@@ -68,7 +69,7 @@ class MachineTextAnimate(sim.Animate):
 class MachineBarJobAnimate(sim.Animate):
     def __init__(self, machine):
         self.machine = machine
-        super().__init__(rectangle0=(0, 0, 0, 0), linewidth0=0)
+        sim.Animate.__init__(self, rectangle0=(0, 0, 0, 0), linewidth0=0)
 
     def rectangle(self, t):
         d = self.machine.job_time
@@ -88,7 +89,7 @@ class MachineBarJobAnimate(sim.Animate):
 class RepairBlockAnimate(sim.Animate):
     def __init__(self, i):
         self.i = i
-        super().__init__(y0=10, rectangle0=(0, 0, 20, 20), linecolor0='white')
+        sim.Animate.__init__(self, y0=10, rectangle0=(0, 0, 20, 20), linecolor0='white')
 
     def x(self, t):
         return xrepairman(self.i, t)
@@ -125,7 +126,7 @@ class RepairBlockAnimate(sim.Animate):
 class RepairTextAnimate(sim.Animate):
     def __init__(self, i):
         self.i = i
-        super().__init__(y0=10 + 3, text='',
+        sim.Animate.__init__(self, y0=10 + 3, text='',
             textcolor0='white', font='narrow', fontsize0=15, anchor='sw')
 
     def x(self, t):
