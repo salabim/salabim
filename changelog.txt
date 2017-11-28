@@ -1,6 +1,6 @@
 salabim  changelog
 
-version 2.2.7  2017-11-24
+version 2.2.7  2017-11-28
 =========================
 New features:
 Animation of queues is now a standard feature, which makes visualisation of queue contents much simpler.
