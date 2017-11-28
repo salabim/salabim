@@ -24,94 +24,25 @@ class AnimateLED(sim.Animate):
         else:
             return ''
 
-
-class AnimateFloorVisitor(sim.Animate):
-    def __init__(self, x, y, floor, part, index):
-        self.floor = floor
-        self.index = index
-        b = 0.1 * xvisitor_dim
-        if part == 0:
-            sim.Animate.__init__(self,
-                rectangle0=(b, 2, xvisitor_dim - b, yvisitor_dim - b),
-                x0=x, y0=y, linewidth0=0)
+def animation_pre_tick(self, t):
+    for car in cars:
+        if car.mode() == 'Move':
+            y = sim.interpolate(
+                t, car.mode_time(), car.scheduled_time(),
+                car.floor.y, car.nextfloor.y)
         else:
-            sim.Animate.__init__(self,
-                text='', fontsize0=xvisitor_dim * 0.7,
-                anchor='center', offsetx0=5 * b, offsety0=2 + 4 * b,
-                textcolor0='white',
-                x0=x, y0=y)
-
-    def fillcolor(self, t):
-        visitor = self.floor.visitors[self.index]
-        if visitor is not None:
-            return direction_color(visitor.direction)
-
-    def text(self, t):
-        visitor = self.floor.visitors[self.index]
-        if visitor is not None:
-            return str(visitor.tofloor.n)
-
-    def visible(self, t):
-        return self.floor.visitors[self.index] is not None
-
-
-class AnimateCar(sim.Animate):
-    def __init__(self, x, car):
-        self.car = car
-        sim.Animate.__init__(self, x0=x,
-           rectangle0=(0, 0, capacity * xvisitor_dim, yvisitor_dim), fillcolor0='lightblue')
-
-    def y(self, t):
-        if self.car.mode() == 'Move':
-            return sim.interpolate(
-                t, self.car.mode_time(), self.car.scheduled_time(),
-                self.car.floor.y, self.car.nextfloor.y)
-
-        else:
-            return self.car.floor.y
-
-
-class AnimateCarVisitor(sim.Animate):
-    def __init__(self, x, car, part, index):
-        self.car = car
-        self.index = index
-        b = 0.1 * xvisitor_dim
-        if part == 0:
-            sim.Animate.__init__(self,
-                rectangle0=(b, 2, xvisitor_dim - b, yvisitor_dim - b),
-                x0=x, linewidth0=0)
-        else:
-            sim.Animate.__init__(self, text='', fontsize0=xvisitor_dim * 0.7,
-                anchor='center', offsetx0=5 * b, offsety0=2 + 4 * b,
-                textcolor0='white', x0=x, linewidth0=0)
-
-    def fillcolor(self, t):
-        visitor = self.car.visitors[self.index]
-        if visitor is not None:
-            return direction_color(visitor.direction)
-
-    def y(self, t):
-        if self.car.mode() == 'Move':
-            return sim.interpolate(
-                t, self.car.mode_time(), self.car.scheduled_time(),
-                self.car.floor.y, self.car.nextfloor.y)
-        else:
-            return self.car.floor.y
-
-    def text(self, t):
-        visitor = self.car.visitors[self.index]
-        if visitor is not None:
-            return str(visitor.tofloor.n)
-
-    def visible(self, t):
-        return self.car.visitors[self.index] is not None
-
+            y = car.floor.y
+        car.visitors.animate(x=xcar[car], y=y, direction='e')
+        car.pic.update(y0=y)     
 
 def do_animation():
 
     global xvisitor_dim
     global yvisitor_dim
+    global xcar
     global capacity_last, ncars_last, topfloor_last
+    
+    sim.Environment.animation_pre_tick = animation_pre_tick
 
     xvisitor_dim = 30
     yvisitor_dim = xvisitor_dim
@@ -143,21 +74,14 @@ def do_animation():
         sim.Animate(x0=xsign, y0=y + yvisitor_dim / 2,
             text=str(floor.n), fontsize0=xvisitor_dim / 2, anchor='center')
 
-        x = xwait - xvisitor_dim
-        index = 0
-        while x > 0:
-            AnimateFloorVisitor(x=x, y=y, floor=floor, index=index, part=0)
-            AnimateFloorVisitor(x=x, y=y, floor=floor, index=index, part=1)
-            x -= xvisitor_dim
-            index += 1
 
+        floor.visitors.animate(x=xwait-xvisitor_dim,y=floor.y,direction='w')
+        
     for car in cars:
-        AnimateCar(x=xcar[car], car=car)
         x = xcar[car]
-        for index in range(capacity):
-            AnimateCarVisitor(x=x, car=car, index=index, part=0)
-            AnimateCarVisitor(x=x, car=car, index=index, part=1)
-            x += xvisitor_dim
+        car.pic=sim.Animate(x0=x,
+           rectangle0=(0, 0, capacity * xvisitor_dim, yvisitor_dim), fillcolor0='lightblue')
+        car.visitors.animate(x=xcar[car], y=600, direction='e')
 
     ncars_last = ncars
     sim.AnimateSlider(x=510, y=env.height, width=90, height=20,
@@ -278,7 +202,18 @@ class Visitor(sim.Component):
         self.fromfloor = floors[from_]
         self.tofloor = floors[to]
         self.direction = getdirection(self.fromfloor, self.tofloor)
-
+        
+    def animation_objects(self, q):
+        size_x = xvisitor_dim
+        size_y = yvisitor_dim
+        b = 0.1 * xvisitor_dim
+        an1 = sim.Animate(rectangle0=(b, 2, xvisitor_dim - b, yvisitor_dim - b),
+            linewidth0=0, fillcolor0=direction_color(self.direction))
+        an2 = sim.Animate(text=str(self.tofloor.n), fontsize0=xvisitor_dim * 0.7,
+            anchor='center', offsetx0=5 * b, offsety0=2 + 4 * b,
+            textcolor0='white') 
+        return size_x, size_y, an1, an2       
+        
     def process(self):
         self.enter(self.fromfloor.visitors)
         if not (self.fromfloor, self.direction) in requests:

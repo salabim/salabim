@@ -18,11 +18,11 @@ eatingtime_mean = 20
 thinkingtime_mean = 20
 nphilosophers = 8
 
-philosopher = {}
-fork = {}
+philosopher = []
+fork = []
 for i in range(nphilosophers):
-    philosopher[i] = Philosopher()
-    fork[i] = sim.Resource('fork.')
+    philosopher.append(Philosopher())
+    fork.append(sim.Resource('fork.'))
     if i != 0:
         philosopher[i].leftfork = fork[i - 1]
     philosopher[i].rightfork = fork[i]

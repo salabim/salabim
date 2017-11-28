@@ -58,7 +58,4 @@ print()
 waitingline.length_of_stay.print_histogram(30, 0, 10)
 print('number reneged', env.number_reneged)
 print('number balked', env.number_balked)
-import matplotlib.pyplot as plt
-plt.plot(*waitingline.length.tx(exoff=True), 'bo')
-plt.ylabel('length of ' + waitingline.name())
-plt.show()
+

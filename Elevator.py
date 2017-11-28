@@ -62,7 +62,7 @@ class Car(sim.Component):
         dooropen = False
         while True:
             if self.direction == still:
-                if len(requests) == 0:
+                if not requests:
                     yield self.passivate(mode='Idle')
             if self.count_to_floor(self.floor) > 0:
                 yield self.hold(dooropen_time, mode='Door open')
@@ -94,10 +94,10 @@ class Car(sim.Component):
                             requests[self.floor,
                                      self.direction] = self.env.now()
 
-                if len(self.visitors) > 0:
+                if self.visitors:
                     break
             else:
-                if len(requests) > 0:
+                if requests:
                     earliest = sim.inf
                     for (floor, direction) in requests:
                         if requests[floor, direction] < earliest:
@@ -169,15 +169,8 @@ VisitorGenerator(
     from_=(1, topfloor), to=(1, topfloor), id='n_n', name='vg_n_n')
 
 requests = {}
-floors = {}
-for ifloor in range(topfloor + 1):
-    floors[ifloor] = Floor(ifloor)
-
-cars = []
-
-for icar in range(ncars):
-    thiscar = Car(name='car ' + str(icar), capacity=capacity)
-    cars.append(thiscar)
+floors = {ifloor: Floor(ifloor) for ifloor in range(topfloor + 1)}
+cars = [Car(name='car ' + str(icar), capacity=capacity) for icar in range(ncars)]
 
 env.trace(True)
 env.run(1000)

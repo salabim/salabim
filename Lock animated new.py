@@ -28,104 +28,6 @@ def ship_polygon(ship):
         ship.side * 2, 3, ship.side * (ship.length - 2), 3)
 
 
-class AnimateWaitShip(sim.Animate):
-    def __init__(self, part, x, y, index, side):
-        if side == left:
-            anchor = 'se'
-        else:
-            anchor = 'sw'
-        if part == 0:
-            sim.Animate.__init__(self, polygon0=(), x0=x, y0=y,
-                fillcolor0=shipcolor(side), anchor=anchor, linewidth0=0)
-        elif part == 1:
-            sim.Animate.__init__(self, text='', x0=x, y0=y, textcolor0='white',
-                anchor=anchor, fontsize0=2.5, offsetx0=side * 5)
-        self.index = index
-        self.side = side
-
-    def polygon(self, t):
-        ship = wait[self.side][self.index]
-        if ship is not None:
-            return ship_polygon(ship)
-        else:
-            return((0, 0, 0, 0))
-
-    def text(self, t):
-        ship = wait[self.side][self.index]
-        if ship is not None:
-            return shortname(ship)
-        else:
-            return ''
-
-
-class AnimateLockShip(sim.Animate):
-    def __init__(self, part, y, index):
-        self.part = part
-        if part == 0:
-            sim.Animate.__init__(self, polygon0=(), x0=0, y0=y, fillcolor0='', linewidth0=0)
-        elif part == 1:
-            sim.Animate.__init__(self, text='', x0=0, y0=y, textcolor0='white', fontsize0=2.5)
-        self.index = index
-        self.side = side
-
-    def polygon(self, t):
-        ship = lockqueue[self.index]
-        if ship is not None:
-            return ship_polygon(ship)
-        else:
-            return((0, 0, 0, 0))
-
-    def text(self, t):
-        ship = lockqueue[self.index]
-        if ship is not None:
-            return shortname(ship)
-        else:
-            return ''
-
-    def anchor(self, t):
-        ship = lockqueue[self.index]
-        if ship is None:
-            return 'sw'
-        else:
-            if ship.side == left:
-                return 'se'
-            else:
-                return 'sw'
-
-    def fillcolor(self, t):
-        if self.part == 0:
-            ship = lockqueue[self.index]
-            if ship is not None:
-                return shipcolor(ship.side)
-            else:
-                return (0, 0, 0, 0)
-        else:
-            return sim.Animate.fillcolor(self, t)
-
-    def x(self, t):
-        ship = lockqueue[self.index]
-        if ship is None:
-            return 0
-        else:
-            if self.part == 0:
-                offset = 0
-            else:
-                offset = ship.side * 5
-            xprev = 0
-            for scanship in lockqueue:
-                if scanship == ship:
-                    return xdoor[-ship.side] + ship.side * xprev + offset
-                else:
-                    xprev += scanship.length
-
-    def y(self, t):
-        if lock.mode() == 'Switch':
-            return sim.interpolate(t, lock.mode_time(), lock.scheduled_time(),
-                ylevel[lock.side], ylevel[-lock.side])
-        else:
-            return ylevel[lock.side]
-
-
 def lock_water_rectangle(t):
     if lock.mode() == 'Switch':
         y = sim.interpolate(t, lock.mode_time(), lock.scheduled_time(
@@ -151,6 +53,15 @@ def lock_door_right_rectangle(t):
     return (xdoor[right] - 1, -waterdepth, xdoor[right] + 1, y)
 
 
+def animation_pre_tick(self, t):
+    if lock.mode() == 'Switch':
+        y = sim.interpolate(t, lock.mode_time(), lock.scheduled_time(),
+            ylevel[lock.side], ylevel[-lock.side])
+    else:
+        y = ylevel[lock.side]
+    lockqueue.animate(x=xdoor[-lock.side], y=y, direction='w' if lock.side == left else 'e')
+
+
 def do_animation():
     global ylevel, xdoor, waterdepth
 
@@ -158,22 +69,14 @@ def do_animation():
     waterdepth = 2
     ylevel = {left: 0, right: lockheight}
     xdoor = {left: -0.5 * locklength, right: 0.5 * locklength}
-    xbound = {left: -1 * locklength, right: 1 * locklength}
-    yspace = 5
+    xbound = {left: -1.2 * locklength, right: 1.2 * locklength}
 
+    sim.Environment.animation_pre_tick = animation_pre_tick
     env.animation_parameters(
         x0=xbound[left], y0=-waterdepth, x1=xbound[right], modelname='Lock', speed=8, fps=30)
 
     for side in [left, right]:
-        x = xdoor[side]
-        for i in range(10):
-            y = 10 + ylevel[side] + i * yspace
-            AnimateWaitShip(part=0, index=i, x=x, y=y, side=side)
-            AnimateWaitShip(part=1, index=i, x=x, y=y, side=side)
-    for i in range(4):
-        y = ylevel[left]
-        AnimateLockShip(part=0, index=i, y=y)
-        AnimateLockShip(part=1, index=i, y=y)
+        wait[side].animate(x=xdoor[side], y=10 + ylevel[side], direction='n')
 
     sim.Animate(rectangle0=(xbound[left], ylevel[left] - waterdepth,
                             xdoor[left], ylevel[left]), fillcolor0='aqua', linewidth0=0)
@@ -232,6 +135,19 @@ class Shipgenerator(sim.Component):
 
 
 class Ship(sim.Component):
+    def animation_objects(self, q):
+        size_x = self.length
+        size_y = 5
+        if self.side == left:
+            anchor = 'se'
+        else:
+            anchor = 'sw'
+        an1 = sim.Animate(polygon0=ship_polygon(self),
+            fillcolor0=shipcolor(self.side), anchor=anchor, linewidth0=0)
+        an2 = sim.Animate(text=shortname(self), textcolor0='white',
+            anchor=anchor, fontsize0=2.5, offsetx0=self.side * 5)
+        return (size_x, size_y, an1, an2)
+
     def process(self):
         self.enter(wait[self.side])
         yield self.passivate(mode='Wait')
@@ -240,8 +156,8 @@ class Ship(sim.Component):
         self.enter(lockqueue)
         lock.activate()
         yield self.passivate(mode='In lock')
-        yield self.hold(outtime, mode='Sail out')
         self.leave(lockqueue)
+        yield self.hold(outtime, mode='Sail out')
         lock.activate()
 
 
@@ -259,6 +175,7 @@ class Lock(sim.Component):
                     usedlength += ship.length
                     ship.activate()
                     yield self.passivate('Wait for sail in')
+
             yield self.hold(switchtime, mode='Switch')
             self.side = -self.side
             for ship in lockqueue:
@@ -272,8 +189,8 @@ locklength = 60
 switchtime = 10
 intime = 2
 outtime = 2
-meanlength = 20
-iat = 30
+meanlength = 30
+iat = 20
 
 lockqueue = sim.Queue('lockqueue')
 

@@ -46,7 +46,7 @@ class Machine(sim.Component):
 
     """
 
-    def setup(self, machine=0):
+    def setup(self):
         self.parts_made = 0
         self.broken = False
         self.disturber = Disturber(machine=self)

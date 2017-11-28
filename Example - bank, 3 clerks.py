@@ -48,4 +48,3 @@ waitingline.length_of_stay.print_histogram(30, 0, 10)
 
 waitingline.length_of_stay.print_statistics()
 waitingline.length.print_statistics()
-

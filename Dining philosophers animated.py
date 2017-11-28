@@ -49,7 +49,7 @@ def do_animation():
     env.animation_parameters(x0=-50 * env.width / env.height, y0=-50, x1=+50 * env.width / env.height,
                              modelname='Dining philosophers',
                              speed=8)
-    for i in philosopher:
+    for i, _ in enumerate(philosopher):
         AnimatePhilosopher(i=i)
         AnimateFork(i=i)
     sim.AnimateSlider(x=520, y=env.height, width=100, height=20,
@@ -101,12 +101,11 @@ sim.random_seed(1234567)
 
 while True:
     env = sim.Environment()
-
-    philosopher = {}
-    fork = {}
+    philosopher = []
+    fork = []
     for i in range(nphilosophers):
-        philosopher[i] = Philosopher()
-        fork[i] = sim.Resource('fork.')
+        philosopher.append(Philosopher())
+        fork.append(sim.Resource('fork.'))
         if i != 0:
             philosopher[i].leftfork = fork[i - 1]
         philosopher[i].rightfork = fork[i]

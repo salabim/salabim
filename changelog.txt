@@ -1,5 +1,50 @@
 salabim  changelog
 
+version 2.2.7  2017-11-24
+=========================
+New features:
+Animation of queues is now a standard feature, which makes visualisation of queue contents much simpler.
+In order to realize that, a component now has an animation_objects method,
+which defines how a component is to be visualized.
+The default method shows a black square of 40x40 with the sequence_number in white in this square.
+But, it is possible and quite likely necessary to override the animation_objects method.
+The method should return a list or tuple containing the x-size, y-size and one or more animation objects.
+In order to animate a queue, the method Queue.animate should be called with the position of 
+the first component and the direction for subsequent components.
+Please have a look at the MMc model for a demonstration.
+
+Animation of states is now a standard feature, which facilitates in visualization of a changing state.
+In order to realize that, a state now has an animation_object method, which defines
+how a state is displayed for each possible value.
+The default method shows a black square of 40x40 with the value dispayed in white in this square. If
+the value is a valid colour, an emmpty square with that colour is displayed.
+But, it is possible and quite likely necessary to override the animation_objects method.
+The method should return a list or tuple containing one or more animation objects.
+In order to animate a state, the method State.animate should be called once with the position of
+the animation object.
+
+The animation now calls a method Environment.animation_pre_tick(t) just before starting
+the animation objects display loop.
+And Environment.animation_post_tick(t) just after the loop. Both methods are by default dummy
+(they just return).
+Overriding/monkey patching these methods (particularly animation_pre_tick) can be useful for advanced animations,
+e.g. for a queue where the y position changes over time (cf. the Elevator animated model).
+
+Reintroduced functionality to remove animation objects belonging to a component that becomes a data component.
+The 'belonging to' has to be indicated with parent in the call to Animate.
+
+Minor changes and bug fixes:
+Default arguments are now handled with an omitted value rather than None (or '*' in some cases).
+
+All error handling is now via SalabimError.
+
+Internal handling of Monitor.x, MonitorTimestamped.xduration, MonitorTimestamped.xt and
+MonitorTimestamped.tx improved.
+
+Code optimized with several list comprehensions.
+
+Bug fixes.
+
 version 2.2.6  2017-10-07
 =========================
 Salabim now supports Python 2.7. The biggest advantage of this is, that models can

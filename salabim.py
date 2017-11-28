@@ -1,5 +1,5 @@
 '''
-salabim  discrete event simulation module
+salabim  discrete event simulation
 
 The MIT License (MIT)
 
@@ -9,7 +9,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
 the Software without restriction, including without limitation the rights to
 use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-of the Software, and to permit persons to whom the Software is furnished to do
+of the Software, and to permit persons to who the Software is furnished to do
 so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
@@ -28,7 +28,7 @@ see www.salabim.org for more information, the manual and updates.
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.6'
+__version__ = '2.2.7'
 
 import heapq
 import random
@@ -82,14 +82,11 @@ if Pythonista:
 
 inf = float('inf')
 nan = float('nan')
+omitted = ['omitted']
 
 
-class SalabimException(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return self.value
+class SalabimError(Exception):
+    pass
 
 
 class Monitor(object):
@@ -99,13 +96,13 @@ class Monitor(object):
     Parameters
     ----------
     name : str
-        name of the monitor|n|
+        name of the monitor |n|
         if the name ends with a period (.),
         auto serializing will be applied |n|
-        if omitted, the name monitor (serialized)
+        if omitted, the name monitor. (serialized)
 
     monitor : bool
-        if True (default}, monitoring will be on. |n|
+        if True (default), monitoring will be on. |n|
         if False, monitoring is disabled |n|
         it is possible to control monitoring later,
         with the monitor method
@@ -116,6 +113,7 @@ class Monitor(object):
                non numeric values. In calculations the values are
                forced to a numeric value (0 if not possible)
             - 'bool' (True, False) Actually integer >= 0 <= 255 1 byte
+            - 'int8' integer >= -128 <= 127 1 byte
             - 'uint8' integer >= 0 <= 255 1 byte
             - 'int16' integer >= -32768 <= 32767 2 bytes
             - 'uint16' integer >= 0 <= 65535 2 bytes
@@ -132,41 +130,42 @@ class Monitor(object):
 
     cached_x = [(0, 0), (0, 0)]  # index=ex0, value=[hash,x]
 
-    def __init__(self, name, monitor=True, type='any', env=None):
-        if env is None:
+    def __init__(self, name=omitted, monitor=True, type='any', env=omitted):
+        if env is omitted:
             self.env = _default_env
         else:
             self.env = env
-        if name is None:
+        if name is omitted:
             name = 'monitor.'
         self.name(name)
-        if type in _lookup_arraytype:
-            self._type = type
-        else:
-            raise AssertionError('type (' + type + ') not recognized')
+        try:
+            self.xtypecode, _ = type_to_typecode_off(type)
+        except KeyError:
+            raise SalabimError('type (' + type + ') not recognized')
         self._timestamp = False
         self.reset(monitor)
 
-    def reset(self, monitor=None):
+    def reset(self, monitor=omitted):
         '''
         resets monitor
 
         Parameters
         ----------
         monitor : bool
-            if True (default}, monitoring will be on. |n|
+            if True, monitoring will be on. |n|
             if False, monitoring is disabled
+            if omitted, no change of monitoring state
         '''
 
-        if monitor is None:
+        if monitor is omitted:
             monitor = self._monitor
-        if self._type == 'any':
-            self._x = []
+        if self.xtypecode:
+            self._x = array.array(self.xtypecode)
         else:
-            self._x = array.array(_lookup_arraytype[self._type])
+            self._x = []
         self.monitor(monitor)
 
-    def monitor(self, value=None):
+    def monitor(self, value=omitted):
         '''
         enables/disabled monitor
 
@@ -175,13 +174,13 @@ class Monitor(object):
         value : bool
             if True, monitoring will be on. |n|
             if False, monitoring is disabled |n|
-            if not specified, no change
+            if omitted, no change
 
         Returns
         -------
         True, if monitoring enabled. False, if not : bool
         '''
-        if value is not None:
+        if value is not omitted:
             self._monitor = value
         return self.monitor
 
@@ -195,7 +194,7 @@ class Monitor(object):
         if self._monitor:
             self._x.append(x)
 
-    def name(self, txt=None):
+    def name(self, txt=omitted):
         '''
         Parameters
         ----------
@@ -209,7 +208,7 @@ class Monitor(object):
         Name of the monitor : str
         '''
 
-        if txt is not None:
+        if txt is not omitted:
             _set_name(txt, self.env._nameserializeMonitor, self)
         return _decode_name(self._name)
 
@@ -228,9 +227,10 @@ class Monitor(object):
         '''
 
         x = self.x(ex0=ex0)
-        if len(x) == 0:
+        if x:
+            return sum(x) / len(x)
+        else:
             return nan
-        return sum(x) / len(x)
 
     def std(self, ex0=False):
         '''
@@ -246,14 +246,12 @@ class Monitor(object):
         standard deviation : float
         '''
         x = self.x(ex0=ex0)
-        if len(x) == 0:
+        if x:
+            wmean = self.mean(ex0)
+            wvar = sum(((vx - wmean)**2) for vx in x) / len(x)
+            return math.sqrt(wvar)
+        else:
             return nan
-        wmean = self.mean(ex0)
-        ssum = 0
-        for vx in x:
-            ssum += ((vx - wmean)**2)
-        wvar = ssum / len(x)
-        return math.sqrt(wvar)
 
     def minimum(self, ex0=False):
         '''
@@ -269,9 +267,10 @@ class Monitor(object):
         minimum : float
         '''
         x = self.x(ex0=ex0)
-        if len(x) == 0:
+        if x:
+            return min(x)
+        else:
             return nan
-        return min(x)
 
     def maximum(self, ex0=False):
         '''
@@ -288,9 +287,10 @@ class Monitor(object):
         '''
 
         x = self.x(ex0=ex0)
-        if len(x) == 0:
+        if x:
+            return max(x)
+        else:
             return nan
-        return max(x)
 
     def median(self, ex0=False):
         '''
@@ -315,7 +315,8 @@ class Monitor(object):
         ----------
         q : float
             percentage of the distribution |n|
-            must be between 0 and 100
+            values <0 are treated a 0 |n|
+            values >100 are treated as 100
 
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
@@ -326,24 +327,24 @@ class Monitor(object):
             0 returns the minimum, 50 the median and 100 the maximum
         '''
 
-        assert (q >= 0) and (q <= 100)
+        q = max(0, min(q, 100))
         if self._timestamp:
-            x, duration = self.xduration(ex0=ex0)
+            x, weights = self.xduration(ex0=ex0)
         else:
             x = self.x(ex0=ex0)
-            duration = [1] * len(x)
+            weights = [1] * len(x)
         if len(x) == 1:
             return x[0]
-        dtot = sum(duration)
-        if dtot == 0:
+        sumweights = sum(weights)
+        if not sumweights:
             return nan
 
-        xd = sorted(zip(x, duration), key=lambda v: v[0])
-        x_sorted, duration_sorted = zip(*xd)
-        duration_sorted = [0] + list(duration_sorted)
-        threshold = dtot * q / 100
+        xweights = sorted(zip(x, weights), key=lambda v: v[0])
+        x_sorted, weights_sorted = zip(*xweights)
+        weights_sorted = [0] + list(weights_sorted)
+        threshold = sumweights * q / 100
         vcum_imin1 = 0
-        for i, v in enumerate(duration_sorted):
+        for i, v in enumerate(weights_sorted):
             vcum_i = vcum_imin1 + v
             if vcum_i > threshold:
                 break
@@ -370,11 +371,7 @@ class Monitor(object):
         number of values >lowerbound and <=upperbound : int
         '''
         x = self.x(ex0=ex0)
-        n = 0
-        for vx in x:
-            if (vx > lowerbound) and (vx <= upperbound):
-                n += 1
-        return n
+        return sum(1 for vx in x if (vx > lowerbound) and (vx <= upperbound))
 
     def number_of_entries(self, ex0=False):
         '''
@@ -389,8 +386,7 @@ class Monitor(object):
         -------
         number of entries : int
         '''
-        x = self.x(ex0=ex0)
-        return len(x)
+        return len(self.x(ex0=ex0))
 
     def number_of_entries_zero(self):
         '''
@@ -424,7 +420,7 @@ class Monitor(object):
         indent = pad('', l)
 
         if show_header:
-            print(indent + 'Statistics of {} at {:13.3f}'.format(self.name(), self.env._now))
+            print(indent + 'Statistics of {} at {}'.format(self.name(), fn(self.env._now, 13, 3)))
 
         if show_legend:
             print(
@@ -537,7 +533,7 @@ class Monitor(object):
 
     def x(self, ex0=False, force_numeric=True):
         '''
-        array of tallied values
+        array/list of tallied values
 
         Parameters
         ----------
@@ -557,29 +553,19 @@ class Monitor(object):
         if Monitor.cached_x[ex0][0] == thishash:
             return Monitor.cached_x[ex0][1]
 
-        if self._type == 'any':
-            if force_numeric:
-                x = list_to_numeric_array(self._x)
-            else:
-                if ex0:
-                    x = []
-                    for el in self._x:
-                        if el != 0:
-                            x.append(el)
-                    return x
-                else:
-                    x = self._x
-                Monitor.cached_x[ex0] = (hash, x)
-                return x
+        if self.xtypecode or (not force_numeric):
+            xall = self._x
+            typecode = self.xtypecode
         else:
-            x = self. _x
+            xall = list_to_array(self._x)
+            typecode = xall.typecode
 
         if ex0:
-            xex = array.array(x.typecode)
-            for v in x:
-                if v != 0:
-                    xex.append(v)
-            x = xex
+            x = [vx for vx in xall if vx != 0]
+            if typecode:
+                x = array.array(typecode, x)
+        else:
+            x = xall
 
         Monitor.cached_x[ex0] = (hash, x)
         return x
@@ -614,6 +600,7 @@ class MonitorTimestamp(Monitor):
                non numeric values. In calculations the values are
                forced to a numeric value (0 if not possible) do not use -inf
             - 'bool' bool (False, True). Actually integer >= 0 <= 254 1 byte do not use 255
+            - 'int8' integer >= -127 <= 127 1 byte do not use -128
             - 'uint8' integer >= 0 <= 254 1 byte do not use 255
             - 'int16' integer >= -32767 <= 32767 2 bytes do not use -32768
             - 'uint16' integer >= 0 <= 65534 2 bytes do not use 65535
@@ -651,18 +638,18 @@ class MonitorTimestamp(Monitor):
 
     cached_xduration = [(0, ()), (0, ())]  # index=ex0, value=[hash,(x,duration)]
 
-    def __init__(self, name, getter, monitor=True, type='any', env=None):
-        if name is None:
+    def __init__(self, name, getter, monitor=True, type='any', env=omitted):
+        if name is omitted:
             name = 'monitortimestamp.'
-        if env is None:
+        if env is omitted:
             self.env = _default_env
         else:
             self.env = env
-        if type in _lookup_arraytype:
-            self._type = type
-        else:
-            raise AssertionError('type (' + str(type) + ') nor recognized')
-        self.off = _lookup_off[_lookup_arraytype[type]]
+        try:
+            self.xtypecode, self.off = type_to_typecode_off(type)
+        except KeyError:
+            raise SalabimError('type (' + type + ') not recognized')
+
         self.name(name)
         self._timestamp = True
         self._getter = getter
@@ -671,23 +658,24 @@ class MonitorTimestamp(Monitor):
     def __call__(self):  # direct moneypatching __call__ doesn't work
         return self._getter()
 
-    def reset(self, monitor=None):
+    def reset(self, monitor=omitted):
         '''
         resets timestamped monitor
 
         Parameters
         ----------
         monitor : bool
-            if True (default}, monitoring will be on. |n|
+            if True (default), monitoring will be on. |n|
             if False, monitoring is disabled |n|
-            if None (default), the monitor state remains unchanged
+            if omitted, the monitor state remains unchanged
         '''
-        if monitor is not None:
+        if monitor is not omitted:
             self._monitor = monitor
-        if self._type == 'any':
-            self._x = []
+        if self.xtypecode:
+            self._x = array.array(self.xtypecode)
         else:
-            self._x = array.array(_lookup_arraytype[self._type])
+            self._x = []
+
         if self._monitor:
             self._x.append(self._getter())
         else:
@@ -695,7 +683,7 @@ class MonitorTimestamp(Monitor):
         self._t = array.array('d')
         self._t.append(self.env._now)
 
-    def monitor(self, value=None):
+    def monitor(self, value=omitted):
         '''
         enables/disabled timestamped monitor
 
@@ -704,14 +692,14 @@ class MonitorTimestamp(Monitor):
         value : bool
             if True, monitoring will be on. |n|
             if False, monitoring is disabled |n|
-            if None (default), no change
+            if omitted, no change
 
         Returns
         -------
         True, if monitoring enabled. False, if not : bool
         '''
 
-        if value is not None:
+        if value is not omitted:
             self._monitor = value
             if self._monitor:
                 self.tally()
@@ -740,7 +728,7 @@ class MonitorTimestamp(Monitor):
             self._x.append(self.off)
             self._t.append(t)
 
-    def name(self, txt=None):
+    def name(self, txt=omitted):
         '''
         Parameters
         ----------
@@ -753,7 +741,7 @@ class MonitorTimestamp(Monitor):
         -------
         Name of the monitor : str
         '''
-        if txt is not None:
+        if txt is not omitted:
             _set_name(txt, self.env._nameserializeMonitorTimestamp, self)
         return _decode_name(self._name)
 
@@ -772,12 +760,10 @@ class MonitorTimestamp(Monitor):
         '''
         x, duration = self.xduration(ex0=ex0)
         sumduration = sum(duration)
-        if sumduration == 0:
+        if sumduration:
+            return sum(vx * vduration for vx, vduration in zip(x, duration)) / sumduration
+        else:
             return nan
-        sumxduration = 0
-        for vx, vduration in zip(x, duration):
-            sumxduration += (vx * vduration)
-        return sumxduration / sumduration
 
     def std(self, ex0=False):
         '''
@@ -794,14 +780,12 @@ class MonitorTimestamp(Monitor):
         '''
         x, duration = self.xduration(ex0=ex0)
         sumduration = sum(duration)
-        if sumduration == 0:
+        if sumduration:
+            wmean = self.mean(ex0)
+            wvar = sum((vduration * (vx - wmean)**2) for vx, vduration in zip(x, duration)) / sumduration
+            return math.sqrt(wvar)
+        else:
             return nan
-        wmean = self.mean(ex0)
-        ssum = 0
-        for vx, vduration in zip(x, duration):
-            ssum += (vduration * (vx - wmean)**2)
-        wvar = ssum / sumduration
-        return math.sqrt(wvar)
 
     def minimum(self, ex0=False):
         '''
@@ -817,9 +801,10 @@ class MonitorTimestamp(Monitor):
         minimum : float
         '''
         x, duration = self.xduration(ex0=ex0)
-        if len(x) == 0:
+        if x:
+            return min(x)
+        else:
             return nan
-        return min(x)
 
     def maximum(self, ex0=False):
         '''
@@ -835,9 +820,10 @@ class MonitorTimestamp(Monitor):
         maximum : float
         '''
         x, duration = self.xduration(ex0=ex0)
-        if len(x) == 0:
+        if x:
+            return max(x)
+        else:
             return nan
-        return max(x)
 
     def median(self, ex0=False):
         '''
@@ -862,7 +848,8 @@ class MonitorTimestamp(Monitor):
         ----------
         q : float
             percentage of the distribution |n|
-            must be between 0 and 100
+            values <0 are treated a 0 |n|
+            values >100 are treated as 100
 
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
@@ -895,17 +882,32 @@ class MonitorTimestamp(Monitor):
         number of values >lowerbound and <=upperbound: int
         '''
         x, duration = self.xduration(ex0=ex0)
-        n = 0
-        for vx, vduration in zip(x, duration):
-            if (vx > lowerbound) and (vx <= upperbound):
-                n += vduration
-        return n
+        return sum((vduration for vx, vduration in zip(x, duration) if (vx > lowerbound) and (vx <= upperbound)))
 
     def duration(self, ex0=False):
-        x, duration = self.xduration(ex0=ex0)
+        '''
+        total duration
+
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include samples with value 0. if True, exclude zero samples.
+
+        Returns
+        -------
+        total duration
+        '''
+        _, duration = self.xduration(ex0=ex0)
         return sum(duration)
 
     def duration_zero(self):
+        '''
+        total duration of samples with value 0
+
+        Returns
+        -------
+        total duration of zero samples
+        '''
         return self.duration() - self.duration(ex0=True)
 
     def xduration(self, ex0=False, force_numeric=True):
@@ -939,34 +941,27 @@ class MonitorTimestamp(Monitor):
 
         durationall.append(self.env._now - lastt)
 
-        if self._type == 'any':
-            if force_numeric:
-                x = list_to_numeric_array(self._x)
-            else:
-                x = []
-                duration = array.array('d')
-
-                for vx, vduration in zip(self._x, durationall):
-                    if (not ex0) or (vx != 0):
-                        x.append(vx)
-                        duration.append(vduration)
-                MonitorTimestamp.cached_xduration[ex0] = (thishash, (x, duration))
-                return x, duration
-
+        if self.xtypecode or (not force_numeric):
+            xall = self._x
+            typecode = self.xtypecode
         else:
-            x = self._x
+            xall = list_to_array(self._x)
+            typecode = xall.typecode
 
-        xex = array.array(x.typecode)
-        durationex = array.array('d')
+        duration = array.array('d')
+        if typecode:
+            x = array.array(typecode)
+        else:
+            x = []
 
-        for vx, vduration in zip(x, durationall):
+        for vx, vduration in zip(xall, durationall):
             if vx != self.off:
                 if (not ex0) or (vx != 0):
-                    xex.append(vx)
-                    durationex.append(vduration)
+                    x.append(vx)
+                    duration.append(vduration)
 
-        MonitorTimestamp.cached_xduration[ex0] = (thishash, (xex, durationex))
-        return xex, durationex
+        MonitorTimestamp.cached_xduration[ex0] = (thishash, (x, duration))
+        return x, duration
 
     def xt(self, ex0=False, exoff=False, force_numeric=True):
         '''
@@ -992,41 +987,23 @@ class MonitorTimestamp(Monitor):
         ----
         The value self.off is stored when monitoring is turned off
         '''
-        if self._type == 'any':
-            if force_numeric:
-                x = list_to_numeric_array(self._x)
-            else:
-                x = []
-                t = array.array('d')
-                for thisx, thist in zip(self._x, self._t):
-                    if (not ex0) or (thisx != 0):
-                        if (not exoff) or (thisx != self.off):
-                            x.append(thisx)
-                            t.append(thist)
-                return x, t
+        if self.xtypecode or (not force_numeric):
+            xall = self._x
+            typecode = self.xtypecode
         else:
-            x = self._x
+            xall = list_to_array(self._x)
+            typecode = xall.typecode
 
-        t = self._t
-        if ex0:
-            xex = array.array(x.typecode)
-            tex = array.array(t.typecode)
-            for vx, vt in zip(x, t):
-                if vx != 0:
-                    xex.append(vx)
-                    tex.append(vt)
-            x = xex
-            t = tex
-
-        if exoff:
-            xex = array.array(x.typecode)
-            tex = array.array(t.typecode)
-            for vx, vt in zip(x, t):
-                if vx != self.off:
-                    xex.append(vx)
-                    tex.append(vt)
-            x = xex
-            t = tex
+        if typecode:
+            x = array.array(typecode)
+        else:
+            x = []
+        t = array.array('d')
+        for vx, vt in zip(xall, self._t):
+            if vx != self.off:
+                if not ex0 or (vx != 0):
+                    x.append(vx)
+                    t.append(vt)
 
         return x, t
 
@@ -1157,6 +1134,7 @@ if Pythonista:
                 capture_image = Image.new('RGB',
                     (an_env.width, an_env.height), colorspec_to_tuple(an_env.background_color))
 
+                an_env.animation_pre_tick(an_env.t)
                 for ao in an_env.an_objects:
                     ao.make_pil_image(an_env.t)
                     if ao._image_visible:
@@ -1164,6 +1142,7 @@ if Pythonista:
                             (int(ao._image_x),
                             int(an_env.height - ao._image_y - ao._image.size[1])),
                             ao._image)
+                an_env.animation_post_tick(an_env.t)
 
                 ims = scene.load_pil_image(capture_image)
                 scene.image(ims, 0, 0, *capture_image.size)
@@ -1254,6 +1233,8 @@ class Qmember():
         c._qmembers[q] = self
         q.env.print_trace('', '', c.name(), 'enter ' + q.name())
         q.length.tally()
+        if q._animate_on:
+            q._animate_update()
 
 
 class Queue(object):
@@ -1266,7 +1247,7 @@ class Queue(object):
         name of the queue |n|
         if the name ends with a period (.),
         auto serializing will be applied |n|
-        if omitted, the name queue (serialized)
+        if omitted, the name queue. (serialized)
 
     monitor : bool
         if True (default) , both length and length_of_stay are monitored |n|
@@ -1280,12 +1261,12 @@ class Queue(object):
         for internal use only
     '''
 
-    def __init__(self, name=None, monitor=True, env=None, _isinternal=False):
-        if env is None:
+    def __init__(self, name=omitted, monitor=True, env=omitted, _isinternal=False):
+        if env is omitted:
             self.env = _default_env
         else:
             self.env = env
-        if name is None:
+        if name is omitted:
             name = 'queue.'
         self.name(name)
         self._head = Qmember()
@@ -1301,6 +1282,7 @@ class Queue(object):
         self._length = 0
         self._iter_sequence = 0
         self._iter_touched = {}
+        self._animate_on = False
         self.length = MonitorTimestamp(
             ('Length of ', self), getter=self._getlength, monitor=monitor, type='uint32', env=self.env)
         self.length_of_stay = Monitor(
@@ -1308,18 +1290,95 @@ class Queue(object):
         if not _isinternal:
             self.env.print_trace('', '', self.name() + ' create')
 
+    def _animate_update(self):
+        if self._animate_reverse:
+            q = reversed(self)
+        else:
+            q = self
+        x = self._animate_x
+        y = self._animate_y
+        for c in q:
+            if self not in c._aos:
+                c._aos[self] = c.animation_objects(self)
+                if isinstance(c._aos[self], (tuple, list)):
+                    if len(c._aos[self]) <= 1:
+                        raise SalabimError('at least 2 elements (sizex, sizey) required')
+                    for i, el in enumerate(c._aos[self]):
+                        if i == 0:
+                            try:
+                                float(el)
+                            except ValueError:
+                                raise SalabimError('element #0 (sizex) of tuple/list not numeric')
+                        elif i == 1:
+                            try:
+                                float(el)
+                            except ValueError:
+                                raise SalabimError('element #1 (sizey) of tuple/list not numeric')
+                        else:
+                            if not isinstance(el, Animate):
+                                raise SalabimError('element #{} of tuple/list is not Animate type'.format(i))
+                else:
+                    raise SalabimError('animation_objects should return list or tuple')
+
+            for ao in c._aos[self][2:]:
+                ao.x0 = x
+                ao.y0 = y
+            x += self._displacement_x * c._aos[self][0]
+            y += self._displacement_y * c._aos[self][1]
+
+    def animate(self, x=500, y=100, direction='w', on=True, reverse=False):
+        '''
+        turns on/off animation for the queue
+
+        Parameters
+        ----------
+        x : float
+            x-position of the first component in the queue |n|
+            default: 500
+
+        y : float
+            y-position of the first component in the queue |n|
+            default: 100
+
+        direction : str
+            if 'w', waitling line runs westwards (i.e. from right to left) (default) |n|
+            if 'n', waitling line runs northeards (i.e. from bottom to top) |n|
+            if 'e', waitling line runs eastwards (i.e. from left to right) |n|
+            if 's', waitling line runs southwards (i.e. from top to bottom)
+
+        on : bool
+            if True (default) do animate the queue. If False, do not animate.
+
+        reverse : bool
+            if False (default), display in normal order. If True, reversed.
+        '''
+
+        self._animate_on = on
+        if on:
+            self._animate_x = x
+            self._animate_y = y
+            self._displacement_x, self._displacement_y = \
+                {'w': (-1, 0), 'n': (0, 1), 'e': (1, 0), 's': (0, -1)}[direction.lower()]
+
+            self._animate_reverse = reverse
+            self._animate_update()
+        else:
+            for c in self:
+                c._remove_from_aos(self)
+
     def _getlength(self):
         return self._length
 
-    def reset_monitors(self, monitor=None):
+    def reset_monitors(self, monitor=omitted):
         '''
         resets queue monitor length_of_stay and time stamped monitor length
 
         Parameters
         ----------
         monitor : bool
-            if True (default}, monitoring will be on. |n|
-            if False, monitoring is disabled
+            if True, monitoring will be on. |n|
+            if False, monitoring is disabled |n|
+            if omitted, no change of monitoring state
 
         Note
         ----
@@ -1328,7 +1387,7 @@ class Queue(object):
         self.length.reset(monitor=monitor)
         self.length_of_stay.reset(monitor=monitor)
 
-    def monitor(self, value=None):
+    def monitor(self, value):
         '''
         enables/disables monitoring of length_of_stay and length
 
@@ -1337,7 +1396,6 @@ class Queue(object):
         value : bool
             if True, monitoring will be on. |n|
             if False, monitoring is disabled |n|
-            if not specified, no change
 
         Note
         ----
@@ -1353,9 +1411,7 @@ class Queue(object):
     def print_info(self):
         print('Queue ' + hex(id(self)))
         print('  name=' + self.name())
-        if self._length == 0:
-            print('  no components')
-        else:
+        if self._length:
             print('  component(s):')
             mx = self._head.successor
             while mx != self._tail:
@@ -1363,12 +1419,14 @@ class Queue(object):
                     ' enter_time' + time_to_string(mx.enter_time) +
                     ' priority=' + str(mx.priority))
                 mx = mx.successor
+        else:
+            print('  no components')
 
     def print_statistics(self):
         '''
         prints a summary of statistics of a queue
         '''
-        print('Statistics of {} at {:13.3f}'.format(self.name(), self.env._now))
+        print('Statistics of {} at {}'.format(self.name(), fn(self.env._now, 13, 3)))
         self.length.print_statistics(
             show_header=False, show_legend=True, do_indent=True)
 
@@ -1376,7 +1434,7 @@ class Queue(object):
         self.length_of_stay.print_statistics(
             show_header=False, show_legend=False, do_indent=True)
 
-    def name(self, txt=None):
+    def name(self, txt=omitted):
         '''
         Parameters
         ----------
@@ -1390,7 +1448,7 @@ class Queue(object):
         Name of the queue : str
         '''
 
-        if txt is not None:
+        if txt is not omitted:
             _set_name(txt, self.env._nameserializeQueue, self)
         return _decode_name(self._name)
 
@@ -1503,7 +1561,7 @@ class Queue(object):
             may not be member of the queue yet
 
         priority : float
-            priority of the component|n|
+            priority of the component |n|
 
         Note
         ----
@@ -1767,7 +1825,7 @@ class Queue(object):
         ----
         the priority will be set to 0 for all components in the
         resulting  queue |n|
-        the order of the resulting queue is as follows: |n|
+        the order of the resulting queue is as follows |n|:
         first all components of self, in that order,
         followed by all components in q that are not in self,
         in that order.
@@ -1806,7 +1864,7 @@ class Queue(object):
         are in self and q |n|
         the priority will be set to 0 for all components in the
         resulting  queue |n|
-        the order of the resulting queue is as follows: |n|
+        the order of the resulting queue is as follows |n|:
         in the same order as in self.
         '''
         save_trace = self.env._trace
@@ -1914,10 +1972,11 @@ class Queue(object):
 
 
 def finish():
-    raise SalabimException('Stopped by user')
     if Pythonista:
         if MyScene.this_scene is not None:
             MyScene.this_scene.view.close()
+    print('stopped by user')
+    exit()
 
 
 class Environment(object):
@@ -1941,7 +2000,7 @@ class Environment(object):
         name of the environment |n|
         if the name ends with a period (.),
         auto serializing will be applied |n|
-        if omitted, the name ``environment`` (serialized)
+        if omitted, the name ``environment.`` (serialized)
 
     is_default_env : bool
         if True, this environment becomes the default environment |n|
@@ -1961,17 +2020,19 @@ class Environment(object):
     _nameserialize = {}
     an_env = None
 
-    def __init__(self, trace=False, random_seed=1234567, name=None, is_default_env=True):
+    def __init__(self, trace=False, random_seed=omitted, name=omitted, is_default_env=True):
         global _default_env
         if is_default_env:
             _default_env = self
-        if name is None:
+        if name is omitted:
             if is_default_env:
                 name = 'Default environment'
             else:
                 name = 'environment.'
         self._trace = trace
         if random_seed != '':
+            if random_seed is omitted:
+                random_seed = 1234567
             random.seed(random_seed)
         self.name(name)
         self.env = self
@@ -2025,6 +2086,30 @@ class Environment(object):
     def __repr__(self):
         return 'Environment(' + self.name() + ')'
 
+    def animation_pre_tick(self, t):
+        '''
+        called just before the animation object loop. |n|
+        Default behaviour: just return
+
+        Parameters
+        ----------
+        t : float
+            Current (animation) time.
+        '''
+        return
+
+    def animation_post_tick(self, t):
+        '''
+        called just after the animation object loop. |n|
+        Default behaviour: just return
+
+        Parameters
+        ----------
+        t : float
+            Current (animation) time.
+        '''
+        return
+
     def print_info(self):
         print('Environment ' + hex(id(self)))
         print('  name=' + self.name() +
@@ -2057,21 +2142,25 @@ class Environment(object):
                     c._status = data
                     c._scheduled_time = inf
                     c._process = None
+                    if an_env == self:
+                        for ao in self.an_objects[:]:
+                            if ao.parent == c:
+                                self.an_objects.remove(ao)
                     return
         if len(self.env._standbylist) > 0:
-            self.env._pendingstandbylist = list(self.env._standbylist)
-            self.env._standbylist = []
+            self._pendingstandbylist = list(self.env._standbylist)
+            self._standbylist = []
 
-        if len(self._event_list) == 0:
+        if self._event_list:
+            (t, _, c) = heapq.heappop(self._event_list)
+        else:
             t = inf
             c = self._main
-        else:
-            (t, _, c) = heapq.heappop(self._event_list)
         c._on_event_list = False
         self.env._now = t
 
         try:
-            self.env._current_component = c
+            self._current_component = c
             if c._process is None:  # denotes end condition
                 return
 
@@ -2088,6 +2177,10 @@ class Environment(object):
             c._status = data
             c._scheduled_time = inf
             c._process = None
+            if an_env == self:
+                for ao in self.an_objects[:]:
+                    if ao.parent == c:
+                        self.an_objects.remove(ao)
             return
 
     def _print_event_list(self, s):
@@ -2096,11 +2189,11 @@ class Environment(object):
             print('{:10.3f} {}'.format(t, comp.name()))
 
     def animation_parameters(self,
-                             animate=None, speed=None, width=None, height=None,
-                             x0=None, y0=0, x1=None, background_color=None,
-                             fps=None, modelname=None, use_toplevel=None,
-                             show_fps=None, show_speed=None, show_time=None,
-                             video=None):
+                             animate=omitted, speed=omitted, width=omitted, height=omitted,
+                             x0=omitted, y0=0, x1=omitted, background_color=omitted,
+                             fps=omitted, modelname=omitted, use_toplevel=omitted,
+                             show_fps=omitted, show_speed=omitted, show_time=omitted,
+                             video=omitted):
         '''
         set animation parameters
 
@@ -2108,7 +2201,7 @@ class Environment(object):
         ----------
         animate : bool
             animate indicator |n|
-            if omitted, True, i.e. animation |n|
+            if omitted, True, i.e. animation on |n|
             Installation of PIL is required for animation.
 
         speed : float
@@ -2160,15 +2253,15 @@ class Environment(object):
             if False (default), the root will be initialized with tkinter.Tk()
 
         show_fps : bool
-            if True, show the number of frames per second (default)|n|
+            if True, show the number of frames per second (default)  |n|
             if False, do not show the number of frames per second
 
         show_speed: bool
-            if True, show the animation speed (default)|n|
+            if True, show the animation speed (default)  |n|
             if False, do not show the animation speed
 
         show_time: bool
-            if True, show the time (default)|n|
+            if True, show the time (default)  |n|
             if False, do not show the time
 
         video : str
@@ -2188,41 +2281,41 @@ class Environment(object):
         On the other hand, changing speed, show_fps, show_time, show_speed and fps can be useful in
         a running animation.
         '''
-        if speed is not None:
+        if speed is not omitted:
             self.speed = speed
             if an_env == self:
                 an_env.set_start_animation()
 
-        if show_fps is not None:
+        if show_fps is not omitted:
             self.show_fps = show_fps
-        if show_speed is not None:
+        if show_speed is not omitted:
             self.show_speed = show_speed
-        if show_time is not None:
+        if show_time is not omitted:
             self.show_time = show_time
 
-        if animate is None:
+        if animate is omitted:
             self.animate = True
         else:
             self.animate = animate
-        if width is not None:
+        if width is not omitted:
             self.width = width
-        if height is not None:
+        if height is not omitted:
             self.height = height
-        if x0 is not None:
+        if x0 is not omitted:
             self.x0 = x0
-        if x1 is not None:
+        if x1 is not omitted:
             self.x1 = x1
-        if y0 is not None:
+        if y0 is not omitted:
             self.y0 = y0
-        if background_color is not None:
+        if background_color is not omitted:
             self.background_color = background_color
-        if fps is not None:
+        if fps is not omitted:
             self.fps = fps
-        if modelname is not None:
+        if modelname is not omitted:
             self.modelname = modelname
-        if use_toplevel is not None:
+        if use_toplevel is not omitted:
             self.use_toplevel = use_toplevel
-        if video is not None:
+        if video is not omitted:
             self.video = video
 
     def peek(self):
@@ -2234,10 +2327,10 @@ class Environment(object):
         if len(self.env._pendingstandbylist) > 0:
             return self.env._now
         else:
-            if len(self.env._event_list) == 0:
-                return inf
+            if self._event_list:
+                return self._event_list[0][0]
             else:
-                return self.env._event_list[0][0]
+                return inf
 
     def main(self):
         '''
@@ -2255,7 +2348,7 @@ class Environment(object):
         '''
         return self._now
 
-    def trace(self, value=None):
+    def trace(self, value=omitted):
         '''
         trace status
 
@@ -2276,7 +2369,7 @@ class Environment(object):
 
             ``if env.trace():``
         '''
-        if value is not None:
+        if value is not omitted:
             self._trace = value
         return self._trace
 
@@ -2288,7 +2381,7 @@ class Environment(object):
         '''
         return self._current_component
 
-    def run(self, duration=None, till=None):
+    def run(self, duration=omitted, till=omitted):
         '''
         start execution of the simulation
 
@@ -2300,15 +2393,15 @@ class Environment(object):
 
         till : float
             schedule time |n|
-            if omitted, 0 is assumed
+            if omitted, inf is assumed
 
         Note
         ----
         only issue run() from the main level
         '''
         global an_env
-        if till is None:
-            if duration is None:
+        if till is omitted:
+            if duration is omitted:
                 scheduled_time = inf
             else:
                 if duration == inf:
@@ -2316,33 +2409,33 @@ class Environment(object):
                 else:
                     scheduled_time = self.env._now + duration
         else:
-            if duration is None:
+            if duration is omitted:
                 scheduled_time = till
             else:
-                raise AssertionError('both duration and till specified')
+                raise SalabimError('both duration and till specified')
 
         self._main._reschedule(scheduled_time, False, 'run')
 
         if self.animate:
             if 'PIL' not in sys.modules:
-                raise AssertionError('PIL is required for animation. Install with pip install Pillow.')
+                raise SalabimError('PIL is required for animation. Install with pip install Pillow.')
             if not (('tkinter' in sys.modules) or ('Tkinter' in sys.modules) or Pythonista):
-                raise AssertionError('tkinter is required for animation.')
+                raise SalabimError('tkinter is required for animation.')
             if self.video == '':
                 self.dovideo = False
             else:
                 self.dovideo = True
                 if Pythonista:
-                    raise AssertionError(
+                    raise SalabimError(
                         'video production is not supported under Pythonista.')
                 if platform.python_implementation == 'PyPy':
-                    raise AssertionError(
+                    raise SalabimError(
                         'video production is not supported under PyPy.')
                 if 'cv2' not in sys.modules:
-                    raise AssertionError(
+                    raise SalabimError(
                         'cv2 required for video production. Install with pip install opencv-python.')
                 if 'numpy' not in sys.modules:
-                    raise AssertionError(
+                    raise SalabimError(
                         'numpy required for video production. Install with pip install numpy.')
 
             self.t = self._now  # for the call to set_start_animation
@@ -2402,8 +2495,8 @@ class Environment(object):
 
     def simulate_loop(self):
         while True:
-            self.env.step()
-            if self.env._current_component == self._main:
+            self.step()
+            if self._current_component == self._main:
                 self.print_trace('{:10.3f}'.format(
                     self._now), self._main.name(), 'current')
                 self._scheduled_time = inf
@@ -2415,6 +2508,7 @@ class Environment(object):
 
         while self.running:
             tick_start = time.time()
+
             if self.dovideo:
                 self.t = self.start_animation_time + self.video_sequence * self.speed / self.fps
             else:
@@ -2450,9 +2544,8 @@ class Environment(object):
 
             canvas_objects_iter = iter(self.canvas_objects[:])
             co = next(canvas_objects_iter, None)
-
+            self.animation_pre_tick(self.t)
             for ao in self.an_objects:
-
                 ao.make_pil_image(self.t)
                 if ao._image_visible:
                     if co is None:
@@ -2489,6 +2582,8 @@ class Environment(object):
                 else:
                     ao.canvas_object = None
 
+            self.animation_post_tick(self.t)
+
             for co in canvas_objects_iter:
                 self.canvas.delete(co)
                 self.canvas_objects.remove(co)
@@ -2514,7 +2609,7 @@ class Environment(object):
             if not self.dovideo:
                 tick_duration = time.time() - tick_start
                 if tick_duration < 1 / self.fps:
-                    time.sleep((1 / self.fps) - tick_duration)
+                    time.sleep(((1 / self.fps) - tick_duration) * 0.8)  # 0.8 compensation because of clock inaccuracy
 
     def an_system_modelname(self):
         '''
@@ -2649,7 +2744,7 @@ class Environment(object):
         else:
             return fontsize / self.scale
 
-    def name(self, txt=None):
+    def name(self, txt=omitted):
         '''
         Parameters
         ----------
@@ -2663,7 +2758,7 @@ class Environment(object):
         Name of the environment : str
         '''
 
-        if txt is not None:
+        if txt is not omitted:
             _set_name(txt, Environment._nameserialize, self)
         return _decode_name(self._name)
 
@@ -2720,7 +2815,7 @@ class Animate(object):
     ----------
     parent : Component
         component where this animation object belongs to (default None) |n|
-        if given, the animation ofject will be removed
+        if given, the animation object will be removed
         automatically upon termination of the parent
 
     layer : int
@@ -2788,7 +2883,7 @@ class Animate(object):
         anchor position |n|
         specifies where to put images or texts relative to the anchor
         point |n|
-        possible values are (default: center): |n|
+        possible values are (default: center) |n|:
         ``nw    n    ne`` |n|
         ``w   center  e`` |n|
         ``sw    s    se``
@@ -2920,20 +3015,20 @@ class Animate(object):
     ======================  ========= ========= ========= ========= ========= =========
     '''
 
-    def __init__(self, parent=None, layer=0, keep=True, visible=True,
+    def __init__(self, parent=omitted, layer=0, keep=True, visible=True,
                  screen_coordinates=False,
-                 t0=None, x0=0, y0=0, offsetx0=0, offsety0=0,
-                 circle0=None, line0=None, polygon0=None, rectangle0=None,
-                 image=None, text=None,
+                 t0=omitted, x0=0, y0=0, offsetx0=0, offsety0=0,
+                 circle0=omitted, line0=omitted, polygon0=omitted, rectangle0=omitted,
+                 image=omitted, text=omitted,
                  font='', anchor='center',
                  linewidth0=1, fillcolor0='black', linecolor0='black', textcolor0='black',
-                 angle0=0, fontsize0=20, width0=None,
-                 t1=None, x1=None, y1=None, offsetx1=None, offsety1=None,
-                 circle1=None, line1=None, polygon1=None, rectangle1=None,
-                 linewidth1=None, fillcolor1=None, linecolor1=None, textcolor1=None,
-                 angle1=None, fontsize1=None, width1=None, env=None):
+                 angle0=0, fontsize0=20, width0=omitted,
+                 t1=omitted, x1=omitted, y1=omitted, offsetx1=omitted, offsety1=omitted,
+                 circle1=omitted, line1=omitted, polygon1=omitted, rectangle1=omitted,
+                 linewidth1=omitted, fillcolor1=omitted, linecolor1=omitted, textcolor1=omitted,
+                 angle1=omitted, fontsize1=omitted, width1=omitted, env=omitted):
 
-        self.env = _default_env if env is None else env
+        self.env = _default_env if env is omitted else env
         self._image_ident = None  # denotes no image yet
         self._image = None
         self._image_x = 0
@@ -2943,14 +3038,14 @@ class Animate(object):
         self.type = self.settype(
             circle0, line0, polygon0, rectangle0, image, text)
         if self.type == '':
-            raise AssertionError('no object specified')
-        type1 = self.settype(circle1, line1, polygon1, rectangle1, None, None)
+            raise SalabimError('no object specified')
+        type1 = self.settype(circle1, line1, polygon1, rectangle1, omitted, omitted)
         if (type1 != '') and (type1 != self.type):
-            raise AssertionError('incompatible types: ' +
-                                 self.type + ' and ' + type1)
+            raise SalabimError('incompatible types: ' +
+                self.type + ' and ' + type1)
 
         self.layer0 = layer
-        self.parent = parent
+        self.parent = (None if parent is omitted else parent)
         self.keep = keep
         self.visible0 = visible
         self.screen_coordinates = screen_coordinates
@@ -2962,12 +3057,12 @@ class Animate(object):
         self.rectangle0 = rectangle0
         self.text0 = text
 
-        if image is None:
+        if image is omitted:
             self.width0 = 0  # just to be able to interpolate
         else:
             self.image0 = spec_to_image(image)
             self.image_serial0 = self.env.serialize()
-            self.width0 = self.image0.size[0] if width0 is None else width0
+            self.width0 = self.image0.size[0] if width0 is omitted else width0
 
         self.font0 = font
         self.anchor0 = anchor
@@ -2984,44 +3079,44 @@ class Animate(object):
         self.angle0 = angle0
         self.fontsize0 = fontsize0
 
-        self.t0 = self.env._now if t0 is None else t0
+        self.t0 = self.env._now if t0 is omitted else t0
 
-        self.circle1 = self.circle0 if circle1 is None else circle1
-        self.line1 = self.line0 if line1 is None else line1
-        self.polygon1 = self.polygon0 if polygon1 is None else polygon1
-        self.rectangle1 = self.rectangle0 if rectangle1 is None else rectangle1
+        self.circle1 = self.circle0 if circle1 is omitted else circle1
+        self.line1 = self.line0 if line1 is omitted else line1
+        self.polygon1 = self.polygon0 if polygon1 is omitted else polygon1
+        self.rectangle1 = self.rectangle0 if rectangle1 is omitted else rectangle1
 
-        self.x1 = self.x0 if x1 is None else x1
-        self.y1 = self.y0 if y1 is None else y1
-        self.offsetx1 = self.offsetx0 if offsetx1 is None else offsetx1
-        self.offsety1 = self.offsety0 if offsety1 is None else offsety1
+        self.x1 = self.x0 if x1 is omitted else x1
+        self.y1 = self.y0 if y1 is omitted else y1
+        self.offsetx1 = self.offsetx0 if offsetx1 is omitted else offsetx1
+        self.offsety1 = self.offsety0 if offsety1 is omitted else offsety1
         self.fillcolor1 =\
-            self.fillcolor0 if fillcolor1 is None else fillcolor1
+            self.fillcolor0 if fillcolor1 is omitted else fillcolor1
         self.linecolor1 =\
-            self.linecolor0 if linecolor1 is None else linecolor1
+            self.linecolor0 if linecolor1 is omitted else linecolor1
         self.textcolor1 =\
-            self.textcolor0 if textcolor1 is None else textcolor1
+            self.textcolor0 if textcolor1 is omitted else textcolor1
         self.linewidth1 =\
-            self.linewidth0 if linewidth1 is None else linewidth1
-        self.angle1 = self.angle0 if angle1 is None else angle1
+            self.linewidth0 if linewidth1 is omitted else linewidth1
+        self.angle1 = self.angle0 if angle1 is omitted else angle1
         self.fontsize1 =\
-            self.fontsize0 if fontsize1 is None else fontsize1
-        self.width1 = self.width0 if width1 is None else width1
+            self.fontsize0 if fontsize1 is omitted else fontsize1
+        self.width1 = self.width0 if width1 is omitted else width1
 
-        self.t1 = inf if t1 is None else t1
+        self.t1 = inf if t1 is omitted else t1
 
         self.env.an_objects.append(self)
 
-    def update(self, layer=None, keep=None, visible=None,
-               t0=None, x0=None, y0=None, offsetx0=None, offsety0=None,
-               circle0=None, line0=None, polygon0=None, rectangle0=None,
-               image=None, text=None, font=None, anchor=None,
-               linewidth0=None, fillcolor0=None, linecolor0=None, textcolor0=None,
-               angle0=None, fontsize0=None, width0=None,
-               t1=None, x1=None, y1=None, offsetx1=None, offsety1=None,
-               circle1=None, line1=None, polygon1=None, rectangle1=None,
-               linewidth1=None, fillcolor1=None, linecolor1=None, textcolor1=None,
-               angle1=None, fontsize1=None, width1=None):
+    def update(self, layer=omitted, keep=omitted, visible=omitted,
+               t0=omitted, x0=omitted, y0=omitted, offsetx0=omitted, offsety0=omitted,
+               circle0=omitted, line0=omitted, polygon0=omitted, rectangle0=omitted,
+               image=omitted, text=omitted, font=omitted, anchor=omitted,
+               linewidth0=omitted, fillcolor0=omitted, linecolor0=omitted, textcolor0=omitted,
+               angle0=omitted, fontsize0=omitted, width0=omitted,
+               t1=omitted, x1=omitted, y1=omitted, offsetx1=omitted, offsety1=omitted,
+               circle1=omitted, line1=omitted, polygon1=omitted, rectangle1=omitted,
+               linewidth1=omitted, fillcolor1=omitted, linecolor1=omitted, textcolor1=omitted,
+               angle1=omitted, fontsize1=omitted, width1=omitted):
         '''
         updates an animation object
 
@@ -3086,7 +3181,7 @@ class Animate(object):
             anchor position |n|
             specifies where to put images or texts relative to the anchor
             point (default see below) |n|
-            possible values are (default: center): |n|
+            possible values are (default: center) |n|:
             ``nw    n    ne`` |n|
             ``w   center  e`` |n|
             ``sw    s    se``
@@ -3167,78 +3262,78 @@ class Animate(object):
         t = self.env._now
         type0 = self.settype(circle0, line0, polygon0, rectangle0, image, text)
         if (type0 != '') and (type0 != self.type):
-            raise AssertionError('incorrect type ' +
-                                 type0 + ' (should be ' + self.type)
-        type1 = self.settype(circle1, line1, polygon1, rectangle1, None, None)
+            raise SalabimError('incorrect type ' +
+                type0 + ' (should be ' + self.type)
+        type1 = self.settype(circle1, line1, polygon1, rectangle1, omitted, omitted)
         if (type1 != '') and (type1 != self.type):
-            raise AssertionError('incompatible types: ' +
-                                 self.type + ' and ' + type1)
+            raise SalabimError('incompatible types: ' +
+                self.type + ' and ' + type1)
 
-        if layer is not None:
+        if layer is not omitted:
             self.layer0 = layer
-        if keep is not None:
+        if keep is not omitted:
             self.keep = keep
-        if visible is not None:
+        if visible is not omitted:
             self.visible0 = visible
-        self.circle0 = self.circle() if circle0 is None else circle0
-        self.line0 = self.line() if line0 is None else line0
-        self.polygon0 = self.polygon() if polygon0 is None else polygon0
+        self.circle0 = self.circle() if circle0 is omitted else circle0
+        self.line0 = self.line() if line0 is omitted else line0
+        self.polygon0 = self.polygon() if polygon0 is omitted else polygon0
         self.rectangle0 =\
-            self.rectangle() if rectangle0 is None else rectangle0
-        if text is not None:
+            self.rectangle() if rectangle0 is omitted else rectangle0
+        if text is not omitted:
             self.text0 = text
-        self.width0 = self.width() if width0 is None else width0
-        if image is not None:
+        self.width0 = self.width() if width0 is omitted else width0
+        if image is not omitted:
             self.image0 = spec_to_image(image)
             self.image_serial0 = self.env.serialize()
-            self.width0 = self.image0.size[0] if width0 is None else width0
+            self.width0 = self.image0.size[0] if width0 is omitted else width0
 
-        if font is not None:
+        if font is not omitted:
             self.font0 = font
-        if anchor is not None:
+        if anchor is not omitted:
             self.anchor0 = anchor
 
-        self.x0 = self.x(t) if x0 is None else x0
-        self.y0 = self.y(t) if y0 is None else y0
-        self.offsetx0 = self.offsetx(t) if offsetx0 is None else offsetx0
-        self.offsety0 = self.offsety(t) if offsety0 is None else offsety0
+        self.x0 = self.x(t) if x0 is omitted else x0
+        self.y0 = self.y(t) if y0 is omitted else y0
+        self.offsetx0 = self.offsetx(t) if offsetx0 is omitted else offsetx0
+        self.offsety0 = self.offsety(t) if offsety0 is omitted else offsety0
 
         self.fillcolor0 =\
-            self.fillcolor(t) if fillcolor0 is None else fillcolor0
+            self.fillcolor(t) if fillcolor0 is omitted else fillcolor0
         self.linecolor0 = self.linecolor(
-            t) if linecolor0 is None else linecolor0
-        self.linewidth0 = self.linewidth(t) if linewidth0 is None else\
+            t) if linecolor0 is omitted else linecolor0
+        self.linewidth0 = self.linewidth(t) if linewidth0 is omitted else\
             linewidth0
         self.textcolor0 =\
-            self.textcolor(t) if textcolor0 is None else textcolor0
-        self.angle0 = self.angle(t) if angle0 is None else angle0
-        self.fontsize0 = self.fontsize(t) if fontsize0 is None else fontsize0
-        self.t0 = self.env._now if t0 is None else t0
+            self.textcolor(t) if textcolor0 is omitted else textcolor0
+        self.angle0 = self.angle(t) if angle0 is omitted else angle0
+        self.fontsize0 = self.fontsize(t) if fontsize0 is omitted else fontsize0
+        self.t0 = self.env._now if t0 is omitted else t0
 
-        self.circle1 = self.circle0 if circle1 is None else circle1
-        self.line1 = self.line0 if line1 is None else line1
-        self.polygon1 = self.polygon0 if polygon1 is None else polygon1
+        self.circle1 = self.circle0 if circle1 is omitted else circle1
+        self.line1 = self.line0 if line1 is omitted else line1
+        self.polygon1 = self.polygon0 if polygon1 is omitted else polygon1
         self.rectangle1 =\
-            self.rectangle0 if rectangle1 is None else rectangle1
+            self.rectangle0 if rectangle1 is omitted else rectangle1
 
-        self.x1 = self.x0 if x1 is None else x1
-        self.y1 = self.y0 if y1 is None else y1
-        self.offsetx1 = self.offsetx0 if offsetx1 is None else offsetx1
-        self.offsety1 = self.offsety0 if offsety1 is None else offsety1
+        self.x1 = self.x0 if x1 is omitted else x1
+        self.y1 = self.y0 if y1 is omitted else y1
+        self.offsetx1 = self.offsetx0 if offsetx1 is omitted else offsetx1
+        self.offsety1 = self.offsety0 if offsety1 is omitted else offsety1
         self.fillcolor1 =\
-            self.fillcolor0 if fillcolor1 is None else fillcolor1
+            self.fillcolor0 if fillcolor1 is omitted else fillcolor1
         self.linecolor1 =\
-            self.linecolor0 if linecolor1 is None else linecolor1
+            self.linecolor0 if linecolor1 is omitted else linecolor1
         self.textcolor1 =\
-            self.textcolor0 if textcolor1 is None else textcolor1
+            self.textcolor0 if textcolor1 is omitted else textcolor1
         self.linewidth1 =\
-            self.linewidth0 if linewidth1 is None else linewidth1
-        self.angle1 = self.angle0 if angle1 is None else angle1
+            self.linewidth0 if linewidth1 is omitted else linewidth1
+        self.angle1 = self.angle0 if angle1 is omitted else angle1
         self.fontsize1 =\
-            self.fontsize0 if fontsize1 is None else fontsize1
-        self.width1 = self.width0 if width1 is None else width1
+            self.fontsize0 if fontsize1 is omitted else fontsize1
+        self.width1 = self.width0 if width1 is omitted else width1
 
-        self.t1 = inf if t1 is None else t1
+        self.t1 = inf if t1 is omitted else t1
         if self not in self.env.an_objects:
             self.env.an_objects.append(self)
 
@@ -3254,7 +3349,7 @@ class Animate(object):
         if self in self.env.an_objects:
             self.env.an_objects.remove(self)
 
-    def x(self, t=None):
+    def x(self, t=omitted):
         '''
         x-position of an animate object. May be overridden.
 
@@ -3266,84 +3361,84 @@ class Animate(object):
         Returns
         -------
         x : float
-            default behaviour: linear interpolation betwen self.x0 and self.x1
+            default behaviour: linear interpolation between self.x0 and self.x1
 
         '''
-        return interpolate((self.env._now if t is None else t),
+        return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.x0, self.x1)
 
-    def y(self, t=None):
-        return interpolate((self.env._now if t is None else t),
+    def y(self, t=omitted):
+        return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.y0, self.y1)
 
-    def offsetx(self, t=None):
-        return interpolate((self.env._now if t is None else t),
+    def offsetx(self, t=omitted):
+        return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.offsetx0, self.offsetx1)
 
-    def offsety(self, t=None):
-        return interpolate((self.env._now if t is None else t),
+    def offsety(self, t=omitted):
+        return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.offsety0, self.offsety1)
 
-    def angle(self, t=None):
-        return interpolate((self.env._now if t is None else t),
+    def angle(self, t=omitted):
+        return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.angle0, self.angle1)
 
-    def linewidth(self, t=None):
-        return interpolate((self.env._now if t is None else t),
+    def linewidth(self, t=omitted):
+        return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.linewidth0, self.linewidth1)
 
-    def linecolor(self, t=None):
-        return colorinterpolate((self.env._now if t is None else t),
+    def linecolor(self, t=omitted):
+        return colorinterpolate((self.env._now if t is omitted else t),
                                 self.t0, self.t1, self.linecolor0, self.linecolor1)
 
-    def fillcolor(self, t=None):
-        return colorinterpolate((self.env._now if t is None else t),
+    def fillcolor(self, t=omitted):
+        return colorinterpolate((self.env._now if t is omitted else t),
                                 self.t0, self.t1, self.fillcolor0, self.fillcolor1)
 
-    def circle(self, t=None):
-        return interpolate((self.env._now if t is None else t),
+    def circle(self, t=omitted):
+        return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.circle0, self.circle1)
 
-    def textcolor(self, t=None):
-        return colorinterpolate((self.env._now if t is None else t),
+    def textcolor(self, t=omitted):
+        return colorinterpolate((self.env._now if t is omitted else t),
                                 self.t0, self.t1, self.textcolor0, self.textcolor1)
 
-    def line(self, t=None):
-        return interpolate((self.env._now if t is None else t),
+    def line(self, t=omitted):
+        return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.line0, self.line1)
 
-    def polygon(self, t=None):
-        return interpolate((self.env._now if t is None else t),
+    def polygon(self, t=omitted):
+        return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.polygon0, self.polygon1)
 
-    def rectangle(self, t=None):
-        return interpolate((self.env._now if t is None else t),
+    def rectangle(self, t=omitted):
+        return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.rectangle0, self.rectangle1)
 
-    def width(self, t=None):
-        return interpolate((self.env._now if t is None else t),
+    def width(self, t=omitted):
+        return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.width0, self.width1)
 
-    def fontsize(self, t=None):
-        return interpolate((self.env._now if t is None else t),
+    def fontsize(self, t=omitted):
+        return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.fontsize0, self.fontsize1)
 
-    def text(self, t=None):
+    def text(self, t=omitted):
         return self.text0
 
-    def anchor(self, t=None):
+    def anchor(self, t=omitted):
         return self.anchor0
 
-    def layer(self, t=None):
+    def layer(self, t=omitted):
         return self.layer0
 
-    def font(self, t=None):
+    def font(self, t=omitted):
         return self.font0
 
-    def visible(self, t=None):
+    def visible(self, t=omitted):
         return self.visible0
 
-    def image(self, t=None):
+    def image(self, t=omitted):
         '''
         returns image and a serial number at time t
         use the function spec_to_image to change the image here |n|
@@ -3355,26 +3450,26 @@ class Animate(object):
     def settype(self, circle, line, polygon, rectangle, image, text):
         n = 0
         t = ''
-        if circle is not None:
+        if circle is not omitted:
             t = 'circle'
             n += 1
-        if line is not None:
+        if line is not omitted:
             t = 'line'
             n += 1
-        if polygon is not None:
+        if polygon is not omitted:
             t = 'polygon'
             n += 1
-        if rectangle is not None:
+        if rectangle is not omitted:
             t = 'rectangle'
             n += 1
-        if image is not None:
+        if image is not omitted:
             t = 'image'
             n += 1
-        if text is not None:
+        if text is not omitted:
             t = 'text'
             n += 1
         if n >= 2:
-            raise AssertionError('more than one object given')
+            raise SalabimError('more than one object given')
         return t
 
     def make_pil_image(self, t):
@@ -3702,18 +3797,17 @@ class AnimateButton(object):
 
     Note
     ----
-    On CPython platforms, the tkinter functionality is used.
+    On CPython/PyPy platforms, the tkinter functionality is used.
     On Pythonista, this is emulated by salabim
     '''
 
     def __init__(self, x=0, y=0, width=80, height=30,
                  linewidth=0, fillcolor='40%gray',
                  linecolor='black', color='white', text='', font='',
-                 fontsize=15, action=None, env=None):
+                 fontsize=15, action=None, env=omitted):
 
-        self.env = _default_env if env is None else env
+        self.env = _default_env if env is omitted else env
         self.type = 'button'
-        self.parent = None
         self.t0 = -inf
         self.t1 = inf
         self.x0 = 0
@@ -3829,25 +3923,24 @@ class AnimateSlider(object):
     Note
     ----
     The current value of the slider is the v attibute of the slider. |n|
-    On CPython platforms, the tkinter functionality is used. |n|
+    On CPython/PyPy platforms, the tkinter functionality is used. |n|
     On Pythonista, this is emulated by salabim
     '''
 
     def __init__(self, layer=0, x=0, y=0, width=100, height=20,
-                 vmin=0, vmax=10, v=None, resolution=1,
+                 vmin=0, vmax=10, v=omitted, resolution=1,
                  linecolor='black', labelcolor='black', label='',
-                 font='', fontsize=12, action=None, env=None):
+                 font='', fontsize=12, action=None, env=omitted):
 
-        self.env = _default_env if env is None else env
+        self.env = _default_env if env is omitted else env
         n = round((vmax - vmin) / resolution) + 1
         self.vmin = vmin
         self.vmax = vmin + (n - 1) * resolution
-        self._v = vmin if v is None else v
+        self._v = vmin if v is omitted else v
         self.xdelta = width / n
         self.resolution = resolution
 
         self.type = 'slider'
-        self.parent = None
         self.t0 = -inf
         self.t1 = inf
         self.x0 = 0
@@ -3872,7 +3965,7 @@ class AnimateSlider(object):
 
         self.env.ui_objects.append(self)
 
-    def v(self, value=None):
+    def v(self, value=omitted):
         '''
         value |n|
 
@@ -3886,11 +3979,11 @@ class AnimateSlider(object):
         -------
         Current value of the slider : float
         '''
-        if value is not None:
+        if value is not omitted:
             if Pythonista:
                 self._v = value
             else:
-                if self.an_env == self.env:
+                if an_env == self.env:
                     self.slider.set(value)
                 else:
                     self._v = value
@@ -3936,8 +4029,8 @@ class AnimateSlider(object):
 class Component(object):
     '''Component object
 
-    A salabim component is used as a data component (primarily for queueing
-    or as a component with a process) |n|
+    A salabim component is used as a data component (primarily for queueing)
+    or as a component with a process |n|
     Usually, a component will be defined as a subclass of Component.
 
     Parameters
@@ -3977,13 +4070,13 @@ class Component(object):
     suppress_trace : bool
         suppress_trace indicator |n|
         if True, this component will be excluded from the trace |n|
-        If False (default), the componetn will be in the trace |n|
-        Can be queried of set later with the suppress_trace method.
+        If False (default), the component will be traced |n|
+        Can be queried or set later with the suppress_trace method.
 
     mode : str preferred
         mode |n|
-        will be used in trace and can be used in animations|n|
-        if nothing specified, the mode will be None.|n|
+        will be used in trace and can be used in animations |n|
+        if omitted, the mode will be None. |n|
         also mode_time will be set to now.
 
     env : Environment
@@ -3991,20 +4084,20 @@ class Component(object):
         if omitted, _default_env will be used
     '''
 
-    def __init__(self, name=None, at=None, delay=0, urgent=False,
-      process='*', suppress_trace=False, mode=None, env=None, *args, **kwargs):
-        if env is None:
+    def __init__(self, name=omitted, at=omitted, delay=0, urgent=False,
+      process=omitted, suppress_trace=False, mode=None, env=omitted, *args, **kwargs):
+        if env is omitted:
             self.env = _default_env
         else:
             self.env = env
-        if name is None:
+        if name is omitted:
             name = str(type(self)).split('.')[-1].split("'")[0].lower() + '.'
         self.name(name)
         self._qmembers = {}
         self._process = None
         self._status = data
-        self._requests = collections.defaultdict(float)
-        self._claims = collections.defaultdict(float)
+        self._requests = collections.defaultdict(int)
+        self._claims = collections.defaultdict(int)
         self._waits = []
         self._on_event_list = False
         self._scheduled_time = inf
@@ -4013,9 +4106,10 @@ class Component(object):
         self._suppress_trace = suppress_trace
         self._mode = mode
         self._mode_time = self.env._now
+        self._aos = {}
         self.env.print_trace('', '', self.name() +
             ' create', _modetxt(self._mode))
-        if process == '*':
+        if process is omitted:
             if self.hasprocess():
                 process = 'process'
             else:
@@ -4023,6 +4117,41 @@ class Component(object):
         if process is not None:
             self.activate(process=process, at=at, delay=delay, urgent=urgent)
         self.setup(*args, **kwargs)
+
+    def animation_objects(self, q):
+        '''
+        defines how to display a component when animating a queue
+
+        Parameters
+        ----------
+        q : Queue
+            queue to be visualized. This may be ignored.
+
+        Returns
+        -------
+        List or tuple containg |n|
+            size_x : how much to displace the next component in x-direction, if applicable|n|
+            size_y : how much to displace the next component in y-direction, if applicable |n|
+            animation objects0 : instance of Animate class |n|
+            ...|n|
+            default behaviour: |n|
+            green square of size 40 (displacements 50), with the sequence number centered in white.
+
+        Note
+        ----
+        If you override this method, be sure to use the same header. |n|
+        '''
+        size_x = 50
+        size_y = 50
+        ao1 = Animate(rectangle0=(-20, -20, 20, 20), linewidth0=0, fillcolor0='black')
+        ao2 = Animate(text=str(self.sequence_number()), textcolor0='white', anchor='center')
+        return (size_x, size_y, ao1, ao2)
+
+    def _remove_from_aos(self, q):
+        if q in self._aos:
+            for ao in self._aos[q][2:]:
+                ao.remove()
+            del self._aos[q]
 
     def setup(self, *args, **kwargs):
         '''
@@ -4091,7 +4220,7 @@ class Component(object):
             if inspect.isgeneratorfunction(self.process):
                 return True
             else:
-                raise AssertionError('process has no yield statement')
+                raise SalabimError('process has no yield statement')
         return False
 
     def _push(self, t, urgent):
@@ -4112,7 +4241,7 @@ class Component(object):
                     heapq.heapify(self.env._event_list)
                     self._on_event_list = False
                     return
-            raise AssertionError('remove error', self.name())
+            raise SalabimError('remove error', self.name())
         if self.status == standby:
             if self in self.env._standby_list:
                 self.env._standby_list(self)
@@ -4120,16 +4249,16 @@ class Component(object):
                 self.env._pending_standby_list(self)
 
     def _check_fail(self):
-        if len(self._requests) != 0:
+        if self._requests:
             self.env.print_trace('', '', self.name(), 'request failed')
             for r in list(self._requests.keys()):
                 self._leave(r._requesters)
                 if r._requesters._length == 0:
                     r._minq = inf
-            self._requests = collections.defaultdict(float)
+            self._requests = collections.defaultdict(int)
             self._failed = True
 
-        if len(self._waits) != 0:
+        if self._waits:
             self.env.print_trace('', '', self.name(), 'wait failed')
             for state, _, _ in self._waits:
                 if self in state._waiters:  # there might be more values for this state
@@ -4139,7 +4268,7 @@ class Component(object):
 
     def _reschedule(self, scheduled_time, urgent, caller, extra=''):
         if scheduled_time < self.env._now:
-            raise AssertionError(
+            raise SalabimError(
                 'scheduled time ({:0.3f}) before now ({:0.3f})'.
                 format(scheduled_time, self.env._now))
         self._scheduled_time = scheduled_time
@@ -4151,8 +4280,8 @@ class Component(object):
             'scheduled for {:10.3f}'.format(scheduled_time) + extra +
             _urgenttxt(urgent) + _modetxt(self._mode))
 
-    def activate(self, at=None, delay=0, urgent=False, process=None,
-      keep_request=False, keep_wait=False, mode='*'):
+    def activate(self, at=omitted, delay=0, urgent=False, process=omitted,
+      keep_request=False, keep_wait=False, mode=omitted):
         '''
         activate component
 
@@ -4196,8 +4325,8 @@ class Component(object):
 
         mode : str preferred
             mode |n|
-            will be used in trace and can be used in animations|n|
-            if nothing specified, the mode will be unchanged.|n|
+            will be used in trace and can be used in animations |n|
+            if nothing specified, the mode will be unchanged. |n|
             also mode_time will be set to now, if mode is set.
 
         Note
@@ -4207,23 +4336,23 @@ class Component(object):
         of the two values.
         '''
         p = None
-        if process is None:
+        if process is omitted:
             if self._status == data:
                 if self.hasprocess():
                     p = self.process
                 else:
-                    raise AssertionError('no process for data component')
+                    raise SalabimError('no process for data component')
         else:
             try:
                 p = eval('self.' + process)
             except:
-                raise AssertionError('self.' + process + ' not found')
+                raise SalabimError('self.' + process + ' not found')
 
         if p is None:
             extra = ''
         else:
             if not inspect.isgeneratorfunction(p):
-                raise AssertionError(process, 'has no yield statement')
+                raise SalabimError(process, 'has no yield statement')
             self._process = p()
             extra = ' @' + process
 
@@ -4235,18 +4364,18 @@ class Component(object):
             else:
                 self._check_fail()
 
-        if mode != '*':
+        if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
 
-        if at is None:
+        if at is omitted:
             scheduled_time = self.env._now + delay
         else:
             scheduled_time = at + delay
 
         self._reschedule(scheduled_time, urgent, 'activate', extra)
 
-    def hold(self, duration=None, till=None, urgent=False, mode='*'):
+    def hold(self, duration=omitted, till=omitted, urgent=False, mode=omitted):
         '''
         hold the component
 
@@ -4260,7 +4389,7 @@ class Component(object):
         till : float
            specifies at what time the component will become current |n|
            if omitted, now is used |n|
-           if is allowed
+           inf is allowed
 
         urgent : bool
             urgency indicator |n|
@@ -4273,8 +4402,8 @@ class Component(object):
 
         mode : str preferred
             mode |n|
-            will be used in trace and can be used in animations|n|
-            if nothing specified, the mode will be unchanged.|n|
+            will be used in trace and can be used in animations |n|
+            if nothing specified, the mode will be unchanged. |n|
             also mode_time will be set to now, if mode is set.
 
         Note
@@ -4289,31 +4418,31 @@ class Component(object):
                 self._checkisnotdata()
                 self._remove()
                 self._check_fail()
-        if mode != '*':
+        if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
 
-        if till is None:
-            if duration is None:
+        if till is omitted:
+            if duration is omitted:
                 scheduled_time = self.env._now
             else:
                 scheduled_time = self.env._now + duration
         else:
-            if duration is None:
+            if duration is omitted:
                 scheduled_time = till
             else:
-                raise AssertionError('both duration and till specified')
+                raise SalabimError('both duration and till specified')
 
         self._reschedule(scheduled_time, urgent, 'hold')
 
-    def passivate(self, mode='*'):
+    def passivate(self, mode=omitted):
         '''
         passivate the component
 
         mode : str preferred
             mode |n|
             will be used in trace and can be used in animations |n|
-            if nothing is specified, the mode will be unchanged.|n|
+            if nothing is specified, the mode will be unchanged. |n|
             also mode_time will be set to now, if mode is set.
 
         Note
@@ -4327,13 +4456,13 @@ class Component(object):
         self.env.print_trace('', '', self.name() +
                              ' passivate', _modetxt(self._mode))
         self._scheduled_time = inf
-        if mode != '*':
+        if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
 
         self._status = passive
 
-    def cancel(self, mode='*'):
+    def cancel(self, mode=omitted):
         '''
         cancel component (makes the component data)
 
@@ -4341,8 +4470,8 @@ class Component(object):
         ----------
         mode : str preferred
             mode |n|
-            will be used in trace and can be used in animations|n|
-            if nothing specified, the mode will be unchanged.|n|
+            will be used in trace and can be used in animations |n|
+            if nothing specified, the mode will be unchanged. |n|
             also mode_time will be set to now, if mode is set.
 
         Note
@@ -4357,12 +4486,16 @@ class Component(object):
                              self.name() + ' ' + _modetxt(self._mode))
         self._process = None
         self._scheduled_time = inf
-        if mode != '*':
+        if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
         self._status = data
+        if an_env == self.env:
+            for ao in self.env.an_objects[:]:
+                if ao.parent == self:
+                    self.env.an_objects.remove(ao)
 
-    def standby(self, mode='*'):
+    def standby(self, mode=omitted):
         '''
         puts the component in standby mode
 
@@ -4370,8 +4503,8 @@ class Component(object):
         ----------
         mode : str preferred
             mode |n|
-            will be used in trace and can be used in animations|n|
-            if nothing specified, the mode will be unchanged.|n|
+            will be used in trace and can be used in animations |n|
+            if nothing specified, the mode will be unchanged. |n|
             also mode_time will be set to now, if mode is set.
 
         Note
@@ -4390,7 +4523,7 @@ class Component(object):
         self.env.print_trace('', '', 'standby', _modetxt(self._mode))
         self._scheduled_time = self.env._now
         self.env._standbylist.append(self)
-        if mode != '*':
+        if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
         self._status = standby
@@ -4455,9 +4588,9 @@ class Component(object):
         --> requests 1 from r1, 2 from r2 |n|
 
         '''
-        fail_at = kwargs.pop('fail_at', None)
-        fail_delay = kwargs.pop('fail_delay', None)
-        mode = kwargs.pop('mode', '*')
+        fail_at = kwargs.pop('fail_at', omitted)
+        fail_delay = kwargs.pop('fail_delay', omitted)
+        mode = kwargs.pop('mode', omitted)
         assert not kwargs
 
         if self._status != current:
@@ -4465,8 +4598,8 @@ class Component(object):
             self._checkisnotmain()
             self._remove()
             self._check_fail()
-        if fail_at is None:
-            if fail_delay is None:
+        if fail_at is omitted:
+            if fail_delay is omitted:
                 scheduled_time = inf
             else:
                 if fail_delay == inf:
@@ -4474,12 +4607,12 @@ class Component(object):
                 else:
                     scheduled_time = self.env._now + fail_delay
         else:
-            if fail_delay is None:
+            if fail_delay is omitted:
                 scheduled_time = fail_at
             else:
-                raise AssertionError('both fail_at and fail_delay specified')
+                raise SalabimError('both fail_at and fail_delay specified')
 
-        if mode != '*':
+        if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
 
@@ -4498,10 +4631,10 @@ class Component(object):
                 if len(argsi) >= 3:
                     priority = argsi[2]
             else:
-                raise AssertionError('incorrect specifier', argsi)
+                raise SalabimError('incorrect specifier', argsi)
 
             if q <= 0:
-                raise AssertionError('quantity ' + str(q) + ' <=0')
+                raise SalabimError('quantity ' + str(q) + ' <=0')
             self._requests[r] += q  # is same resource is specified several times, just add them up
             addstring = ''
             if priority is None:
@@ -4520,7 +4653,7 @@ class Component(object):
 
         self._tryrequest()
 
-        if len(self._requests) != 0:
+        if self._requests:
             self._reschedule(scheduled_time, False, 'request')
 
     def _tryrequest(self):
@@ -4533,23 +4666,23 @@ class Component(object):
             for r in list(self._requests):
                 r._claimed_quantity += self._requests[r]
 
+                self._leave(r._requesters)
                 if not r._anonymous:
                     self._claims[r] += self._requests[r]
                     self._enter(r._claimers)
-                self._leave(r._requesters)
                 if r._requesters._length == 0:
                     r._minq = inf
                 r.claimed_quantity.tally()
                 r.available_quantity.tally()
-            self._requests = collections.defaultdict(float)
+            self._requests = collections.defaultdict(int)
             self._remove()
             self._reschedule(self.env._now, False, 'request honour')
 
-    def _release(self, r, q):
+    def _release(self, r, q=omitted):
         if r not in self._claims:
-            raise AssertionError(self.name() +
+            raise SalabimError(self.name() +
                 ' not claiming from resource ' + r.name())
-        if q is None:
+        if q is omitted:
             q = self._claims[r]
         if q > self._claims[r]:
             q = self._claims[r]
@@ -4572,9 +4705,9 @@ class Component(object):
 
         Parameters
         ----------
-        args : sequence
-            - sequence of resources, where quantity=current claimed quantity
-            - sequence of tuples/lists containing the resource and the quantity.
+        args : sequence of items, where each items can be
+            - a resources, where quantity=current claimed quantity
+            - a tuple/list containing a resource and the quantity to be released
 
         Note
         ----
@@ -4597,11 +4730,7 @@ class Component(object):
         c1.release((r2,1),r3) |n|
         --> releases 2 from r2,and 3 from r3
         '''
-        if len(args) == 0:
-            for r in list(self._claims.keys()):
-                self._release(r, None)
-
-        else:
+        if args:
             for i in range(len(args)):
                 q = None
                 argsi = args[i]
@@ -4612,11 +4741,14 @@ class Component(object):
                     if len(argsi) >= 2:
                         q = argsi[1]
                 else:
-                    raise AssertionError('incorrect specifier' + argsi)
+                    raise SalabimError('incorrect specifier' + argsi)
                 if r._anonymous:
-                    raise AssertionError(
+                    raise SalabimError(
                         'not possible to release anonymous resources ' + r.name())
                 self._release(r, q)
+        else:
+            for r in list(self._claims.keys()):
+                self._release(r)
 
     def wait(self, *args, **kwargs):
         '''
@@ -4624,9 +4756,9 @@ class Component(object):
 
         Parameters
         ----------
-        args : sequence
-            - sequence of states, where value=True, priority=tail of waiters queue)
-            - sequence of tuples/lists containing |n|
+        args : sequence of items, where each item can be
+            - a state, where value=True, priority=tail of waiters queue)
+            - a tuple/list containing |n|
                 state, a value and optionally a priority. |n|
                 if the priority is not specified, this component will
                 be added to the tail of
@@ -4634,20 +4766,20 @@ class Component(object):
 
         fail_at : float
             time out |n|
-            if the waitfor is not honored before fail_at,
+            if the wait is not honored before fail_at,
             the wait will be cancelled and the
             parameter failed will be set. |n|
             if not specified, the wait will not time out.
 
         fail_delay : float
             time out |n|
-            if the waitfor is not honored before now+fail_delay,
+            if the wait is not honored before now+fail_delay,
             the request will be cancelled and the
             parameter failed will be set. |n|
             if not specified, the wait will not time out.
 
         all : bool
-            if False (default), continue, if any of the given state/values are met |n|
+            if False (default), continue, if any of the given state/values is met |n|
             if True, continue if all of the given state/values are met
 
         mode : str preferred
@@ -4700,10 +4832,10 @@ class Component(object):
         yield self.wait(s1,s2,all=True) |n|
         --> waits for s1.value()==True and s2.value==True |n|
         '''
-        fail_at = kwargs.pop('fail_at', None)
-        fail_delay = kwargs.pop('fail_delay', None)
+        fail_at = kwargs.pop('fail_at', omitted)
+        fail_delay = kwargs.pop('fail_delay', omitted)
         all = kwargs.pop('all', False)
-        mode = kwargs.pop('mode', '*')
+        mode = kwargs.pop('mode', omitted)
         assert not kwargs
 
         if self._status != current:
@@ -4715,8 +4847,8 @@ class Component(object):
         self._wait_all = all
         self._fail = False
 
-        if fail_at is None:
-            if fail_delay is None:
+        if fail_at is omitted:
+            if fail_delay is omitted:
                 scheduled_time = inf
             else:
                 if fail_delay == inf:
@@ -4724,12 +4856,12 @@ class Component(object):
                 else:
                     scheduled_time = self.env._now + fail_delay
         else:
-            if fail_delay is None:
+            if fail_delay is omitted:
                 scheduled_time = fail_at
             else:
-                raise AssertionError('both fail_at and fail_delay specified')
+                raise SalabimError('both fail_at and fail_delay specified')
 
-        if mode != '*':
+        if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
 
@@ -4746,9 +4878,8 @@ class Component(object):
                 if len(argsi) >= 3:
                     priority = argsi[2]
             else:
-                raise AssertionError('incorrect specifier', args)
+                raise SalabimError('incorrect specifier', args)
 
-            addstring = ''
             for (statex, _, _) in self._waits:
                 if statex == state:
                     break
@@ -4756,7 +4887,6 @@ class Component(object):
                 if priority is None:
                     self._enter(state._waiters)
                 else:
-                    addstring = addstring + ' priority=' + str(priority)
                     self._enter_sorted(state._waiters, priority)
             if inspect.isfunction(value):
                 self._waits.append((state, value, 2))
@@ -4765,11 +4895,11 @@ class Component(object):
             else:
                 self._waits.append((state, value, 0))
 
-        if len(self._waits) == 0:
-            raise AssertionError('no states specified')
+        if not self._waits:
+            raise SalabimError('no states specified')
         self._trywait()
 
-        if len(self._waits) != 0:
+        if self._waits:
             self._reschedule(scheduled_time, False, 'wait')
 
     def _trywait(self):
@@ -4868,7 +4998,7 @@ class Component(object):
         '''
         return self._failed
 
-    def name(self, txt=None):
+    def name(self, txt=omitted):
         '''
         Parameters
         ----------
@@ -4882,7 +5012,7 @@ class Component(object):
         Name of the component : str
         '''
 
-        if txt is not None:
+        if txt is not omitted:
             _set_name(txt, self.env._nameserializeComponent, self)
         return _decode_name(self._name)
 
@@ -4918,7 +5048,7 @@ class Component(object):
         else:
             return self._process.__name__
 
-    def suppress_trace(self, value=None):
+    def suppress_trace(self, value=omitted):
         '''
         Parameters
         ----------
@@ -4931,11 +5061,11 @@ class Component(object):
         suppress_status : bool
             components with the suppress_status of False, will be ignored in the trace
         '''
-        if value is not None:
+        if value is not omitted:
             self._suppress_trace = value
         return self._suppress_trace
 
-    def mode(self, value=None):
+    def mode(self, value=omitted):
         '''
         Parameters
         ----------
@@ -4950,7 +5080,7 @@ class Component(object):
             the mode is useful for tracing and animations. |n|
             Usually the mode will be set in a call to passivate, hold, activate, request or standby.
         '''
-        if value is not None:
+        if value is not omitted:
             self._mode_time = self.env._now
             self._mode = value
 
@@ -4990,7 +5120,7 @@ class Component(object):
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
         '''
-        return len(self._requests) != 0
+        return bool(self._requests)
 
     def iswaiting(self):
         '''
@@ -5002,7 +5132,7 @@ class Component(object):
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
         '''
-        return len(self._requests) != 0
+        return bool(self._waits)
 
     def isscheduled(self):
         '''
@@ -5014,7 +5144,7 @@ class Component(object):
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
         '''
-        return (self._status == scheduled) and (len(self._requests) == 0)
+        return (self._status == scheduled) and (not self._requests) and (not self._waits)
 
     def isstandby(self):
         '''
@@ -5215,8 +5345,11 @@ class Component(object):
         length_of_stay = self.env._now - mx.enter_time
         q.length_of_stay.tally(length_of_stay)
         q.length.tally()
+        if q._animate_on:
+            self._remove_from_aos(q)
+            q._animate_update()
 
-    def priority(self, q, priority=None):
+    def priority(self, q, priority=omitted):
         '''
         gets/sets the priority of a component in a queue
 
@@ -5239,7 +5372,7 @@ class Component(object):
         '''
 
         mx = self._checkinqueue(q)
-        if priority is not None:
+        if priority is not omitted:
             if priority != mx.priority:
                 # leave.sort is not possible, because statistics will be affected
                 mx.predecessor.successor = mx.successor
@@ -5361,23 +5494,23 @@ class Component(object):
         if mx is None:
             pass
         else:
-            raise AssertionError(
+            raise SalabimError(
                 self.name() + ' is already member of ' + q.name())
 
     def _checkinqueue(self, q):
         mx = self._member(q)
         if mx is None:
-            raise AssertionError(self.name() + ' is not member of ' + q.name())
+            raise SalabimError(self.name() + ' is not member of ' + q.name())
         else:
             return mx
 
     def _checkisnotdata(self):
         if self._status == data:
-            raise AssertionError(self.name() + ' data component not allowed')
+            raise SalabimError(self.name() + ' data component not allowed')
 
     def _checkisnotmain(self):
         if self == self.env._main:
-            raise AssertionError(self.name() + ' main component not allowed')
+            raise SalabimError(self.name() + ' main component not allowed')
 
 
 class _Distribution():
@@ -5403,11 +5536,11 @@ class Exponential(_Distribution):
         it assigns a new stream with the specified seed
     '''
 
-    def __init__(self, mean, randomstream=None):
+    def __init__(self, mean, randomstream=omitted):
         if mean <= 0:
-            raise AssertionError('mean<=0')
+            raise SalabimError('mean<=0')
         self._mean = mean
-        if randomstream is None:
+        if randomstream is omitted:
             self.randomstream = random
         else:
             assert isinstance(randomstream, random.Random)
@@ -5457,15 +5590,15 @@ class Normal(_Distribution):
         it assigns a new stream with the specified seed
     '''
 
-    def __init__(self, mean, standard_deviation=None, randomstream=None):
+    def __init__(self, mean, standard_deviation=omitted, randomstream=omitted):
         self._mean = mean
-        if standard_deviation is None:
+        if standard_deviation is omitted:
             self._standard_deviation = 0
         else:
             self._standard_deviation = standard_deviation
         if self._standard_deviation < 0:
-            raise AssertionError('standard_deviation<0')
-        if randomstream is None:
+            raise SalabimError('standard_deviation<0')
+        if randomstream is omitted:
             self.randomstream = random
         else:
             assert isinstance(randomstream, random.Random)
@@ -5516,15 +5649,15 @@ class Uniform(_Distribution):
         it assigns a new stream with the specified seed
     '''
 
-    def __init__(self, lowerbound, upperbound=None, randomstream=None):
+    def __init__(self, lowerbound, upperbound=omitted, randomstream=omitted):
         self._lowerbound = lowerbound
-        if upperbound is None:
+        if upperbound is omitted:
             self._upperbound = lowerbound
         else:
             self._upperbound = upperbound
         if self._lowerbound > self._upperbound:
-            raise AssertionError('lowerbound>upperbound')
-        if randomstream is None:
+            raise SalabimError('lowerbound>upperbound')
+        if randomstream is omitted:
             self.randomstream = random
         else:
             assert isinstance(randomstream, random.Random)
@@ -5581,23 +5714,23 @@ class Triangular(_Distribution):
         it assigns a new stream with the specified seed
     '''
 
-    def __init__(self, low, high=None, mode=None, randomstream=None):
+    def __init__(self, low, high=omitted, mode=omitted, randomstream=omitted):
         self._low = low
-        if high is None:
+        if high is omitted:
             self._high = low
         else:
             self._high = high
-        if mode is None:
+        if mode is omitted:
             self._mode = (self._high + self._low) / 2
         else:
             self._mode = mode
         if self._low > self._high:
-            raise AssertionError('low>high')
+            raise SalabimError('low>high')
         if self._low > self._mode:
-            raise AssertionError('low>mode')
+            raise SalabimError('low>mode')
         if self._high < self._mode:
-            raise AssertionError('high<mode')
-        if randomstream is None:
+            raise SalabimError('high<mode')
+        if randomstream is omitted:
             self.randomstream = random
         else:
             assert isinstance(randomstream, random.Random)
@@ -5647,9 +5780,9 @@ class Constant(_Distribution):
 
     '''
 
-    def __init__(self, value, randomstream=None):
+    def __init__(self, value, randomstream=omitted):
         self._value = value
-        if randomstream is None:
+        if randomstream is omitted:
             self.randomstream = random
         else:
             assert isinstance(randomstream, random.Random)
@@ -5704,10 +5837,10 @@ class Cdf(_Distribution):
 
     '''
 
-    def __init__(self, spec, randomstream=None):
+    def __init__(self, spec, randomstream=omitted):
         self._x = []
         self._cum = []
-        if randomstream is None:
+        if randomstream is omitted:
             self.randomstream = random
         else:
             assert isinstance(randomstream, random.Random)
@@ -5716,27 +5849,27 @@ class Cdf(_Distribution):
         lastcum = 0
         lastx = -inf
         spec = list(spec)
-        if len(spec) == 0:
-            raise AssertionError('no arguments specified')
+        if not spec:
+            raise SalabimError('no arguments specified')
         if spec[1] != 0:
-            raise AssertionError('first cumulative value should be 0')
+            raise SalabimError('first cumulative value should be 0')
         while len(spec) > 0:
             x = spec.pop(0)
-            if len(spec) == 0:
-                raise AssertionError('uneven number of parameters specified')
+            if not spec:
+                raise SalabimError('uneven number of parameters specified')
             if x < lastx:
-                raise AssertionError(
+                raise SalabimError(
                     'x value {} is smaller than previous value {}'.format(x, lastx))
             cum = spec.pop(0)
             if cum < lastcum:
-                raise AssertionError('cumulative value {} is smaller than previous value {}'
-                                     .format(cum, lastcum))
+                raise SalabimError('cumulative value {} is smaller than previous value {}'
+                    .format(cum, lastcum))
             self._x.append(x)
             self._cum.append(cum)
             lastx = x
             lastcum = cum
         if lastcum == 0:
-            raise AssertionError('last cumulative value should be >0')
+            raise SalabimError('last cumulative value should be >0')
         for i in range(len(self._cum)):
             self._cum[i] = self._cum[i] / lastcum
         self._mean = 0
@@ -5784,10 +5917,10 @@ class Pdf(_Distribution):
     spec : list or tuple
         either
 
-        -   if no possibilities specified: |n|
+        -   if no probabilities specified |n|:
             list with x-values and corresponding probability
             (x0, p0, x1, p1, ...xn,pn) |n|
-        -   if probabilities is specified: |n|
+        -   if probabilities is specified |n|:
             list with x-values
 
     probabilities : list, tuple or float
@@ -5812,10 +5945,10 @@ class Pdf(_Distribution):
     but a sample will be returned when calling sample.
     '''
 
-    def __init__(self, spec, probabilities=None, randomstream=None):
+    def __init__(self, spec, probabilities=omitted, randomstream=omitted):
         self._x = [0]  # just a place holder
         self._cum = [0]
-        if randomstream is None:
+        if randomstream is omitted:
             self.randomstream = random
         else:
             assert isinstance(randomstream, random.Random)
@@ -5824,15 +5957,15 @@ class Pdf(_Distribution):
         sump = 0
         sumxp = 0
         hasmean = True
-        if probabilities is None:
+        if probabilities is omitted:
             spec = list(spec)
 
-            if len(spec) == 0:
-                raise AssertionError('no arguments specified')
+            if not spec:
+                raise SalabimError('no arguments specified')
             while len(spec) > 0:
                 x = spec.pop(0)
-                if len(spec) == 0:
-                    raise AssertionError(
+                if not spec:
+                    raise SalabimError(
                         'uneven number of parameters specified')
                 self._x.append(x)
                 p = spec.pop(0)
@@ -5851,7 +5984,7 @@ class Pdf(_Distribution):
             else:
                 probabilities = len(spec) * [1]
             if len(spec) != len(probabilities):
-                raise AssertionError(
+                raise SalabimError(
                     'length of x-values does not match length of probabilities')
 
             while len(spec) > 0:
@@ -5868,7 +6001,7 @@ class Pdf(_Distribution):
                     hasmean = False
 
         if sump == 0:
-            raise AssertionError('at least one probability should be >0')
+            raise SalabimError('at least one probability should be >0')
 
         for i in range(len(self._cum)):
             self._cum[i] = self._cum[i] / sump
@@ -5950,7 +6083,7 @@ class Distribution(_Distribution):
     Exp(a)       ==> Exponential(100), provided sim.a=100 |n|
     '''
 
-    def __init__(self, spec, randomstream=None):
+    def __init__(self, spec, randomstream=omitted):
 
         spec_orig = spec
 
@@ -5975,7 +6108,7 @@ class Distribution(_Distribution):
                 c3 = sp[2]
                 spec = 'Triangular({},{},{})'.format(c1, c2, c3)
             else:
-                raise AssertionError('incorrect specifier', spec_orig)
+                raise SalabimError('incorrect specifier', spec_orig)
 
         else:
             for distype in ('Uniform', 'Constant', 'Triangular', 'Exponential', 'Normal', 'Cdf', 'Pdf'):
@@ -5986,7 +6119,7 @@ class Distribution(_Distribution):
 
         d = eval(spec)
 
-        if randomstream is None:
+        if randomstream is omitted:
             self.randomstream = random
         else:
             assert isinstance(randomstream, random.Random)
@@ -6028,7 +6161,7 @@ class State(object):
         name of the state |n|
         if the name ends with a period (.),
         auto serializing will be applied |n|
-        if omitted, the name state will be used
+        if omitted, the name state. will be used
 
     value : any, preferably printable
         initial value of the state |n|
@@ -6041,13 +6174,14 @@ class State(object):
     type : str
         specifies how the state values are monitored. Using a
         int, uint of float type results in less memory usage and better
-        performance. Note that you avoid the number not to use
+        performance. Note that you should avoid the number not to use
         as this is used to indicate 'off'
 
-        -   'any' (default) stores values in a list. This allows for
-            non numeric values. In calculations the values are
-            forced to a numeric value (0 if not possible) do not use -inf
+        -  'any' (default) stores values in a list. This allows for
+           non numeric values. In calculations the values are
+           forced to a numeric value (0 if not possible) do not use -inf
         -  'bool' bool (False, True). Actually integer >= 0 <= 254 1 byte do not use 255
+        -  'int8' integer >= -127 <= 127 1 byte do not use -128
         -  'uint8' integer >= 0 <= 254 1 byte do not use 255
         -  'int16' integer >= -32767 <= 32767 2 bytes do not use -32768
         -  'uint16' integer >= 0 <= 65534 2 bytes do not use 65535
@@ -6056,29 +6190,92 @@ class State(object):
         -  'int64' integer >= -9223372036854775807 <= 9223372036854775807 8 bytes do not use -9223372036854775808
         -  'uint64' integer >= 0 <= 18446744073709551614 8 bytes do not use 18446744073709551615
         -  'float' float 8 bytes do not use -inf
+        
+    animation_objects : list or tuple
+        overrides the deafult animation_object method |n|
+        the method should have a header like |n|
+        ``def animation_objects(self, value):`` |n|
+        and should return a list or tuple of animation objects, which
+        will be used when the state changes value. |n|
+        The default method displays a square of size 40. If the value
+        is a valid color, that will be the color of the square. Otherwise,
+        the square will be black with the value displayed in white in
+        the centre.
 
     env : Environment
         environment to be used |n|
         if omitted, _default_env is used
     '''
-    def __init__(self, name=None, value=False, type='any', monitor=True, env=None):
-        if env is None:
+    def __init__(self, name=omitted, value=False, type='any',
+      monitor=True, animation_objects=omitted, env=omitted):
+        if env is omitted:
             self.env = _default_env
         else:
             self.env = env
-        if name is None:
+        if name is omitted:
             name = 'state.'
         self.name(name)
         self._value = value
+        self._animate_on = False
+        self._aos = []
         self._waiters = Queue(
             name=('waiters of ', self),
             monitor=monitor, env=self.env, _isinternal=True)
         self.value = MonitorTimestamp(
             name=('Value of ', self),
             getter=self._get_value, monitor=monitor, type=type, env=self.env)
+        if animation_objects is not omitted:
+            self.animation_objects = animation_objects.__get__(self, State)
         self.env.print_trace(
             '', '', self.name() + ' create',
             'value= ' + str(self._value))
+
+    def animate(self, x=500, y=100, on=True):
+        '''
+        turns on/off animation for the state
+
+        Parameters
+        ----------
+        x : float
+            x-position of the animation|n|
+            default: 500
+
+        y : float
+            y-position of the animation |n|
+            default: 100
+
+        on : bool
+            if True (default) do animate the state. If False, do not animate.
+        '''
+
+        self._animate_on = on
+        if on:
+            self._animate_x = x
+            self._animate_y = y
+            self._animate_update()
+        else:
+            self._remove_from_aos()
+
+    def _remove_from_aos(self):
+        for ao in self._aos:
+            ao.remove()
+        self._aos = []
+
+    def animation_objects(self, value):
+        if str(value).lower() in colornames():
+            ao1 = Animate(rectangle0=(-20, -20, 20, 20), fillcolor0=value, linewidth0=0)
+            return (ao1,)
+        else:
+            ao1 = Animate(rectangle0=(-20, -20, 20, 20), fillcolor0='black', linewidth0=0)
+            ao2 = Animate(text=str(value), textcolor0='white', anchor='center')
+            return ao1, ao2
+
+    def _animate_update(self):
+        self._remove_from_aos()
+        for ao in self.animation_objects(self._value):
+            ao.x0 = self._animate_x
+            ao.y0 = self._animate_y
+            self._aos.append(ao)
 
     def __repr__(self):
         return 'State(' + self.name() + ')'
@@ -6087,9 +6284,7 @@ class State(object):
         print('State ' + hex(id(self)))
         print('  name=' + self.name())
         print('  value=' + str(self._value))
-        if len(self._waiters) == 0:
-            print('  no waiting components')
-        else:
+        if self._waiters:
             print('  waiting component(s):')
             mx = self._waiters._head.successor
             while mx != self._waiters._tail:
@@ -6103,6 +6298,8 @@ class State(object):
                         values = values + str(value)
 
                 print('    ' + pad(c.name(), 20), ' value(s): ' + values)
+        else:
+            print('  no waiting components')
 
     def __call__(self):
         return self._value
@@ -6136,6 +6333,8 @@ class State(object):
         if self._value != value:
             self._value = value
             self.value.tally()
+            if self._animate_on:
+                self._animate_update()
             self._trywait()
 
     def reset(self, value=False):
@@ -6157,9 +6356,11 @@ class State(object):
         if self._value != value:
             self._value = value
             self.value.tally()
+            if self._animate_on:
+                self._animate_update()
             self._trywait()
 
-    def trigger(self, value=True, value_after=None, max=inf):
+    def trigger(self, value=True, value_after=omitted, max=inf):
         '''
         triggers the value of the state
 
@@ -6183,7 +6384,7 @@ class State(object):
             the value will be set to value_after and again checked for possible
             honors.
         '''
-        if value_after is None:
+        if value_after is omitted:
             value_after = self._value
         self.env.print_trace('', '', self.name() + ' trigger',
             ' value = ' + str(value) + ' --> ' + str(value_after) +
@@ -6193,6 +6394,8 @@ class State(object):
         self._trywait(max)
         self._value = value_after
         self.value.tally()
+        if self._animate_on:
+            self._animate_update()
         self._trywait()
 
     def _trywait(self, max=inf):
@@ -6205,7 +6408,7 @@ class State(object):
                 if max == 0:
                     return
 
-    def monitor(self, value=None):
+    def monitor(self, value=omitted):
         '''
         enables/disables the state monitors and timestamped monitors
 
@@ -6224,26 +6427,25 @@ class State(object):
         self.requesters().monitor(value)
         self.value.monitor(value)
 
-    def reset_monitors(self, monitor=None):
+    def reset_monitors(self, monitor=omitted):
         '''
-        resets the timestamped monitor for the state's value
+        resets the timestamped monitor for the state's value and the monitors of the requesters queue
 
         Parameters
         ----------
         monitor : bool
-        if True (default}, monitoring will be on. |n|
-            if False, monitoring is disabled
+            if True, monitoring will be on. |n|
+            if False, monitoring is disabled |n|
+            if omitted, no change of monitoring state
 
-        Note
-        ----
-        Equivalent to ``state.value.reset()``
         '''
+        self.requesters().reset_monitors(monitor)
         self.value.reset()
 
     def _get_value(self):
         return self._value
 
-    def name(self, txt=None):
+    def name(self, txt=omitted):
         '''
         Parameters
         ----------
@@ -6256,7 +6458,7 @@ class State(object):
         -------
         Name of the state : str
         '''
-        if txt is not None:
+        if txt is not omitted:
             _set_name(txt, self.env._nameserializeState, self)
         return _decode_name(self._name)
 
@@ -6284,7 +6486,7 @@ class State(object):
         '''
         prints a summary of statistics of the state
         '''
-        print('Statistics of {} at {:13.3f}'.format(self.name(), self.env._now))
+        print('Statistics of {} at {}'.format(self.name(), fn(self.env._now, 13, 3)))
         self.waiters().length.print_statistics(show_header=False, show_legend=True, do_indent=True)
         print()
         self.waiters().length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True)
@@ -6310,7 +6512,7 @@ class Resource(object):
         name of the resource |n|
         if the name ends with a period (.),
         auto serializing will be applied |n|
-        if omitted, the name resource will be used
+    if omitted, the name resource. will be used
 
     capacity : float
         capacity of the resouce |n|
@@ -6332,13 +6534,13 @@ class Resource(object):
         if omitted, _default_env is used
     '''
 
-    def __init__(self, name=None, capacity=1,
-                 anonymous=False, monitor=True, env=None):
-        if env is None:
+    def __init__(self, name=omitted, capacity=1,
+                 anonymous=False, monitor=True, env=omitted):
+        if env is omitted:
             self.env = _default_env
         else:
             self.env = env
-        if name is None:
+        if name is omitted:
             name = 'resource.'
         self._capacity = capacity
         self.name(name)
@@ -6364,15 +6566,16 @@ class Resource(object):
             '', '', self.name() + ' create',
             'capacity=' + str(self._capacity) + (' anonymous' if self._anonymous else ''))
 
-    def reset_monitors(self, monitor=None):
+    def reset_monitors(self, monitor=omitted):
         '''
         resets the resource monitors  and timestamped monitors
 
         Parameters
         ----------
         monitor : bool
-            if True (default}, monitoring will be on. |n|
-            if False, monitoring is disabled
+            if True, monitoring will be on. |n|
+            if False, monitoring is disabled |n|
+            if omitted, no change of monitoring state
 
         Note
         ----
@@ -6407,16 +6610,15 @@ class Resource(object):
             m.print_statistics(show_header=False, show_legend=show_legend, do_indent=True)
             print()
 
-    def monitor(self, value=None):
+    def monitor(self, value):
         '''
         enables/disables the resource monitors  and timestamped monitors
 
         Parameters
         ----------
         value : bool
-            if True, monitoring will be on. |n|
+            if True, monitoring is enabled |n|
             if False, monitoring is disabled |n|
-            if not specified, no change
 
         Note
         ----
@@ -6437,9 +6639,7 @@ class Resource(object):
         print('Resource ' + hex(id(self)))
         print('  name=' + self.name())
         print('  capacity=' + str(self._capacity))
-        if len(self._requesters) == 0:
-            print('  no requesting components')
-        else:
+        if self._requesters:
             print('  requesting component(s):')
             mx = self._requesters._head.successor
             while mx != self._requesters._tail:
@@ -6447,6 +6647,8 @@ class Resource(object):
                 mx = mx.successor
                 print('    ' + pad(c.name(), 20) +
                     ' quantity=' + str(c._requests[self]))
+        else:
+            print('  no requesting components')
 
         print('  claimed_quantity=' + str(self._claimed_quantity))
         if self._claimed_quantity >= 0:
@@ -6471,7 +6673,7 @@ class Resource(object):
             mx = mx.successor
             c._tryrequest()
 
-    def release(self, quantity=None):
+    def release(self, quantity=omitted):
         '''
         releases all claims or a specified quantity
 
@@ -6489,7 +6691,7 @@ class Resource(object):
         '''
 
         if self._anonymous:
-            if quantity is None:
+            if quantity is omitted:
                 q = self._claimed_quantity
             else:
                 q = quantity
@@ -6502,8 +6704,8 @@ class Resource(object):
             self._tryrequest()
 
         else:
-            if quantity is not None:
-                raise AssertionError(
+            if quantity is not omitted:
+                raise SalabimError(
                     'no quantity allowed for non-anonymous resource')
 
             mx = self._claimers._head.successor
@@ -6544,19 +6746,15 @@ class Resource(object):
         ----------
         cap : float or int
             capacity of the resource |n|
-            this may lead to honoring one or more requests.|n|
+            this may lead to honoring one or more requests. |n|
             if omitted, no change
-
-        Returns
-        -------
-        the capacity : float or int
         '''
         self._capacity = cap
         self.capacity.tally()
         self.available_quantity.tally()
         self._tryrequest()
 
-    def name(self, txt=None):
+    def name(self, txt=omitted):
         '''
         Parameters
         ----------
@@ -6569,7 +6767,7 @@ class Resource(object):
         -------
         Name of the resource : str
         '''
-        if txt is not None:
+        if txt is not omitted:
             _set_name(txt, self.env._nameserializeResource, self)
         return _decode_name(self._name)
 
@@ -6579,7 +6777,7 @@ class Resource(object):
         -------
         base name of the resource (the name used at init or name): str
         '''
-        return self._base_namee
+        return self._base_name
 
     def sequence_number(self):
         '''
@@ -6682,7 +6880,7 @@ def colorspec_to_tuple(colorspec):
             if len(colorhex) == 7:
                 colorhex = colorhex + alpha
             return colorspec_to_tuple(colorhex)
-    raise AssertionError('wrong spec for color')
+    raise SalabimError('wrong spec for color')
 
 
 def hex_to_rgb(v):
@@ -6694,7 +6892,7 @@ def hex_to_rgb(v):
         return int(v[:2], 16), int(v[2:4], 16), int(v[4:6], 16)
     if len(v) == 8:
         return int(v[:2], 16), int(v[2:4], 16), int(v[4:6], 16), int(v[6:8], 16)
-    raise AssertionError('Incorrect value' + str(v))
+    raise SalabimError('Incorrect value' + str(v))
 
 
 def colorspec_to_hex(colorspec, withalpha=True):
@@ -6778,17 +6976,18 @@ def interpolate(t, t0, t1, v0, v1):
         f(t0)=v0
 
     v1: float, list or tuple
-        f(t1)=v1
+        f(t1)=v1 |n|
+        if list or tuple, len(v0) should equal len(v1)
 
     Returns
     -------
-    f(t) : float
+    f(t) : float or tuple
 
     Note
     ----
     Note that no extrapolation is done, i.e f(t)=v0 for t<t0 and f(t)=v1 for
     t>t1. |n|
-    This function is heavily used during animation.
+    This function is used during animation.
     '''
     if (v0 is None) or (v1 is None):
         return None
@@ -6805,10 +7004,7 @@ def interpolate(t, t0, t1, v0, v1):
         return v0
     p = (0.0 + t - t0) / (t1 - t0)
     if isinstance(v0, (list, tuple)):
-        l = []
-        for x0, x1 in zip(v0, v1):
-            l.append(_i(p, x0, x1))
-        return tuple(l)
+        return tuple((_i(p, x0, x1) for x0, x1 in zip(v0, v1)))
     else:
         return _i(p, v0, v1)
 
@@ -6823,15 +7019,15 @@ def clocktext(t):
                     (an_env.frametimes[-1] - an_env.frametimes[0])
             else:
                 fps = 0
-            s = s + 'fps={:.1f}'.format(fps)
+            s += 'fps={:.1f}'.format(fps)
         if an_env.show_speed:
             if s != '':
-                s = s + ' '
-            s = s + '*{:.3f}'.format(an_env.speed)
+                s += ' '
+            s += '*{:.3f}'.format(an_env.speed)
         if an_env.show_time:
             if s != '':
-                s = s + ' '
-            s = s + 't={:.3f}'.format(t)
+                s += ' '
+            s += 't={:.3f}'.format(t)
     return s
 
 
@@ -6912,44 +7108,51 @@ def fn(x, l, d):
     return ('{:' + str(l) + '.' + str(d) + 'f}').format(x)
 
 
-_lookup_arraytype = {
-    'bool': 'B',
-    'int8': 'b',
-    'uint8': 'B',
-    'int16': 'h',
-    'uint16': 'H',
-    'int32': 'i',
-    'uint32': 'I',
-    'int64': 'l',
-    'uint64': 'L',
-    'float': 'd',
-    'double': 'd',
-    'any': 'any'
-    }
-
-_lookup_off = {
-    'b': -128,
-    'B': 255,
-    'h': -32768,
-    'H': 65535,
-    'i': -2147483648,
-    'I': 4294967295,
-    'l': -9223372036854775808,
-    'L': 18446744073709551615,
-    'd': -inf,
-    'any': -inf
-    }
+def type_to_typecode_off(type):
+    lookup = {
+        'bool': ('B', 255),
+        'int8': ('b', -128),
+        'uint8': ('B', 255),
+        'int16': ('h', -32768),
+        'uint16': ('H', 65535),
+        'int32': ('i', -2147483648),
+        'uint32': ('I', 4294967295),
+        'int64': ('l', -9223372036854775808),
+        'uint64': ('L', 18446744073709551615),
+        'float': ('d', -inf),
+        'double': ('d', -inf),
+        'any': ('', -inf)
+        }
+    return lookup[type]
 
 
-def list_to_numeric_array(l):
-    result = array.array('d')
+def list_to_array(l):
+    float_result = array.array('d')
+    int_result = array.array('l')
+    int_ok = True
     for v in l:
         try:
             vfloat = float(v)
         except:
             vfloat = 0
-        result.append(vfloat)
-    return result
+        float_result.append(vfloat)
+        if int_ok:
+            try:
+                vint = int(v)
+            except:
+                vint = 0
+            if vint == vfloat:
+                try:
+                    int_result.append(vint)  # this may fail in case of a too large value
+                except:
+                    int_ok = False
+            else:
+                int_ok = False
+
+    if int_ok:
+        return int_result
+    else:
+        return float_result
 
 
 def normalize(s):
@@ -7010,7 +7213,7 @@ def waiting():
     return 'waiting'
 
 
-def random_seed(seed, randomstream=None):
+def random_seed(seed, randomstream=omitted):
     '''
     Parameters
     ----------
@@ -7025,7 +7228,7 @@ def random_seed(seed, randomstream=None):
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
     '''
-    if randomstream is None:
+    if randomstream is omitted:
         randomstream = random
     randomstream.seed(seed)
 
@@ -7386,34 +7589,33 @@ def fonts():
     return fonts.font_list
 
 
+def standardfonts():
+    return {
+        '': 'calibri',
+        'std': 'calibri',
+        'mono': 'DejaVuSansMono',
+        'narrow': 'mplus-1m-regular'
+    }
+
+
 def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
-    '''
-    internal funtion to get and cache fonts
-    '''
     if hasattr(getfont, 'lookup'):
         if (fontname, fontsize) in getfont.lookup:
             return getfont.lookup[(fontname, fontsize)]
     else:
         getfont.lookup = {}
 
-    standardfonts = {
-        '': 'calibri',
-        'std': 'calibri',
-        'mono': 'DejaVuSansMono',
-        'narrow': 'mplus-1m-regular'}
-
     if isinstance(fontname, str):
         fontlist1 = (fontname,)
     else:
         fontlist1 = fontname
 
-    fontlist = []
-    for f in fontlist1:
-        fontlist.append(standardfonts.get(f.lower(), f))
+    fontlist = [standardfonts().get(f.lower(), f) for f in fontlist1]
 
     result = None
 
     for ifont in fontlist:
+
         try:
             result = ImageFont.truetype(font=ifont, size=int(fontsize))
             break
@@ -7450,6 +7652,7 @@ def show_fonts():
     for fns, ifilename in fonts():
         for fn in fns:
             fontnames.append(fn)
+    fontnames.extend(standardfonts().keys())
     last = ''
     for font in sorted(fontnames, key=normalize):
         if font != last:  # remove duplicates

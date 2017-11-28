@@ -6,7 +6,52 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test31()
+    test38()
+
+def test38():
+    def animation_objects(self, value):
+        if value=='blue':
+            an1=sim.Animate(circle0=(40,),fillcolor0=value, linewidth0=0)
+        else:
+            an1=sim.Animate(rectangle0=(-40,-20,40,20), fillcolor0=value,linewidth0=0)
+        an2=sim.Animate(text=value,textcolor0='white')
+        return (an1,an2)
+        
+    class X(sim.Component):
+        def process(self):
+            
+            for i in ('red','green','blue','yellow','red'):
+                letters.set(i[0])
+                light.set(i)
+                yield self.hold(1)
+            
+    env=sim.Environment()
+    X()
+    light=sim.State('light')
+    light.animate()
+    letters=sim.State('letters')
+    letters.animate(x=100,y=100)
+        
+    env.animation_parameters()
+    env.run()
+    
+def test37():
+    env=sim.Environment()
+    s = sim.Monitor('s')
+
+    s.tally(1)
+    s.tally(2)
+    s.tally(3)
+    s.tally(0)
+    s.tally(4)
+    s.tally('a')
+
+    print(s.x(ex0=False,force_numeric=True))
+
+
+def test36():
+    l=(1,2,3,4,5,5,'6','x','6.1')
+    print(sim.list_to_array(l))
 
 def test35():
     env=sim.Environment()
@@ -18,7 +63,10 @@ def test34():
     class X(sim.Component):
         def process(self):
 
-            yield self.hold(1)
+            try:
+                yield self.hold(-1)
+            except sim.SalabimError:
+                yield self.hold(1)
             s1.set(1)
             yield self.hold(1)
             s1.set(2)
@@ -484,6 +532,10 @@ def test3():
     pdf=sim.Pdf((1,2),1)
     sample_and_print(pdf,5)
 
+    print('pdf x')
+    pdf=sim.Pdf((1,1,2,1))
+    sample_and_print(pdf,5)
+
     print('pdf 1')
     pdf=sim.Pdf((sim.Uniform(10,20),10,sim.Uniform(20,30),80,sim.Uniform(30,40),10))
     sample_and_print(pdf,5)
@@ -494,6 +546,10 @@ def test3():
 
     print('pdf 3')
     pdf=sim.Pdf(('red','green',1000),(10,1,10))
+    sample_and_print(pdf,5)
+
+    print('pdf 4')
+    pdf=sim.Pdf(('red',10,'green',1,1000,10))
     sample_and_print(pdf,5)
 
 def test4():
