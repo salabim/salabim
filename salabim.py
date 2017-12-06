@@ -28,7 +28,7 @@ see www.salabim.org for more information, the manual and updates.
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.7'
+__version__ = '2.2.8'
 
 import heapq
 import random
@@ -1090,6 +1090,7 @@ if Pythonista:
                     if touch.location in \
                             scene.Rect(uio.x - 2, uio.y - 2, uio.width + 2, uio.height + 2):
                         uio.action()
+                        break  # new buttons might have been installed
                 if uio.type == 'slider':
                     if touch.location in\
                             scene.Rect(uio.x - 2, uio.y - 2, uio.width + 4, uio.height + 4):
@@ -1099,31 +1100,44 @@ if Pythonista:
                         uio._v = max(min(uio._v, uio.vmax), uio.vmin)
                         if uio.action is not None:
                             uio.action(uio._v)
+                            break  # new items might have been installed
 
         def draw(self):
 
             if an_env is not None:
                 scene.background(pythonistacolor(
                     colorspec_to_tuple(an_env.background_color)))
-                if an_env.paused:
-                    an_env.t = an_env.start_animation_time
+
+                if an_env._synced:
+                    if an_env.paused:
+                        an_env.t = an_env.start_animation_time
+                    else:
+                        an_env.t = \
+                            an_env.start_animation_time +\
+                            ((time.time() -
+                              an_env.start_animation_clocktime) * an_env.speed)
+                    while an_env.peek() < an_env.t:
+                        an_env.step()
+                        if an_env._current_component == an_env._main:
+                            an_env.print_trace(
+                                '{:10.3f}'.format(an_env._now),
+                                an_env._main.name(), 'current')
+                            an_env._main._scheduled_time = inf
+                            an_env._main._status = current
+                            an_env.an_quit()
+                            return
                 else:
-                    an_env.t = \
-                        an_env.start_animation_time +\
-                        ((time.time() -
-                          an_env.start_animation_clocktime) * an_env.speed)
-
-                while an_env.peek() < an_env.t:
-                    an_env.step()
-                    if an_env._current_component == an_env._main:
-                        an_env.print_trace(
-                            '{:10.3f}'.format(an_env._now),
-                            an_env._main.name(), 'current')
-                        an_env._main._scheduled_time = inf
-                        an_env._main._status = current
-                        an_env.an_quit()
-                        return
-
+                    if an_env._step_pressed or (not an_env.paused):
+                        an_env._step_pressed = False
+                        an_env.step()
+                        an_env.t = an_env._now
+                        if an_env._current_component == an_env._main:
+                            an_env.print_trace('{:10.3f}'.format(an_env._now),
+                                an_env._main.name(), 'current')
+                            an_env._scheduled_time = inf
+                            an_env._status = current
+                            an_env.an_quit()
+                            return
                 if not an_env.paused:
                     an_env.frametimes.append(time.time())
 
@@ -1146,6 +1160,7 @@ if Pythonista:
 
                 ims = scene.load_pil_image(capture_image)
                 scene.image(ims, 0, 0, *capture_image.size)
+                scene.unload_image(ims)
 
                 for uio in an_env.ui_objects:
 
@@ -1156,7 +1171,7 @@ if Pythonista:
                         scene.fill(pythonistacolor(uio.fillcolor))
                         scene.stroke(pythonistacolor(uio.linecolor))
                         scene.stroke_weight(linewidth)
-                        scene.rect(uio.x, uio.y, uio.width, uio.height)
+                        scene.rect(uio.x - 4, uio.y + 2, uio.width + 8, uio.height - 4)
                         scene.tint(uio.color)
                         scene.translate(uio.x + uio.width / 2,
                                         uio.y + uio.height / 2)
@@ -1341,10 +1356,10 @@ class Queue(object):
             default: 100
 
         direction : str
-            if 'w', waitling line runs westwards (i.e. from right to left) (default) |n|
-            if 'n', waitling line runs northeards (i.e. from bottom to top) |n|
-            if 'e', waitling line runs eastwards (i.e. from left to right) |n|
-            if 's', waitling line runs southwards (i.e. from top to bottom)
+            if 'w', waiting line runs westwards (i.e. from right to left) (default) |n|
+            if 'n', waiting line runs northeards (i.e. from bottom to top) |n|
+            if 'e', waiting line runs eastwards (i.e. from left to right) |n|
+            if 's', waiting line runs southwards (i.e. from top to bottom)
 
         on : bool
             if True (default) do animate the queue. If False, do not animate.
@@ -2057,9 +2072,12 @@ class Environment(object):
 
         self.an_objects = []
         self.ui_objects = []
+        self.menu_objects = []
         self.serial = 0
         self.speed = 1
         self.animate = False
+        self._synced = True
+        self._step_pressed = False
         if Pythonista:
             self.width, self.height = ui.get_screen_size()
             self.width = int(self.width)
@@ -2074,8 +2092,7 @@ class Environment(object):
         self.fps = 30
         self.modelname = ''
         self.use_toplevel = False
-        self.show_fps = True
-        self.show_speed = True
+        self.show_fps = False
         self.show_time = True
         self.video = ''
 
@@ -2189,11 +2206,11 @@ class Environment(object):
             print('{:10.3f} {}'.format(t, comp.name()))
 
     def animation_parameters(self,
-                             animate=omitted, speed=omitted, width=omitted, height=omitted,
-                             x0=omitted, y0=0, x1=omitted, background_color=omitted,
-                             fps=omitted, modelname=omitted, use_toplevel=omitted,
-                             show_fps=omitted, show_speed=omitted, show_time=omitted,
-                             video=omitted):
+      animate=omitted, synced=omitted, speed=omitted, width=omitted, height=omitted,
+      x0=omitted, y0=0, x1=omitted, background_color=omitted,
+      fps=omitted, modelname=omitted, use_toplevel=omitted,
+      show_fps=omitted, show_time=omitted,
+      video=omitted):
         '''
         set animation parameters
 
@@ -2203,6 +2220,10 @@ class Environment(object):
             animate indicator |n|
             if omitted, True, i.e. animation on |n|
             Installation of PIL is required for animation.
+
+        synced : bool
+            specifies whether animation is synced |n|
+            if omitted, no change. At init of the environment synced will be set to True
 
         speed : float
             speed |n|
@@ -2253,12 +2274,8 @@ class Environment(object):
             if False (default), the root will be initialized with tkinter.Tk()
 
         show_fps : bool
-            if True, show the number of frames per second (default)  |n|
-            if False, do not show the number of frames per second
-
-        show_speed: bool
-            if True, show the animation speed (default)  |n|
-            if False, do not show the animation speed
+            if True, show the number of frames per second |n|
+            if False, do not show the number of frames per second (default)
 
         show_time: bool
             if True, show the time (default)  |n|
@@ -2278,7 +2295,7 @@ class Environment(object):
         Note that changing the parameters x0, x1, y0, width, height, background_color, modelname,
         use_toplevelmand video, animate has no effect on the current animation.
         So to avoid confusion, do not use change these parameters when an animation is running. |n|
-        On the other hand, changing speed, show_fps, show_time, show_speed and fps can be useful in
+        On the other hand, changing speed, show_fps, show_time, and fps can be useful in
         a running animation.
         '''
         if speed is not omitted:
@@ -2288,8 +2305,7 @@ class Environment(object):
 
         if show_fps is not omitted:
             self.show_fps = show_fps
-        if show_speed is not omitted:
-            self.show_speed = show_speed
+
         if show_time is not omitted:
             self.show_time = show_time
 
@@ -2297,6 +2313,8 @@ class Environment(object):
             self.animate = True
         else:
             self.animate = animate
+        if synced is not omitted:
+            self._synced = synced
         if width is not omitted:
             self.width = width
         if height is not omitted:
@@ -2468,10 +2486,10 @@ class Environment(object):
                     uio.install()
 
             self.system_an_objects = []
-            self.system_ui_objects = []
+            self.menu_objects = []
 
             self.an_system_modelname()
-            self.an_system_buttons()
+            self.an_system_run_buttons()
             self.an_system_clocktext()
 
             if self.dovideo:
@@ -2509,26 +2527,40 @@ class Environment(object):
         while self.running:
             tick_start = time.time()
 
-            if self.dovideo:
-                self.t = self.start_animation_time + self.video_sequence * self.speed / self.fps
-            else:
-                if self.paused:
-                    self.t = self.start_animation_time
+            if self._synced:
+                if self.dovideo:
+                    self.t = self.start_animation_time + self.video_sequence * self.speed / self.fps
                 else:
-                    self.t = self.start_animation_time +\
-                        ((time.time() - self.start_animation_clocktime) *
-                         self.speed)
+                    if self.paused:
+                        self.t = self.start_animation_time
+                    else:
+                        self.t = self.start_animation_time +\
+                            ((time.time() - self.start_animation_clocktime) *
+                            self.speed)
 
-            while self.peek() < self.t:
-                self.step()
-                if self._current_component == self._main:
-                    self.print_trace('{:10.3f}'.format(self._now),
-                        self._main.name(), 'current')
-                    self._scheduled_time = inf
-                    self._status = current
-                    self.running = False
-                    self.an_quit()
-                    return
+                while self.peek() < self.t:
+                    self.step()
+                    if self._current_component == self._main:
+                        self.print_trace('{:10.3f}'.format(self._now),
+                            self._main.name(), 'current')
+                        self._scheduled_time = inf
+                        self._status = current
+                        self.running = False
+                        self.an_quit()
+                        return
+            else:
+                if self._step_pressed or (not self.paused):
+                    self._step_pressed = False
+                    self.step()
+                    self.t = self._now
+                    if self._current_component == self._main:
+                        self.print_trace('{:10.3f}'.format(self._now),
+                            self._main.name(), 'current')
+                        self._scheduled_time = inf
+                        self._status = current
+                        self.running = False
+                        self.an_quit()
+                        return
             if not self.running:
                 break
 
@@ -2606,7 +2638,7 @@ class Environment(object):
                 self.video_sequence += 1
 
             self.canvas.update()
-            if not self.dovideo:
+            if (not self.dovideo) and self._synced:
                 tick_duration = time.time() - tick_start
                 if tick_duration < 1 / self.fps:
                     time.sleep(((1 / self.fps) - tick_duration) * 0.8)  # 0.8 compensation because of clock inaccuracy
@@ -2629,29 +2661,103 @@ class Environment(object):
                          screen_coordinates=True, env=self)
             self.system_an_objects.append(ao)
 
-    def an_system_buttons(self):
+    def an_system_run_buttons(self):
         '''
-        function to initialize the system animation buttons |n|
+        function to initialize the run buttons |n|
         called by run(), if animation is True. |n|
         may be overridden to change the standard behaviour.
         '''
-        uio = AnimateButton(x=48, y=self.height - 21, text='Stop',
-                            action=self.env.an_stop, env=self)
-        self.system_ui_objects.append(uio)
-        uio = AnimateButton(x=48 + 1 * 90, y=self.height - 21, text='Anim/2',
-                            action=self.env.an_half, env=self)
-        self.system_ui_objects.append(uio)
-        uio = AnimateButton(x=48 + 2 * 90, y=self.height - 21, text='Anim*2',
-                            action=self.env.an_double, env=self)
-        self.system_ui_objects.append(uio)
-        uio = AnimateButton(x=48 + 3 * 90, y=self.height - 21, text='',
-                            action=self.env.an_pause, env=self)
-        self.system_ui_objects.append(uio)
-        uio.text = lambda: pausetext()
-        uio = AnimateButton(x=48 + 4 * 90, y=self.height - 21, text='',
-                            action=self.env.an_trace, env=self)
-        self.system_ui_objects.append(uio)
-        uio.text = tracetext
+        self.set_start_animation()
+        for ob in self.menu_objects[:]:
+            ob.remove()
+        uio = AnimateButton(x=35, y=self.height - 21, text='Menu',
+          width=50, action=self.env.an_pause, env=self, fillcolor='blue')
+        self.menu_objects.append(uio)
+
+    def an_system_unsynced_buttons(self):
+        '''
+        function to initialize the unsynced buttons |n|
+        may be overridden to change the standard behaviour.
+        '''
+        for ob in self.menu_objects[:]:
+            ob.remove()
+
+        uio = AnimateButton(x=35, y=self.height - 21, text='Go',
+          width=50, action=self.env.an_go, env=self, fillcolor='green')
+        self.menu_objects.append(uio)
+
+        uio = AnimateButton(x=35 + 1 * 60, y=self.height - 21, text='Step',
+          width=50, action=self.env.an_step, env=self)
+        self.menu_objects.append(uio)
+
+        uio = AnimateButton(x=35 + 3 * 60, y=self.height - 21, text='Synced',
+          width=50, action=self.env.an_synced_on, env=self)
+        self.menu_objects.append(uio)
+
+        uio = AnimateButton(x=35 + 4 * 60, y=self.height - 21, text='Trace',
+          width=50, action=self.env.an_trace, env=self)
+        self.menu_objects.append(uio)
+
+        uio = AnimateButton(x=35 + 5 * 60, y=self.height - 21, text='Stop',
+          width=50, action=self.env.an_stop, env=self, fillcolor='red')
+        self.menu_objects.append(uio)
+
+        uio = Animate(x0=35 + 3 * 60, y0=self.height - 35, text='', anchor='N', fontsize0=15,
+          screen_coordinates=True)
+        uio.text = self.syncedtext
+        self.menu_objects.append(uio)
+
+        uio = Animate(x0=35 + 4 * 60, y0=self.height - 35, text='', anchor='N', fontsize0=15,
+          screen_coordinates=True)
+        uio.text = self.tracetext
+        self.menu_objects.append(uio)
+
+    def an_system_synced_buttons(self):
+        '''
+        function to initialize the synced buttons |n|
+        may be overridden to change the standard behaviour.
+        '''
+        for ob in self.menu_objects[:]:
+            ob.remove()
+
+        uio = AnimateButton(x=35, y=self.height - 21, text='Go',
+          width=50, action=self.env.an_go, env=self, fillcolor='green')
+        self.menu_objects.append(uio)
+
+        uio = AnimateButton(x=35 + 1 * 60, y=self.height - 21, text='/2',
+          width=50, action=self.env.an_half, env=self)
+        self.menu_objects.append(uio)
+
+        uio = AnimateButton(x=35 + 2 * 60, y=self.height - 21, text='*2',
+          width=50, action=self.env.an_double, env=self)
+        self.menu_objects.append(uio)
+
+        uio = AnimateButton(x=35 + 3 * 60, y=self.height - 21, text='Synced',
+          width=50, action=self.env.an_synced_off, env=self)
+        self.menu_objects.append(uio)
+
+        uio = AnimateButton(x=35 + 4 * 60, y=self.height - 21, text='Trace',
+          width=50, action=self.env.an_trace, env=self)
+        self.menu_objects.append(uio)
+
+        uio = AnimateButton(x=35 + 5 * 60, y=self.height - 21, text='Stop',
+          width=50, action=self.env.an_stop, env=self, fillcolor='red')
+        self.menu_objects.append(uio)
+
+        uio = Animate(x0=35 + 1.5 * 60, y0=self.height - 35, text='', anchor='N', fontsize0=15,
+          screen_coordinates=True)
+        uio.text = self.speedtext
+        self.menu_objects.append(uio)
+
+        uio = Animate(x0=35 + 3 * 60, y0=self.height - 35, text='', anchor='N', fontsize0=15,
+          screen_coordinates=True)
+        uio.text = self.syncedtext
+        self.menu_objects.append(uio)
+
+        uio = Animate(x0=35 + 4 * 60, y0=self.height - 35, text='', anchor='N', fontsize0=15,
+          screen_coordinates=True)
+        uio.text = self.tracetext
+        self.menu_objects.append(uio)
 
     def an_system_clocktext(self):
         '''
@@ -2663,7 +2769,7 @@ class Environment(object):
                      text='', fontsize0=15, font='narrow', anchor='ne',
                      screen_coordinates=True, env=self)
         self.system_an_objects.append(ao)
-        ao.text = clocktext
+        ao.text = self.clocktext
 
     def an_quit(self):
         global an_env
@@ -2671,8 +2777,6 @@ class Environment(object):
 
         for ao in self.system_an_objects:
             ao.remove()
-        for uio in self.system_ui_objects:
-            uio.remove()
 
         for uio in self.ui_objects:
             if uio.type == 'slider':
@@ -2684,22 +2788,18 @@ class Environment(object):
         an_env = None
 
     def an_half(self):
-        if self.paused:
-            self.paused = False
-        else:
-            self.speed /= 2
-            self.set_start_animation()
+        self.speed /= 2
 
     def an_double(self):
-        if self.paused:
-            self.paused = False
-        else:
-            self.speed *= 2
-            self.set_start_animation()
+        self.speed *= 2
 
-    def an_pause(self):
-        self.paused = not self.paused
-        self.set_start_animation()
+    def an_go(self):
+        self.paused = False
+        if self._synced:
+            self.set_start_animation()
+        else:
+            self._step_pressed = True  # force to next event
+        self.an_system_run_buttons()
 
     def an_stop(self):
         self.an_quit()
@@ -2707,6 +2807,57 @@ class Environment(object):
 
     def an_trace(self):
         self._trace = not self._trace
+
+    def an_synced_on(self):
+        assert True
+        self._synced = True
+        self.an_system_synced_buttons()
+
+    def an_synced_off(self):
+        self._synced = False
+        self.an_system_unsynced_buttons()
+
+    def an_step(self):
+        self._step_pressed = True
+
+    def an_pause(self):
+        self.paused = True
+        self.set_start_animation()
+        if self._synced:
+            self.an_system_synced_buttons()
+        else:
+            self.an_system_unsynced_buttons()
+
+    def clocktext(self, t):
+        s = ''
+        if self._synced and (not self.paused) and self.show_fps:
+            if len(self.frametimes) >= 2:
+                fps = (len(self.frametimes) - 1) / \
+                    (self.frametimes[-1] - self.frametimes[0])
+            else:
+                fps = 0
+            s += 'fps={:.1f}'.format(fps)
+
+        if self.show_time:
+            if s != '':
+                s += ' '
+            s += 't={:.3f}'.format(t)
+        return s
+
+    def tracetext(self, t):
+        if self._trace:
+            return '= on'
+        else:
+            return '= off'
+
+    def syncedtext(self, t):
+        if self._synced:
+            return '= on'
+        else:
+            return '= off'
+
+    def speedtext(self, t):
+        return 'speed = {:.3f}'.format(self.speed)
 
     def set_start_animation(self):
         self.frametimes = collections.deque(maxlen=30)
@@ -3346,6 +3497,10 @@ class Animate(object):
         ----
         The animation object might be still updated, if required
         '''
+        if self in self.env.ui_objects:
+            self.env.ui_objects.remove(self)
+        if self in self.env.menu_objects:
+            self.env.menu_objects.remove(self)
         if self in self.env.an_objects:
             self.env.an_objects.remove(self)
 
@@ -3560,6 +3715,7 @@ class Animate(object):
                     if (linewidth > 0) and (linecolor[3] != 0):
                         draw.line(rscaled, fill=linecolor,
                                   width=int(linewidth))
+                    del draw
 
                 self._image_x = qx + minrx - linewidth + \
                     (offsetx * cosa - offsety * sina)
@@ -3604,6 +3760,7 @@ class Animate(object):
                         draw.polygon(p, fill=fillcolor)
                     if (linewidth > 0) and (linecolor[3] != 0):
                         draw.line(p, fill=linecolor, width=int(linewidth))
+                    del draw
 
                 dx = offsetx
                 dy = offsety
@@ -3685,7 +3842,7 @@ class Animate(object):
                     text, fontname, fontsize, angle, textcolor)
                 if self._image_ident != self._image_ident_prev:
                     font = getfont(fontname, fontsize)
-                    if text == '':  # this code is a workarond for a bug in PIL >= 4.2.1
+                    if text == '':  # this code is a workaround for a bug in PIL >= 4.2.1
                         im = Image.new(
                             'RGBA', (0, 0), (0, 0, 0, 0))
                     else:
@@ -3697,6 +3854,7 @@ class Animate(object):
                         draw.text(xy=(0, 0), text=text, font=font, fill=textcolor)
                         # this code is to correct a bug in the rendering of text,
                         # leaving a kind of shadow around the text
+                        del draw
                         textcolor3 = textcolor[0:3]
                         if textcolor3 != (0, 0, 0):  # black is ok
                             for y in range(imheight):
@@ -3856,6 +4014,8 @@ class AnimateButton(object):
         '''
         if self in self.env.ui_objects:
             self.env.ui_objects.remove(self)
+        if self in self.env.menu_objects:
+            self.env.menu_objects.remove(self)
         if not Pythonista:
             self.button.destroy()
 
@@ -4022,6 +4182,8 @@ class AnimateSlider(object):
         '''
         if self in self.env.ui_objects:
             self.env.ui_objects.remove(self)
+        if self in self.env.menu_objects:
+            self.env.menu_objects.remove(self)
         if not Pythonista:
             self.slider.destroy()
 
@@ -6190,7 +6352,7 @@ class State(object):
         -  'int64' integer >= -9223372036854775807 <= 9223372036854775807 8 bytes do not use -9223372036854775808
         -  'uint64' integer >= 0 <= 18446744073709551614 8 bytes do not use 18446744073709551615
         -  'float' float 8 bytes do not use -inf
-        
+
     animation_objects : list or tuple
         overrides the deafult animation_object method |n|
         the method should have a header like |n|
@@ -7007,42 +7169,6 @@ def interpolate(t, t0, t1, v0, v1):
         return tuple((_i(p, x0, x1) for x0, x1 in zip(v0, v1)))
     else:
         return _i(p, v0, v1)
-
-
-def clocktext(t):
-    s = ''
-    if (not an_env.paused) or (int(time.time() * 2) % 2 == 0):
-
-        if (not an_env.paused) and an_env.show_fps:
-            if len(an_env.frametimes) >= 2:
-                fps = (len(an_env.frametimes) - 1) / \
-                    (an_env.frametimes[-1] - an_env.frametimes[0])
-            else:
-                fps = 0
-            s += 'fps={:.1f}'.format(fps)
-        if an_env.show_speed:
-            if s != '':
-                s += ' '
-            s += '*{:.3f}'.format(an_env.speed)
-        if an_env.show_time:
-            if s != '':
-                s += ' '
-            s += 't={:.3f}'.format(t)
-    return s
-
-
-def pausetext():
-    if an_env.paused:
-        return 'Resume'
-    else:
-        return 'Pause'
-
-
-def tracetext():
-    if an_env._trace:
-        return 'Trace off'
-    else:
-        return 'Trace on'
 
 
 def _set_name(name, _nameserialize, object):

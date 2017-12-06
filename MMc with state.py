@@ -35,7 +35,8 @@ nservers = 5
 iat = 1
 server_time = 4
 
-servers = (Server(i=i) for i in range(nservers))
+for i in range(nservers):
+    Server()
 
 ClientGenerator()
 

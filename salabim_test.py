@@ -20,19 +20,21 @@ def test38():
     class X(sim.Component):
         def process(self):
             
-            for i in ('red','green','blue','yellow','red'):
-                letters.set(i[0])
-                light.set(i)
-                yield self.hold(1)
+            while True:
+                for i in ('red','green','blue','yellow','red'):
+                    letters.set(i[0])
+                    light.set(i)
+                    yield self.hold(1)
             
-    env=sim.Environment()
+    env=sim.Environment(trace=False)
+
     X()
     light=sim.State('light')
     light.animate()
     letters=sim.State('letters')
     letters.animate(x=100,y=100)
         
-    env.animation_parameters()
+    env.animation_parameters(synced=False)
     env.run()
     
 def test37():

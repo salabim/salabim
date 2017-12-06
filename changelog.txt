@@ -1,5 +1,28 @@
 salabim  changelog
 
+version 2.2.8  2017-12-06
+=========================
+New features / major changes:
+Animation can now run synced (i.e. in real time, with a speed factor) or not synced. In the latter
+case, the animation will step from event to event. In that case also single stepping is now supported.
+Synced on/off can be set with animation_parameters and/or with the menu system.
+
+The menu system is completely redesigned. It now shows only a 'Menu' button at start up. When this button
+is pressed, several buttons are shown. Here, the user can select Synced on/off, Trace on/off and Stop. When Synced
+is on, the user can increase or decrease the animation speed. When Synced is off, the user can single
+step through the simulation (with Step). Finally, with Go the simulation will run again.
+The animation speed is no longer shown in the right hand upper corner. And frames per second (fps) is disabled
+by default now, in order to get a less cluttered top line and more space for user information.
+
+Minor changes and bug fixes:
+A major bug caused Pythonista to crash frequently and rapidly. This is now fixed.
+
+The function show_speed of Environment.animation_parameters is no longer available.
+
+The functions clocktext is are now a method of Environment, thus making it overridable.
+
+Sample models are updated.
+
 version 2.2.7  2017-11-28
 =========================
 New features:
