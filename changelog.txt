@@ -1,9 +1,6 @@
 salabim  changelog
 
-TO DO:
-pause animation from program
-
-version 2.2.9
+version 2.2.9  2017-12-20
 =========================
 From this version the following classes:
   Environment
