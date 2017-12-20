@@ -30,8 +30,6 @@ class Car(sim.Component):
                 tank_truck.activate()
         yield self.request((fuel_pump, liters_required))
         yield self.hold(liters_required / REFUELING_SPEED)
-#        yield self.release((fuel_pump,0))
-        self.release(gas_station)
 
 
 class TankTruck(sim.Component):
@@ -59,7 +57,7 @@ class CarGenerator(sim.Component):
 
 
 # Setup and start the simulation
-env = sim.Environment()
+env = sim.Environment(trace=False)
 print('Gas Station refuelling')
 
 # Create environment and start processes
@@ -77,4 +75,4 @@ fuel_pump.available_quantity.print_histogram()
 
 
 gas_station.requesters().length.print_histogram()
-gas_station.requesters().length_of_stay.print_histogram(30, 10, 0)
+gas_station.requesters().length_of_stay.print_histogram(30, 0, 10)

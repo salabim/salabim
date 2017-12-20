@@ -28,7 +28,7 @@ see www.salabim.org for more information, the manual and updates.
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.8'
+__version__ = '2.2.9'
 
 import heapq
 import random
@@ -130,13 +130,13 @@ class Monitor(object):
 
     cached_x = [(0, 0), (0, 0)]  # index=ex0, value=[hash,x]
 
-    def __init__(self, name=omitted, monitor=True, type='any', env=omitted):
+    def __init__(self, name=omitted, monitor=True, type='any', env=omitted, *args, **kwargs):
         if env is omitted:
             self.env = _default_env
         else:
             self.env = env
         if name is omitted:
-            name = 'monitor.'
+            name = _name_from_type(self)
         self.name(name)
         try:
             self.xtypecode, _ = type_to_typecode_off(type)
@@ -144,6 +144,15 @@ class Monitor(object):
             raise SalabimError('type (' + type + ') not recognized')
         self._timestamp = False
         self.reset(monitor)
+        self.setup(*args, **kwargs)
+
+    def setup(self, *args, **kwargs):
+        '''
+        called immediately after initialization of a monitor.
+
+        by default this is a dummy method, but it can be overridden.
+        '''
+        pass
 
     def reset(self, monitor=omitted):
         '''
@@ -211,6 +220,26 @@ class Monitor(object):
         if txt is not omitted:
             _set_name(txt, self.env._nameserializeMonitor, self)
         return _decode_name(self._name)
+
+    def base_name(self):
+        '''
+        Returns
+        -------
+        base name of the monitor (the name used at init or name): str
+        '''
+        return self._base_namee
+
+    def sequence_number(self):
+        '''
+        Returns
+        -------
+        sequence_number of the monitor : int
+            (the sequence number at init or name) |n|
+            normally this will be the integer value of a serialized name,
+            but also non serialized names (without a dot at the end)
+            will be numbered)
+        '''
+        return self._sequence_number
 
     def mean(self, ex0=False):
         '''
@@ -638,9 +667,9 @@ class MonitorTimestamp(Monitor):
 
     cached_xduration = [(0, ()), (0, ())]  # index=ex0, value=[hash,(x,duration)]
 
-    def __init__(self, name, getter, monitor=True, type='any', env=omitted):
+    def __init__(self, name, getter, monitor=True, type='any', env=omitted, *args, **kwargs):
         if name is omitted:
-            name = 'monitortimestamp.'
+            name = _name_from_type(self)
         if env is omitted:
             self.env = _default_env
         else:
@@ -654,6 +683,15 @@ class MonitorTimestamp(Monitor):
         self._timestamp = True
         self._getter = getter
         self.reset(monitor=monitor)
+        self.setup(*args, **kwargs)
+
+    def setup(self, *args, **kwargs):
+        '''
+        called immediately after initialization of a monitortimestamp.
+
+        by default this is a dummy method, but it can be overridden.
+        '''
+        pass
 
     def __call__(self):  # direct moneypatching __call__ doesn't work
         return self._getter()
@@ -733,7 +771,7 @@ class MonitorTimestamp(Monitor):
         Parameters
         ----------
         txt : str
-            name of the monitor |n|
+            name of the monitortimestamp |n|
             if txt ends with a period, the name will be serialized |n|
             if omittted, no change
 
@@ -744,6 +782,26 @@ class MonitorTimestamp(Monitor):
         if txt is not omitted:
             _set_name(txt, self.env._nameserializeMonitorTimestamp, self)
         return _decode_name(self._name)
+
+    def base_name(self):
+        '''
+        Returns
+        -------
+        base name of the monitortimestamp (the name used at init or name): str
+        '''
+        return self._base_namee
+
+    def sequence_number(self):
+        '''
+        Returns
+        -------
+        sequence_number of the monitortimestamp : int
+            (the sequence number at init or name) |n|
+            normally this will be the integer value of a serialized name,
+            but also non serialized names (without a dot at the end)
+            will be numbered)
+        '''
+        return self._sequence_number
 
     def mean(self, ex0=False):
         '''
@@ -1276,13 +1334,13 @@ class Queue(object):
         for internal use only
     '''
 
-    def __init__(self, name=omitted, monitor=True, env=omitted, _isinternal=False):
+    def __init__(self, name=omitted, monitor=True, env=omitted, _isinternal=False, *args, **kwargs):
         if env is omitted:
             self.env = _default_env
         else:
             self.env = env
         if name is omitted:
-            name = 'queue.'
+            name = _name_from_type(self)
         self.name(name)
         self._head = Qmember()
         self._tail = Qmember()
@@ -1304,6 +1362,15 @@ class Queue(object):
             ('Length of stay in ', self), monitor=monitor, type='float')
         if not _isinternal:
             self.env.print_trace('', '', self.name() + ' create')
+        self.setup(*args, **kwargs)
+
+    def setup(self, *args, **kwargs):
+        '''
+        called immediately after initialization of a queue.
+
+        by default this is a dummy method, but it can be overridden.
+        '''
+        pass
 
     def _animate_update(self):
         if self._animate_reverse:
@@ -2035,7 +2102,7 @@ class Environment(object):
     _nameserialize = {}
     an_env = None
 
-    def __init__(self, trace=False, random_seed=omitted, name=omitted, is_default_env=True):
+    def __init__(self, trace=False, random_seed=omitted, name=omitted, is_default_env=True, *args, **kwargs):
         global _default_env
         if is_default_env:
             _default_env = self
@@ -2043,7 +2110,8 @@ class Environment(object):
             if is_default_env:
                 name = 'Default environment'
             else:
-                name = 'environment.'
+                if name is omitted:
+                    name = _name_from_type(self)
         self._trace = trace
         if random_seed != '':
             if random_seed is omitted:
@@ -2095,6 +2163,15 @@ class Environment(object):
         self.show_fps = False
         self.show_time = True
         self.video = ''
+        self.setup(*args, **kwargs)
+
+    def setup(self, *args, **kwargs):
+        '''
+        called immediately after initialization of an environment.
+
+        by default this is a dummy method, but it can be overridden.
+        '''
+        pass
 
     def serialize(self):
         self.serial += 1
@@ -2809,7 +2886,6 @@ class Environment(object):
         self._trace = not self._trace
 
     def an_synced_on(self):
-        assert True
         self._synced = True
         self.an_system_synced_buttons()
 
@@ -3058,7 +3134,8 @@ class Animate(object):
         fontsize of text at time t0 (default: 20)
 
     width0 : float
-       width of the image to be displayed at time t0 (default: no scaling)
+       width of the image to be displayed at time t0 |n|
+       if omitted or None, no scaling
 
     t1 : float
         time of end of the animation (default: inf) |n|
@@ -3212,8 +3289,7 @@ class Animate(object):
             self.width0 = 0  # just to be able to interpolate
         else:
             self.image0 = spec_to_image(image)
-            self.image_serial0 = self.env.serialize()
-            self.width0 = self.image0.size[0] if width0 is omitted else width0
+            self.width0 = None if width0 is omitted else width0  # None means original size
 
         self.font0 = font
         self.anchor0 = anchor
@@ -3353,7 +3429,8 @@ class Animate(object):
             fontsize of text at time t0 (default see below)
 
         width0 : float
-            width of the image to be displayed at time t0 (default see below)
+            width of the image to be displayed at time t0 (default see below) |n|
+            if None, the original width of the image will be used
 
         t1 : float
             time of end of the animation (default: inf) |n|
@@ -3436,7 +3513,6 @@ class Animate(object):
         self.width0 = self.width() if width0 is omitted else width0
         if image is not omitted:
             self.image0 = spec_to_image(image)
-            self.image_serial0 = self.env.serialize()
             self.width0 = self.image0.size[0] if width0 is omitted else width0
 
         if font is not omitted:
@@ -3573,6 +3649,20 @@ class Animate(object):
     def width(self, t=omitted):
         return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.width0, self.width1)
+        '''
+        width position of an animated image object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        width : float
+            default behaviour: linear interpolation between self.width0 and self.width1 |n|
+            if None, the original width of the image will be used
+        '''
 
     def fontsize(self, t=omitted):
         return interpolate((self.env._now if t is omitted else t),
@@ -3595,12 +3685,10 @@ class Animate(object):
 
     def image(self, t=omitted):
         '''
-        returns image and a serial number at time t
-        use the function spec_to_image to change the image here |n|
-        if there's a change in the image, a new serial number should be returned
-        if there's no change, do not update the serial number
+        returns image at time t
+        use the function spec_to_image to change the image here
         '''
-        return self.image0, self.image_serial0
+        return self.image0
 
     def settype(self, circle, line, polygon, rectangle, image, text):
         n = 0
@@ -3772,8 +3860,13 @@ class Animate(object):
                 self._image_y = qy + ey - radius - linewidth - 1
 
             elif self.type == 'image':
-                image, image_serial = self.image(t)
+                image = self.image(t)
+                if isinstance(image, (tuple, list)):
+                    image = image[0]  # ignore serial number (for compatibility with pre 2.2.9 versions)
                 width = self.width(t)
+                if width is None:
+                    width = image.size[0]
+
                 height = width * image.size[1] / image.size[0]
                 angle = self.angle(t)
 
@@ -3787,7 +3880,7 @@ class Animate(object):
                     offsetx = offsetx * self.env.scale
                     offsety = offsety * self.env.scale
 
-                self._image_ident = (image_serial, width, height, angle)
+                self._image_ident = (image, width, height, angle)
                 if self._image_ident != self._image_ident_prev:
                     if not self.screen_coordinates:
                         width *= self.env.scale
@@ -4253,7 +4346,7 @@ class Component(object):
         else:
             self.env = env
         if name is omitted:
-            name = str(type(self)).split('.')[-1].split("'")[0].lower() + '.'
+            name = _name_from_type(self)
         self.name(name)
         self._qmembers = {}
         self._process = None
@@ -4753,7 +4846,8 @@ class Component(object):
         fail_at = kwargs.pop('fail_at', omitted)
         fail_delay = kwargs.pop('fail_delay', omitted)
         mode = kwargs.pop('mode', omitted)
-        assert not kwargs
+        if kwargs:
+            raise TypeError("request() got an expected keyword argument '" + tuple(kwargs.keys())[0] + "'")
 
         if self._status != current:
             self._checkisnotdata()
@@ -4840,11 +4934,11 @@ class Component(object):
             self._remove()
             self._reschedule(self.env._now, False, 'request honour')
 
-    def _release(self, r, q=omitted):
+    def _release(self, r, q=None):
         if r not in self._claims:
             raise SalabimError(self.name() +
                 ' not claiming from resource ' + r.name())
-        if q is omitted:
+        if q is None:
             q = self._claims[r]
         if q > self._claims[r]:
             q = self._claims[r]
@@ -4998,7 +5092,8 @@ class Component(object):
         fail_delay = kwargs.pop('fail_delay', omitted)
         all = kwargs.pop('all', False)
         mode = kwargs.pop('mode', omitted)
-        assert not kwargs
+        if kwargs:
+            raise TypeError("wait() got an expected keyword argument '" + tuple(kwargs.keys())[0] + "'")
 
         if self._status != current:
             self._checkisnotdata()
@@ -5705,7 +5800,7 @@ class Exponential(_Distribution):
         if randomstream is omitted:
             self.randomstream = random
         else:
-            assert isinstance(randomstream, random.Random)
+            randomstream_check(randomstream)
             self.randomstream = randomstream
 
     def __repr__(self):
@@ -5763,7 +5858,7 @@ class Normal(_Distribution):
         if randomstream is omitted:
             self.randomstream = random
         else:
-            assert isinstance(randomstream, random.Random)
+            randomstream_check(randomstream)
             self.randomstream = randomstream
 
     def __repr__(self):
@@ -5822,7 +5917,7 @@ class Uniform(_Distribution):
         if randomstream is omitted:
             self.randomstream = random
         else:
-            assert isinstance(randomstream, random.Random)
+            randomstream_check(randomstream)
             self.randomstream = randomstream
         self._mean = (self._lowerbound + self._upperbound) / 2
 
@@ -5895,7 +5990,7 @@ class Triangular(_Distribution):
         if randomstream is omitted:
             self.randomstream = random
         else:
-            assert isinstance(randomstream, random.Random)
+            randomstream_check(randomstream)
             self.randomstream = randomstream
         self._mean = (self._low + self._mode + self._high) / 3
 
@@ -5947,7 +6042,7 @@ class Constant(_Distribution):
         if randomstream is omitted:
             self.randomstream = random
         else:
-            assert isinstance(randomstream, random.Random)
+            randomstream_check(randomstream)
             self.randomstream = randomstream
         self._mean = value
 
@@ -6005,7 +6100,7 @@ class Cdf(_Distribution):
         if randomstream is omitted:
             self.randomstream = random
         else:
-            assert isinstance(randomstream, random.Random)
+            randomstream_check(randomstream)
             self.randomstream = randomstream
 
         lastcum = 0
@@ -6113,7 +6208,7 @@ class Pdf(_Distribution):
         if randomstream is omitted:
             self.randomstream = random
         else:
-            assert isinstance(randomstream, random.Random)
+            randomstream_check(randomstream)
             self.randomstream = randomstream
 
         sump = 0
@@ -6284,7 +6379,7 @@ class Distribution(_Distribution):
         if randomstream is omitted:
             self.randomstream = random
         else:
-            assert isinstance(randomstream, random.Random)
+            randomstream_check(randomstream)
             self.randomstream = randomstream
         self._distribution = d
         self._mean = d._mean
@@ -6369,13 +6464,13 @@ class State(object):
         if omitted, _default_env is used
     '''
     def __init__(self, name=omitted, value=False, type='any',
-      monitor=True, animation_objects=omitted, env=omitted):
+      monitor=True, animation_objects=omitted, env=omitted, *args, **kwargs):
         if env is omitted:
             self.env = _default_env
         else:
             self.env = env
         if name is omitted:
-            name = 'state.'
+            name = _name_from_type(self)
         self.name(name)
         self._value = value
         self._animate_on = False
@@ -6391,6 +6486,15 @@ class State(object):
         self.env.print_trace(
             '', '', self.name() + ' create',
             'value= ' + str(self._value))
+        self.setup(*args, **kwargs)
+
+    def setup(self, *args, **kwargs):
+        '''
+        called immediately after initialization of a state.
+
+        by default this is a dummy method, but it can be overridden.
+        '''
+        pass
 
     def animate(self, x=500, y=100, on=True):
         '''
@@ -6697,13 +6801,13 @@ class Resource(object):
     '''
 
     def __init__(self, name=omitted, capacity=1,
-                 anonymous=False, monitor=True, env=omitted):
+                 anonymous=False, monitor=True, env=omitted, *args, **kwargs):
         if env is omitted:
             self.env = _default_env
         else:
             self.env = env
         if name is omitted:
-            name = 'resource.'
+            name = _name_from_type(self)
         self._capacity = capacity
         self.name(name)
         self._requesters = Queue(
@@ -6727,6 +6831,15 @@ class Resource(object):
         self.env.print_trace(
             '', '', self.name() + ' create',
             'capacity=' + str(self._capacity) + (' anonymous' if self._anonymous else ''))
+        self.setup(*args, **kwargs)
+
+    def setup(self, *args, **kwargs):
+        '''
+        called immediately after initialization of a resource.
+
+        by default this is a dummy method, but it can be overridden.
+        '''
+        pass
 
     def reset_monitors(self, monitor=omitted):
         '''
@@ -7067,13 +7180,30 @@ def colorspec_to_hex(colorspec, withalpha=True):
             format(int(v[0]), int(v[1]), int(v[2]))
 
 
-def spec_to_image(image):
-    if isinstance(image, str):
-        im = Image.open(image)
-        im = im.convert('RGBA')
+def spec_to_image(spec):
+    '''
+    convert an image specification to an image
+    
+    Parameters
+    ----------
+    image : str or PIL.Image.Image
+        if str: filename of file to be loaded |n|
+        if '': dummy image will be returned |n|
+        if PIL.Image.Image: return this image untranslated
+        
+    Returns
+    -------
+    image : PIL.Image..Image
+    '''
+    if isinstance(spec, str):
+        if spec == '':
+            im = Image.new('RGBA', (0, 0), (0, 0, 0, 0))
+        else:
+            im = Image.open(spec)
+            im = im.convert('RGBA')
         return im
     else:
-        return image
+        return spec
 
 
 def _i(p, v0, v1):
@@ -7234,6 +7364,11 @@ def fn(x, l, d):
     return ('{:' + str(l) + '.' + str(d) + 'f}').format(x)
 
 
+def randomstream_check(randomstream):
+    if not isinstance(randomstream, random.Random):
+        raise SalabimError('randomstream is not an instance of random.Random()')
+
+
 def type_to_typecode_off(type):
     lookup = {
         'bool': ('B', 255),
@@ -7309,6 +7444,10 @@ def _modetxt(mode):
         return ''
     else:
         return ' mode=' + str(mode)
+
+
+def _name_from_type(object):
+    return str(type(object)).split('.')[-1].split("'")[0].lower() + '.'
 
 
 def data():

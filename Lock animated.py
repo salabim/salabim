@@ -14,7 +14,7 @@ def shortname(ship):
         if c != '.':
             s = s + c
     return s
-
+a
 
 def shipcolor(side):
     if side == left:

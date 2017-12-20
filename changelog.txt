@@ -1,5 +1,37 @@
 salabim  changelog
 
+TO DO:
+pause animation from program
+
+version 2.2.9
+=========================
+From this version the following classes:
+  Environment
+  Monitor
+  MonitorTimestamp
+  Queue
+  Resource
+  State
+support automatic naming according to the class where it is defined, like Component.
+Also, all these classes now call a setup method as the last statement in __init__ .
+By default, this setup method is dummy.
+
+Classes Monitor and MonitorTimestamp now contain base_name() and sequence_number() methods.
+
+The image method of the class Animate now just returns an image and not anymore a tuple of 
+an image and a serial number.
+
+The function spec_to_image now supports the null string, in which case a dummy picture will be
+returned.
+
+Animation of images is now correctly handled if width0 is omitted. When overriding Animate.width,
+None can be used to disable scaling.
+
+Improved error handling (no more asserts).
+
+Bug in Resource.release fixed.
+
+
 version 2.2.8  2017-12-06
 =========================
 New features / major changes:
@@ -829,7 +861,7 @@ Complete overhaul of the tkinter way objects are shown. Instead of deleting all 
 for each animation tick, salabim now tries to minimize the number of create_image calls, 
 by using itemconfig and coords and reusing canvas elements, if possible and necessary.
 The result is a much smoother animation, particularly at higher animation speeds.
-The above is doesn't, unfortunately, apply to Pythonista.
+The above doesn't, unfortunately, apply to Pythonista.
 
 Now all of the following methods of the class Animate may be overridden:
     def x(self,t=None)

@@ -6,7 +6,19 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test38()
+    test39()
+
+def test39():
+    class C(sim.Component):
+        def process(self):
+            yield self.request(r,s='y')
+
+    env=sim.Environment(trace=True)
+    x=sim.Uniform(4)
+    r = sim.Resource()
+    C()
+    env.run(4)
+
 
 def test38():
     def animation_objects(self, value):
@@ -16,27 +28,31 @@ def test38():
             an1=sim.Animate(rectangle0=(-40,-20,40,20), fillcolor0=value,linewidth0=0)
         an2=sim.Animate(text=value,textcolor0='white')
         return (an1,an2)
-        
+
     class X(sim.Component):
         def process(self):
-            
+
             while True:
                 for i in ('red','green','blue','yellow','red'):
                     letters.set(i[0])
                     light.set(i)
                     yield self.hold(1)
-            
-    env=sim.Environment(trace=False)
 
+    class Q(sim.Queue):
+        pass
+
+    env=sim.Environment(trace=True)
+    for i in range(3):
+        q=Q(name='rij.')
     X()
     light=sim.State('light')
     light.animate()
     letters=sim.State('letters')
     letters.animate(x=100,y=100)
-        
+
     env.animation_parameters(synced=False)
     env.run()
-    
+
 def test37():
     env=sim.Environment()
     s = sim.Monitor('s')

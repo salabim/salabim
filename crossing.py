@@ -22,7 +22,7 @@ class TrafficLight(sim.Component):
     def setup(self):
         light['west'].set('red')
         light['east'].set('red')
-        light['north'].set('green')
+        light['north'].set('green')w
         light['south'].set('green')
 
     def process(self):

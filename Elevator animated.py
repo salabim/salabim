@@ -24,6 +24,7 @@ class AnimateLED(sim.Animate):
         else:
             return ''
 
+
 def animation_pre_tick(self, t):
     for car in cars:
         if car.mode() == 'Move':
@@ -33,7 +34,8 @@ def animation_pre_tick(self, t):
         else:
             y = car.floor.y
         car.visitors.animate(x=xcar[car], y=y, direction='e')
-        car.pic.update(y0=y)     
+        car.pic.update(y0=y)
+
 
 def do_animation():
 
@@ -41,7 +43,7 @@ def do_animation():
     global yvisitor_dim
     global xcar
     global capacity_last, ncars_last, topfloor_last
-    
+
     sim.Environment.animation_pre_tick = animation_pre_tick
 
     xvisitor_dim = 30
@@ -64,7 +66,7 @@ def do_animation():
     x -= xvisitor_dim
     xwait = x
 
-    for floor in floors.values():
+    for floor in floors:
         y = yfloor0 + floor.n * yvisitor_dim
         floor.y = y
         for direction in (up, down):
@@ -74,12 +76,11 @@ def do_animation():
         sim.Animate(x0=xsign, y0=y + yvisitor_dim / 2,
             text=str(floor.n), fontsize0=xvisitor_dim / 2, anchor='center')
 
+        floor.visitors.animate(x=xwait - xvisitor_dim, y=floor.y, direction='w')
 
-        floor.visitors.animate(x=xwait-xvisitor_dim,y=floor.y,direction='w')
-        
     for car in cars:
         x = xcar[car]
-        car.pic=sim.Animate(x0=x,
+        car.pic = sim.Animate(x0=x,
            rectangle0=(0, 0, capacity * xvisitor_dim, yvisitor_dim), fillcolor0='lightblue')
         car.visitors.animate(x=xcar[car], y=600, direction='e')
 
@@ -202,7 +203,7 @@ class Visitor(sim.Component):
         self.fromfloor = floors[from_]
         self.tofloor = floors[to]
         self.direction = getdirection(self.fromfloor, self.tofloor)
-        
+
     def animation_objects(self, q):
         size_x = xvisitor_dim
         size_y = yvisitor_dim
@@ -211,9 +212,9 @@ class Visitor(sim.Component):
             linewidth0=0, fillcolor0=direction_color(self.direction))
         an2 = sim.Animate(text=str(self.tofloor.n), fontsize0=xvisitor_dim * 0.7,
             anchor='center', offsetx0=5 * b, offsety0=2 + 4 * b,
-            textcolor0='white') 
-        return size_x, size_y, an1, an2       
-        
+            textcolor0='white')
+        return size_x, size_y, an1, an2
+
     def process(self):
         self.enter(self.fromfloor.visitors)
         if not (self.fromfloor, self.direction) in requests:
@@ -225,12 +226,16 @@ class Visitor(sim.Component):
         yield self.passivate()
 
 
+class VisitorsInCar(sim.Queue):
+    pass
+
+
 class Car(sim.Component):
-    def setup(self, capacity):
+    def setup(self):
         self.capacity = capacity
         self.direction = still
         self.floor = floors[0]
-        self.visitors = sim.Queue(name='visitors in car')
+        self.visitors = VisitorsInCar()
 
     def process(self):
         dooropen = False
@@ -299,10 +304,14 @@ class Car(sim.Component):
         return n
 
 
+class Visitors(sim.Queue):
+    pass
+
+
 class Floor():
-    def __init__(self, n):
-        self.n = n
-        self.visitors = sim.Queue(name='visitors ' + str(n))
+    def __init__(self):
+        self.visitors = Visitors()
+        self.n = self.visitors.sequence_number()
 
     def count_in_direction(self, dir):
         n = 0
@@ -338,7 +347,7 @@ ncars = 3
 topfloor = 15
 
 while True:
-    env = sim.Environment()
+    env = sim.Environment(trace=True)
 
     vg_0_n = VisitorGenerator(
         from_=(0, 0), to=(1, topfloor), id='0_n', name='vg_0_n')
@@ -348,9 +357,9 @@ while True:
         from_=(1, topfloor), to=(1, topfloor), id='n_n', name='vg_n_n')
 
     requests = {}
-    floors = {ifloor: Floor(ifloor) for ifloor in range(topfloor + 1)}
+    floors = [Floor() for ifloor in range(topfloor + 1)]
 
-    cars = [Car(name='car ' + str(icar), capacity=capacity) for icar in range(ncars)]
+    cars = [Car() for icar in range(ncars)]
 
     make_video = False
 
