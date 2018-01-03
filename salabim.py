@@ -28,7 +28,7 @@ see www.salabim.org for more information, the manual and updates.
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.9'
+__version__ = '2.2.10'
 
 import heapq
 import random
@@ -99,7 +99,10 @@ class Monitor(object):
         name of the monitor |n|
         if the name ends with a period (.),
         auto serializing will be applied |n|
-        if omitted, the name monitor. (serialized)
+        if the name end with a comma,
+        auto serializing starting at 1 will be applied |n|
+        if omitted, the name will be derived from the class
+        it is defined in (lowercased)
 
     monitor : bool
         if True (default), monitoring will be on. |n|
@@ -135,9 +138,7 @@ class Monitor(object):
             self.env = _default_env
         else:
             self.env = env
-        if name is omitted:
-            name = _name_from_type(self)
-        self.name(name)
+        _set_name(name, self.env._nameserializeMonitor, self)
         try:
             self.xtypecode, _ = type_to_typecode_off(type)
         except KeyError:
@@ -152,7 +153,10 @@ class Monitor(object):
 
         by default this is a dummy method, but it can be overridden.
         '''
-        pass
+        if args:
+            raise SalabimError('too many arguments: ' + str(args))
+        if kwargs:
+            raise SalabimError('too many keyword arguments: ' + str(kwargs))
 
     def reset(self, monitor=omitted):
         '''
@@ -203,23 +207,13 @@ class Monitor(object):
         if self._monitor:
             self._x.append(x)
 
-    def name(self, txt=omitted):
+    def name(self):
         '''
-        Parameters
-        ----------
-        txt : str
-            name of the monitor |n|
-            if txt ends with a period, the name will be serialized |n|
-            if omittted, no change
-
         Returns
         -------
         Name of the monitor : str
         '''
-
-        if txt is not omitted:
-            _set_name(txt, self.env._nameserializeMonitor, self)
-        return _decode_name(self._name)
+        return self._name
 
     def base_name(self):
         '''
@@ -227,7 +221,7 @@ class Monitor(object):
         -------
         base name of the monitor (the name used at init or name): str
         '''
-        return self._base_namee
+        return self._base_name
 
     def sequence_number(self):
         '''
@@ -236,7 +230,7 @@ class Monitor(object):
         sequence_number of the monitor : int
             (the sequence number at init or name) |n|
             normally this will be the integer value of a serialized name,
-            but also non serialized names (without a dot at the end)
+            but also non serialized names (without a dot or a comma at the end)
             will be numbered)
         '''
         return self._sequence_number
@@ -449,7 +443,7 @@ class Monitor(object):
         indent = pad('', l)
 
         if show_header:
-            print(indent + 'Statistics of {} at {}'.format(self.name(), fn(self.env._now, 13, 3)))
+            print(indent + 'Statistics of {} at {}'.format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
 
         if show_legend:
             print(
@@ -607,7 +601,13 @@ class MonitorTimestamp(Monitor):
     Parameters
     ----------
     name : str
-        name to be used at print_histogram
+        name of the timestamped monitor
+        if the name ends with a period (.),
+        auto serializing will be applied |n|
+        if the name end with a comma,
+        auto serializing starting at 1 will be applied |n|
+        if omitted, the name will be derived from the class
+        it is defined in (lowercased)
 
     getter : function
         this function must return the current value |n|
@@ -667,9 +667,7 @@ class MonitorTimestamp(Monitor):
 
     cached_xduration = [(0, ()), (0, ())]  # index=ex0, value=[hash,(x,duration)]
 
-    def __init__(self, name, getter, monitor=True, type='any', env=omitted, *args, **kwargs):
-        if name is omitted:
-            name = _name_from_type(self)
+    def __init__(self, name=omitted, getter=None, monitor=True, type='any', env=omitted, *args, **kwargs):
         if env is omitted:
             self.env = _default_env
         else:
@@ -679,7 +677,7 @@ class MonitorTimestamp(Monitor):
         except KeyError:
             raise SalabimError('type (' + type + ') not recognized')
 
-        self.name(name)
+        _set_name(name, self.env._nameserializeComponent, self)
         self._timestamp = True
         self._getter = getter
         self.reset(monitor=monitor)
@@ -691,7 +689,10 @@ class MonitorTimestamp(Monitor):
 
         by default this is a dummy method, but it can be overridden.
         '''
-        pass
+        if args:
+            raise SalabimError('too many arguments: ' + str(args))
+        if kwargs:
+            raise SalabimError('too many keyword arguments: ' + str(kwargs))
 
     def __call__(self):  # direct moneypatching __call__ doesn't work
         return self._getter()
@@ -766,22 +767,13 @@ class MonitorTimestamp(Monitor):
             self._x.append(self.off)
             self._t.append(t)
 
-    def name(self, txt=omitted):
+    def name(self):
         '''
-        Parameters
-        ----------
-        txt : str
-            name of the monitortimestamp |n|
-            if txt ends with a period, the name will be serialized |n|
-            if omittted, no change
-
         Returns
         -------
         Name of the monitor : str
         '''
-        if txt is not omitted:
-            _set_name(txt, self.env._nameserializeMonitorTimestamp, self)
-        return _decode_name(self._name)
+        return self._name
 
     def base_name(self):
         '''
@@ -789,7 +781,7 @@ class MonitorTimestamp(Monitor):
         -------
         base name of the monitortimestamp (the name used at init or name): str
         '''
-        return self._base_namee
+        return self._base_name
 
     def sequence_number(self):
         '''
@@ -798,7 +790,7 @@ class MonitorTimestamp(Monitor):
         sequence_number of the monitortimestamp : int
             (the sequence number at init or name) |n|
             normally this will be the integer value of a serialized name,
-            but also non serialized names (without a dot at the end)
+            but also non serialized names (without a dot or a comma at the end)
             will be numbered)
         '''
         return self._sequence_number
@@ -1163,8 +1155,7 @@ if Pythonista:
         def draw(self):
 
             if an_env is not None:
-                scene.background(pythonistacolor(
-                    colorspec_to_tuple(an_env.background_color)))
+                scene.background(pythonistacolor('bg'))
 
                 if an_env._synced:
                     if an_env.paused:
@@ -1178,7 +1169,7 @@ if Pythonista:
                         an_env.step()
                         if an_env._current_component == an_env._main:
                             an_env.print_trace(
-                                '{:10.3f}'.format(an_env._now),
+                                '{:10.3f}'.format(an_env._now - an_env._offset),
                                 an_env._main.name(), 'current')
                             an_env._main._scheduled_time = inf
                             an_env._main._status = current
@@ -1190,7 +1181,7 @@ if Pythonista:
                         an_env.step()
                         an_env.t = an_env._now
                         if an_env._current_component == an_env._main:
-                            an_env.print_trace('{:10.3f}'.format(an_env._now),
+                            an_env.print_trace('{:10.3f}'.format(an_env._now - an_env._offset),
                                 an_env._main.name(), 'current')
                             an_env._scheduled_time = inf
                             an_env._status = current
@@ -1204,7 +1195,7 @@ if Pythonista:
                 touchvalues = self.touches.values()
 
                 capture_image = Image.new('RGB',
-                    (an_env.width, an_env.height), colorspec_to_tuple(an_env.background_color))
+                    (an_env.width, an_env.height), colorspec_to_tuple('bg'))
 
                 an_env.animation_pre_tick(an_env.t)
                 for ao in an_env.an_objects:
@@ -1230,7 +1221,7 @@ if Pythonista:
                         scene.stroke(pythonistacolor(uio.linecolor))
                         scene.stroke_weight(linewidth)
                         scene.rect(uio.x - 4, uio.y + 2, uio.width + 8, uio.height - 4)
-                        scene.tint(uio.color)
+                        scene.tint(pythonistacolor(uio.color))
                         scene.translate(uio.x + uio.width / 2,
                                         uio.y + uio.height / 2)
                         scene.text(uio.text(), uio.font,
@@ -1316,11 +1307,18 @@ class Queue(object):
 
     Parameters
     ----------
+    fill : Queue, list or tuple
+        fill the queue with the components in fill |n|
+        if omitted, the queue will be empty at initialization
+
     name : str
         name of the queue |n|
         if the name ends with a period (.),
         auto serializing will be applied |n|
-        if omitted, the name queue. (serialized)
+        if the name end with a comma,
+        auto serializing starting at 1 will be applied |n|
+        if omitted, the name will be derived from the class
+        it is defined in (lowercased)
 
     monitor : bool
         if True (default) , both length and length_of_stay are monitored |n|
@@ -1334,14 +1332,12 @@ class Queue(object):
         for internal use only
     '''
 
-    def __init__(self, name=omitted, monitor=True, env=omitted, _isinternal=False, *args, **kwargs):
+    def __init__(self, name=omitted, monitor=True, fill=omitted, env=omitted, _isinternal=False, *args, **kwargs):
         if env is omitted:
             self.env = _default_env
         else:
             self.env = env
-        if name is omitted:
-            name = _name_from_type(self)
-        self.name(name)
+        _set_name(name, self.env._nameserializeQueue, self)
         self._head = Qmember()
         self._tail = Qmember()
         self._head.successor = self._tail
@@ -1357,9 +1353,12 @@ class Queue(object):
         self._iter_touched = {}
         self._animate_on = False
         self.length = MonitorTimestamp(
-            ('Length of ', self), getter=self._getlength, monitor=monitor, type='uint32', env=self.env)
+            'Length of ' + self.name(), getter=self._getlength, monitor=monitor, type='uint32', env=self.env)
         self.length_of_stay = Monitor(
-            ('Length of stay in ', self), monitor=monitor, type='float')
+            'Length of stay in ' + self.name(), monitor=monitor, type='float')
+        if fill is not omitted:
+            for c in fill:
+                c._enter(self)
         if not _isinternal:
             self.env.print_trace('', '', self.name() + ' create')
         self.setup(*args, **kwargs)
@@ -1370,7 +1369,10 @@ class Queue(object):
 
         by default this is a dummy method, but it can be overridden.
         '''
-        pass
+        if args:
+            raise SalabimError('too many arguments: ' + str(args))
+        if kwargs:
+            raise SalabimError('too many keyword arguments: ' + str(kwargs))
 
     def _animate_update(self):
         if self._animate_reverse:
@@ -1488,17 +1490,17 @@ class Queue(object):
         self.length_of_stay.monitor(value=value)
 
     def __repr__(self):
-        return 'Queue(' + self.name() + ')'
+        return objectclass_to_str(self) + '(' + self.name() + ')'
 
     def print_info(self):
-        print('Queue ' + hex(id(self)))
+        print(objectclass_to_str(self) + ' ' + hex(id(self)))
         print('  name=' + self.name())
         if self._length:
             print('  component(s):')
             mx = self._head.successor
             while mx != self._tail:
                 print('    ' + pad(mx.component.name(), 20) +
-                    ' enter_time' + time_to_string(mx.enter_time) +
+                    ' enter_time' + time_to_string(mx.enter_time - self.env._offset) +
                     ' priority=' + str(mx.priority))
                 mx = mx.successor
         else:
@@ -1508,7 +1510,7 @@ class Queue(object):
         '''
         prints a summary of statistics of a queue
         '''
-        print('Statistics of {} at {}'.format(self.name(), fn(self.env._now, 13, 3)))
+        print('Statistics of {} at {}'.format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
         self.length.print_statistics(
             show_header=False, show_legend=True, do_indent=True)
 
@@ -1516,23 +1518,13 @@ class Queue(object):
         self.length_of_stay.print_statistics(
             show_header=False, show_legend=False, do_indent=True)
 
-    def name(self, txt=omitted):
+    def name(self):
         '''
-        Parameters
-        ----------
-        txt : str
-            name of the queue |n|
-            if txt ends with a period, the name will be serialized |n|
-            if omittted, no change
-
         Returns
         -------
         Name of the queue : str
         '''
-
-        if txt is not omitted:
-            _set_name(txt, self.env._nameserializeQueue, self)
-        return _decode_name(self._name)
+        return self._name
 
     def base_name(self):
         '''
@@ -1540,7 +1532,7 @@ class Queue(object):
         -------
         base name of the queue (the name used at init or name): str
         '''
-        return self._base_namee
+        return self._base_name
 
     def sequence_number(self):
         '''
@@ -1549,7 +1541,7 @@ class Queue(object):
         sequence_number of the queue : int
             (the sequence number at init or name) |n|
             normally this will be the integer value of a serialized name,
-            but also non serialized names (without a dot at the end)
+            but also non serialized names (without a dot or a comma at the end)
             will be numbered)
         '''
         return self._sequence_number
@@ -1568,7 +1560,27 @@ class Queue(object):
         ----
         the priority will be set to
         the priority of the tail of the queue, if any
-        or 0 if queue is empty
+        or 0 if queue is empty |n|
+        This method is equivalent to append()
+        '''
+        component.enter(self)
+
+    def append(self, component):
+        '''
+        appends a component to the tail of a queue
+
+        Parameters
+        ----------
+        component : Component
+            component to be appened to the tail of the queue |n|
+            may not be member of the queue yet
+
+        Note
+        ----
+        the priority will be set to
+        the priority of the tail of the queue, if any
+        or 0 if queue is empty |n|
+        This method is equivalent to add()
         '''
         component.enter(self)
 
@@ -1611,6 +1623,39 @@ class Queue(object):
         '''
         component.enter_in_front_off(self, poscomponent)
 
+    def insert(self, index, component):
+        '''
+        Insert component before index'th element of the queue
+
+        Arguments
+        ---------
+        index : int
+            component to be added just before index'th element |n|
+            should be >=0 and <=len(self)
+
+        component : Component
+            component to be added to the queue
+
+        Note
+        ----
+        the priority of component will be set to the priority of the index'th component,
+        or 0 if the queue is empty
+        '''
+        if index < 0:
+            raise SalabimError('index <0')
+        if index > self._length:
+            raise SalabimError('index > lengh of queue')
+        component._checknotinqueue(self)
+        mx = self._head.successor
+        count = 0
+        while mx != self._tail:
+            if count == index:
+                break
+            count = count + 1
+            mx = mx.successor
+        priority = mx.priority
+        Qmember().insert_in_front_of(mx, component, self, priority)
+
     def add_behind(self, component, poscomponent):
         '''
         adds a component to a queue, just behind a component
@@ -1652,7 +1697,7 @@ class Queue(object):
         '''
         component.enter_sorted(self, priority)
 
-    def remove(self, component):
+    def remove(self, component=omitted):
         '''
         removes component from the queue
 
@@ -1660,9 +1705,16 @@ class Queue(object):
         ----------
         component : Component
             component to be removed |n|
-            must be member of the queue
+            if omitted, all components will be removed.
+
+        Notes
+        -----
+        component must be member of the queue
         '''
-        component.leave(self)
+        if component is omitted:
+            self.clear()
+        else:
+            component.leave(self)
 
     def head(self):
         '''
@@ -1688,16 +1740,25 @@ class Queue(object):
         '''
         return self._tail.predecessor.component
 
-    def pop(self):
+    def pop(self, index=omitted):
         '''
-        removes the head component, if any. |n|
+        removes a component by its position (or head)
+
+        Parameters
+        ----------
+        index : int
+            index'th element to remove, if any |n|
+            if omitted, return the head of the queue, if any
 
         Returns
         -------
-        The head component : Component
-            None if the queue is empty
+        The i-th component or head : Component
+            None if not existing
         '''
-        c = self._head.successor.component
+        if index == omitted:
+            c = self._head.successor.component
+        else:
+            c = self[index]
         if c is not None:
             c.leave(self)
         return c
@@ -1790,6 +1851,16 @@ class Queue(object):
         else:
             raise TypeError('Invalid argument type.')
 
+    def __delitem__(self, key):
+        print(key)
+        if isinstance(key, slice):
+            for c in self[key]:
+                self.remove(c)
+        elif isinstance(key, int):
+            self.remove(self[key])
+        else:
+            raise SalabimError('Invalid argument type')
+
     def __len__(self):
         return self._length
 
@@ -1820,6 +1891,41 @@ class Queue(object):
                 iter_index += 1
 
         del self._iter_touched[iter_sequence]
+
+    def __add__(self, q):
+        return self.union(q)
+
+    def __or__(self, q):
+        return self.union(q)
+
+    def __sub__(self, q):
+        return self.difference(q)
+
+    def __and__(self, q):
+        return self.intersection(q)
+
+    def __xor__(self, q):
+        print('***xor')
+        return self.symmetric_difference(q)
+
+    def count(self, component):
+        '''
+        component count
+
+        Arguments
+        ---------
+        component : Component
+            component to count
+
+        Returns
+        -------
+        number of occurences of component in the queue
+
+        Notes
+        -----
+        The result can only be 0 or 1
+        '''
+        return 1 if component in self else 0
 
     def index(self, component):
         '''
@@ -1889,15 +1995,42 @@ class Queue(object):
 
         del self._iter_touched[iter_sequence]
 
-    def union(self, q, name):
+    def extend(self, q):
+        '''
+        extends the queue with components of q that are not already in self
+
+        Arguments
+        ---------
+        q : queue, list or tuple
+
+        Notes
+        -----
+        The components added to the queue will get the priority of the tail of self.
+        '''
+        for c in q:
+            if c not in self:
+                c._enter(q)
+
+    def as_set(self):
+        return {c for c in self}
+
+    def as_list(self):
+        return [c for c in self]
+
+    def union(self, q, name=omitted, monitor=False):
         '''
         Parameters
         ----------
         q : Queue
             queue to be unioned with self
 
-        name :str
-            name of the  new queue
+        name : str
+            name of the  new queue |n|
+            if omitted, self.name() + q.name()
+
+        monitor : bool
+            if True, monitor the queue |n|
+            if False (default), do not monitor the queue
 
         Returns
         -------
@@ -1910,27 +2043,31 @@ class Queue(object):
         the order of the resulting queue is as follows |n|:
         first all components of self, in that order,
         followed by all components in q that are not in self,
-        in that order.
+        in that order. |n|
+        Alternatively, the more pythonic | operator is also supported, e.g. q1 | q2
         '''
         save_trace = self.env._trace
         self.env._trace = False
-        q1 = Queue(name=name, env=self.env)
-        components = []
+        if name is omitted:
+            name = self.name() + ' | ' + q.name()
+        q1 = type(self)(name=name, monitor=monitor, env=self.env)
+        self_set = self.as_set()
+
         mx = self._head.successor
         while mx != self._tail:
-            components.append(mx.component)
+            Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
             mx = mx.successor
+
         mx = q._head.successor
         while mx != q._tail:
-            if mx.component not in components:
-                components.append(mx.component)
+            if mx.component not in self_set:
+                Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
             mx = mx.successor
-        for c in components:
-            Qmember().insert_in_front_of(q1._tail, c, q1, 0)
+
         self.env._trace = save_trace
         return q1
 
-    def intersect(self, q, name):
+    def intersection(self, q, name=omitted, monitor=False):
         '''
         returns the intersect of two queues
 
@@ -1939,33 +2076,41 @@ class Queue(object):
         q : Queue
             queue to be intersected with self
 
-        name :str
-            name of the  new queue
+        name : str
+            name of the  new queue |n|
+            if omitted, self.name() + q.name()
 
-        the resulting queue will contain all elements that
-        are in self and q |n|
+        monitor : bool
+            if True, monitor the queue |n|
+            if False (default), do not monitor the queue
+
+        Returns
+        -------
+        queue with all elements that are in self and q : Queue
+
+        Notes
+        -----
         the priority will be set to 0 for all components in the
         resulting  queue |n|
-        the order of the resulting queue is as follows |n|:
-        in the same order as in self.
+        the order of the resulting queue is as follows: |n|
+        in the same order as in self. |n|
+        Alternatively, the more pythonic & operator is also supported, e.g. q1 & q2
         '''
         save_trace = self.env._trace
         self.env._trace = False
-        q1 = Queue(name=name, env=self.env)
-        components = []
-        mx = q._head.successor
-        while mx != q._tail:
-            components.append(mx.component)
-            mx = mx.successor
+        if name is omitted:
+            name = self.name() + ' & ' + q.name()
+        q1 = type(self)(name=name, monitor=monitor, env=self.env)
+        q_set = q.as_set()
         mx = self._head.successor
         while mx != self._tail:
-            if mx.component in components:
+            if mx.component in q_set:
                 Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
             mx = mx.successor
         self.env._trace = save_trace
         return q1
 
-    def difference(self, q, name):
+    def difference(self, q, name=omitted, monitor=monitor):
         '''
         returns the difference of two queues
 
@@ -1974,48 +2119,117 @@ class Queue(object):
         q : Queue
             queue to be 'subtracted' from self
 
-        name :str
-            name of the  new queue
+        name : str
+            name of the  new queue |n|
+            if omitted, self.name() - q.name()
 
-        the resulting queue will contain all elements of self that are not
-        in q |n|
+        monitor : bool
+            if True, monitor the queue |n|
+            if False (default), do not monitor the queue
+
+        Returns
+        -------
+        queue containing all elements of self that are not in q
+
+        Notes
+        -----
         the priority will be copied from the original queue.
-        Also, the order will be maintained.
+        Also, the order will be maintained. |n|
+        Alternatively, the more pythonic - operator is also supported, e.g. q1 - q2
         '''
+        if name is omitted:
+            name = self.name() + ' - ' + q.name()
         save_trace = self.env._trace
         self.env._trace = False
-        q1 = Queue(name=name, env=self.env)
-        components = []
-        mx = q._head.successor
-        while mx != q._tail:
-            components.append(mx.component)
-            mx = mx.successor
-
+        q1 = type(self)(name=name, monitor=monitor, env=self.env)
+        q_set = q.as_set()
         mx = self._head.successor
         while mx != self._tail:
-            if mx.component not in components:
+            if mx.component not in q_set:
                 Qmember().insert_in_front_of(
                     q1._tail, mx.component, q1, mx.priority)
             mx = mx.successor
         self.env._trace = save_trace
         return q1
 
-    def copy(self, name):
+    def symmetric_difference(self, q, name=omitted, monitor=monitor):
+        '''
+        returns the symmetric difference of two queues
+
+        Parameters
+        ----------
+        q : Queue
+            queue to be 'subtracted' from self
+
+        name : str
+            name of the  new queue |n|
+            if omitted, self.name() - q.name()
+
+        monitor : bool
+            if True, monitor the queue |n|
+            if False (default), do not monitor the queue
+
+        Returns
+        -------
+        queue containing all elements that are either in self or q, but not in both
+
+        Notes
+        -----
+        the priority of all elements will be set to 0 for all components in the new queue.
+        Order: First, elelements in self (in that order), then elements in q (in that order)
+        Alternatively, the more pythonic ^ operator is also supported, e.g. q1 ^ q2
+        '''
+        if name is omitted:
+            name = self.name() + ' ^ ' + q.name()
+        save_trace = self.env._trace
+        self.env._trace = False
+        q1 = type(self)(name=name, monitor=monitor, env=self.env)
+
+        intersection_set = self.as_set() & q.as_set()
+        mx = self._head.successor
+        while mx != self._tail:
+            if mx.component not in intersection_set:
+                Qmember().insert_in_front_of(
+                    q1._tail, mx.component, q1, 0)
+            mx = mx.successor
+        mx = q._head.successor
+        while mx != q._tail:
+            if mx.component not in intersection_set:
+                Qmember().insert_in_front_of(
+                    q1._tail, mx.component, q1, 0)
+            mx = mx.successor
+
+        self.env._trace = save_trace
+        return q1
+
+    def copy(self, name=omitted, monitor=monitor):
         '''
         returns a copy of two queues
 
         Parameters
         ----------
         name : str
-            name of the new queue
+            name of the new queue |n|
+            if omitted, 'copy of ' + self.name()
 
-        the resulting queue will contain all elements of self |n|
+        monitor : bool
+            if True, monitor the queue |n|
+            if False (default), do not monitor the queue
+
+        Returns
+        -------
+        queue with all elements of self : Queue
+
+        Notes
+        -----
         The priority will be copied from original queue.
         Also, the order will be maintained.
         '''
         save_trace = self.env._trace
         self.env._trace = False
-        q1 = Queue(name=name, env=self.env)
+        if name is omitted:
+            name = 'copy of ' + self.name()
+        q1 = type(self)(name=name, env=self.env)
         mx = self._head.successor
         while mx != self._tail:
             Qmember().insert_in_front_of(q1._tail, mx.component, q1, mx.priority)
@@ -2023,7 +2237,7 @@ class Queue(object):
         self.env._trace = save_trace
         return q1
 
-    def move(self, name):
+    def move(self, name=omitted, monitor=monitor):
         '''
         makes a copy of a queue and empties the original
 
@@ -2032,11 +2246,20 @@ class Queue(object):
         name : str
             name of the new queue
 
-        the resulting queue will contain all elements of self,
-        with the proper priority |n|
+        monitor : bool
+            if True, monitor the queue |n|
+            if False (default), do not monitor the yqueue
+
+        Returns
+        -------
+        queue containing all elements of self: Queue
+
+        Notes
+        -----
+        Priorities will be kept |n|
         self will be emptied
         '''
-        q1 = self.copy(name)
+        q1 = self.copy(name, monitor=monitor)
         self.clear()
         return q1
 
@@ -2051,6 +2274,7 @@ class Queue(object):
             c = mx.component
             mx = mx.successor
             c._leave(self)
+        self.env.print_trace('', '', self.name() + ' clear')
 
 
 def finish():
@@ -2082,7 +2306,10 @@ class Environment(object):
         name of the environment |n|
         if the name ends with a period (.),
         auto serializing will be applied |n|
-        if omitted, the name ``environment.`` (serialized)
+        if the name end with a comma,
+        auto serializing starting at 1 will be applied |n|
+        if omitted, the name will be derived from the class (lowercased)
+        or 'default environment' if is_default_env is True.
 
     is_default_env : bool
         if True, this environment becomes the default environment |n|
@@ -2108,25 +2335,23 @@ class Environment(object):
             _default_env = self
         if name is omitted:
             if is_default_env:
-                name = 'Default environment'
-            else:
-                if name is omitted:
-                    name = _name_from_type(self)
+                name = 'default environment'
         self._trace = trace
         if random_seed != '':
             if random_seed is omitted:
                 random_seed = 1234567
             random.seed(random_seed)
-        self.name(name)
+        _set_name(name, Environment._nameserialize, self)
         self.env = self
         # just to allow main to be created; will be reset later
         self._nameserializeComponent = {}
         self._now = 0
+        self._offset = 0
         self._main = Component(name='main', env=self, process=None)
         self._main._status = current
         self._current_component = self._main
         self.ui_objects = []
-        self.print_trace('{:10.3f}'.format(self._now), 'main', 'current')
+        self.print_trace('{:10.3f}'.format(self._now - self._offset), 'main', 'current')
         self._nameserializeQueue = {}
         self._nameserializeComponent = {}
         self._nameserializeResource = {}
@@ -2157,6 +2382,7 @@ class Environment(object):
         self.y0 = 0
         self.x1 = self.width
         self.background_color = 'white'
+        self.foreground_color = 'black'
         self.fps = 30
         self.modelname = ''
         self.use_toplevel = False
@@ -2171,14 +2397,17 @@ class Environment(object):
 
         by default this is a dummy method, but it can be overridden.
         '''
-        pass
+        if args:
+            raise SalabimError('too many arguments: ' + str(args))
+        if kwargs:
+            raise SalabimError('too many keyword arguments: ' + str(kwargs))
 
     def serialize(self):
         self.serial += 1
         return self.serial
 
     def __repr__(self):
-        return 'Environment(' + self.name() + ')'
+        return objectclass_to_str(self) + ' (' + self.name() + ')'
 
     def animation_pre_tick(self, t):
         '''
@@ -2205,10 +2434,10 @@ class Environment(object):
         return
 
     def print_info(self):
-        print('Environment ' + hex(id(self)))
+        print(objectclass_to_str(self) + ' ' + hex(id(self)))
         print('  name=' + self.name() +
             (' (animation environment)' if self == an_env else ''))
-        print('  now=' + time_to_string(self._now))
+        print('  now=' + time_to_string(self._now - self._offset))
         print('  current_component=' + self._current_component.name())
         print('  trace=' + str(self._trace))
 
@@ -2224,15 +2453,14 @@ class Environment(object):
                 c._status = current
                 c._scheduled_time = inf
                 self.env._current_component = c
-                self.print_trace('{:10.3f}'.format(self._now), c.name(),
+                self.print_trace('{:10.3f}'.format(self._now - self.env._offset), c.name(),
                                  'current (standby)')
                 try:
                     next(c._process)
                     return
                 except StopIteration:
                     c.release()
-                    self.print_trace('{:10.3f}'.format(
-                        self._now), c.name(), 'ended')
+                    self.print_trace('', '', c.name() + ' ended')
                     c._status = data
                     c._scheduled_time = inf
                     c._process = None
@@ -2259,7 +2487,7 @@ class Environment(object):
                 return
 
             c._status = current
-            self.print_trace('{:10.3f}'.format(self._now), c.name(),
+            self.print_trace('{:10.3f}'.format(self._now - self._offset), c.name(),
                              'current')
             c._check_fail()
             c._scheduled_time = inf
@@ -2267,7 +2495,7 @@ class Environment(object):
             return
         except StopIteration:
             c.release()
-            self.print_trace('{:10.3f}'.format(self._now), c.name(), 'ended')
+            self.print_trace('', '', c.name() + ' ended')
             c._status = data
             c._scheduled_time = inf
             c._process = None
@@ -2284,7 +2512,7 @@ class Environment(object):
 
     def animation_parameters(self,
       animate=omitted, synced=omitted, speed=omitted, width=omitted, height=omitted,
-      x0=omitted, y0=0, x1=omitted, background_color=omitted,
+      x0=omitted, y0=0, x1=omitted, background_color=omitted, foreground_color=omitted,
       fps=omitted, modelname=omitted, use_toplevel=omitted,
       show_fps=omitted, show_time=omitted,
       video=omitted):
@@ -2333,6 +2561,13 @@ class Environment(object):
         background_color : colorspec
             color of the background |n|
             if omitted, no change. At init of the environment, this will be set to white.
+
+        foreground_color : colorspec
+            color of foreground (texts) |n|
+            if omitted and background_color is specified, either white of black will be used,
+            in order to get a good contrast with the background color. |n|
+            if omitted and background_color is also omitted, no change. At init of the
+            environment, this will be set to black.
 
         fps : float
             number of frames per second
@@ -2403,7 +2638,15 @@ class Environment(object):
         if y0 is not omitted:
             self.y0 = y0
         if background_color is not omitted:
-            self.background_color = background_color
+            if background_color in ('fg', 'bg'):
+                raise SalabimError(background_color + ' not allowed for background_color')
+            self.background_color = check_colorspec(background_color)
+            if foreground_color is omitted:
+                self.foreground_color = contrast_color(self.background_color)
+        if foreground_color is not omitted:
+            if background_color in ('fg', 'bg'):
+                raise SalabimError(background_color + ' not allowed for foreground_color')
+            self.foreground_color = check_colorspec(foreground_color)
         if fps is not omitted:
             self.fps = fps
         if modelname is not omitted:
@@ -2441,7 +2684,24 @@ class Environment(object):
         -------
         the current simulation time : float
         '''
-        return self._now
+        return self._now - self.env._offset
+
+    def reset_now(self, new_now=0):
+        '''
+        reset the current time
+
+        Parameters
+        ----------
+        new_now : float
+            now will be set not new_now |n|
+            default: 0
+        '''
+        offset_before = self._offset
+        self._offset = self._now - new_now
+
+        self.print_trace(
+            '', '', 'now reset to {:0.3f}'.format(new_now),
+            '(all times are reduced by {:0.3f})'.format(self._offset - offset_before))
 
     def trace(self, value=omitted):
         '''
@@ -2505,7 +2765,7 @@ class Environment(object):
                     scheduled_time = self.env._now + duration
         else:
             if duration is omitted:
-                scheduled_time = till
+                scheduled_time = till + self.env._offset
             else:
                 raise SalabimError('both duration and till specified')
 
@@ -2593,7 +2853,7 @@ class Environment(object):
             self.step()
             if self._current_component == self._main:
                 self.print_trace('{:10.3f}'.format(
-                    self._now), self._main.name(), 'current')
+                    self._now - self._offset), self._main.name(), 'current')
                 self._scheduled_time = inf
                 self._status = current
                 return
@@ -2618,7 +2878,7 @@ class Environment(object):
                 while self.peek() < self.t:
                     self.step()
                     if self._current_component == self._main:
-                        self.print_trace('{:10.3f}'.format(self._now),
+                        self.print_trace('{:10.3f}'.format(self._now - self._offset),
                             self._main.name(), 'current')
                         self._scheduled_time = inf
                         self._status = current
@@ -2631,7 +2891,7 @@ class Environment(object):
                     self.step()
                     self.t = self._now
                     if self._current_component == self._main:
-                        self.print_trace('{:10.3f}'.format(self._now),
+                        self.print_trace('{:10.3f}'.format(self._now - self._offset),
                             self._main.name(), 'current')
                         self._scheduled_time = inf
                         self._status = current
@@ -2643,7 +2903,7 @@ class Environment(object):
 
             if self.dovideo:
                 capture_image = Image.new(
-                    'RGB', (self.width, self.height), colorspec_to_tuple(self.background_color))
+                    'RGB', (self.width, self.height), colorspec_to_tuple('bg'))
 
             if not self.paused:
                 self.frametimes.append(time.time())
@@ -2726,10 +2986,11 @@ class Environment(object):
         called by run(), if animation is True. |n|
         may be overridden to change the standard behaviour.
         '''
+
         if self.modelname != '':
             ao = Animate(text=self.modelname,
                          x0=8, y0=self.height - 60,
-                         anchor='w', fontsize0=30, textcolor0='black',
+                         anchor='w', fontsize0=30, textcolor0='fg',
                          screen_coordinates=True, env=self)
             self.system_an_objects.append(ao)
             ao = Animate(text='a salabim model',
@@ -2748,7 +3009,7 @@ class Environment(object):
         for ob in self.menu_objects[:]:
             ob.remove()
         uio = AnimateButton(x=35, y=self.height - 21, text='Menu',
-          width=50, action=self.env.an_pause, env=self, fillcolor='blue')
+          width=50, action=self.env.an_pause, env=self, fillcolor='blue', color='white')
         self.menu_objects.append(uio)
 
     def an_system_unsynced_buttons(self):
@@ -2760,7 +3021,7 @@ class Environment(object):
             ob.remove()
 
         uio = AnimateButton(x=35, y=self.height - 21, text='Go',
-          width=50, action=self.env.an_go, env=self, fillcolor='green')
+          width=50, action=self.env.an_go, env=self, fillcolor='green', color='white')
         self.menu_objects.append(uio)
 
         uio = AnimateButton(x=35 + 1 * 60, y=self.height - 21, text='Step',
@@ -2776,15 +3037,17 @@ class Environment(object):
         self.menu_objects.append(uio)
 
         uio = AnimateButton(x=35 + 5 * 60, y=self.height - 21, text='Stop',
-          width=50, action=self.env.an_stop, env=self, fillcolor='red')
+          width=50, action=self.env.an_stop, env=self, fillcolor='red', color='white')
         self.menu_objects.append(uio)
 
-        uio = Animate(x0=35 + 3 * 60, y0=self.height - 35, text='', anchor='N', fontsize0=15,
+        uio = Animate(x0=35 + 3 * 60, y0=self.height - 35, text='',
+          textcolor0='fg', anchor='N', fontsize0=15,
           screen_coordinates=True)
         uio.text = self.syncedtext
         self.menu_objects.append(uio)
 
-        uio = Animate(x0=35 + 4 * 60, y0=self.height - 35, text='', anchor='N', fontsize0=15,
+        uio = Animate(x0=35 + 4 * 60, y0=self.height - 35, text='',
+          textcolor0=colorspec_to_tuple('fg'), anchor='N', fontsize0=15,
           screen_coordinates=True)
         uio.text = self.tracetext
         self.menu_objects.append(uio)
@@ -2798,7 +3061,7 @@ class Environment(object):
             ob.remove()
 
         uio = AnimateButton(x=35, y=self.height - 21, text='Go',
-          width=50, action=self.env.an_go, env=self, fillcolor='green')
+          width=50, action=self.env.an_go, env=self, fillcolor='green', color='white')
         self.menu_objects.append(uio)
 
         uio = AnimateButton(x=35 + 1 * 60, y=self.height - 21, text='/2',
@@ -2818,20 +3081,23 @@ class Environment(object):
         self.menu_objects.append(uio)
 
         uio = AnimateButton(x=35 + 5 * 60, y=self.height - 21, text='Stop',
-          width=50, action=self.env.an_stop, env=self, fillcolor='red')
+          width=50, action=self.env.an_stop, env=self, fillcolor='red', color='white')
         self.menu_objects.append(uio)
 
-        uio = Animate(x0=35 + 1.5 * 60, y0=self.height - 35, text='', anchor='N', fontsize0=15,
+        uio = Animate(x0=35 + 1.5 * 60, y0=self.height - 35, text='',
+          textcolor0='fg', anchor='N', fontsize0=15,
           screen_coordinates=True)
         uio.text = self.speedtext
         self.menu_objects.append(uio)
 
-        uio = Animate(x0=35 + 3 * 60, y0=self.height - 35, text='', anchor='N', fontsize0=15,
+        uio = Animate(x0=35 + 3 * 60, y0=self.height - 35, text='',
+          textcolor0='fg', anchor='N', fontsize0=15,
           screen_coordinates=True)
         uio.text = self.syncedtext
         self.menu_objects.append(uio)
 
-        uio = Animate(x0=35 + 4 * 60, y0=self.height - 35, text='', anchor='N', fontsize0=15,
+        uio = Animate(x0=35 + 4 * 60, y0=self.height - 35, text='',
+          textcolor0='fg', anchor='N', fontsize0=15,
           screen_coordinates=True)
         uio.text = self.tracetext
         self.menu_objects.append(uio)
@@ -2842,7 +3108,7 @@ class Environment(object):
         called by run(), if animation is True. |n|
         may be overridden to change the standard behaviour.
         '''
-        ao = Animate(x0=self.width, y0=self.height - 5, fillcolor0='black',
+        ao = Animate(x0=self.width, y0=self.height - 5, textcolor0='fg',
                      text='', fontsize0=15, font='narrow', anchor='ne',
                      screen_coordinates=True, env=self)
         self.system_an_objects.append(ao)
@@ -2917,7 +3183,7 @@ class Environment(object):
         if self.show_time:
             if s != '':
                 s += ' '
-            s += 't={:.3f}'.format(t)
+            s += 't={:.3f}'.format(t - self.env._offset)
         return s
 
     def tracetext(self, t):
@@ -2971,36 +3237,26 @@ class Environment(object):
         else:
             return fontsize / self.scale
 
-    def name(self, txt=omitted):
+    def name(self):
         '''
-        Parameters
-        ----------
-        txt : str
-            name of the environment |n|
-            if txt ends with a period, the name will be serialized |n|
-            if omittted, no change
-
         Returns
         -------
         Name of the environment : str
         '''
-
-        if txt is not omitted:
-            _set_name(txt, Environment._nameserialize, self)
-        return _decode_name(self._name)
+        return self._name
 
     def base_name(self):
         '''
         returns the base name of the environment (the name used at init or name)
         '''
-        return self._base_namee
+        return self._base_name
 
     def sequence_number(self):
         '''
         returns the sequence_number of the environment
         (the sequence number at init or name) |n|
         normally this will be the integer value of a serialized name,
-        but also non serialized names (without a dot at the end)
+        but also non serialized names (without a dot or a comma at the end)
         will be numbered)
         '''
         return self._sequence_number
@@ -3081,7 +3337,7 @@ class Animate(object):
         offsets the y-coordinate of the object (default 0) at time t0
 
     circle0 : tuple
-         the circle at time t0 specified as a tuple (radius,)
+         the circle at time t0 specified as a one element tuple (radius,)
 
     line0 : tuple
         the line(s) at time t0 (xa,ya,xb,yb,xc,yc, ...)
@@ -3249,7 +3505,7 @@ class Animate(object):
                  circle0=omitted, line0=omitted, polygon0=omitted, rectangle0=omitted,
                  image=omitted, text=omitted,
                  font='', anchor='center',
-                 linewidth0=1, fillcolor0='black', linecolor0='black', textcolor0='black',
+                 linewidth0=1, fillcolor0='fg', linecolor0='fg', textcolor0='fg',
                  angle0=0, fontsize0=20, width0=omitted,
                  t1=omitted, x1=omitted, y1=omitted, offsetx1=omitted, offsety1=omitted,
                  circle1=omitted, line1=omitted, polygon1=omitted, rectangle1=omitted,
@@ -3299,9 +3555,9 @@ class Animate(object):
         self.offsetx0 = offsetx0
         self.offsety0 = offsety0
 
-        self.fillcolor0 = fillcolor0
-        self.linecolor0 = linecolor0
-        self.textcolor0 = textcolor0
+        self.fillcolor0 = check_colorspec(fillcolor0)
+        self.linecolor0 = check_colorspec(linecolor0)
+        self.textcolor0 = check_colorspec(textcolor0)
         self.linewidth0 = linewidth0
         self.angle0 = angle0
         self.fontsize0 = fontsize0
@@ -3318,11 +3574,11 @@ class Animate(object):
         self.offsetx1 = self.offsetx0 if offsetx1 is omitted else offsetx1
         self.offsety1 = self.offsety0 if offsety1 is omitted else offsety1
         self.fillcolor1 =\
-            self.fillcolor0 if fillcolor1 is omitted else fillcolor1
+            self.fillcolor0 if fillcolor1 is omitted else check_colorspec(fillcolor1)
         self.linecolor1 =\
-            self.linecolor0 if linecolor1 is omitted else linecolor1
+            self.linecolor0 if linecolor1 is omitted else check_colorspec(linecolor1)
         self.textcolor1 =\
-            self.textcolor0 if textcolor1 is omitted else textcolor1
+            self.textcolor0 if textcolor1 is omitted else check_colorspec(textcolor1)
         self.linewidth1 =\
             self.linewidth0 if linewidth1 is omitted else linewidth1
         self.angle1 = self.angle0 if angle1 is omitted else angle1
@@ -3526,13 +3782,13 @@ class Animate(object):
         self.offsety0 = self.offsety(t) if offsety0 is omitted else offsety0
 
         self.fillcolor0 =\
-            self.fillcolor(t) if fillcolor0 is omitted else fillcolor0
-        self.linecolor0 = self.linecolor(
-            t) if linecolor0 is omitted else linecolor0
-        self.linewidth0 = self.linewidth(t) if linewidth0 is omitted else\
-            linewidth0
+            self.fillcolor(t) if fillcolor0 is omitted else check_colorspec(fillcolor0)
+        self.linecolor0 =\
+            self.linecolor(t) if linecolor0 is omitted else check_colorspec(linecolor0)
         self.textcolor0 =\
-            self.textcolor(t) if textcolor0 is omitted else textcolor0
+            self.textcolor(t) if textcolor0 is omitted else check_colorspec(textcolor0)
+        self.linewidth0 =\
+            self.linewidth(t) if linewidth0 is omitted else linewidth0
         self.angle0 = self.angle(t) if angle0 is omitted else angle0
         self.fontsize0 = self.fontsize(t) if fontsize0 is omitted else fontsize0
         self.t0 = self.env._now if t0 is omitted else t0
@@ -3548,11 +3804,11 @@ class Animate(object):
         self.offsetx1 = self.offsetx0 if offsetx1 is omitted else offsetx1
         self.offsety1 = self.offsety0 if offsety1 is omitted else offsety1
         self.fillcolor1 =\
-            self.fillcolor0 if fillcolor1 is omitted else fillcolor1
+            self.fillcolor0 if fillcolor1 is omitted else check_colorspec(fillcolor1)
         self.linecolor1 =\
-            self.linecolor0 if linecolor1 is omitted else linecolor1
+            self.linecolor0 if linecolor1 is omitted else check_colorspec(linecolor1)
         self.textcolor1 =\
-            self.textcolor0 if textcolor1 is omitted else textcolor1
+            self.textcolor0 if textcolor1 is omitted else check_colorspec(textcolor1)
         self.linewidth1 =\
             self.linewidth0 if linewidth1 is omitted else linewidth1
         self.angle1 = self.angle0 if angle1 is omitted else angle1
@@ -3593,56 +3849,215 @@ class Animate(object):
         -------
         x : float
             default behaviour: linear interpolation between self.x0 and self.x1
-
         '''
         return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.x0, self.x1)
 
     def y(self, t=omitted):
+        '''
+        y-position of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        y : float
+            default behaviour: linear interpolation between self.y0 and self.y1
+        '''
         return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.y0, self.y1)
 
     def offsetx(self, t=omitted):
+        '''
+        offsetx of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        offsetx : float
+            default behaviour: linear interpolation between self.offsetx0 and self.offsetx1
+        '''
         return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.offsetx0, self.offsetx1)
 
     def offsety(self, t=omitted):
+        '''
+        offsety of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        offsety : float
+            default behaviour: linear interpolation between self.offsety0 and self.offsety1
+        '''
         return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.offsety0, self.offsety1)
 
     def angle(self, t=omitted):
+        '''
+        angle of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        angle : float
+            default behaviour: linear interpolation between self.angle0 and self.angle1
+        '''
         return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.angle0, self.angle1)
 
     def linewidth(self, t=omitted):
+        '''
+        linewidth of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        linewidth : float
+            default behaviour: linear interpolation between self.linewidth0 and self.linewidth1
+        '''
         return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.linewidth0, self.linewidth1)
 
     def linecolor(self, t=omitted):
+        '''
+        linecolor of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        linecolor : colorspec
+            default behaviour: linear interpolation between self.linecolor0 and self.linecolor1
+        '''
         return colorinterpolate((self.env._now if t is omitted else t),
                                 self.t0, self.t1, self.linecolor0, self.linecolor1)
 
     def fillcolor(self, t=omitted):
+        '''
+        fillcolor of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        fillcolor : colorspec
+            default behaviour: linear interpolation between self.fillcolor0 and self.fillcolor1
+        '''
         return colorinterpolate((self.env._now if t is omitted else t),
                                 self.t0, self.t1, self.fillcolor0, self.fillcolor1)
 
     def circle(self, t=omitted):
+        '''
+        circle of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        circle : tuple
+            one element tuple with the radius |n|
+            default behaviour: linear interpolation between self.circle0 and self.circle1
+        '''
         return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.circle0, self.circle1)
 
     def textcolor(self, t=omitted):
+        '''
+        textcolor of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        textcolor : colorspec
+            default behaviour: linear interpolation between self.textcolor0 and self.textcolor1
+        '''
         return colorinterpolate((self.env._now if t is omitted else t),
                                 self.t0, self.t1, self.textcolor0, self.textcolor1)
 
     def line(self, t=omitted):
+        '''
+        line of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        line : tuple
+            series of x- and y-coordinates (xa,ya,xb,yb,xc,yc, ...) |n|
+            default behaviour: linear interpolation between self.line0 and self.line1
+        '''
         return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.line0, self.line1)
 
     def polygon(self, t=omitted):
+        '''
+        polygon of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        polygon: tuple
+            series of x- and y-coordinates describing the polygon (xa,ya,xb,yb,xc,yc, ...) |n|
+            default behaviour: linear interpolation between self.polygon0 and self.polygon1
+        '''
         return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.polygon0, self.polygon1)
 
     def rectangle(self, t=omitted):
+        '''
+        rectangle of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        rectangle: tuple
+            (xlowerleft,ylowerlef,xupperright,yupperright) |n|
+            default behaviour: linear interpolation between self.rectangle0 and self.rectangle1
+        '''
         return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.rectangle0, self.rectangle1)
 
@@ -3665,28 +4080,117 @@ class Animate(object):
         '''
 
     def fontsize(self, t=omitted):
+        '''
+        fontsize of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        fontsize : float
+            default behaviour: linear interpolation between self.fontsize0 and self.fontsize1
+        '''
         return interpolate((self.env._now if t is omitted else t),
                            self.t0, self.t1, self.fontsize0, self.fontsize1)
 
     def text(self, t=omitted):
+        '''
+        text of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        text : str
+            default behaviour: self.text0 (text given at creation or update)
+        '''
         return self.text0
 
     def anchor(self, t=omitted):
+        '''
+        anchor of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        anchor : str
+            default behaviour: self.anchor0 (anchor given at creation or update)
+        '''
+
         return self.anchor0
 
     def layer(self, t=omitted):
+        '''
+        layer of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        layer : int or float
+            default behaviour: self.layer0 (layer given at creation or update)
+        '''
         return self.layer0
 
     def font(self, t=omitted):
+        '''
+        font of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        font : str
+            default behaviour: self.font0 (font given at creation or update)
+        '''
         return self.font0
 
     def visible(self, t=omitted):
+        '''
+        visible attribute of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        visible : bool
+            default behaviour: self.visible0 (visible given at creation or update)
+        '''
         return self.visible0
 
     def image(self, t=omitted):
         '''
-        returns image at time t
-        use the function spec_to_image to change the image here
+        image of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        image : PIL.Image.Image
+            use function spec_to_image to load a file
+            default behaviour: self.image0 (image given at creation or update)
         '''
         return self.image0
 
@@ -4053,8 +4557,8 @@ class AnimateButton(object):
     '''
 
     def __init__(self, x=0, y=0, width=80, height=30,
-                 linewidth=0, fillcolor='40%gray',
-                 linecolor='black', color='white', text='', font='',
+                 linewidth=0, fillcolor='fg',
+                 linecolor='fg', color='bg', text='', font='',
                  fontsize=15, action=None, env=omitted):
 
         self.env = _default_env if env is omitted else env
@@ -4070,9 +4574,9 @@ class AnimateButton(object):
         self.y = y - height / 2
         self.width = width
         self.height = height
-        self.fillcolor = colorspec_to_tuple(fillcolor)
-        self.linecolor = colorspec_to_tuple(linecolor)
-        self.color = colorspec_to_tuple(color)
+        self.fillcolor = check_colorspec(fillcolor)
+        self.linecolor = check_colorspec(linecolor)
+        self.color = check_colorspec(color)
         self.linewidth = linewidth
         self.font = font
         self.fontsize = fontsize
@@ -4182,7 +4686,7 @@ class AnimateSlider(object):
 
     def __init__(self, layer=0, x=0, y=0, width=100, height=20,
                  vmin=0, vmax=10, v=omitted, resolution=1,
-                 linecolor='black', labelcolor='black', label='',
+                 linecolor='fg', labelcolor='fg', label='',
                  font='', fontsize=12, action=None, env=omitted):
 
         self.env = _default_env if env is omitted else env
@@ -4205,8 +4709,8 @@ class AnimateSlider(object):
         self.y = y - height / 2
         self.width = width
         self.height = height
-        self.linecolor = colorspec_to_tuple(linecolor)
-        self.labelcolor = colorspec_to_tuple(labelcolor)
+        self.linecolor = check_colorspec(linecolor)
+        self.labelcolor = check_colorspec(labelcolor)
         self.font = font
         self.fontsize = fontsize
         self.label = label
@@ -4262,8 +4766,9 @@ class AnimateSlider(object):
             anchor=tkinter.NW, window=self.slider)
         self.slider.config(
             font=(self.font, int(self.fontsize * 0.8)),
-            background=colorspec_to_hex(self.env.background_color, False),
-            highlightbackground=colorspec_to_hex(self.env.background_color, False))
+            foreground=colorspec_to_hex('fg', False),
+            background=colorspec_to_hex('bg', False),
+            highlightbackground=colorspec_to_hex('bg', False))
         self.slider.set(self._v)
         self.installed = True
 
@@ -4284,7 +4789,7 @@ class AnimateSlider(object):
 class Component(object):
     '''Component object
 
-    A salabim component is used as a data component (primarily for queueing)
+    A salabim component is used as component (primarily for queueing)
     or as a component with a process |n|
     Usually, a component will be defined as a subclass of Component.
 
@@ -4294,6 +4799,8 @@ class Component(object):
         name of the component. |n|
         if the name ends with a period (.),
         auto serializing will be applied |n|
+        if the name end with a comma,
+        auto serializing starting at 1 will be applied |n|
         if omitted, the name will be derived from the class
         it is defined in (lowercased)
 
@@ -4345,9 +4852,7 @@ class Component(object):
             self.env = _default_env
         else:
             self.env = env
-        if name is omitted:
-            name = _name_from_type(self)
-        self.name(name)
+        _set_name(name, self.env._nameserializeComponent, self)
         self._qmembers = {}
         self._process = None
         self._status = data
@@ -4371,6 +4876,7 @@ class Component(object):
                 process = None
         if process is not None:
             self.activate(process=process, at=at, delay=delay, urgent=urgent)
+            # at not subject to offset as activate is 'external'.
         self.setup(*args, **kwargs)
 
     def animation_objects(self, q):
@@ -4398,8 +4904,8 @@ class Component(object):
         '''
         size_x = 50
         size_y = 50
-        ao1 = Animate(rectangle0=(-20, -20, 20, 20), linewidth0=0, fillcolor0='black')
-        ao2 = Animate(text=str(self.sequence_number()), textcolor0='white', anchor='center')
+        ao1 = Animate(rectangle0=(-20, -20, 20, 20), linewidth0=0, fillcolor0='fg')
+        ao2 = Animate(text=str(self.sequence_number()), textcolor0='bg', anchor='center')
         return (size_x, size_y, ao1, ao2)
 
     def _remove_from_aos(self, q):
@@ -4426,13 +4932,16 @@ class Component(object):
             redcar=Car(color='red') |n|
             bluecar=Car(color='blue')
         '''
-        pass
+        if args:
+            raise SalabimError('too many arguments: ' + str(args))
+        if kwargs:
+            raise SalabimError('too many keyword arguments: ' + str(kwargs))
 
     def __repr__(self):
-        return 'Component(' + self.name() + ')'
+        return objectclass_to_str(self) + ' (' + self.name() + ')'
 
     def print_info(self):
-        print('Component ' + hex(id(self)))
+        print(objectclass_to_str(self) + ' ' + hex(id(self)))
         print('  name=' + self.name())
         print('  class=' + str(type(self)).split('.')[-1].split("'")[0])
         print('  suppress_trace=' + str(self._suppress_trace))
@@ -4446,7 +4955,7 @@ class Component(object):
             print('  member of queue(s):')
             for q in sorted(self._qmembers, key=lambda obj: obj.name().lower()):
                 print('    ' + pad(q.name(), 20) + ' enter_time=' +
-                    time_to_string(self._qmembers[q].enter_time) +
+                    time_to_string(self._qmembers[q].enter_time - self.env._offset) +
                     ' priority=' + str(self._qmembers[q].priority))
         if len(self._requests) > 0:
             print('  requesting resource(s):')
@@ -4532,7 +5041,7 @@ class Component(object):
         self._status = scheduled
         self.env.print_trace(
             '', '', self.name() + ' ' + caller,
-            'scheduled for {:10.3f}'.format(scheduled_time) + extra +
+            'scheduled for {:10.3f}'.format(scheduled_time - self.env._offset) + extra +
             _urgenttxt(urgent) + _modetxt(self._mode))
 
     def activate(self, at=omitted, delay=0, urgent=False, process=omitted,
@@ -4626,7 +5135,7 @@ class Component(object):
         if at is omitted:
             scheduled_time = self.env._now + delay
         else:
-            scheduled_time = at + delay
+            scheduled_time = at + self.env._offset + delay
 
         self._reschedule(scheduled_time, urgent, 'activate', extra)
 
@@ -4684,10 +5193,9 @@ class Component(object):
                 scheduled_time = self.env._now + duration
         else:
             if duration is omitted:
-                scheduled_time = till
+                scheduled_time = till + self.env._offset
             else:
                 raise SalabimError('both duration and till specified')
-
         self._reschedule(scheduled_time, urgent, 'hold')
 
     def passivate(self, mode=omitted):
@@ -4704,17 +5212,18 @@ class Component(object):
         ----
         if to be used for the current component (nearly always the case), use ``yield self.passivate(...)``.
         '''
-        if self._status != current:
+        if self._status == current:
+            self._remaining_duration = 0
+        else:
             self._checkisnotdata()
             self._remove()
             self._check_fail()
-        self.env.print_trace('', '', self.name() +
-                             ' passivate', _modetxt(self._mode))
+            self._remaining_duration = self._scheduled_time - self.env._now
         self._scheduled_time = inf
         if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
-
+        self.env.print_trace('', '', self.name() + ' passivate', _modetxt(self._mode))
         self._status = passive
 
     def cancel(self, mode=omitted):
@@ -4737,13 +5246,13 @@ class Component(object):
             self._checkisnotdata()
             self._remove()
             self._check_fail()
-        self.env.print_trace('', '', 'cancel ' +
-                             self.name() + ' ' + _modetxt(self._mode))
         self._process = None
         self._scheduled_time = inf
         if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
+        self.env.print_trace('', '', 'cancel ' +
+                             self.name() + ' ' + _modetxt(self._mode))
         self._status = data
         if an_env == self.env:
             for ao in self.env.an_objects[:]:
@@ -4775,12 +5284,12 @@ class Component(object):
             self._checkisnotmain()
             self._remove()
             self._check_fail()
-        self.env.print_trace('', '', 'standby', _modetxt(self._mode))
         self._scheduled_time = self.env._now
         self.env._standbylist.append(self)
         if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
+        self.env.print_trace('', '', 'standby', _modetxt(self._mode))
         self._status = standby
 
     def request(self, *args, **kwargs):
@@ -4789,12 +5298,11 @@ class Component(object):
 
         Parameters
         ----------
-        args : sequence
-            - sequence of resources, where quantity=1, priority=tail of requesters queue)
-            - sequence of tuples/lists containing
-                resource, a quantity and optionally a priority.
-                if the priority is not specified, this request
-                for the resources be added to the tail of
+        args : sequence of items where each item can be:
+            - resource, where quantity=1, priority=tail of requesters queue
+            - tuples/list containing a resource, a quantity and optionally a priority.
+                if the priority is not specified, the request
+                for the resource be added to the tail of
                 the requesters queue |n|
 
         fail_at : float
@@ -4864,7 +5372,7 @@ class Component(object):
                     scheduled_time = self.env._now + fail_delay
         else:
             if fail_delay is omitted:
-                scheduled_time = fail_at
+                scheduled_time = fail_at + self.env._offset
             else:
                 raise SalabimError('both fail_at and fail_delay specified')
 
@@ -4873,21 +5381,20 @@ class Component(object):
             self._mode_time = self.env._now
 
         self._failed = False
-        i = 0
-        for i in range(len(args)):
+
+        for arg in args:
             q = 1
             priority = None
-            argsi = args[i]
-            if isinstance(argsi, Resource):
-                r = argsi
-            elif isinstance(argsi, (tuple, list)):
-                r = argsi[0]
-                if len(argsi) >= 2:
-                    q = argsi[1]
-                if len(argsi) >= 3:
-                    priority = argsi[2]
+            if isinstance(arg, Resource):
+                r = arg
+            elif isinstance(arg, (tuple, list)):
+                r = arg[0]
+                if len(arg) >= 2:
+                    q = arg[1]
+                if len(arg) >= 3:
+                    priority = arg[2]
             else:
-                raise SalabimError('incorrect specifier', argsi)
+                raise SalabimError('incorrect specifier', arg)
 
             if q <= 0:
                 raise SalabimError('quantity ' + str(q) + ' <=0')
@@ -4987,17 +5494,16 @@ class Component(object):
         --> releases 2 from r2,and 3 from r3
         '''
         if args:
-            for i in range(len(args)):
+            for arg in args:
                 q = None
-                argsi = args[i]
-                if isinstance(argsi, Resource):
-                    r = argsi
-                elif isinstance(argsi, (tuple, list)):
-                    r = argsi[0]
-                    if len(argsi) >= 2:
-                        q = argsi[1]
+                if isinstance(arg, Resource):
+                    r = arg
+                elif isinstance(arg, (tuple, list)):
+                    r = arg[0]
+                    if len(arg) >= 2:
+                        q = arg[1]
                 else:
-                    raise SalabimError('incorrect specifier' + argsi)
+                    raise SalabimError('incorrect specifier' + arg)
                 if r._anonymous:
                     raise SalabimError(
                         'not possible to release anonymous resources ' + r.name())
@@ -5114,7 +5620,7 @@ class Component(object):
                     scheduled_time = self.env._now + fail_delay
         else:
             if fail_delay is omitted:
-                scheduled_time = fail_at
+                scheduled_time = fail_at + self._env._offset
             else:
                 raise SalabimError('both fail_at and fail_delay specified')
 
@@ -5122,18 +5628,17 @@ class Component(object):
             self._mode = mode
             self._mode_time = self.env._now
 
-        for i in range(len(args)):
+        for arg in args:
             value = True
             priority = None
-            argsi = args[i]
-            if isinstance(argsi, State):
-                state = argsi
-            elif isinstance(argsi, (tuple, list)):
-                state = argsi[0]
-                if len(argsi) >= 2:
-                    value = argsi[1]
-                if len(argsi) >= 3:
-                    priority = argsi[2]
+            if isinstance(arg, State):
+                state = arg
+            elif isinstance(arg, (tuple, list)):
+                state = arg[0]
+                if len(arg) >= 2:
+                    value = arg[1]
+                if len(arg) >= 3:
+                    priority = arg[2]
             else:
                 raise SalabimError('incorrect specifier', args)
 
@@ -5255,23 +5760,13 @@ class Component(object):
         '''
         return self._failed
 
-    def name(self, txt=omitted):
+    def name(self):
         '''
-        Parameters
-        ----------
-        txt : str
-            name of the component |n|
-            if txt ends with a period, the name will be serialized |n|
-            if omittted, no change
-
         Returns
         -------
         Name of the component : str
         '''
-
-        if txt is not omitted:
-            _set_name(txt, self.env._nameserializeComponent, self)
-        return _decode_name(self._name)
+        return self._name
 
     def base_name(self):
         '''
@@ -5279,7 +5774,7 @@ class Component(object):
         -------
         base name of the component (the name used at init or name): str
         '''
-        return self._base_namee
+        return self._base_name
 
     def sequence_number(self):
         '''
@@ -5288,7 +5783,7 @@ class Component(object):
         sequence_number of the component : int
             (the sequence number at init or name) |n|
             normally this will be the integer value of a serialized name,
-            but also non serialized names (without a dot at the end)
+            but also non serialized names (without a dotcomma at the end)
             will be numbered)
         '''
         return self._sequence_number
@@ -5694,7 +6189,7 @@ class Component(object):
         time the component entered the queue : float
         '''
         mx = self._checkinqueue(q)
-        return mx.enter_time
+        return mx.enter_time - self.env._offset
 
     def creation_time(self):
         '''
@@ -5702,7 +6197,7 @@ class Component(object):
         -------
         time the component was created : float
         '''
-        return self._creation_time
+        return self._creation_time - self.env._offset
 
     def scheduled_time(self):
         '''
@@ -5711,7 +6206,29 @@ class Component(object):
         time the component scheduled for, if it is scheduled : float
             returns inf otherwise
         '''
-        return self._scheduled_time
+        return self._scheduled_time - self.env._offset
+
+    def remaining_duration(self):
+        '''
+        Returns
+        -------
+        remaining duration : float
+            if passive, remaining time at time of passivate |n|
+            if scheduled, remaing time till scheduled time |n|
+            if requesting or waiting, time till fail_at time |n|
+            else: 0
+
+        Notes
+        -----
+        This method is very handy for interrupting a process and then resuming it,
+        after some (breakdown) time
+        '''
+        if self._status == passive:
+            return self._remaining_duration
+        elif self._status == scheduled:
+            return self._scheduled_time - self.env._now
+        else:
+            return 0
 
     def mode_time(self):
         '''
@@ -5722,7 +6239,7 @@ class Component(object):
             the time the component was created. |n|
             this function is particularly useful for animations.
         '''
-        return self._mode_time
+        return self._mode_time - self.env._offset
 
     def status(self):
         '''
@@ -5733,6 +6250,7 @@ class Component(object):
             - passive
             - scheduled
             - requesting
+            - waiting
             - current
             - standby
         '''
@@ -6126,9 +6644,8 @@ class Cdf(_Distribution):
             lastx = x
             lastcum = cum
         if lastcum == 0:
-            raise SalabimError('last cumulative value should be >0')
-        for i in range(len(self._cum)):
-            self._cum[i] = self._cum[i] / lastcum
+            raise SalabimError('last cumulative value should be > 0')
+        self._cum = [x / lastcum for x in self._cum]
         self._mean = 0
         for i in range(len(self._cum) - 1):
             self._mean +=\
@@ -6260,8 +6777,7 @@ class Pdf(_Distribution):
         if sump == 0:
             raise SalabimError('at least one probability should be >0')
 
-        for i in range(len(self._cum)):
-            self._cum[i] = self._cum[i] / sump
+        self._cum = [x / sump for x in self._cum]
         if hasmean:
             self._mean = sumxp / sump
         else:
@@ -6281,11 +6797,11 @@ class Pdf(_Distribution):
         sample : any (usually float)
         '''
         r = self.randomstream.random()
-        for i in range(len(self._cum)):
-            if r <= self._cum[i]:
-                if isinstance(self._x[i], _Distribution):
-                    return self._x[i].sample()
-                return self._x[i]
+        for cum, x in zip(self._cum, self._x):
+            if r <= cum:
+                if isinstance(x, _Distribution):
+                    return x.sample()
+                return x
 
     def mean(self):
         '''
@@ -6418,7 +6934,10 @@ class State(object):
         name of the state |n|
         if the name ends with a period (.),
         auto serializing will be applied |n|
-        if omitted, the name state. will be used
+        if the name end with a comma,
+        auto serializing starting at 1 will be applied |n|
+        if omitted, the name will be derived from the class
+        it is defined in (lowercased)
 
     value : any, preferably printable
         initial value of the state |n|
@@ -6469,17 +6988,15 @@ class State(object):
             self.env = _default_env
         else:
             self.env = env
-        if name is omitted:
-            name = _name_from_type(self)
-        self.name(name)
+        _set_name(name, self.env._nameserializeState, self)
         self._value = value
         self._animate_on = False
         self._aos = []
         self._waiters = Queue(
-            name=('waiters of ', self),
+            name='waiters of ' + self.name(),
             monitor=monitor, env=self.env, _isinternal=True)
         self.value = MonitorTimestamp(
-            name=('Value of ', self),
+            name='Value of ' + self.name(),
             getter=self._get_value, monitor=monitor, type=type, env=self.env)
         if animation_objects is not omitted:
             self.animation_objects = animation_objects.__get__(self, State)
@@ -6494,7 +7011,10 @@ class State(object):
 
         by default this is a dummy method, but it can be overridden.
         '''
-        pass
+        if args:
+            raise SalabimError('too many arguments: ' + str(args))
+        if kwargs:
+            raise SalabimError('too many keyword arguments: ' + str(kwargs))
 
     def animate(self, x=500, y=100, on=True):
         '''
@@ -6529,11 +7049,11 @@ class State(object):
 
     def animation_objects(self, value):
         if str(value).lower() in colornames():
-            ao1 = Animate(rectangle0=(-20, -20, 20, 20), fillcolor0=value, linewidth0=0)
+            ao1 = Animate(rectangle0=(-20, -20, 20, 20), fillcolor0=check_colorspec(value), linewidth0=0)
             return (ao1,)
         else:
-            ao1 = Animate(rectangle0=(-20, -20, 20, 20), fillcolor0='black', linewidth0=0)
-            ao2 = Animate(text=str(value), textcolor0='white', anchor='center')
+            ao1 = Animate(rectangle0=(-20, -20, 20, 20), fillcolor0='fg', linewidth0=0)
+            ao2 = Animate(text=str(value), textcolor0='bg', anchor='center')
             return ao1, ao2
 
     def _animate_update(self):
@@ -6544,10 +7064,10 @@ class State(object):
             self._aos.append(ao)
 
     def __repr__(self):
-        return 'State(' + self.name() + ')'
+        return objectclass_to_str(self) + ' (' + self.name() + ')'
 
     def print_info(self):
-        print('State ' + hex(id(self)))
+        print(objectclass_to_str(self) + ' ' + hex(id(self)))
         print('  name=' + self.name())
         print('  value=' + str(self._value))
         if self._waiters:
@@ -6711,22 +7231,13 @@ class State(object):
     def _get_value(self):
         return self._value
 
-    def name(self, txt=omitted):
+    def name(self):
         '''
-        Parameters
-        ----------
-        txt : str
-            name of the state |n|
-            if txt ends with a period, the name will be serialized |n|
-            if omittted, no change
-
         Returns
         -------
         Name of the state : str
         '''
-        if txt is not omitted:
-            _set_name(txt, self.env._nameserializeState, self)
-        return _decode_name(self._name)
+        return self._name
 
     def base_name(self):
         '''
@@ -6743,7 +7254,7 @@ class State(object):
         sequence_number of the state : int
             (the sequence number at init or name) |n|
             normally this will be the integer value of a serialized name,
-            but also non serialized names (without a dot at the end)
+            but also non serialized names (without a dot or a comma at the end)
             will be numbered)
         '''
         return self._sequence_number
@@ -6752,7 +7263,7 @@ class State(object):
         '''
         prints a summary of statistics of the state
         '''
-        print('Statistics of {} at {}'.format(self.name(), fn(self.env._now, 13, 3)))
+        print('Statistics of {} at {}'.format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
         self.waiters().length.print_statistics(show_header=False, show_legend=True, do_indent=True)
         print()
         self.waiters().length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True)
@@ -6778,7 +7289,10 @@ class Resource(object):
         name of the resource |n|
         if the name ends with a period (.),
         auto serializing will be applied |n|
-    if omitted, the name resource. will be used
+        if the name end with a comma,
+        auto serializing starting at 1 will be applied |n|
+        if omitted, the name will be derived from the class
+        it is defined in (lowercased)
 
     capacity : float
         capacity of the resouce |n|
@@ -6806,10 +7320,8 @@ class Resource(object):
             self.env = _default_env
         else:
             self.env = env
-        if name is omitted:
-            name = _name_from_type(self)
         self._capacity = capacity
-        self.name(name)
+        _set_name(name, self.env._nameserializeResource, self)
         self._requesters = Queue(
             name='requesters of ' + name,
             monitor=monitor, env=self.env, _isinternal=True)
@@ -6820,13 +7332,13 @@ class Resource(object):
         self._anonymous = anonymous
         self._minq = inf
         self.capacity = MonitorTimestamp(
-            ('Capacity of ', self),
+            'Capacity of ' + self.name(),
             getter=self._get_capacity, monitor=monitor, type='float', env=self.env)
         self.claimed_quantity = MonitorTimestamp(
-            ('Claimed quantity of ', self),
+            'Claimed quantity of ' + self.name(),
             getter=self._get_claimed_quantity, monitor=monitor, type='float', env=self.env)
         self.available_quantity = MonitorTimestamp(
-            ('Available quantity of ', self),
+            'Available quantity of ' + self.name(),
             getter=self._get_available_quantity, monitor=monitor, type='float', env=self.env)
         self.env.print_trace(
             '', '', self.name() + ' create',
@@ -6839,7 +7351,10 @@ class Resource(object):
 
         by default this is a dummy method, but it can be overridden.
         '''
-        pass
+        if args:
+            raise SalabimError('too many arguments: ' + str(args))
+        if kwargs:
+            raise SalabimError('too many keyword arguments: ' + str(kwargs))
 
     def reset_monitors(self, monitor=omitted):
         '''
@@ -6872,7 +7387,7 @@ class Resource(object):
         '''
         prints a summary of statistics of a resource
         '''
-        print('Statistics of {} at {:13.3f}'.format(self.name(), self.env._now))
+        print('Statistics of {} at {:13.3f}'.format(self.name(), self.env._now - self.env._offset))
         show_legend = True
         for q in [self.requesters(), self.claimers()]:
             q.length.print_statistics(show_header=False, show_legend=show_legend, do_indent=True)
@@ -6908,10 +7423,10 @@ class Resource(object):
         self.claimed_quantity.monitor(value)
 
     def __repr__(self):
-        return 'Resource(' + self.name() + ')'
+        return objectclass_to_str(self) + ' (' + self.name() + ')'
 
     def print_info(self):
-        print('Resource ' + hex(id(self)))
+        print(objectclass_to_str(self) + ' ' + hex(id(self)))
         print('  name=' + self.name())
         print('  capacity=' + str(self._capacity))
         if self._requesters:
@@ -7029,22 +7544,13 @@ class Resource(object):
         self.available_quantity.tally()
         self._tryrequest()
 
-    def name(self, txt=omitted):
+    def name(self):
         '''
-        Parameters
-        ----------
-        txt : str
-            name of the resource |n|
-            if txt ends with a period, the name will be serialized |n|
-            if omittted, no change
-
         Returns
         -------
         Name of the resource : str
         '''
-        if txt is not omitted:
-            _set_name(txt, self.env._nameserializeResource, self)
-        return _decode_name(self._name)
+        return self._name
 
     def base_name(self):
         '''
@@ -7061,7 +7567,7 @@ class Resource(object):
         sequence_number of the resource : int
             (the sequence number at init or name) |n|
             normally this will be the integer value of a serialized name,
-            but also non serialized names (without a dot at the end)
+            but also non serialized names (without a dot or a comma at the end)
             will be numbered)
         '''
         return self._sequence_number
@@ -7127,7 +7633,17 @@ def colornames():
      'yellowgreen': '#9ACD32'}
 
 
+def check_colorspec(colorspec):
+    if colorspec not in ('fg', 'bg'):  # do not check for fg and bg, because an_env might not be set yet
+        return colorspec_to_tuple(colorspec)  # will raise a SalabimError if incorrect
+    return colorspec
+
+
 def colorspec_to_tuple(colorspec):
+    if colorspec == 'fg':
+        return colorspec_to_tuple(an_env.foreground_color)
+    if colorspec == 'bg':
+        return colorspec_to_tuple(an_env.background_color)
     if isinstance(colorspec, (tuple, list)):
         if len(colorspec) == 2:
             c = colorspec_to_tuple(colorspec[0])
@@ -7151,11 +7667,24 @@ def colorspec_to_tuple(colorspec):
                 colorspec = s[0]
             else:
                 alpha = 'FF'
-            colorhex = colornames()[colorspec.replace(' ', '').lower()]
-            if len(colorhex) == 7:
-                colorhex = colorhex + alpha
-            return colorspec_to_tuple(colorhex)
-    raise SalabimError('wrong spec for color')
+            try:
+                colorhex = colornames()[colorspec.replace(' ', '').lower()]
+                if len(colorhex) == 7:
+                    colorhex = colorhex + alpha
+                return colorspec_to_tuple(colorhex)
+            except:
+                pass
+
+    raise SalabimError('wrong color specification: ' + str(colorspec))
+
+
+def contrast_color(colorspec):
+    rgb = colorspec_to_tuple(colorspec)
+    luma = ((0.299 * rgb[0]) + (0.587 * rgb[1]) + (0.114 * rgb[2])) / 255
+    if luma > 0.5:
+        return 'black'
+    else:
+        return 'white'
 
 
 def hex_to_rgb(v):
@@ -7183,14 +7712,14 @@ def colorspec_to_hex(colorspec, withalpha=True):
 def spec_to_image(spec):
     '''
     convert an image specification to an image
-    
+
     Parameters
     ----------
     image : str or PIL.Image.Image
         if str: filename of file to be loaded |n|
         if '': dummy image will be returned |n|
         if PIL.Image.Image: return this image untranslated
-        
+
     Returns
     -------
     image : PIL.Image..Image
@@ -7302,37 +7831,36 @@ def interpolate(t, t0, t1, v0, v1):
 
 
 def _set_name(name, _nameserialize, object):
-    oldname = getattr(object, '_base_name', None)
-    if isinstance(name, tuple):
-        auto = False
-    else:
-        auto = (('*' + name)[-1] == '.')  # * added to allow for null string
+    if name is omitted:
+        name = objectclass_to_str(object).lower() + '.'
+    elif name.startswith('$'):
+        if name == '$':
+            name = objectclass_to_str(object).lower()
+        elif name == '$.':
+            name = objectclass_to_str(object).lower() + '.'
+        elif name == '$,':
+            name = objectclass_to_str(object).lower() + ','
+
+    object._base_name = name
 
     if name in _nameserialize:
-        sequence_number, object0 = _nameserialize[name]
-        sequence_number += 1
-        _nameserialize[name] = sequence_number, None
-    else:
-        sequence_number = 0
-        _nameserialize[name] = sequence_number, (object if auto else None)
+        sequence_number = _nameserialize[name] + 1
+        _nameserialize[name] = sequence_number
 
-    if auto:
-        if sequence_number == 0:
-            newname = name[:-1]
-        else:
-            if sequence_number == 1:
-                if object0._base_name == name:
-                    newname0 = name + str(0)
-                    object0.env.print_trace(
-                        '', '', object0._name + ' rename to ' + newname0)
-                    object0._name = newname0
-            newname = name + str(sequence_number)
     else:
-        newname = name
-    if (oldname is not None) and (_nameserialize != Environment._nameserialize):
-        object.env.print_trace('', '', oldname + ' rename to', newname)
-    object._name = newname
-    object._base_name = name
+        if name.endswith(','):
+            _nameserialize[name] = 1
+            sequence_number = 1
+        else:
+            _nameserialize[name] = 0
+            sequence_number = 0
+
+    if name.endswith('.'):
+        object._name = name + str(sequence_number)
+    elif name.endswith(','):
+        object._name = name[:-1] + '.' + str(sequence_number)
+    else:
+        object._name = name
     object._sequence_number = sequence_number
 
 
@@ -7446,8 +7974,8 @@ def _modetxt(mode):
         return ' mode=' + str(mode)
 
 
-def _name_from_type(object):
-    return str(type(object)).split('.')[-1].split("'")[0].lower() + '.'
+def objectclass_to_str(object):
+    return str(type(object)).split('.')[-1].split("'")[0]
 
 
 def data():
@@ -7498,7 +8026,8 @@ def random_seed(seed, randomstream=omitted):
     randomstream.seed(seed)
 
 
-def pythonistacolor(c):
+def pythonistacolor(colorspec):
+    c = colorspec_to_tuple(colorspec)
     return (c[0] / 255, c[1] / 255, c[2] / 255, c[3] / 255)
 
 

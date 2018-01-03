@@ -1,5 +1,98 @@
 salabim  changelog
 
+version 2.2.10  2018-01-03
+==========================
+New methods:
+  Component.remaining_duration()
+    This method returns the duration left of a hold, request or wait at the time a passivate
+    was given.
+    For components that are scheduled, the remaining time to the scheduled time is returned.
+    This is very handy to interrupt a component's hold for a, like in
+        class Machine(sim.Component):
+            def process(self):
+                while True:
+                    yield self.hold(produce_one_part)
+                    number_of_parts += 1
+                
+        class Disturber(sim.Component):
+            def process(self):
+                while True:
+                    yield self.hold(time_to_failure)
+                    machine.passivate()  # interrupt the production
+                    yield self.hold(time_to_repair)
+                    machine.hold(machine.remaining_duration())  # resume production
+            
+  Environment.reset_now()
+    This method can be used to reset now, by default to 0.
+    All times communicated to/from the application will be according to the new time.
+    Be sure to adjust any user defined times as these will not be updated automatically!
+    
+    Internally, the reset is realized by keeping track of the offset of the time.
+    
+Naming of object changed:
+    In previous versions when initializing an object (Environment, Component, Queue, Resource, State,
+    Monitor or MonitorTimestamped) where the name ended with a period , the sequence number (0) was
+    suppressed for the first object.
+    When a second object with the same name was initialized, that first object was renamed and got
+    a 0 as sequence number. Now, an object with a name ending with a period is always serialized.
+    If the name ends with a comma, the sequence starts at 1 (and the , is replaced by a .).
+    E.g.
+       for i in range(2):
+           a = Airplane(name='airplane')
+           b = Boat()
+           c = Car(name='car,')
+           print(a.name())
+           print(b.name())
+           print(c.name())
+     
+       Result:
+       airplane
+       boat.0
+       car.1
+       airplane
+       boat.1
+       car.2
+       
+    The name() method no longer supports renaming an object, i.e. can only be used to get the name.
+
+Change of name:
+    Queue.intersect has been renamed to Queue.intersection.
+
+New queue functionality:
+    The intersection of two queues can now be assessed also with the & operator, e.g. q1 & q2.
+    The union of two queues can now be assessed also with | operator, e.g. q1 | q2.
+    The difference of two queues can now be assessed also with the - operator, e.g. q1 - q2.
+    The symmetric_difference of two queues (new method) can be assessed also with the ^ operator, e.g. q1 ^ q2.
+
+    Queues have a couple of new methods, to be more in line with list and set functionality:
+    append() is equivalent to add
+    pop now also supports an index
+    del q[] can now be used to delete one component, e.g. q[4] or a component by slice, e.g. q[3:5]
+    remove without an argument now clears a queue completely
+    extend can be used to add component at the tail of a queue from a queue or list
+    initialization of queues with a queue, list and tuple
+
+    as_set() can be used to get all components in a queue as a set.
+    as_list() can be used to get all components in a queue as a list.
+    q[:] can be used to get all components in a queue a list.
+
+    The Queue methods union, difference, intersection, copy and move now support default (meaningful) names.  
+
+New color functionality:
+    The method Environment.animation_parameters now has an additional parameter, foregroundcolor.
+    If not specified, salabim automatically chooses the most contrasting color (white or black).
+    This foreground color is used to show the system button, the time, modelname.
+    Besides, several colors in Animate, AmimateButton and AnimateSliders now defaults to
+    this foreground_color.
+
+    Also, it is now possible to specify 'fg' for the foreground color and 'bg' for the background color when
+    a color is required.
+
+Internal:
+    Several optimizations.
+    Better checks for validity of colors.
+
+    
 version 2.2.9  2017-12-20
 =========================
 From this version the following classes:

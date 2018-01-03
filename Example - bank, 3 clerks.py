@@ -30,7 +30,7 @@ class Clerk(sim.Component):
 
 
 env = sim.Environment(trace=False)
-CustomerGenerator()
+CustomerGenerator(name='customergenerator')
 clerks = sim.Queue('clerks')
 for i in range(3):
     Clerk().enter(clerks)

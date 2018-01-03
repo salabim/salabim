@@ -26,7 +26,7 @@ class Clerk(sim.Component):
 
 
 env = sim.Environment(trace=False)
-CustomerGenerator()
+CustomerGenerator(name='customergenerator')
 for i in range(3):
     Clerk()
 waitingline = sim.Queue('waitingline')

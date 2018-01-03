@@ -14,7 +14,6 @@ def shortname(ship):
         if c != '.':
             s = s + c
     return s
-a
 
 def shipcolor(side):
     if side == left:
@@ -201,7 +200,7 @@ for side in (left, right):
     shipgenerator = Shipgenerator(name=sidename(side) + 'Shipgenerator')
     shipgenerator.side = side
 
-lock = Lock('Lock')
+lock = Lock(name='lock')
 lock.side = left
 
 do_animation()

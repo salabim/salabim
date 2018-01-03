@@ -30,9 +30,9 @@ nservers = 5
 iat = 1
 server_time = 4
 
-servers = sim.Resource('servers', capacity=nservers)
+servers = sim.Resource(name='servers', capacity=nservers)
 
-ClientGenerator()
+ClientGenerator(name='$')
 
 do_animation()
 env.run()

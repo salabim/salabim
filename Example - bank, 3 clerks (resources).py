@@ -17,7 +17,7 @@ class Customer(sim.Component):
 
 
 env = sim.Environment(trace=False)
-CustomerGenerator()
+CustomerGenerator(name='customergenerator')
 clerks = sim.Resource('clerk', capacity=3)
 
 env.run(till=50000)

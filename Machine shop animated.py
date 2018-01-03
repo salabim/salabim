@@ -255,7 +255,7 @@ random.seed(RANDOM_SEED)  # This helps reproducing the results
 repairman = sim.Resource('repairman')
 
 machines = [Machine(n=i) for i in range(NUM_MACHINES)]
-other = Other()
+other = Other(name='other')
 
 # Execute!
 do_animation()

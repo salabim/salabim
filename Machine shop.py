@@ -99,7 +99,7 @@ random.seed(RANDOM_SEED)  # This helps reproducing the results
 repairman = sim.Resource('repairman', monitor=True)
 
 machines = [Machine() for i in range(NUM_MACHINES)]
-other = Other()
+other = Other(name='other')
 
 # Execute!
 env.run(till=SIM_TIME)

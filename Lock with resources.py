@@ -75,7 +75,7 @@ for side in (left, right):
     shipgenerator = Shipgenerator(name=sidename(side) + 'Shipgenerator')
     shipgenerator.side = side
 
-lock = Lock('Lock')
+lock = Lock(name='lock')
 lock.side = left
 
 env.run(100)

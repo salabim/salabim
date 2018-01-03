@@ -6,7 +6,77 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test39()
+    test42()
+
+def test42():
+    class Rij(sim.Queue):
+        pass
+
+    class Komponent(sim.Component):
+        pass
+
+    class Reg(sim.Monitor):
+        pass
+
+    env=sim.Environment(trace=True)
+
+    q1=sim.Queue('q1')
+    q2=sim.Queue('q2')
+    for i in range(15):
+        c = sim.Component(name='c.')
+        if i < 10:
+            q1.add_sorted(c, priority=i)
+        if i > 5:
+            q2.add_sorted(c, priority=i+100)
+    env.run(1000)
+    q1.print_info()
+    q2.print_info()
+ 
+
+    (q1 - q2).print_info()
+    (q2 - q1).print_info()
+    (q1 & q2).print_info()
+    (q1 | q2).print_info()
+    (q2 | q1).print_info()
+    (q1 ^ q2).print_info()
+    q3=sim.Queue(name='q3',fill=q1)
+    del q3[1:30:2]
+    q3.print_info()
+
+def test41():
+    class Airplane(sim.Component):
+        pass
+
+    class Boat(sim.Component):
+        pass
+
+    class Car(sim.Component):
+        pass
+
+    env=sim.Environment()
+    for i in range(2):
+        a = Airplane(name='airplane')
+        b = Boat(name='boat,')
+        c = Car()
+        print(a.name(), b.name(), c.name())
+
+def test40():
+    class C(sim.Component):
+        def process(self):
+            yield self.hold(10)
+
+    class Disturber(sim.Component):
+        def process(self):
+            yield self.hold(5)
+            c.passivate()
+            yield self.hold(2)
+            c.hold(c.remaining_duration())
+
+
+    env=sim.Environment(trace=True)
+    c=C(name='c')
+    Disturber(name='disturber')
+    env.run()
 
 def test39():
     class C(sim.Component):

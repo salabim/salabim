@@ -52,7 +52,7 @@ server_time = 4
 
 servers = (Server(i=i) for i in range(nservers))
 
-ClientGenerator()
+ClientGenerator(name='$')
 
 do_animation()
 env.run()

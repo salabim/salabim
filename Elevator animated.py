@@ -44,6 +44,15 @@ def do_animation():
     global xcar
     global capacity_last, ncars_last, topfloor_last
 
+    if make_video:
+        env.animation_parameters(modelname='Elevator', speed=32, video='Elevator.mp4',
+            show_fps=False, background_color='20%gray')
+    else:
+        env.animation_parameters(modelname='Elevator', speed=32, background_color='20%gray')
+        
+    print(env)
+    print(env.foreground_color)
+
     sim.Environment.animation_pre_tick = animation_pre_tick
 
     xvisitor_dim = 30
@@ -72,7 +81,7 @@ def do_animation():
         for direction in (up, down):
             if (direction == up and floor.n < topfloor) or (direction == down and floor.n > 0):
                 AnimateLED(x=xled[direction], y=y + 6, floor=floor, direction=direction)
-        sim.Animate(x0=0, y0=y, line0=(0, 0, xwait, 0), linecolor0='black')
+        sim.Animate(x0=0, y0=y, line0=(0, 0, xwait, 0))
         sim.Animate(x0=xsign, y0=y + yvisitor_dim / 2,
             text=str(floor.n), fontsize0=xvisitor_dim / 2, anchor='center')
 
@@ -104,12 +113,6 @@ def do_animation():
 
     sim.AnimateSlider(x=710, y=env.height - 50, width=90, height=25,
         vmin=0, vmax=400, resolution=25, v=load_n_0, label='Load n->0', action=set_load_n_0)
-
-    if make_video:
-        env.animation_parameters(modelname='Elevator', speed=32, video='Elevator.mp4',
-            show_speed=False, show_fps=False)
-    else:
-        env.animation_parameters(modelname='Elevator', speed=32)
 
 
 def set_load_0_n(val):

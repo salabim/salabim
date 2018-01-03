@@ -170,7 +170,7 @@ VisitorGenerator(
 
 requests = {}
 floors = {ifloor: Floor(ifloor) for ifloor in range(topfloor + 1)}
-cars = [Car(name='car ' + str(icar), capacity=capacity) for icar in range(ncars)]
+cars = [Car(capacity=capacity) for icar in range(ncars)]
 
 env.trace(True)
 env.run(1000)

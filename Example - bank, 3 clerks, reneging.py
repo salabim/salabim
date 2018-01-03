@@ -41,7 +41,7 @@ class Clerk(sim.Component):
 
 
 env = sim.Environment(trace=False)
-CustomerGenerator()
+CustomerGenerator(name='customergenerator')
 env.number_balked = 0
 env.number_reneged = 0
 clerks = sim.Queue('clerks')

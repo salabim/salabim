@@ -38,6 +38,6 @@ server_time = 4
 for i in range(nservers):
     Server()
 
-ClientGenerator()
+ClientGenerator(name='clientgenerator')
 
 env.run(100)
