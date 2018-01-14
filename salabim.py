@@ -1,34 +1,12 @@
 '''
 salabim  discrete event simulation
 
-The MIT License (MIT)
-
-Copyright (c) 2017 Ruud van der Ham, ruud@salabim.org
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-of the Software, and to permit persons to who the Software is furnished to do
-so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-see www.salabim.org for more information, the manual and updates.
+see www.salabim.org for more information, the manual, updates and license information.
 '''
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.10'
+__version__ = '2.2.11'
 
 import heapq
 import random
@@ -1035,7 +1013,8 @@ class MonitorTimestamp(Monitor):
 
         Note
         ----
-        The value self.off is stored when monitoring is turned off
+        The value self.off is stored when monitoring is turned off |n|
+        The timestamps are not corrected for any reset_now() adjustment.
         '''
         if self.xtypecode or (not force_numeric):
             xall = self._x
@@ -1079,7 +1058,8 @@ class MonitorTimestamp(Monitor):
 
         Note
         ----
-        The value self.off is stored when monitoring is turned off
+        The value self.off is stored when monitoring is turned off |n|
+        The timestamps are not corrected for any reset_now() adjustment.
         '''
         return tuple(reversed(self.xt(ex0=ex0, exoff=exoff, force_numeric=force_numeric)))
 
@@ -1170,19 +1150,20 @@ if Pythonista:
                         if an_env._current_component == an_env._main:
                             an_env.print_trace(
                                 '{:10.3f}'.format(an_env._now - an_env._offset),
-                                an_env._main.name(), 'current')
+                                an_env._main.name(), 'current', s0=an_env._main.lineno_txt())
                             an_env._main._scheduled_time = inf
                             an_env._main._status = current
                             an_env.an_quit()
                             return
                 else:
                     if an_env._step_pressed or (not an_env.paused):
-                        an_env._step_pressed = False
                         an_env.step()
+                        if not an_env._current_component._suppress_pause_at_step:
+                            an_env._step_pressed = False
                         an_env.t = an_env._now
                         if an_env._current_component == an_env._main:
                             an_env.print_trace('{:10.3f}'.format(an_env._now - an_env._offset),
-                                an_env._main.name(), 'current')
+                                an_env._main.name(), 'current', s0=an_env._main.lineno_txt())
                             an_env._scheduled_time = inf
                             an_env._status = current
                             an_env.an_quit()
@@ -1455,7 +1436,7 @@ class Queue(object):
 
     def reset_monitors(self, monitor=omitted):
         '''
-        resets queue monitor length_of_stay and time stamped monitor length
+        resets queue monitor length_of_stay and timestamped monitor length
 
         Parameters
         ----------
@@ -1707,8 +1688,8 @@ class Queue(object):
             component to be removed |n|
             if omitted, all components will be removed.
 
-        Notes
-        -----
+        Note
+        ----
         component must be member of the queue
         '''
         if component is omitted:
@@ -1905,7 +1886,6 @@ class Queue(object):
         return self.intersection(q)
 
     def __xor__(self, q):
-        print('***xor')
         return self.symmetric_difference(q)
 
     def count(self, component):
@@ -1921,8 +1901,8 @@ class Queue(object):
         -------
         number of occurences of component in the queue
 
-        Notes
-        -----
+        Note
+        ----
         The result can only be 0 or 1
         '''
         return 1 if component in self else 0
@@ -2003,8 +1983,8 @@ class Queue(object):
         ---------
         q : queue, list or tuple
 
-        Notes
-        -----
+        Note
+        ----
         The components added to the queue will get the priority of the tail of self.
         '''
         for c in q:
@@ -2088,8 +2068,8 @@ class Queue(object):
         -------
         queue with all elements that are in self and q : Queue
 
-        Notes
-        -----
+        Note
+        ----
         the priority will be set to 0 for all components in the
         resulting  queue |n|
         the order of the resulting queue is as follows: |n|
@@ -2131,8 +2111,8 @@ class Queue(object):
         -------
         queue containing all elements of self that are not in q
 
-        Notes
-        -----
+        Note
+        ----
         the priority will be copied from the original queue.
         Also, the order will be maintained. |n|
         Alternatively, the more pythonic - operator is also supported, e.g. q1 - q2
@@ -2173,8 +2153,8 @@ class Queue(object):
         -------
         queue containing all elements that are either in self or q, but not in both
 
-        Notes
-        -----
+        Note
+        ----
         the priority of all elements will be set to 0 for all components in the new queue.
         Order: First, elelements in self (in that order), then elements in q (in that order)
         Alternatively, the more pythonic ^ operator is also supported, e.g. q1 ^ q2
@@ -2220,8 +2200,8 @@ class Queue(object):
         -------
         queue with all elements of self : Queue
 
-        Notes
-        -----
+        Note
+        ----
         The priority will be copied from original queue.
         Also, the order will be maintained.
         '''
@@ -2254,8 +2234,8 @@ class Queue(object):
         -------
         queue containing all elements of self: Queue
 
-        Notes
-        -----
+        Note
+        ----
         Priorities will be kept |n|
         self will be emptied
         '''
@@ -2311,6 +2291,11 @@ class Environment(object):
         if omitted, the name will be derived from the class (lowercased)
         or 'default environment' if is_default_env is True.
 
+    print_trace_header : bool
+        if True (default) print a (two line) header line as a legend |n|
+        if False, do not print a header |n|
+        note that the header is only printed if trace=True
+
     is_default_env : bool
         if True, this environment becomes the default environment |n|
         if False, no change |n|
@@ -2329,7 +2314,8 @@ class Environment(object):
     _nameserialize = {}
     an_env = None
 
-    def __init__(self, trace=False, random_seed=omitted, name=omitted, is_default_env=True, *args, **kwargs):
+    def __init__(self, trace=False, random_seed=omitted, name=omitted,
+      print_trace_header=True, is_default_env=True, *args, **kwargs):
         global _default_env
         if is_default_env:
             _default_env = self
@@ -2337,6 +2323,8 @@ class Environment(object):
             if is_default_env:
                 name = 'default environment'
         self._trace = trace
+        if print_trace_header:
+            self.print_trace_header()
         if random_seed != '':
             if random_seed is omitted:
                 random_seed = 1234567
@@ -2349,6 +2337,7 @@ class Environment(object):
         self._offset = 0
         self._main = Component(name='main', env=self, process=None)
         self._main._status = current
+        self._main.lineno = inspect.getframeinfo(inspect.stack()[1][0]).lineno
         self._current_component = self._main
         self.ui_objects = []
         self.print_trace('{:10.3f}'.format(self._now - self._offset), 'main', 'current')
@@ -2454,13 +2443,13 @@ class Environment(object):
                 c._scheduled_time = inf
                 self.env._current_component = c
                 self.print_trace('{:10.3f}'.format(self._now - self.env._offset), c.name(),
-                                 'current (standby)')
+                  'current (standby)', s0=self.lineno_txt())
                 try:
                     next(c._process)
                     return
                 except StopIteration:
                     c.release()
-                    self.print_trace('', '', c.name() + ' ended')
+                    self.print_trace('', '', c.name() + ' ended', s0='')
                     c._status = data
                     c._scheduled_time = inf
                     c._process = None
@@ -2488,14 +2477,14 @@ class Environment(object):
 
             c._status = current
             self.print_trace('{:10.3f}'.format(self._now - self._offset), c.name(),
-                             'current')
+              'current', s0=c.lineno_txt())
             c._check_fail()
             c._scheduled_time = inf
             next(c._process)
             return
         except StopIteration:
             c.release()
-            self.print_trace('', '', c.name() + ' ended')
+            self.print_trace('', '', c.name() + ' ended', s0='')
             c._status = data
             c._scheduled_time = inf
             c._process = None
@@ -2695,6 +2684,15 @@ class Environment(object):
         new_now : float
             now will be set not new_now |n|
             default: 0
+
+        Note
+        ----
+        Internally, salabim still works with the 'old time'. Only in the interface
+        from and to the user program, a correction will be applied.
+
+        The registered time in timestamped monitors will be always is the 'old' time.
+        This is only important when using the time value in MonitorTimestamp.xt() or
+        MonitorTimestamp.tx().
         '''
         offset_before = self._offset
         self._offset = self._now - new_now
@@ -2769,6 +2767,7 @@ class Environment(object):
             else:
                 raise SalabimError('both duration and till specified')
 
+        self._main.lineno = inspect.getframeinfo(inspect.stack()[1][0]).lineno
         self._main._reschedule(scheduled_time, False, 'run')
 
         if self.animate:
@@ -2853,7 +2852,7 @@ class Environment(object):
             self.step()
             if self._current_component == self._main:
                 self.print_trace('{:10.3f}'.format(
-                    self._now - self._offset), self._main.name(), 'current')
+                    self._now - self._offset), self._main.name(), 'current', s0=self._main.lineno_txt())
                 self._scheduled_time = inf
                 self._status = current
                 return
@@ -2879,7 +2878,7 @@ class Environment(object):
                     self.step()
                     if self._current_component == self._main:
                         self.print_trace('{:10.3f}'.format(self._now - self._offset),
-                            self._main.name(), 'current')
+                            self._main.name(), 'current', s0=self._main.lineno_txt())
                         self._scheduled_time = inf
                         self._status = current
                         self.running = False
@@ -2887,12 +2886,13 @@ class Environment(object):
                         return
             else:
                 if self._step_pressed or (not self.paused):
-                    self._step_pressed = False
                     self.step()
+                    if not self._current_component._suppress_pause_at_step:
+                        self._step_pressed = False
                     self.t = self._now
                     if self._current_component == self._main:
                         self.print_trace('{:10.3f}'.format(self._now - self._offset),
-                            self._main.name(), 'current')
+                            self._main.name(), 'current', s0=self._main.lineno_txt())
                         self._scheduled_time = inf
                         self._status = current
                         self.running = False
@@ -3261,7 +3261,16 @@ class Environment(object):
         '''
         return self._sequence_number
 
-    def print_trace(self, s1='', s2='', s3='', s4=''):
+    def print_trace_header(self):
+        '''
+        print a (two line) header line as a legend |n|
+        not that the header is only printed if trace=True
+        '''
+        if self._trace:
+            self.print_trace('      time', 'current component', 'action', 'information', 'line#')
+            self.print_trace(10 * '-', 20 * '-', 35 * '-', 48 * '-', 5 * '-')
+
+    def print_trace(self, s1='', s2='', s3='', s4='', s0=omitted):
         '''
         prints a trace line
 
@@ -3271,23 +3280,30 @@ class Environment(object):
             part 1 (usually formatted  now), padded to 10 characters
 
         s2 : str
-            part 2 (usually formatted  now), padded to 20 characters
+            part 2 (usually only used for the compoent that gets current), padded to 20 characters
 
         s3 : str
-            part 3 (usually formatted  now), padded to 35 characters
+            part 3, padded to 35 characters
 
         s4 : str
-            part 4 (usually formatted  now)
+            part 4
 
         Note
         ----
         if the current component's suppress_trace is True, nothing is printed
         '''
         if self._trace:
-            if hasattr(self, '_current_component'):
-                if not self._current_component._suppress_trace:
-                    print(pad(s1, 10) + ' ' + pad(s2, 20) + ' ' +
-                          pad(s3, max(len(s3), 36)) + ' ' + s4.strip())
+            if not (hasattr(self, '_current_component') and self._current_component._suppress_trace):
+                if s0 is omitted:
+                    stack = inspect.stack()
+                    filename0 = inspect.getframeinfo(stack[0][0]).filename
+                    for i in range(len(inspect.stack())):
+                        infoi = inspect.getframeinfo(stack[i][0])
+                        if filename0 != infoi.filename:
+                            break
+                    s0 = '{:5d}'.format(infoi.lineno)
+                print(pad(s0, 7), pad(s1, 10) + ' ' + pad(s2, 20) + ' ' +
+                  pad(s3, max(len(s3), 36)) + ' ' + s4.strip())
 
 
 class Animate(object):
@@ -3375,13 +3391,13 @@ class Animate(object):
         linewidth of the contour at time t0 (default 0 = no contour)
 
     fillcolor0 : colorspec
-        color of interior at time t0 (default black)
+        color of interior at time t0 (default foreground_color)
 
     linecolor0 : colorspec
-        color of the contour at time t0 (default black)
+        color of the contour at time t0 (default foreground_color
 
     textcolor0 : colorspec
-        color of the text at time 0 (default black)
+        color of the text at time 0 (default foreground_color)
 
     angle0 : float
         angle of the polygon at time t0 (in degrees) (default 0)
@@ -3409,7 +3425,7 @@ class Animate(object):
     offsety1 : float
         offsets the y-coordinate of the object (default offsety0) at time t1
 
-    circl10 : tuple
+    circle1 : tuple
          the circle at time t1 specified as a tuple (radius,)
 
     line1 : tuple
@@ -3459,6 +3475,8 @@ class Animate(object):
         - valid colorname
         - hexname
         - tuple (R,G,B) or (R,G,B,A)
+        - 'fg' for the foreground color
+        - 'bg' for the background color
 
     colornames may contain an additional alpha, like ``red#7f``
     hexnames may be either 3 of 4 bytes long (RGB or RGBA)
@@ -4526,13 +4544,13 @@ class AnimateButton(object):
         width of contour in screen coordinates (default 0=no contour)
 
     fillcolor : colorspec
-        color of the interior (default 40%gray)
+        color of the interior (foreground_color)
 
     linecolor : colorspec
-        color of contour (default black)
+        color of contour (default foreground_color)
 
     color : colorspec
-        color of the text (default white)
+        color of the text (default background_color)
 
     text : str or function
         text of the button (default null string) |n|
@@ -4651,14 +4669,11 @@ class AnimateSlider(object):
     linewidth : float
         width of contour in screen coordinate (default 0 = no contour)
 
-    fillcolor : colorspec
-        color of the interior (default 40%gray)
-
     linecolor : colorspec
-        color of contour (default black)
+        color of contour (default foreground_color)
 
     labelcolor : colorspec
-        color of the label (default black)
+        color of the label (default foreground_color)
 
     label : str
         label if the slider (default null string) |n|
@@ -4835,6 +4850,12 @@ class Component(object):
         If False (default), the component will be traced |n|
         Can be queried or set later with the suppress_trace method.
 
+    suppress_pause_at_step : bool
+        suppress_pause_at_step indicator |n|
+        if True, if this component becomes current, do not pause when stepping |n|
+        If False (default), the component will be paused when stepping |n|
+        Can be queried or set later with the suppress_pause_at_step method.
+
     mode : str preferred
         mode |n|
         will be used in trace and can be used in animations |n|
@@ -4847,7 +4868,7 @@ class Component(object):
     '''
 
     def __init__(self, name=omitted, at=omitted, delay=0, urgent=False,
-      process=omitted, suppress_trace=False, mode=None, env=omitted, *args, **kwargs):
+      process=omitted, suppress_trace=False, suppress_pause_at_step=False, mode=None, env=omitted, *args, **kwargs):
         if env is omitted:
             self.env = _default_env
         else:
@@ -4864,6 +4885,7 @@ class Component(object):
         self._failed = False
         self._creation_time = self.env._now
         self._suppress_trace = suppress_trace
+        self._suppress_pause_at_step = suppress_pause_at_step
         self._mode = mode
         self._mode_time = self.env._now
         self._aos = {}
@@ -4945,6 +4967,7 @@ class Component(object):
         print('  name=' + self.name())
         print('  class=' + str(type(self)).split('.')[-1].split("'")[0])
         print('  suppress_trace=' + str(self._suppress_trace))
+        print('  suppress_pause_at_step=' + str(self._suppress_pause_at_step))
         print('  status=' + self._status())
         print('  mode=' + _modetxt(self._mode).strip())
         print('  mode_time=' + time_to_string(self._mode_time))
@@ -5041,8 +5064,11 @@ class Component(object):
         self._status = scheduled
         self.env.print_trace(
             '', '', self.name() + ' ' + caller,
-            'scheduled for {:10.3f}'.format(scheduled_time - self.env._offset) + extra +
-            _urgenttxt(urgent) + _modetxt(self._mode))
+            merge_blanks(
+                'scheduled for {:10.3f}'.format(scheduled_time - self.env._offset) +
+                _urgenttxt(urgent) + '@' + self.lineno_txt(),
+                _modetxt(self._mode),
+                extra))
 
     def activate(self, at=omitted, delay=0, urgent=False, process=omitted,
       keep_request=False, keep_wait=False, mode=omitted):
@@ -5118,7 +5144,7 @@ class Component(object):
             if not inspect.isgeneratorfunction(p):
                 raise SalabimError(process, 'has no yield statement')
             self._process = p()
-            extra = ' @' + process
+            extra = 'process=' + self._process.__name__
 
         if self._status != current:
             self._remove()
@@ -5137,7 +5163,7 @@ class Component(object):
         else:
             scheduled_time = at + self.env._offset + delay
 
-        self._reschedule(scheduled_time, urgent, 'activate', extra)
+        self._reschedule(scheduled_time, urgent, 'activate', extra=extra)
 
     def hold(self, duration=omitted, till=omitted, urgent=False, mode=omitted):
         '''
@@ -5223,7 +5249,7 @@ class Component(object):
         if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
-        self.env.print_trace('', '', self.name() + ' passivate', _modetxt(self._mode))
+        self.env.print_trace('', '', self.name() + ' passivate', merge_blanks(_modetxt(self._mode)))
         self._status = passive
 
     def cancel(self, mode=omitted):
@@ -5810,12 +5836,29 @@ class Component(object):
 
         Returns
         -------
-        suppress_status : bool
-            components with the suppress_status of False, will be ignored in the trace
+        suppress_trace : bool
+            components with the suppress_status of True, will be ignored in the trace
         '''
         if value is not omitted:
             self._suppress_trace = value
         return self._suppress_trace
+
+    def suppress_pause_at_step(self, value=omitted):
+        '''
+        Parameters
+        ----------
+        value: bool
+            new suppress_trace value |n|
+            if omitted, no change
+
+        Returns
+        -------
+        suppress_pause_at_step : bool
+            components with the suppress_pause_at_step of True, will be ignored in a step
+        '''
+        if value is not omitted:
+            self._suppress_pause_at_step = value
+        return self._suppress_pause_at_step
 
     def mode(self, value=omitted):
         '''
@@ -6218,8 +6261,8 @@ class Component(object):
             if requesting or waiting, time till fail_at time |n|
             else: 0
 
-        Notes
-        -----
+        Note
+        ----
         This method is very handy for interrupting a process and then resuming it,
         after some (breakdown) time
         '''
@@ -6287,21 +6330,36 @@ class Component(object):
         if self == self.env._main:
             raise SalabimError(self.name() + ' main component not allowed')
 
+    def lineno_txt(self):
+        plus = '+'
+        if self == self.env._main:
+            lineno = self.lineno
+        else:
+            lineno = self._process.gi_frame.f_lineno
+            if self._process.gi_frame.f_lasti == -1:  # checks whether generator is created
+                plus = ' '
+        return '{:5d}{}'.format(lineno, plus)
+
 
 class _Distribution():
-    pass
+    def __call__(self):
+        return self.sample()
 
 
 class Exponential(_Distribution):
     '''
     exponential distribution
 
-    Exponential(mean,randomstream)
-
     Parameters
     ----------
-    mean :float
-        mean of the distribtion |n|
+    mean : float
+        mean of the distribtion (beta)|n|
+        if omitted, the rate is used |n|
+        must be >0
+
+    rate : float
+        rate of the distribution (lambda)|n|
+        if omitted, the mean is used |n|
         must be >0
 
     randomstream: randomstream
@@ -6309,12 +6367,28 @@ class Exponential(_Distribution):
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
+
+    Note
+    ----
+    Either mean or rate has to be specified, not both
     '''
 
-    def __init__(self, mean, randomstream=omitted):
-        if mean <= 0:
-            raise SalabimError('mean<=0')
-        self._mean = mean
+    def __init__(self, mean=omitted, rate=omitted, randomstream=omitted):
+        if mean is omitted:
+            if rate is omitted:
+                raise SalabimError('neither mean nor rate are specified')
+            else:
+                if rate <= 0:
+                    raise SalabimError('rate<=0')
+                self._mean = 1 / rate
+        else:
+            if rate is omitted:
+                if mean <= 0:
+                    raise SalabimError('mean<=0')
+                self._mean = mean
+            else:
+                raise SalabimError('both mean and rate are specified')
+
         if randomstream is omitted:
             self.randomstream = random
         else:
@@ -6327,6 +6401,7 @@ class Exponential(_Distribution):
     def print_info(self):
         print('Exponential distribution ' + hex(id(self)))
         print('  mean=' + str(self._mean))
+        print('  rate (lambda)=' + str(1 / self._mean))
         print('  randomstream=' + hex(id(self.randomstream)))
 
     def sample(self):
@@ -6346,8 +6421,6 @@ class Normal(_Distribution):
     '''
     normal distribution
 
-    Normal(mean,standard_deviation,randomstream)
-
     Parameters
     ----------
     mean : float
@@ -6358,6 +6431,12 @@ class Normal(_Distribution):
         if omitted, 0 is used, thus effectively a contant distributiin |n|
         must be >=0
 
+    use_gauss : bool
+        if False (default), use the random.normalvariate method |n|
+        if True, use the random.gauss method |n|
+        the documentation for random states that the gauss method should be slightly faster,
+        although that statement is doubtful.
+        
     randomstream: randomstream
         randomstream to be used |n|
         if omitted, random will be used |n|
@@ -6365,12 +6444,10 @@ class Normal(_Distribution):
         it assigns a new stream with the specified seed
     '''
 
-    def __init__(self, mean, standard_deviation=omitted, randomstream=omitted):
+    def __init__(self, mean, standard_deviation=0, use_gauss=False, randomstream=omitted):
+        self._use_gauss =  use_gauss
         self._mean = mean
-        if standard_deviation is omitted:
-            self._standard_deviation = 0
-        else:
-            self._standard_deviation = standard_deviation
+        self._standard_deviation = standard_deviation
         if self._standard_deviation < 0:
             raise SalabimError('standard_deviation<0')
         if randomstream is omitted:
@@ -6386,13 +6463,18 @@ class Normal(_Distribution):
         print('Normal distribution ' + hex(id(self)))
         print('  mean=' + str(self._mean))
         print('  standard_deviation=' + str(self._standard_deviation))
+        if self._use_gauss:
+            print('  use_gauss=True')
         print('  randomstream=' + hex(id(self.randomstream)))
 
     def sample(self):
         '''
         returns sample
         '''
-        return self.randomstream.normalvariate(self._mean, self._standard_deviation)
+        if self._use_gauss:
+            return self.randomstream.gauss(self._mean, self._standard_deviation)
+        else:
+            return self.randomstream.normalvariate(self._mean, self._standard_deviation)
 
     def mean(self):
         '''
@@ -6404,8 +6486,6 @@ class Normal(_Distribution):
 class Uniform(_Distribution):
     '''
     uniform distribution
-
-    Uniform(lowerbound,upperboud,seed)
 
     Parameters
     ----------
@@ -6464,8 +6544,6 @@ class Uniform(_Distribution):
 class Triangular(_Distribution):
     '''
     triangular distribution
-
-    Triangular(low,high,mode,seed)
 
     Parameters
     ----------
@@ -6539,8 +6617,6 @@ class Constant(_Distribution):
     '''
     constant distribution
 
-    Constant(value,randomstream)
-
     Parameters
     ----------
     value : float
@@ -6585,11 +6661,286 @@ class Constant(_Distribution):
         return self._mean
 
 
+class Weibull(_Distribution):
+    '''
+    weibull distribution
+
+    Parameters
+    ----------
+    scale: float
+        scale of the distribution (alpha or k)
+
+    shape: float
+        shape of the distribution (beta or lambda)|n|
+        should be >0
+
+    randomstream: randomstream
+        randomstream to be used |n|
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
+    '''
+
+    def __init__(self, scale, shape, randomstream=omitted):
+        self._scale = scale
+        if shape <= 0:
+            raise SalabimError('shape<=0')
+
+        self._shape = shape
+        if randomstream is omitted:
+            self.randomstream = random
+        else:
+            randomstream_check(randomstream)
+            self.randomstream = randomstream
+
+        self._mean = self._scale * math.gamma((1 / self._shape) + 1)
+
+    def __repr__(self):
+        return 'Weibull'
+
+    def print_info(self):
+        print('Weibull distribution ' + hex(id(self)))
+        print('  scale (alpha or k)=' + str(self._scale))
+        print('  shape (beta or lambda)=' + str(self._shape))
+        print('  randomstream=' + hex(id(self.randomstream)))
+
+    def sample(self):
+        '''
+        returns sample
+        '''
+        return self.randomstream.weibullvariate(self._scale, self._shape)
+
+    def mean(self):
+        '''
+        returns the mean of the distribution
+        '''
+        return self._mean
+
+
+class Gamma(_Distribution):
+    '''
+    gamma distribution
+
+    Parameters
+    ----------
+    shape: float
+        shape of the distribution (k) |n|
+        should be >0
+
+    scale: float
+        scale of the distribution (teta) |n|
+        should be >0
+
+    rate : float
+        rate of the distribution (beta) |n|
+        should be >0
+
+    randomstream: randomstream
+        randomstream to be used |n|
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
+
+    Note
+    ----
+    Either scale or rate has to be specified, not both.
+    '''
+
+    def __init__(self, shape, scale=omitted, rate=omitted, randomstream=omitted):
+        if shape <= 0:
+            raise SalabimError('shape<=0')
+        self._shape = shape
+        if rate is omitted:
+            if scale is omitted:
+                raise SalabimError('neither scale nor rate specified')
+            else:
+                if scale <= 0:
+                    raise SalabimError('scale<=0')
+                self._scale = scale
+        else:
+            if scale is omitted:
+                if rate <= 0:
+                    raise SalabimError('rate<=0')
+                self._scale = 1 / rate
+            else:
+                raise SalabimError('both scale and rate specified')
+
+        if randomstream is omitted:
+            self.randomstream = random
+        else:
+            randomstream_check(randomstream)
+            self.randomstream = randomstream
+
+        self._mean = self._shape * self._scale
+
+    def __repr__(self):
+        return 'Gamma'
+
+    def print_info(self):
+        print('Gamma distribution ' + hex(id(self)))
+        print('  shape (k)=' + str(self._shape))
+        print('  scale (teta)=' + str(self._scale))
+        print('  rate (beta)=' + str(1 / self._scale))
+        print('  randomstream=' + hex(id(self.randomstream)))
+
+    def sample(self):
+        '''
+        returns sample
+        '''
+        return self.randomstream.gammavariate(self._shape, self._scale)
+
+    def mean(self):
+        '''
+        returns the mean of the distribution
+        '''
+        return self._mean
+
+
+class Beta(_Distribution):
+    '''
+    beta distribution
+
+    Parameters
+    ----------
+    alpha: float
+        alpha shape of the distribution |n|
+        should be >0
+
+    beta: float
+        beta shape of the distribution |n|
+        should be >0
+
+    randomstream: randomstream
+        randomstream to be used |n|
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
+    '''
+
+    def __init__(self, alpha, beta, randomstream=omitted):
+        if alpha <= 0:
+            raise SalabimError('alpha<=0')
+        self._alpha = alpha
+        if beta <= 0:
+            raise SalabimError('beta<>=0')
+        self._beta = beta
+
+        if randomstream is omitted:
+            self.randomstream = random
+        else:
+            randomstream_check(randomstream)
+            self.randomstream = randomstream
+
+        self._mean = self._alpha / (self._alpha + self._beta)
+
+    def __repr__(self):
+        return 'Beta'
+
+    def print_info(self):
+        print('Beta distribution ' + hex(id(self)))
+        print('  alpha=' + str(self._alpha))
+        print('  beta=' + str(self._beta))
+        print('  randomstream=' + hex(id(self.randomstream)))
+
+    def sample(self):
+        '''
+        returns sample
+        '''
+        return self.randomstream.betavariate(self._alpha, self._beta)
+
+    def mean(self):
+        '''
+        returns the mean of the distribution
+        '''
+        return self._mean
+
+
+class Erlang(_Distribution):
+    '''
+    erlang distribution
+
+    Parameters
+    ----------
+    shape: int
+        shape of the distribution (k) |n|
+        should be >0
+
+    rate: float
+        rate parameter (lambda) |n|
+        if omitted, the scale is used |n|
+        should be >0
+
+    scale: float
+        scale of the distribution (mu) |n|
+        if omitted, the rate is used |n|
+        should be >0
+
+    randomstream: randomstream
+        randomstream to be used |n|
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
+
+    Note
+    ----
+    Either rate or scale has to be specified, not both.
+    '''
+
+    def __init__(self, shape, rate=omitted, scale=omitted, randomstream=omitted):
+        if int(shape) != shape:
+            raise SalabimError('shape not integer')
+        if shape <= 0:
+            raise SalabimError('shape <=0')
+        self._shape = shape
+        if rate is omitted:
+            if scale is omitted:
+                raise SalabimError('neither rate nor scale specified')
+            else:
+                if scale <= 0:
+                    raise SalabimError('scale<=0')
+                self._rate = 1 / scale
+        else:
+            if scale is omitted:
+                if rate <= 0:
+                    raise SalabimError('rate<=0')
+                self._rate = rate
+            else:
+                raise SalabimError('both rate and scale specified')
+
+        if randomstream is omitted:
+            self.randomstream = random
+        else:
+            randomstream_check(randomstream)
+            self.randomstream = randomstream
+
+        self._mean = self._shape / self._rate
+
+    def __repr__(self):
+        return 'Erlang'
+
+    def print_info(self):
+        print('Erlang distribution ' + hex(id(self)))
+        print('  shape (k)=' + str(self._shape))
+        print('  rate (lambda)=' + str(self._rate))
+        print('  scale (mu)=' + str(1 / self._rate))
+        print('  randomstream=' + hex(id(self.randomstream)))
+
+    def sample(self):
+        '''
+        returns sample
+        '''
+        return self.randomstream.gammavariate(self._shape, 1 / self._rate)
+
+    def mean(self):
+        '''
+        returns the mean of the distribution
+        '''
+        return self._mean
+
+
 class Cdf(_Distribution):
     '''
     Cumulative distribution function
-
-    Cdf(spec,seed)
 
     Parameters
     ----------
@@ -6683,8 +7034,6 @@ class Cdf(_Distribution):
 class Pdf(_Distribution):
     '''
     Probability distribution function
-
-    Pdf(spec,probabilities,seed)
 
     Parameters
     ----------
@@ -6818,13 +7167,12 @@ class Distribution(_Distribution):
     '''
     Generate a distribution from a string
 
-    Distribution(spec,randomstream)
-
     Parameters
     ----------
     spec : str
         - string containing a valid salabim distribution, where only the first
-          letters are relevant and casing is not important
+          letters are relevant and casing is not important. Note that Erlang is
+          the only distribution that requires at leat two letters (Er)
         - string containing one float (c1), resulting in Constant(c1)
         - string containing two floats seperated by a comma (c1,c2),
           resulting in a Uniform(c1,c2)
@@ -6854,6 +7202,8 @@ class Distribution(_Distribution):
     12,15        ==> Uniform(12,15) |n|
     (12,15)      ==> Uniform(12,15) |n|
     Exp(a)       ==> Exponential(100), provided sim.a=100 |n|
+    E(2)         ==> Exponential(2)
+    Er(2,3)      ==> Erlang(2,3)
     '''
 
     def __init__(self, spec, randomstream=omitted):
@@ -6884,7 +7234,8 @@ class Distribution(_Distribution):
                 raise SalabimError('incorrect specifier', spec_orig)
 
         else:
-            for distype in ('Uniform', 'Constant', 'Triangular', 'Exponential', 'Normal', 'Cdf', 'Pdf'):
+            for distype in ('Uniform', 'Constant', 'Triangular', 'Exponential', 'Normal',
+              'Cdf', 'Pdf', 'Weibull', 'Gamma', 'Erlang', 'Beta'):
                 if pre == distype.upper()[:len(pre)]:
                     sp[0] = distype
                     spec = '('.join(sp)
@@ -7323,10 +7674,10 @@ class Resource(object):
         self._capacity = capacity
         _set_name(name, self.env._nameserializeResource, self)
         self._requesters = Queue(
-            name='requesters of ' + name,
+            name='requesters of ' + self.name(),
             monitor=monitor, env=self.env, _isinternal=True)
         self._claimers = Queue(
-            name='claimers of ' + name,
+            name='claimers of ' + self.name(),
             monitor=monitor, env=self.env, _isinternal=True)
         self._claimed_quantity = 0
         self._anonymous = anonymous
@@ -7833,12 +8184,12 @@ def interpolate(t, t0, t1, v0, v1):
 def _set_name(name, _nameserialize, object):
     if name is omitted:
         name = objectclass_to_str(object).lower() + '.'
-    elif name.startswith('$'):
-        if name == '$':
+    elif len(name) <= 1:
+        if name == '':
             name = objectclass_to_str(object).lower()
-        elif name == '$.':
+        elif name == '.':
             name = objectclass_to_str(object).lower() + '.'
-        elif name == '$,':
+        elif name == ',':
             name = objectclass_to_str(object).lower() + ','
 
     object._base_name = name
@@ -7944,6 +8295,21 @@ def list_to_array(l):
         return float_result
 
 
+def merge_blanks(*l):
+    '''
+    merges all non blank elements of l, separated by a blank
+
+    Parameters
+    ----------
+    *l : elements to be merged : str
+
+    Returns
+    -------
+    string with merged elements of l : str
+    '''
+    return ' '.join(x for x in l if x)
+
+
 def normalize(s):
     res = ''
     for c in s.upper():
@@ -7962,16 +8328,16 @@ def time_to_string(t):
 
 def _urgenttxt(urgent):
     if urgent:
-        return ' urgent'
+        return '!'
     else:
-        return ''
+        return ' '
 
 
 def _modetxt(mode):
     if mode is None:
         return ''
     else:
-        return ' mode=' + str(mode)
+        return 'mode=' + str(mode)
 
 
 def objectclass_to_str(object):

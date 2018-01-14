@@ -6,7 +6,54 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test42()
+    test43()
+
+def test44():
+
+    class X(sim.Component):
+        def process(self):
+            yield self.hold(10,mode='ok')
+            if self == x1:
+                yield self.passivate()
+            yield self.hold(10,urgent=True)
+
+    class Y(sim.Component):
+        def process(self):
+            yield self.request((res, 4), fail_at=15)
+            x1.activate(mode=5)
+            
+
+
+    env=sim.Environment(trace=True)
+    res = sim.Resource()
+
+    x0=X()
+    x1=X(name='')
+    x2=X(name=',')
+    Y()
+
+    env.run(50)
+
+def test43():
+    def test(d):
+        d.print_info()
+        print('mean=', d.mean())
+        l=[d.sample() for i in range(10000)]
+        print('one sample', d())
+        print('mean sampled =', sum(l)/(len(l)+1))
+        print('-'  * 79)
+
+    env=sim.Environment()
+
+    test(sim.Weibull(2,1))
+    test(sim.Gamma(5,9))
+    test(sim.Erlang(2,scale=3))
+    test(sim.Exponential(rate=2))
+    test(sim.Beta(32,300))
+    test(sim.Normal(5,7))
+    test(sim.Normal(5,7,use_gauss=True))
+
+    test(sim.Distribution('N(5,7,use_gauss=False)'))
 
 def test42():
     class Rij(sim.Queue):
@@ -29,9 +76,13 @@ def test42():
         if i > 5:
             q2.add_sorted(c, priority=i+100)
     env.run(1000)
+    del q1[1]
+    print('length',q1.length.number_of_entries())
+    print('length_of_stay',q1.length_of_stay.number_of_entries())
+    
     q1.print_info()
     q2.print_info()
- 
+
 
     (q1 - q2).print_info()
     (q2 - q1).print_info()

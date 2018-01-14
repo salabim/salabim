@@ -1,5 +1,116 @@
 salabim  changelog
 
+version 2.2.11  2018-01-14         
+==========================
+Enhanced trace output
+---------------------
+The trace output now also shows the line number in the source code. This can be extremely
+useful when debugging or learning.
+
+E.g. the following code
+
+    1|import salabim as sim
+    2|
+    3|class X(sim.Component):
+    4|    def process(self):
+    5|        yield self.hold(10,mode='one')
+    6|        if self == x1:
+    7|            yield self.passivate()
+    8|        yield self.hold(10,urgent=True, mode='two')
+    9|
+   10|class Y(sim.Component):
+   11|    def process(self):
+   12|        yield self.request((res, 4), fail_at=15)
+   13|        x1.activate()
+   14|
+   15|env=sim.Environment(trace=True)
+   16|res = sim.Resource()
+   17|
+   18|x0=X()
+   19|x1=X()
+   20|Y()
+   21|
+   22|env.run(50)
+   
+prints:
+
+line#         time current component    action                               information
+-----   ---------- -------------------- -----------------------------------  ------------------------------------------------
+   15                                   main create                          
+   15        0.000 main                 current                              
+   16                                   resource.0 create                    capacity=1
+   18                                   x.0 create                           
+   18                                   x.0 activate                         scheduled for      0.000 @    4  process=process
+   19                                   x.1 create                           
+   19                                   x.1 activate                         scheduled for      0.000 @    4  process=process
+   20                                   y.0 create                           
+   20                                   y.0 activate                         scheduled for      0.000 @   11  process=process
+   22                                   main run                             scheduled for     50.000 @   22+
+    4        0.000 x.0                  current                              
+    5                                   x.0 hold                             scheduled for     10.000 @    5+ mode=one
+    4        0.000 x.1                  current                              
+    5                                   x.1 hold                             scheduled for     10.000 @    5+ mode=one
+   11        0.000 y.0                  current                              
+   12                                   y.0                                  request for 4 from resource.0
+   12                                   y.0 request                          scheduled for     15.000 @   12+
+    5+      10.000 x.0                  current                              
+    8                                   x.0 hold                             scheduled for     20.000!@    8+ mode=two
+    5+      10.000 x.1                  current                              
+    7                                   x.1 passivate                        mode=one
+   12+      15.000 y.0                  current                              
+   22                                   y.0                                  request failed
+   13                                   x.1 activate                         scheduled for     15.000 @    7+ mode=one
+                                        y.0 ended                            
+    7+      15.000 x.1                  current                              
+    8                                   x.1 hold                             scheduled for     25.000!@    8+ mode=two
+    8+      20.000 x.0                  current                              
+                                        x.0 ended                            
+    8+      25.000 x.1                  current                              
+                                        x.1 ended                            
+   22+      50.000 main                 current                              
+   
+Note that output line now starts with the line number in the source.
+If a + is behind the line number, that means the statement following that line.
+Also, for components to be scheduled the line number where the component will start execution
+is shown following the @ sign.
+Urgent scheduling is now indicated with an ! sign behind the time.
+
+Distributions
+-------------
+New distributions:
+    Beta
+    Erlang
+    Gamma
+    Weibull
+    
+Exponential distributions can now be specified with a mean (beta) or a rate (lambda).
+
+Normal distributions can now be specified to use the alternative random.gauss method.
+   
+
+New parameter for class Component
+---------------------------------
+suppress_pause_at_trace
+
+   
+New methods
+-----------
+Component.suppress_pause_at_trace
+
+Sampling from a distribution is now also possible by just calling the distribution, like:
+    yield self.hold(inter_arrival_time())
+, which is equivalent to    
+    yield self.hold(inter_arrival_time.sample())
+
+Documentation update
+--------------------
+The online documentation is now better structured and more accessible.
+Also, a lot of content added, although still not complete. As always, volunteers are welcome
+to help in improving the manual!
+
+The documentation makes clear now that the time stamps as used in timestamped monitors are
+not adjusted for reset_now().
+
 version 2.2.10  2018-01-03
 ==========================
 New methods:
