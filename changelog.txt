@@ -1,5 +1,41 @@
 salabim  changelog
 
+version 2.2.12  2018-01-18        
+==========================
+In the trace the line numbers are now prefixed by a letter to indicate
+in which file the line is in.
+The file from which the environment is created is not prefixed.
+The trace will issue a line when a not yet used source file is referenced.
+
+New method Environment.print_trace_header() will print a header.
+If an Environment is initialized, the trace_header is also printed provided trace=True.
+
+Now MonitorTimestamped.xt() and MonitorTimestampled.tx() add the last tallied value along with
+the current time as the last x- and t-value. This can be turned off by specifying add_now=False.
+
+Defining MonitorTimestamp is now much simpler as it is no longer required to use a getter function.
+Instead, the caller has now to provide the value to be tallied directly to the tally() method.
+When initializing a timestamped monitor, an initial_tally can be provided (by default 0).
+
+Added IntUniform distribution to sample integer values in a given range, for example:
+  die = sim.IntUniform(1,6)
+
+Added method bounded_sample to all distributions, to force sampling of a distribution within given bounds.
+This is, for instance, useful when sampling from a normal distribution, where the sample has be positive:
+  s = Normal(8,5).bounded_sample(lowerbound=0)
+
+Added Component.queues() which returns a set of all queues where the component is in.
+Added Component.count() which returns the number of queues the component is in or 1 if the component is i the queue, 0 otherwise
+
+Added a method Environment.beep() which can be useful to attract attention, etc. Note that this works only under Windows or iOS (Pythonista).
+For all other platforms, this is just a dummy function.
+
+Component.index_in_queue() renamed to Component.index() to be consistent with Queue.index()
+
+Significant updates to the documentation (structure).
+
+Optimizations by checking _trace flag before calling print_trace.
+
 version 2.2.11  2018-01-14         
 ==========================
 Enhanced trace output

@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.11'
+__version__ = '2.2.12'
 
 import heapq
 import random
@@ -19,6 +19,7 @@ import os
 import inspect
 import platform
 import sys
+import itertools
 
 Pythonista = (sys.platform == 'ios')
 Windows = (sys.platform.startswith('win'))
@@ -197,7 +198,7 @@ class Monitor(object):
         '''
         Returns
         -------
-        base name of the monitor (the name used at init or name): str
+        base name of the monitor (the name used at initialization): str
         '''
         return self._base_name
 
@@ -206,7 +207,7 @@ class Monitor(object):
         Returns
         -------
         sequence_number of the monitor : int
-            (the sequence number at init or name) |n|
+            (the sequence number at initialization) |n|
             normally this will be the integer value of a serialized name,
             but also non serialized names (without a dot or a comma at the end)
             will be numbered)
@@ -587,9 +588,9 @@ class MonitorTimestamp(Monitor):
         if omitted, the name will be derived from the class
         it is defined in (lowercased)
 
-    getter : function
-        this function must return the current value |n|
-        usually this will be a method of an object
+    initial_tally : any, usually float
+        initial value to be tallied (default 0) |n|
+        if it important to provide the value at time=now
 
     monitor : bool
         if True (default), monitoring will be on. |n|
@@ -645,7 +646,7 @@ class MonitorTimestamp(Monitor):
 
     cached_xduration = [(0, ()), (0, ())]  # index=ex0, value=[hash,(x,duration)]
 
-    def __init__(self, name=omitted, getter=None, monitor=True, type='any', env=omitted, *args, **kwargs):
+    def __init__(self, name=omitted, initial_tally=0, monitor=True, type='any', env=omitted, *args, **kwargs):
         if env is omitted:
             self.env = _default_env
         else:
@@ -657,7 +658,7 @@ class MonitorTimestamp(Monitor):
 
         _set_name(name, self.env._nameserializeComponent, self)
         self._timestamp = True
-        self._getter = getter
+        self._tally = initial_tally
         self.reset(monitor=monitor)
         self.setup(*args, **kwargs)
 
@@ -673,7 +674,22 @@ class MonitorTimestamp(Monitor):
             raise SalabimError('too many keyword arguments: ' + str(kwargs))
 
     def __call__(self):  # direct moneypatching __call__ doesn't work
-        return self._getter()
+        return self._tally
+
+    def get(self):
+        '''
+        Returns
+        -------
+        last tallied value : any, usually float
+
+            Instead of this method, the timestamped monitor can also be called directly, like |n|
+
+            level = sim.MonitorTimestamp('level') |n|
+            ... |n|
+            print(level()) |n|
+            print(level.get())  # identical |n|
+        '''
+        return self._tally
 
     def reset(self, monitor=omitted):
         '''
@@ -694,7 +710,7 @@ class MonitorTimestamp(Monitor):
             self._x = []
 
         if self._monitor:
-            self._x.append(self._getter())
+            self._x.append(self._tally)
         else:
             self._x.append(self.off)
         self._t = array.array('d')
@@ -719,22 +735,26 @@ class MonitorTimestamp(Monitor):
         if value is not omitted:
             self._monitor = value
             if self._monitor:
-                self.tally()
+                self.tally(self._tally)
             else:
-                self._tally_off()
+                self._tally_off()  # can't use tally() here because self._tally should be untouched
         return self.monitor
 
-    def tally(self):
+    def tally(self, value):
         '''
-        tally the current value, if monitor is on
+        tally value
+
+        Arguments
+        ---------
+        value : any, usually float
         '''
+        self._tally = value
         if self._monitor:
-            x = self._getter()
             t = self.env._now
             if self._t[-1] == t:
-                self._x[-1] = x
+                self._x[-1] = value
             else:
-                self._x.append(x)
+                self._x.append(value)
                 self._t.append(t)
 
     def _tally_off(self):
@@ -757,7 +777,7 @@ class MonitorTimestamp(Monitor):
         '''
         Returns
         -------
-        base name of the monitortimestamp (the name used at init or name): str
+        base name of the monitortimestamp (the name used at initialization): str
         '''
         return self._base_name
 
@@ -766,7 +786,7 @@ class MonitorTimestamp(Monitor):
         Returns
         -------
         sequence_number of the monitortimestamp : int
-            (the sequence number at init or name) |n|
+            (the sequence number at initialization) |n|
             normally this will be the integer value of a serialized name,
             but also non serialized names (without a dot or a comma at the end)
             will be numbered)
@@ -923,7 +943,7 @@ class MonitorTimestamp(Monitor):
 
         Returns
         -------
-        total duration
+        total duration : float
         '''
         _, duration = self.xduration(ex0=ex0)
         return sum(duration)
@@ -934,7 +954,7 @@ class MonitorTimestamp(Monitor):
 
         Returns
         -------
-        total duration of zero samples
+        total duration of zero samples : float
         '''
         return self.duration() - self.duration(ex0=True)
 
@@ -991,7 +1011,7 @@ class MonitorTimestamp(Monitor):
         MonitorTimestamp.cached_xduration[ex0] = (thishash, (x, duration))
         return x, duration
 
-    def xt(self, ex0=False, exoff=False, force_numeric=True):
+    def xt(self, ex0=False, exoff=False, force_numeric=True, add_now=True):
         '''
         tuple of array/list with x-values and array with timestamp
 
@@ -1006,6 +1026,10 @@ class MonitorTimestamp(Monitor):
         force_numeric : bool
             if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
             if False, do not interpret x-values, return as list if type is list
+
+        add_now : bool
+            if True (default), the last tallied x-value and the current time is added to the result |n|
+            if False, the result ends with the last tallied value and the time that was tallied
 
         Returns
         -------
@@ -1028,15 +1052,20 @@ class MonitorTimestamp(Monitor):
         else:
             x = []
         t = array.array('d')
-        for vx, vt in zip(xall, self._t):
-            if vx != self.off:
-                if not ex0 or (vx != 0):
-                    x.append(vx)
-                    t.append(vt)
+        if add_now:
+            addx = [xall[-1]]
+            addt = [self.env._now]
+        else:
+            addx = []
+            addt = []
+        for vx, vt in zip(itertools.chain(xall, addx), itertools.chain(self._t, addt)):
+            if not ex0 or (vx != 0):
+                x.append(vx)
+                t.append(vt)
 
         return x, t
 
-    def tx(self, ex0=False, exoff=False, force_numeric=False):
+    def tx(self, ex0=False, exoff=False, force_numeric=False, add_now=True):
         '''
         tuple of array with timestamps and array/list with x-values
 
@@ -1052,6 +1081,10 @@ class MonitorTimestamp(Monitor):
             if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
             if False, do not interpret x-values, return as list if type is list
 
+        add_now : bool
+            if True (default), the current time and the last tallied x-value added to the result |n|
+            if False, the result ends with the time of the last tally and the last tallied x-value
+
         Returns
         -------
         array with timestamps and array/list with x-values : tuple
@@ -1061,7 +1094,7 @@ class MonitorTimestamp(Monitor):
         The value self.off is stored when monitoring is turned off |n|
         The timestamps are not corrected for any reset_now() adjustment.
         '''
-        return tuple(reversed(self.xt(ex0=ex0, exoff=exoff, force_numeric=force_numeric)))
+        return tuple(reversed(self.xt(ex0=ex0, exoff=exoff, force_numeric=force_numeric, add_now=add_now)))
 
     def print_statistics(self, show_header=True, show_legend=True, do_indent=False):
         '''
@@ -1148,9 +1181,10 @@ if Pythonista:
                     while an_env.peek() < an_env.t:
                         an_env.step()
                         if an_env._current_component == an_env._main:
-                            an_env.print_trace(
-                                '{:10.3f}'.format(an_env._now - an_env._offset),
-                                an_env._main.name(), 'current', s0=an_env._main.lineno_txt())
+                            if an_env._trace:
+                                an_env.print_trace(
+                                    '{:10.3f}'.format(an_env._now - an_env._offset),
+                                    an_env._main.name(), 'current', s0=an_env._main.lineno_txt())
                             an_env._main._scheduled_time = inf
                             an_env._main._status = current
                             an_env.an_quit()
@@ -1162,8 +1196,9 @@ if Pythonista:
                             an_env._step_pressed = False
                         an_env.t = an_env._now
                         if an_env._current_component == an_env._main:
-                            an_env.print_trace('{:10.3f}'.format(an_env._now - an_env._offset),
-                                an_env._main.name(), 'current', s0=an_env._main.lineno_txt())
+                            if an_env._trace:
+                                an_env.print_trace('{:10.3f}'.format(an_env._now - an_env._offset),
+                                    an_env._main.name(), 'current', s0=an_env._main.lineno_txt())
                             an_env._scheduled_time = inf
                             an_env._status = current
                             an_env.an_quit()
@@ -1276,8 +1311,9 @@ class Qmember():
         for iter in q._iter_touched:
             q._iter_touched[iter] = True
         c._qmembers[q] = self
-        q.env.print_trace('', '', c.name(), 'enter ' + q.name())
-        q.length.tally()
+        if q.env._trace:
+            q.env.print_trace('', '', c.name(), 'enter ' + q.name())
+        q.length.tally(q._length)
         if q._animate_on:
             q._animate_update()
 
@@ -1334,14 +1370,15 @@ class Queue(object):
         self._iter_touched = {}
         self._animate_on = False
         self.length = MonitorTimestamp(
-            'Length of ' + self.name(), getter=self._getlength, monitor=monitor, type='uint32', env=self.env)
+            'Length of ' + self.name(), initial_tally=0, monitor=monitor, type='uint32', env=self.env)
         self.length_of_stay = Monitor(
             'Length of stay in ' + self.name(), monitor=monitor, type='float')
         if fill is not omitted:
             for c in fill:
                 c._enter(self)
         if not _isinternal:
-            self.env.print_trace('', '', self.name() + ' create')
+            if self.env._trace:
+                self.env.print_trace('', '', self.name() + ' create')
         self.setup(*args, **kwargs)
 
     def setup(self, *args, **kwargs):
@@ -1431,9 +1468,6 @@ class Queue(object):
             for c in self:
                 c._remove_from_aos(self)
 
-    def _getlength(self):
-        return self._length
-
     def reset_monitors(self, monitor=omitted):
         '''
         resets queue monitor length_of_stay and timestamped monitor length
@@ -1511,7 +1545,7 @@ class Queue(object):
         '''
         Returns
         -------
-        base name of the queue (the name used at init or name): str
+        base name of the queue (the name used at initialization): str
         '''
         return self._base_name
 
@@ -1520,7 +1554,7 @@ class Queue(object):
         Returns
         -------
         sequence_number of the queue : int
-            (the sequence number at init or name) |n|
+            (the sequence number at initialization) |n|
             normally this will be the integer value of a serialized name,
             but also non serialized names (without a dot or a comma at the end)
             will be numbered)
@@ -1606,10 +1640,10 @@ class Queue(object):
 
     def insert(self, index, component):
         '''
-        Insert component before index'th element of the queue
+        Insert component before index-th element of the queue
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         index : int
             component to be added just before index'th element |n|
             should be >=0 and <=len(self)
@@ -1728,7 +1762,7 @@ class Queue(object):
         Parameters
         ----------
         index : int
-            index'th element to remove, if any |n|
+            index-th element to remove, if any |n|
             if omitted, return the head of the queue, if any
 
         Returns
@@ -1833,7 +1867,6 @@ class Queue(object):
             raise TypeError('Invalid argument type.')
 
     def __delitem__(self, key):
-        print(key)
         if isinstance(key, slice):
             for c in self[key]:
                 self.remove(c)
@@ -1892,7 +1925,7 @@ class Queue(object):
         '''
         component count
 
-        Arguments
+        Parameters
         ---------
         component : Component
             component to count
@@ -1905,7 +1938,7 @@ class Queue(object):
         ----
         The result can only be 0 or 1
         '''
-        return 1 if component in self else 0
+        return component.count(self)
 
     def index(self, component):
         '''
@@ -1923,7 +1956,7 @@ class Queue(object):
             0 denotes the head, |n|
             returns -1 if component is not in the queue
         '''
-        return component.index_in_queue(self)
+        return component.index(self)
 
     def component_with_name(self, txt):
         '''
@@ -1979,8 +2012,8 @@ class Queue(object):
         '''
         extends the queue with components of q that are not already in self
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         q : queue, list or tuple
 
         Note
@@ -2254,7 +2287,8 @@ class Queue(object):
             c = mx.component
             mx = mx.successor
             c._leave(self)
-        self.env.print_trace('', '', self.name() + ' clear')
+        if self.env._trace:
+            self.env.print_trace('', '', self.name() + ' clear')
 
 
 def finish():
@@ -2323,13 +2357,16 @@ class Environment(object):
             if is_default_env:
                 name = 'default environment'
         self._trace = trace
-        if print_trace_header:
-            self.print_trace_header()
+        self._source_files = {inspect.getframeinfo(_get_caller_frame()).filename: 0}
         if random_seed != '':
             if random_seed is omitted:
                 random_seed = 1234567
             random.seed(random_seed)
         _set_name(name, Environment._nameserialize, self)
+        if self._trace:
+            if print_trace_header:
+                self.print_trace_header()
+            self.print_trace('', '', self.name() + ' initialize')
         self.env = self
         # just to allow main to be created; will be reset later
         self._nameserializeComponent = {}
@@ -2337,10 +2374,10 @@ class Environment(object):
         self._offset = 0
         self._main = Component(name='main', env=self, process=None)
         self._main._status = current
-        self._main.lineno = inspect.getframeinfo(inspect.stack()[1][0]).lineno
+        self._main.frame = _get_caller_frame()
         self._current_component = self._main
-        self.ui_objects = []
-        self.print_trace('{:10.3f}'.format(self._now - self._offset), 'main', 'current')
+        if self._trace:
+            self.print_trace('{:10.3f}'.format(0), 'main', 'current')
         self._nameserializeQueue = {}
         self._nameserializeComponent = {}
         self._nameserializeResource = {}
@@ -2442,14 +2479,16 @@ class Environment(object):
                 c._status = current
                 c._scheduled_time = inf
                 self.env._current_component = c
-                self.print_trace('{:10.3f}'.format(self._now - self.env._offset), c.name(),
-                  'current (standby)', s0=self.lineno_txt())
+                if self._trace:
+                    self.print_trace('{:10.3f}'.format(self._now - self.env._offset), c.name(),
+                        'current (standby)', s0=self.lineno_txt())
                 try:
                     next(c._process)
                     return
                 except StopIteration:
                     c.release()
-                    self.print_trace('', '', c.name() + ' ended', s0='')
+                    if self._trace:
+                        self.print_trace('', '', c.name() + ' ended', s0='')
                     c._status = data
                     c._scheduled_time = inf
                     c._process = None
@@ -2476,7 +2515,8 @@ class Environment(object):
                 return
 
             c._status = current
-            self.print_trace('{:10.3f}'.format(self._now - self._offset), c.name(),
+            if self._trace:
+                self.print_trace('{:10.3f}'.format(self._now - self._offset), c.name(),
               'current', s0=c.lineno_txt())
             c._check_fail()
             c._scheduled_time = inf
@@ -2484,7 +2524,8 @@ class Environment(object):
             return
         except StopIteration:
             c.release()
-            self.print_trace('', '', c.name() + ' ended', s0='')
+            if self._trace:
+                self.print_trace('', '', c.name() + ' ended', s0='')
             c._status = data
             c._scheduled_time = inf
             c._process = None
@@ -2697,9 +2738,10 @@ class Environment(object):
         offset_before = self._offset
         self._offset = self._now - new_now
 
-        self.print_trace(
-            '', '', 'now reset to {:0.3f}'.format(new_now),
-            '(all times are reduced by {:0.3f})'.format(self._offset - offset_before))
+        if self._trace:
+            self.print_trace(
+                '', '', 'now reset to {:0.3f}'.format(new_now),
+                '(all times are reduced by {:0.3f})'.format(self._offset - offset_before))
 
     def trace(self, value=omitted):
         '''
@@ -2767,7 +2809,7 @@ class Environment(object):
             else:
                 raise SalabimError('both duration and till specified')
 
-        self._main.lineno = inspect.getframeinfo(inspect.stack()[1][0]).lineno
+        self._main.frame = _get_caller_frame()
         self._main._reschedule(scheduled_time, False, 'run')
 
         if self.animate:
@@ -2851,8 +2893,9 @@ class Environment(object):
         while True:
             self.step()
             if self._current_component == self._main:
-                self.print_trace('{:10.3f}'.format(
-                    self._now - self._offset), self._main.name(), 'current', s0=self._main.lineno_txt())
+                if self._trace:
+                    self.print_trace('{:10.3f}'.format(
+                        self._now - self._offset), self._main.name(), 'current', s0=self._main.lineno_txt())
                 self._scheduled_time = inf
                 self._status = current
                 return
@@ -2877,8 +2920,9 @@ class Environment(object):
                 while self.peek() < self.t:
                     self.step()
                     if self._current_component == self._main:
-                        self.print_trace('{:10.3f}'.format(self._now - self._offset),
-                            self._main.name(), 'current', s0=self._main.lineno_txt())
+                        if self._trace:
+                            self.print_trace('{:10.3f}'.format(self._now - self._offset),
+                                self._main.name(), 'current', s0=self._main.lineno_txt())
                         self._scheduled_time = inf
                         self._status = current
                         self.running = False
@@ -2891,8 +2935,9 @@ class Environment(object):
                         self._step_pressed = False
                     self.t = self._now
                     if self._current_component == self._main:
-                        self.print_trace('{:10.3f}'.format(self._now - self._offset),
-                            self._main.name(), 'current', s0=self._main.lineno_txt())
+                        if self._trace:
+                            self.print_trace('{:10.3f}'.format(self._now - self._offset),
+                                self._main.name(), 'current', s0=self._main.lineno_txt())
                         self._scheduled_time = inf
                         self._status = current
                         self.running = False
@@ -3247,14 +3292,14 @@ class Environment(object):
 
     def base_name(self):
         '''
-        returns the base name of the environment (the name used at init or name)
+        returns the base name of the environment (the name used at initialization)
         '''
         return self._base_name
 
     def sequence_number(self):
         '''
         returns the sequence_number of the environment
-        (the sequence number at init or name) |n|
+        (the sequence number at initialization) |n|
         normally this will be the integer value of a serialized name,
         but also non serialized names (without a dot or a comma at the end)
         will be numbered)
@@ -3264,11 +3309,42 @@ class Environment(object):
     def print_trace_header(self):
         '''
         print a (two line) header line as a legend |n|
+        also the legend for line numbers will be printed |n|
         not that the header is only printed if trace=True
         '''
-        if self._trace:
-            self.print_trace('      time', 'current component', 'action', 'information', 'line#')
-            self.print_trace(10 * '-', 20 * '-', 35 * '-', 48 * '-', 5 * '-')
+        self.print_trace('      time', 'current component', 'action', 'information', 'line#')
+        self.print_trace(10 * '-', 20 * '-', 35 * '-', 48 * '-', 5 * '-')
+        for ref in range(len(self._source_files)):
+            for fullfilename, iref in self._source_files.items():
+                if ref == iref:
+                    self._print_legend(iref)
+
+    def _print_legend(self, ref):
+        if ref:
+            s = 'line numbers prefixed by ' + chr(ord('A') + ref - 1) + ' refer to'
+        else:
+            s = 'line numbers refers to'
+        for fullfilename, iref in self._source_files.items():
+            if ref == iref:
+                self.print_trace('', '', s, os.path.basename(fullfilename), '')
+                break
+
+    def _frame_to_lineno(self, frame):
+        frameinfo = inspect.getframeinfo(frame)
+        ref = self._source_files.get(frameinfo.filename)
+        new_entry = False
+        if ref is None:
+            if self._source_files:
+                ref = len(self._source_files)
+            self._source_files[frameinfo.filename] = ref
+            new_entry = True
+        if ref == 0:
+            pre = ''
+        else:
+            pre = chr(ref + ord('A') - 1)
+        if new_entry:
+            self._print_legend(ref)
+        return rpad(pre + str(frameinfo.lineno), 5)
 
     def print_trace(self, s1='', s2='', s3='', s4='', s0=omitted):
         '''
@@ -3298,12 +3374,35 @@ class Environment(object):
                     stack = inspect.stack()
                     filename0 = inspect.getframeinfo(stack[0][0]).filename
                     for i in range(len(inspect.stack())):
-                        infoi = inspect.getframeinfo(stack[i][0])
-                        if filename0 != infoi.filename:
+                        frame = stack[i][0]
+                        if filename0 != inspect.getframeinfo(frame).filename:
                             break
-                    s0 = '{:5d}'.format(infoi.lineno)
+
+                    s0 = self._frame_to_lineno(_get_caller_frame())
                 print(pad(s0, 7), pad(s1, 10) + ' ' + pad(s2, 20) + ' ' +
                   pad(s3, max(len(s3), 36)) + ' ' + s4.strip())
+
+    def beep(self):
+        '''
+        Beeps
+
+        Works only on Windows and iOS (Pythonista). For other platforms this is just a dummy method.
+        '''
+        if Windows:
+            try:
+                import winsound
+                winsound.PlaySound(
+                    os.environ['WINDIR'] + r'\media\Windows Ding.wav', winsound.SND_FILENAME | winsound.SND_ASYNC)
+            except:
+                pass
+
+        elif Pythonista:
+            try:
+                import sound
+                sound.stop_all_effects()
+                sound.play_effect('game:Beep', pitch=0.3)
+            except:
+                pass
 
 
 class Animate(object):
@@ -4889,8 +4988,9 @@ class Component(object):
         self._mode = mode
         self._mode_time = self.env._now
         self._aos = {}
-        self.env.print_trace('', '', self.name() +
-            ' create', _modetxt(self._mode))
+        if self.env._trace:
+            self.env.print_trace('', '', self.name() +
+                ' create', _modetxt(self._mode))
         if process is omitted:
             if self.hasprocess():
                 process = 'process'
@@ -5037,7 +5137,8 @@ class Component(object):
 
     def _check_fail(self):
         if self._requests:
-            self.env.print_trace('', '', self.name(), 'request failed')
+            if self.env._trace:
+                self.env.print_trace('', '', self.name(), 'request failed')
             for r in list(self._requests.keys()):
                 self._leave(r._requesters)
                 if r._requesters._length == 0:
@@ -5046,7 +5147,8 @@ class Component(object):
             self._failed = True
 
         if self._waits:
-            self.env.print_trace('', '', self.name(), 'wait failed')
+            if self.env._trace:
+                self.env.print_trace('', '', self.name(), 'wait failed')
             for state, _, _ in self._waits:
                 if self in state._waiters:  # there might be more values for this state
                     self._leave(state._waiters)
@@ -5062,13 +5164,14 @@ class Component(object):
         if scheduled_time != inf:
             self._push(scheduled_time, urgent)
         self._status = scheduled
-        self.env.print_trace(
-            '', '', self.name() + ' ' + caller,
-            merge_blanks(
-                'scheduled for {:10.3f}'.format(scheduled_time - self.env._offset) +
-                _urgenttxt(urgent) + '@' + self.lineno_txt(),
-                _modetxt(self._mode),
-                extra))
+        if self.env._trace:
+            self.env.print_trace(
+                '', '', self.name() + ' ' + caller,
+                merge_blanks(
+                    'scheduled for {:10.3f}'.format(scheduled_time - self.env._offset) +
+                    _urgenttxt(urgent) + '@' + self.lineno_txt(),
+                    _modetxt(self._mode),
+                    extra))
 
     def activate(self, at=omitted, delay=0, urgent=False, process=omitted,
       keep_request=False, keep_wait=False, mode=omitted):
@@ -5249,7 +5352,8 @@ class Component(object):
         if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
-        self.env.print_trace('', '', self.name() + ' passivate', merge_blanks(_modetxt(self._mode)))
+        if self.env._trace:
+            self.env.print_trace('', '', self.name() + ' passivate', merge_blanks(_modetxt(self._mode)))
         self._status = passive
 
     def cancel(self, mode=omitted):
@@ -5277,8 +5381,9 @@ class Component(object):
         if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
-        self.env.print_trace('', '', 'cancel ' +
-                             self.name() + ' ' + _modetxt(self._mode))
+        if self.env._trace:
+            self.env.print_trace('', '', 'cancel ' +
+                self.name() + ' ' + _modetxt(self._mode))
         self._status = data
         if an_env == self.env:
             for ao in self.env.an_objects[:]:
@@ -5315,7 +5420,8 @@ class Component(object):
         if mode is not omitted:
             self._mode = mode
             self._mode_time = self.env._now
-        self.env.print_trace('', '', 'standby', _modetxt(self._mode))
+        if self.env._trace:
+            self.env.print_trace('', '', 'standby', _modetxt(self._mode))
         self._status = standby
 
     def request(self, *args, **kwargs):
@@ -5431,10 +5537,11 @@ class Component(object):
             else:
                 addstring = addstring + ' priority=' + str(priority)
                 self._enter_sorted(r._requesters, priority)
-            self.env.print_trace(
-                '', '', self.name(),
-                'request for ' + str(q) + ' from ' + r.name() + addstring +
-                ' ' + _modetxt(self._mode))
+            if self.env._trace:
+                self.env.print_trace(
+                    '', '', self.name(),
+                    'request for ' + str(q) + ' from ' + r.name() + addstring +
+                    ' ' + _modetxt(self._mode))
 
         for r, q in self._requests.items():
             if q < r._minq:
@@ -5461,8 +5568,8 @@ class Component(object):
                     self._enter(r._claimers)
                 if r._requesters._length == 0:
                     r._minq = inf
-                r.claimed_quantity.tally()
-                r.available_quantity.tally()
+                r.claimed_quantity.tally(r._claimed_quantity)
+                r.available_quantity.tally(r._capacity - r._claimed_quantity)
             self._requests = collections.defaultdict(int)
             self._remove()
             self._reschedule(self.env._now, False, 'request honour')
@@ -5482,10 +5589,11 @@ class Component(object):
             if r._claimers._length == 0:
                 r._claimed_quantity = 0  # to avoid rounding problems
             del self._claims[r]
-        r.claimed_quantity.tally()
-        r.available_quantity.tally()
-        self.env.print_trace('', '', self.name(),
-            'release ' + str(q) + ' from ' + r.name())
+        r.claimed_quantity.tally(r._claimed_quantity)
+        r.available_quantity.tally(r._capacity - r._claimed_quantity)
+        if self.env._trace:
+            self.env.print_trace('', '', self.name(),
+                'release ' + str(q) + ' from ' + r.name())
         r._tryrequest()
 
     def release(self, *args):
@@ -5798,7 +5906,7 @@ class Component(object):
         '''
         Returns
         -------
-        base name of the component (the name used at init or name): str
+        base name of the component (the name used at initialization): str
         '''
         return self._base_name
 
@@ -5807,7 +5915,7 @@ class Component(object):
         Returns
         -------
         sequence_number of the component : int
-            (the sequence number at init or name) |n|
+            (the sequence number at initialization) |n|
             normally this will be the integer value of a serialized name,
             but also non serialized names (without a dotcomma at the end)
             will be numbered)
@@ -5965,7 +6073,36 @@ class Component(object):
         '''
         return self._status == data
 
-    def index_in_queue(self, q):
+    def queues(self):
+        '''
+        Returns
+        -------
+        set of queues where the component belongs to
+        '''
+        return set(self._qmembers)
+
+    def count(self, q=omitted):
+        '''
+        queue count
+
+        Parameters
+        ----------
+        q : Queue
+            queue to check or |n|
+            if omitted, the number of queues where the component is in
+
+        Returns
+        -------
+        1 if component is in q, 0 otherwise : int
+            |n|
+            if q is omitted, the number of queues where the component is in
+        '''
+        if q is omitted:
+            return len(self._qmembers)
+        else:
+            return 1 if self in q else 0
+
+    def index(self, q):
         '''
         Parameters
         ----------
@@ -6136,10 +6273,11 @@ class Component(object):
         # signal for components method that member is not in the queue
         q._length -= 1
         del self._qmembers[q]
-        self.env.print_trace('', '', self.name(), 'leave ' + q.name())
+        if self.env._trace:
+            self.env.print_trace('', '', self.name(), 'leave ' + q.name())
         length_of_stay = self.env._now - mx.enter_time
         q.length_of_stay.tally(length_of_stay)
-        q.length.tally()
+        q.length.tally(q._length)
         if q._animate_on:
             self._remove_from_aos(q)
             q._animate_update()
@@ -6333,17 +6471,81 @@ class Component(object):
     def lineno_txt(self):
         plus = '+'
         if self == self.env._main:
-            lineno = self.lineno
+            frame = self.frame
         else:
-            lineno = self._process.gi_frame.f_lineno
-            if self._process.gi_frame.f_lasti == -1:  # checks whether generator is created
+            frame = self._process.gi_frame
+            if frame.f_lasti == -1:  # checks whether generator is created
                 plus = ' '
-        return '{:5d}{}'.format(lineno, plus)
+
+        return self.env._frame_to_lineno(frame) + plus
 
 
 class _Distribution():
-    def __call__(self):
-        return self.sample()
+
+    def bounded_sample(self, lowerbound=-inf, upperbound=inf, fail_value=omitted, number_of_retries=100):
+        '''
+        Parameters
+        ----------
+        lowerbound : float
+            sample values < lowerbound will be rejected (at most 100 retries) |n|
+            if omitted, no lowerbound check
+
+        upperbound : float
+            sample values > upperbound will be rejected (at most 100 retries) |n|
+            if omitted, no upperbound check
+
+        fail_value : float
+            value to be used if. after 100 retries, sample is still not within bounds |n|
+            default: lowerbound, if specified, otherwise upperbound
+
+        number_of_tries : int
+            number of tries before fail_value is returned |n|
+            default: 100
+
+        Returns
+        -------
+        Bounded sample of a distribution : depending on distribution type (usually float)
+
+        Note
+        ----
+        If, after number_of_tries retries, the sampled value is still not within the given bounds,
+        fail_value  will be returned |n|
+        Samples that cannot be converted (only possible with Pdf) to float are assumed to be within the bounds.
+        '''
+        if (lowerbound == -inf) and (upperbound == inf):
+            return self.sample()
+
+        if lowerbound is omitted:
+            lowerbound = -inf
+        if upperbound is omitted:
+            upperbound = inf
+
+        if lowerbound > upperbound:
+            raise SalabimError('lowerbound > upperbound')
+
+        if number_of_retries <= 0:
+            raise SalabimError('number_of_tries <= 0')
+
+        if fail_value is omitted:
+            if lowerbound == -inf:
+                fail_value = upperbound
+            else:
+                fail_value = lowerbound
+
+        for _ in range(number_of_retries):
+            sample = self.sample()
+            try:
+                samplefloat = float(sample)
+            except ValueError:
+                return sample  # a value that cannot be converted to a float is sampled is assumed to be correct
+
+            if (samplefloat >= lowerbound) and (samplefloat <= upperbound):
+                return sample
+
+        return fail_value
+
+    def __call__(self, *args):
+        return self.sample(*args)
 
 
 class Exponential(_Distribution):
@@ -6406,13 +6608,17 @@ class Exponential(_Distribution):
 
     def sample(self):
         '''
-        returns sample
+        Returns
+        -------
+        Sample of the distribution : float
         '''
         return self.randomstream.expovariate(1 / (self._mean))
 
     def mean(self):
         '''
-        returns the mean of the distribution
+        Returns
+        -------
+        Mean of the distribution : float
         '''
         return self._mean
 
@@ -6436,7 +6642,7 @@ class Normal(_Distribution):
         if True, use the random.gauss method |n|
         the documentation for random states that the gauss method should be slightly faster,
         although that statement is doubtful.
-        
+
     randomstream: randomstream
         randomstream to be used |n|
         if omitted, random will be used |n|
@@ -6445,7 +6651,7 @@ class Normal(_Distribution):
     '''
 
     def __init__(self, mean, standard_deviation=0, use_gauss=False, randomstream=omitted):
-        self._use_gauss =  use_gauss
+        self._use_gauss = use_gauss
         self._mean = mean
         self._standard_deviation = standard_deviation
         if self._standard_deviation < 0:
@@ -6469,7 +6675,9 @@ class Normal(_Distribution):
 
     def sample(self):
         '''
-        returns sample
+        Returns
+        -------
+        Sample of the distribution : float
         '''
         if self._use_gauss:
             return self.randomstream.gauss(self._mean, self._standard_deviation)
@@ -6478,7 +6686,88 @@ class Normal(_Distribution):
 
     def mean(self):
         '''
-        returns the mean of the distribution
+        Returns
+        -------
+        Mean of the distribution : float
+        '''
+        return self._mean
+
+
+class IntUniform(_Distribution):
+    '''
+    integer uniform distribution, i.e. sample integer values between lowerbound and upperbound (inclusive)
+
+    Parameters
+    ----------
+    lowerbound : int
+        lowerbound of the distribution
+
+    upperbound : int
+        upperbound of the distribution |n|
+        if omitted, lowerbound will be used |n|
+        must be >= lowerbound
+
+    randomstream: randomstream
+        randomstream to be used |n|
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
+
+    Note
+    ----
+    In contrast to range, the upperbound is included.
+
+    Example
+    -------
+    die = sim.IntUniform(1,6)
+    for _ in range(10):
+        print (die())
+
+    This will print 10 throws of a die.
+    '''
+
+    def __init__(self, lowerbound, upperbound=omitted, randomstream=omitted):
+        self._lowerbound = lowerbound
+        if upperbound is omitted:
+            self._upperbound = lowerbound
+        else:
+            self._upperbound = upperbound
+        if self._lowerbound > self._upperbound:
+            raise SalabimError('lowerbound>upperbound')
+        if lowerbound != int(lowerbound):
+            raise SalabimError('lowerbound not integer')
+        if upperbound != int(upperbound):
+            raise SalabimError('upperbound not integer')
+
+        if randomstream is omitted:
+            self.randomstream = random
+        else:
+            randomstream_check(randomstream)
+            self.randomstream = randomstream
+        self._mean = (self._lowerbound + self._upperbound) / 2
+
+    def __repr__(self):
+        return 'IntUniform'
+
+    def print_info(self):
+        print('IntUniform distribution ' + hex(id(self)))
+        print('  lowerbound=' + str(self._lowerbound))
+        print('  upperbound=' + str(self._upperbound))
+        print('  randomstream=' + hex(id(self.randomstream)))
+
+    def sample(self):
+        '''
+        Returns
+        -------
+        Sample of the distribution: int
+        '''
+        return self.randomstream.randint(self._lowerbound, self._upperbound)
+
+    def mean(self):
+        '''
+        Returns
+        -------
+        Mean of the distribution : float
         '''
         return self._mean
 
@@ -6530,13 +6819,17 @@ class Uniform(_Distribution):
 
     def sample(self):
         '''
-        returns sample
+        Returns
+        -------
+        Sample of the distribution: float
         '''
         return self.randomstream.uniform(self._lowerbound, self._upperbound)
 
     def mean(self):
         '''
-        returns the mean of the distribution
+        Returns
+        -------
+        Mean of the distribution : float
         '''
         return self._mean
 
@@ -6602,13 +6895,17 @@ class Triangular(_Distribution):
 
     def sample(self):
         '''
-        returns sample
+        Returns
+        -------
+        Sample of the distribtion : float
         '''
         return self.randomstream.triangular(self._low, self._high, self._mode)
 
     def mean(self):
         '''
-        returns the mean of the distribution
+        Returns
+        -------
+        Mean of the distribution : float
         '''
         return self._mean
 
@@ -6650,13 +6947,17 @@ class Constant(_Distribution):
 
     def sample(self):
         '''
-        returns sample (is always the specified constant)
+        Returns
+        -------
+        sample of the distribution (= the specified constant) : float
         '''
         return(self._value)
 
     def mean(self):
         '''
-        returns the mean of the distribution
+        Returns
+        -------
+        mean of the distribution (= the specified constant) : float
         '''
         return self._mean
 
@@ -6706,13 +7007,17 @@ class Weibull(_Distribution):
 
     def sample(self):
         '''
-        returns sample
+        Returns
+        -------
+        Sample of the distribution : float
         '''
         return self.randomstream.weibullvariate(self._scale, self._shape)
 
     def mean(self):
         '''
-        returns the mean of the distribution
+        Returns
+        -------
+        Mean of the distribution : float
         '''
         return self._mean
 
@@ -6785,13 +7090,17 @@ class Gamma(_Distribution):
 
     def sample(self):
         '''
-        returns sample
+        Returns
+        -------
+        Sample of the distribution : float
         '''
         return self.randomstream.gammavariate(self._shape, self._scale)
 
     def mean(self):
         '''
-        returns the mean of the distribution
+        Returns
+        -------
+        Mean of the distribution : float
         '''
         return self._mean
 
@@ -6844,13 +7153,17 @@ class Beta(_Distribution):
 
     def sample(self):
         '''
-        returns sample
+        Returns
+        -------
+        Sample of the distribution : float
         '''
         return self.randomstream.betavariate(self._alpha, self._beta)
 
     def mean(self):
         '''
-        returns the mean of the distribution
+        Returns
+        -------
+        Mean of the distribution : float
         '''
         return self._mean
 
@@ -6927,13 +7240,17 @@ class Erlang(_Distribution):
 
     def sample(self):
         '''
-        returns sample
+        Returns
+        -------
+        Sample of the distribution : float
         '''
         return self.randomstream.gammavariate(self._shape, 1 / self._rate)
 
     def mean(self):
         '''
-        returns the mean of the distribution
+        Returns
+        -------
+        Mean of the distribution : float
         '''
         return self._mean
 
@@ -7014,7 +7331,7 @@ class Cdf(_Distribution):
         '''
         Returns
         -------
-        sample : float
+        Sample of the distribution : float
         '''
         r = self.randomstream.random()
         for i in range(len(self._cum)):
@@ -7026,7 +7343,7 @@ class Cdf(_Distribution):
         '''
         Returns
         -------
-        mean of the distribution : float
+        Mean of the distribution : float
         '''
         return self._mean
 
@@ -7063,7 +7380,7 @@ class Pdf(_Distribution):
     p0+p1=...+pn>0 |n|
     all densities are auto scaled according to the sum of p0 to pn,
     so no need to have p0 to pn add up to 1 or 100. |n|
-    The x-values may be any type. |n|
+    The x-values can be any type. |n|
     If it is a salabim distribution, not the distribution,
     but a sample will be returned when calling sample.
     '''
@@ -7143,7 +7460,7 @@ class Pdf(_Distribution):
         '''
         Returns
         -------
-        sample : any (usually float)
+        Sample of the distribution : any (usually float)
         '''
         r = self.randomstream.random()
         for cum, x in zip(self._cum, self._x):
@@ -7235,7 +7552,7 @@ class Distribution(_Distribution):
 
         else:
             for distype in ('Uniform', 'Constant', 'Triangular', 'Exponential', 'Normal',
-              'Cdf', 'Pdf', 'Weibull', 'Gamma', 'Erlang', 'Beta'):
+              'Cdf', 'Pdf', 'Weibull', 'Gamma', 'Erlang', 'Beta', 'IntUniform'):
                 if pre == distype.upper()[:len(pre)]:
                     sp[0] = distype
                     spec = '('.join(sp)
@@ -7261,7 +7578,7 @@ class Distribution(_Distribution):
         '''
         Returns
         -------
-        sample : float
+        Sample of the  distribution : any (usually float)
         '''
         self._distribution.randomstream = self.randomstream
         return self._distribution.sample()
@@ -7270,7 +7587,7 @@ class Distribution(_Distribution):
         '''
         Returns
         -------
-        mean of the distribution : float
+        Mean of the distribution : float
         '''
         return self._mean
 
@@ -7348,12 +7665,13 @@ class State(object):
             monitor=monitor, env=self.env, _isinternal=True)
         self.value = MonitorTimestamp(
             name='Value of ' + self.name(),
-            getter=self._get_value, monitor=monitor, type=type, env=self.env)
+            initial_tally=value, monitor=monitor, type=type, env=self.env)
         if animation_objects is not omitted:
             self.animation_objects = animation_objects.__get__(self, State)
-        self.env.print_trace(
-            '', '', self.name() + ' create',
-            'value= ' + str(self._value))
+        if self.env._trace:
+            self.env.print_trace(
+                '', '', self.name() + ' create',
+                'value= ' + str(self._value))
         self.setup(*args, **kwargs)
 
     def setup(self, *args, **kwargs):
@@ -7448,6 +7766,13 @@ class State(object):
         Returns
         -------
         value of the state : any
+            Instead of this method, the state can also be called directly, like |n|
+
+            level = sim.State('level') |n|
+            ... |n|
+            print(level()) |n|
+            print(level.get())  # identical |n|
+
         '''
         return self._value
 
@@ -7466,10 +7791,11 @@ class State(object):
         ----
         This method is identical to reset, except the default value is True.
         '''
-        self.env.print_trace('', '', self.name() + ' set', 'value = ' + str(value))
+        if self.env._trace:
+            self.env.print_trace('', '', self.name() + ' set', 'value = ' + str(value))
         if self._value != value:
             self._value = value
-            self.value.tally()
+            self.value.tally(value)
             if self._animate_on:
                 self._animate_update()
             self._trywait()
@@ -7489,10 +7815,11 @@ class State(object):
         ----
         This method is identical to set, except the default value is False.
         '''
-        self.env.print_trace('', '', self.name() + ' reset', 'value = ' + str(value))
+        if self.env._trace:
+            self.env.print_trace('', '', self.name() + ' reset', 'value = ' + str(value))
         if self._value != value:
             self._value = value
-            self.value.tally()
+            self.value.tally(value)
             if self._animate_on:
                 self._animate_update()
             self._trywait()
@@ -7523,14 +7850,15 @@ class State(object):
         '''
         if value_after is omitted:
             value_after = self._value
-        self.env.print_trace('', '', self.name() + ' trigger',
-            ' value = ' + str(value) + ' --> ' + str(value_after) +
-            ' allow ' + str(max) + ' components')
+        if self.env._trace:
+            self.env.print_trace('', '', self.name() + ' trigger',
+                ' value = ' + str(value) + ' --> ' + str(value_after) +
+                ' allow ' + str(max) + ' components')
         self._value = value
-        self.value.tally()  # strictly speaking, not required
+        self.value.tally(value)  # strictly speaking, not required
         self._trywait(max)
         self._value = value_after
-        self.value.tally()
+        self.value.tally(value_after)
         if self._animate_on:
             self._animate_update()
         self._trywait()
@@ -7566,7 +7894,7 @@ class State(object):
 
     def reset_monitors(self, monitor=omitted):
         '''
-        resets the timestamped monitor for the state's value and the monitors of the requesters queue
+        resets the timestamped monitor for the state's value and the monitors of the waiters queue
 
         Parameters
         ----------
@@ -7576,7 +7904,7 @@ class State(object):
             if omitted, no change of monitoring state
 
         '''
-        self.requesters().reset_monitors(monitor)
+        self._waiters.reset_monitors(monitor)
         self.value.reset()
 
     def _get_value(self):
@@ -7594,7 +7922,7 @@ class State(object):
         '''
         Returns
         -------
-        base name of the state (the name used at init or name): str
+        base name of the state (the name used at initialization): str
         '''
         return self._base_name
 
@@ -7603,7 +7931,7 @@ class State(object):
         Returns
         -------
         sequence_number of the state : int
-            (the sequence number at init or name) |n|
+            (the sequence number at initialization) |n|
             normally this will be the integer value of a serialized name,
             but also non serialized names (without a dot or a comma at the end)
             will be numbered)
@@ -7684,16 +8012,17 @@ class Resource(object):
         self._minq = inf
         self.capacity = MonitorTimestamp(
             'Capacity of ' + self.name(),
-            getter=self._get_capacity, monitor=monitor, type='float', env=self.env)
+            initial_tally=capacity, monitor=monitor, type='float', env=self.env)
         self.claimed_quantity = MonitorTimestamp(
             'Claimed quantity of ' + self.name(),
-            getter=self._get_claimed_quantity, monitor=monitor, type='float', env=self.env)
+            initial_tally=0, monitor=monitor, type='float', env=self.env)
         self.available_quantity = MonitorTimestamp(
             'Available quantity of ' + self.name(),
-            getter=self._get_available_quantity, monitor=monitor, type='float', env=self.env)
-        self.env.print_trace(
-            '', '', self.name() + ' create',
-            'capacity=' + str(self._capacity) + (' anonymous' if self._anonymous else ''))
+            initial_tally=capacity, monitor=monitor, type='float', env=self.env)
+        if self.env._trace:
+            self.env.print_trace(
+                '', '', self.name() + ' create',
+                'capacity=' + str(self._capacity) + (' anonymous' if self._anonymous else ''))
         self.setup(*args, **kwargs)
 
     def setup(self, *args, **kwargs):
@@ -7840,8 +8169,8 @@ class Resource(object):
             self._claimed_quantity -= q
             if self._claimed_quantity < 1e-8:
                 self._claimed_quantity = 0
-            self.claimed_quantity.tally()
-            self.available_quantity.tally()
+            self.claimed_quantity.tally(self._claimed_quantity)
+            self.available_quantity.tally(self._capacity - self._claimed_quantity)
             self._tryrequest()
 
         else:
@@ -7872,15 +8201,6 @@ class Resource(object):
         '''
         return self._claimers
 
-    def _get_capacity(self):
-        return self._capacity
-
-    def _get_claimed_quantity(self):
-        return self._claimed_quantity
-
-    def _get_available_quantity(self):
-        return self._capacity - self._claimed_quantity
-
     def set_capacity(self, cap):
         '''
         Parameters
@@ -7891,8 +8211,8 @@ class Resource(object):
             if omitted, no change
         '''
         self._capacity = cap
-        self.capacity.tally()
-        self.available_quantity.tally()
+        self.capacity.tally(self._capacity)
+        self.available_quantity.tally(self._capacity - self._claimed_quantity)
         self._tryrequest()
 
     def name(self):
@@ -7907,7 +8227,7 @@ class Resource(object):
         '''
         Returns
         -------
-        base name of the resource (the name used at init or name): str
+        base name of the resource (the name used at initialization): str
         '''
         return self._base_name
 
@@ -7916,7 +8236,7 @@ class Resource(object):
         Returns
         -------
         sequence_number of the resource : int
-            (the sequence number at init or name) |n|
+            (the sequence number at initialization) |n|
             normally this will be the integer value of a serialized name,
             but also non serialized names (without a dot or a comma at the end)
             will be numbered)
@@ -8116,12 +8436,11 @@ def colorinterpolate(t, t0, t1, v0, v1):
 
     Returns
     -------
-    f(t) : float
+    linear interpolation between v0 and v1 based on t between t0 and t : colorspec
 
     Note
     ----
-    Note that no extrapolation is done, i.e f(t)=v0 for t<t0 and f(t)=v1 for
-    t>t1. |n|
+    Note that no extrapolation is for t<t0 (v0) and for t>t1 (v1) |n|
     This function is heavily used during animation.
     '''
     vt0 = colorspec_to_tuple(v0)
@@ -8153,13 +8472,12 @@ def interpolate(t, t0, t1, v0, v1):
 
     Returns
     -------
-    f(t) : float or tuple
+    linear interpolation between v0 and v1 based on t between t0 and t : float or tuple
 
     Note
     ----
-    Note that no extrapolation is done, i.e f(t)=v0 for t<t0 and f(t)=v1 for
-    t>t1. |n|
-    This function is used during animation.
+    Note that no extrapolation is for t<t0 (v0) and for t>t1 (v1) |n|
+    This function is heavily used during animation.
     '''
     if (v0 is None) or (v1 is None):
         return None
@@ -8342,6 +8660,16 @@ def _modetxt(mode):
 
 def objectclass_to_str(object):
     return str(type(object)).split('.')[-1].split("'")[0]
+
+
+def _get_caller_frame():
+    stack = inspect.stack()
+    filename0 = inspect.getframeinfo(stack[0][0]).filename
+    for i in range(len(inspect.stack())):
+        frame = stack[i][0]
+        if filename0 != inspect.getframeinfo(frame).filename:
+            break
+    return frame
 
 
 def data():

@@ -6,9 +6,61 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test43()
+    test46()
+
+def test46():
+    class Y(sim.Component):
+        pass
+
+    class X(sim.Component):
+        def process(self):
+            x=0
+
+            for i in range(10):
+                q.add(Y())
+                print ('q.length=', q.length())
+                if i==3:
+                    monx.monitor(False)
+                    monx.tally(x)
+                if i==6:
+                    monx.monitor(True)
+                yield self.hold(1)
+                x += 1
+
+    env = sim.Environment()
+    env.beep()
+    monx = sim.MonitorTimestamp('monx')
+    q = sim.Queue('q')
+    X()
+
+    env.run(20)
+    print(monx.xt())
+    print(q.length.xt())
+
+
+
+def test45():
+    def test(d, lowerbound=-sim.inf, upperbound=sim.inf):
+        d.print_info()
+        print('mean=', d.mean())
+        l=[d(lowerbound, upperbound) for i in range(10000)]
+        print('one sample', d())
+        print('mean sampled =', sum(l)/(len(l)+1))
+        print('-'  * 79)
+
+    env=sim.Environment()
+    mon = sim.Monitor()
+    d = sim.IntUniform(1,6)
+    for _ in range(10000):
+        mon.tally(d.bounded_sample(lowerbound=5, upperbound=sim.inf, number_of_retries=300))
+
+    mon.print_histogram(30,-5,1)
+
 
 def test44():
+    import newqueue
+    import newerqueue
+    import newcomponent
 
     class X(sim.Component):
         def process(self):
@@ -21,7 +73,6 @@ def test44():
         def process(self):
             yield self.request((res, 4), fail_at=15)
             x1.activate(mode=5)
-            
 
 
     env=sim.Environment(trace=True)
@@ -30,20 +81,32 @@ def test44():
     x0=X()
     x1=X(name='')
     x2=X(name=',')
+    z=newcomponent.NewComponent()
+    q0=sim.Queue()
+    q1=newqueue.NewQueue()
+    q2=newerqueue.NewerQueue()
     Y()
+    q0.add(x1)
+    q1.add(x1)
+    q2.add(x1)
 
     env.run(50)
+    env.print_trace_header()
 
 def test43():
     def test(d):
         d.print_info()
         print('mean=', d.mean())
-        l=[d.sample() for i in range(10000)]
+        l=[d() for i in range(10000)]
         print('one sample', d())
         print('mean sampled =', sum(l)/(len(l)+1))
         print('-'  * 79)
 
     env=sim.Environment()
+
+
+    test(sim.IntUniform(1,6))
+    assert False
 
     test(sim.Weibull(2,1))
     test(sim.Gamma(5,9))
@@ -54,6 +117,7 @@ def test43():
     test(sim.Normal(5,7,use_gauss=True))
 
     test(sim.Distribution('N(5,7,use_gauss=False)'))
+    test(sim.Normal(5,5))
 
 def test42():
     class Rij(sim.Queue):
@@ -79,7 +143,7 @@ def test42():
     del q1[1]
     print('length',q1.length.number_of_entries())
     print('length_of_stay',q1.length_of_stay.number_of_entries())
-    
+
     q1.print_info()
     q2.print_info()
 
@@ -91,8 +155,15 @@ def test42():
     (q2 | q1).print_info()
     (q1 ^ q2).print_info()
     q3=sim.Queue(name='q3',fill=q1)
-    del q3[1:30:2]
+    q4=sim.Queue(name='q4',fill=q1)
+    print('before')
     q3.print_info()
+    del q3[-1:-4:-1]
+    print('after')
+    q3.print_info()
+    q4.pop(3)
+    for c in q3:
+        print(c.name(),c.count(q2),c.count(),q4.count(c),c.queues())
 
 def test41():
     class Airplane(sim.Component):
