@@ -10,7 +10,7 @@ Parameters can either be set at initialization of a component or the call to act
 
     import salabim as sim
     class Car(sim.Component):
-        def setup(self, color, duration):
+        def setup(self, color):
             self.color=color
             
         def process(self, duration):
