@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.13'
+__version__ = '2.2.13A'
 
 import heapq
 import random
@@ -666,11 +666,10 @@ class MonitorTimestamp(Monitor):
         called immediately after initialization of a monitortimestamp.
 
         by default this is a dummy method, but it can be overridden.
-        
+
         only keyword arguments are passed
         '''
         pass
-        
 
     def __call__(self):  # direct moneypatching __call__ doesn't work
         return self._tally
@@ -1389,7 +1388,6 @@ class Queue(object):
         only keyword arguments are passed
         '''
         pass
-
 
     def _animate_update(self):
         if self._animate_reverse:
@@ -3367,7 +3365,7 @@ class Environment(object):
 
         s4 : str
             part 4
-            
+
         s0 : str
             part 0. If omitted, the line number from where the call was given will be used at
             the start of the line. Otherwise s0, left padded to 7 characters will be used at
@@ -3377,7 +3375,7 @@ class Environment(object):
         ----
         if self.trace is False, nothing is printed
         if the current component's suppress_trace is True, nothing is printed |n|
-        
+
         '''
         if self._trace:
             if not (hasattr(self, '_current_component') and self._current_component._suppress_trace):
@@ -5017,7 +5015,7 @@ class Component(object):
                     p = eval('self.' + process)
                 except:
                     raise SalabimError('self.' + process + ' not found')
-        
+
         if p is None:
             if at is not omitted:
                 raise SalabimError('at is not allowed for a data component')
@@ -5034,11 +5032,14 @@ class Component(object):
                        ' create data component', _modetxt(self._mode))
         else:
             self.env.print_trace('', '', self.name() +
-                ' create', _modetxt(self._mode))            
+                ' create', _modetxt(self._mode))
             if not inspect.isgeneratorfunction(p):
                 raise SalabimError(process, 'has no yield statement')
-            
-            parameters = inspect.signature(p).parameters
+
+            try:
+                parameters = inspect.signature(p).parameters
+            except AttributeError:
+                parameters = inspect.getargspec(p)[0]  # pre Python 3.4
             kwargs_p = {}
             for kwarg in list(kwargs.keys()):
                 if kwarg in parameters:
@@ -5054,9 +5055,9 @@ class Component(object):
                 scheduled_time = self.env._now + delay
             else:
                 scheduled_time = at + self.env._offset + delay
-    
+
             self._reschedule(scheduled_time, urgent, 'activate', extra=extra)
-                
+
         self.setup(**kwargs)
 
     def animation_objects(self, q):
@@ -5306,8 +5307,12 @@ class Component(object):
         else:
             if not inspect.isgeneratorfunction(p):
                 raise SalabimError(process, 'has no yield statement')
-            
-            parameters = inspect.signature(p).parameters
+
+            try:
+                parameters = inspect.signature(p).parameters
+            except AttributeError:
+                parameters = inspect.getargspec(p)[0]  # pre Python 3.4
+                
             for kwarg in kwargs:
                 if kwarg not in parameters:
                     raise TypeError("unexpected keyword argument '" + kwarg + "'")
@@ -7748,7 +7753,7 @@ class State(object):
         called immediately after initialization of a state.
 
         by default this is a dummy method, but it can be overridden.
-        
+
         only keyword arguments will be passed
         '''
         pass
@@ -8101,7 +8106,6 @@ class Resource(object):
         only keyword arguments are passed
         '''
         pass
-
 
     def reset_monitors(self, monitor=omitted):
         '''

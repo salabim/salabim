@@ -41,7 +41,7 @@ class Lock(sim.Component):
         self.usedlength = 0
         self.side = left
         self.monitor_usedlength = sim.MonitorTimestamp(
-            name='used length', getter=self.get_usedlength)
+            name='used length')
         self.monitor_time_in_complex = sim.Monitor(name='time in complex')
 
     def get_usedlength(self):
@@ -54,7 +54,7 @@ class Lock(sim.Component):
             for ship in wait[self.side]:
                 if self.usedlength + ship.length <= locklength:
                     self.usedlength += ship.length
-                    self.monitor_usedlength.tally()
+                    self.monitor_usedlength.tally(self.usedlength)
                     ship.activate()
                     yield self.passivate('Wait for sail in')
             yield self.hold(switchtime, mode='Switch')
@@ -64,7 +64,7 @@ class Lock(sim.Component):
                 yield self.passivate('Wait for sail out')
                 # avoid rounding errors
                 self.usedlength = max(self.usedlength - ship.length, 0)
-                self.monitor_usedlength.tally()
+                self.monitor_usedlength.tally(self.usedlength)
 
 
 env = sim.Environment(trace=False)

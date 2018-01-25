@@ -1,6 +1,15 @@
 salabim  changelog
 
 
+version 2.2.13A  2018-01-25        
+===========================
+Bug fix
+-------
+The just introduced functionality to use parameters for processes did not work under Python prior to version 3.4, so
+also not under Python 2.7|.
+
+This intermediate version fixes that.
+
 version 2.2.13  2018-01-25        
 ==========================
 New functionality

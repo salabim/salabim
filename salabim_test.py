@@ -7,23 +7,23 @@ Pythonista=(platform.system()=='Darwin')
 
 def test():
     test47()
-    
+
 def test47():
     class Dodo(sim.Component):
         pass
-    
+
     class Car(sim.Component):
-        def xsetup(self, color='unknown'):
+        def setup(self, color='unknown'):
             self.color=color
             print(self.name(),color)
-            
+
         def process(self, duration):
             yield self.hold(duration)
             yield self.activate(process='process', duration=50)
-            
+
         def other(self):
             yield self.hold(1)
-            
+
     env=sim.Environment(trace=True)
     Car(process=None)
     Car(color='red', duration=12, mode='ABC')
@@ -31,9 +31,9 @@ def test47():
 
 
     Dodo()
-    
+
     env.run(100)
-    
+
 
 def test46():
     class Y(sim.Component):
