@@ -1,5 +1,42 @@
 salabim  changelog
 
+
+version 2.2.13  2018-01-25        
+==========================
+New functionality
+-----------------
+It is now possible to use arguments for the process generator of a component. Only keyword arguments are supported. 
+Parameters can either be set at initialization of a component or the call to activate. E.g.:
+
+    import salabim as sim
+    class Car(sim.Component):
+        def setup(self, color, duration):
+            self.color=color
+            
+        def process(self, duration):
+            print(self.color, duration)
+            yield self.hold(duration)
+            yield self.activate(process='process', duration=50)  # this restarts the process
+            
+    env=sim.Environment(trace=True)
+    Car(color='red', duration=12)
+    env.run(100)
+
+Note that the keywords used by the process generator are not passed to setup(), at initialization of a component.
+That means that setup() can't have the same parameters as the process called at initialization (usually process()).
+Furthermore, neither the process generator nor setup() can use
+  at, delay, urgent, process, keep_request, keep_wait when called from activate()
+  name, suppress_trace, suppress_pause_at_step, mode, env, at, delay, urgent, process at initialization of a component
+as parameters.
+
+Bug fix
+-------
+Corrected bug when tracing a standby component.
+
+Optimization
+------------
+Optimized animation perfomance by improving the interpolate function.
+
 version 2.2.12  2018-01-18        
 ==========================
 In the trace the line numbers are now prefixed by a letter to indicate

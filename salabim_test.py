@@ -6,7 +6,34 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test46()
+    test47()
+    
+def test47():
+    class Dodo(sim.Component):
+        pass
+    
+    class Car(sim.Component):
+        def xsetup(self, color='unknown'):
+            self.color=color
+            print(self.name(),color)
+            
+        def process(self, duration):
+            yield self.hold(duration)
+            yield self.activate(process='process', duration=50)
+            
+        def other(self):
+            yield self.hold(1)
+            
+    env=sim.Environment(trace=True)
+    Car(process=None)
+    Car(color='red', duration=12, mode='ABC')
+    Car(color='blue',process='other')
+
+
+    Dodo()
+    
+    env.run(100)
+    
 
 def test46():
     class Y(sim.Component):
@@ -50,7 +77,7 @@ def test45():
 
     env=sim.Environment()
     mon = sim.Monitor()
-    d = sim.IntUniform(1,6)
+    d = sim.Cdf((5, 0, 10, 50, 15, 90, 30, 95, 60, 100))
     for _ in range(10000):
         mon.tally(d.bounded_sample(lowerbound=5, upperbound=sim.inf, number_of_retries=300))
 
@@ -70,7 +97,12 @@ def test44():
             yield self.hold(10,urgent=True)
 
     class Y(sim.Component):
-        def process(self):
+        def setup(self, a='a'):
+            print('a=',a)
+
+
+        def process(self, text):
+            print('-->',text)
             yield self.request((res, 4), fail_at=15)
             x1.activate(mode=5)
 
@@ -85,7 +117,7 @@ def test44():
     q0=sim.Queue()
     q1=newqueue.NewQueue()
     q2=newerqueue.NewerQueue()
-    Y()
+    Y(process='process', text='Hello')
     q0.add(x1)
     q1.add(x1)
     q2.add(x1)

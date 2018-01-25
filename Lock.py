@@ -48,7 +48,6 @@ class Lock(sim.Component):
         return self.usedlength
 
     def process(self):
-        self.usedlength = 0
         while True:
             if len(wait[left]) + len(wait[right]) == 0:
                 yield self.passivate(mode='Idle')

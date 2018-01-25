@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.12'
+__version__ = '2.2.13'
 
 import heapq
 import random
@@ -126,16 +126,15 @@ class Monitor(object):
         self.reset(monitor)
         self.setup(*args, **kwargs)
 
-    def setup(self, *args, **kwargs):
+    def setup(self):
         '''
         called immediately after initialization of a monitor.
 
         by default this is a dummy method, but it can be overridden.
+
+        only keyword arguments are passed
         '''
-        if args:
-            raise SalabimError('too many arguments: ' + str(args))
-        if kwargs:
-            raise SalabimError('too many keyword arguments: ' + str(kwargs))
+        pass
 
     def reset(self, monitor=omitted):
         '''
@@ -662,16 +661,16 @@ class MonitorTimestamp(Monitor):
         self.reset(monitor=monitor)
         self.setup(*args, **kwargs)
 
-    def setup(self, *args, **kwargs):
+    def setup(self):
         '''
         called immediately after initialization of a monitortimestamp.
 
         by default this is a dummy method, but it can be overridden.
+        
+        only keyword arguments are passed
         '''
-        if args:
-            raise SalabimError('too many arguments: ' + str(args))
-        if kwargs:
-            raise SalabimError('too many keyword arguments: ' + str(kwargs))
+        pass
+        
 
     def __call__(self):  # direct moneypatching __call__ doesn't work
         return self._tally
@@ -1381,16 +1380,16 @@ class Queue(object):
                 self.env.print_trace('', '', self.name() + ' create')
         self.setup(*args, **kwargs)
 
-    def setup(self, *args, **kwargs):
+    def setup(self):
         '''
         called immediately after initialization of a queue.
 
         by default this is a dummy method, but it can be overridden.
+
+        only keyword arguments are passed
         '''
-        if args:
-            raise SalabimError('too many arguments: ' + str(args))
-        if kwargs:
-            raise SalabimError('too many keyword arguments: ' + str(kwargs))
+        pass
+
 
     def _animate_update(self):
         if self._animate_reverse:
@@ -1508,6 +1507,9 @@ class Queue(object):
         return objectclass_to_str(self) + '(' + self.name() + ')'
 
     def print_info(self):
+        '''
+        prints information about the component
+        '''
         print(objectclass_to_str(self) + ' ' + hex(id(self)))
         print('  name=' + self.name())
         if self._length:
@@ -2417,16 +2419,15 @@ class Environment(object):
         self.video = ''
         self.setup(*args, **kwargs)
 
-    def setup(self, *args, **kwargs):
+    def setup(self):
         '''
         called immediately after initialization of an environment.
 
         by default this is a dummy method, but it can be overridden.
+
+        only keyword arguments are passed
         '''
-        if args:
-            raise SalabimError('too many arguments: ' + str(args))
-        if kwargs:
-            raise SalabimError('too many keyword arguments: ' + str(kwargs))
+        pass
 
     def serialize(self):
         self.serial += 1
@@ -2460,6 +2461,9 @@ class Environment(object):
         return
 
     def print_info(self):
+        '''
+        prints information about the environment
+        '''
         print(objectclass_to_str(self) + ' ' + hex(id(self)))
         print('  name=' + self.name() +
             (' (animation environment)' if self == an_env else ''))
@@ -2481,7 +2485,7 @@ class Environment(object):
                 self.env._current_component = c
                 if self._trace:
                     self.print_trace('{:10.3f}'.format(self._now - self.env._offset), c.name(),
-                        'current (standby)', s0=self.lineno_txt())
+                        'current (standby)', s0=c.lineno_txt())
                 try:
                     next(c._process)
                     return
@@ -2690,7 +2694,7 @@ class Environment(object):
         '''
         returns the time of the next component to become current |n|
         if there are no more events, peek will return inf |n|
-        for advance use with animation / GUI event loops
+        Only for advance use with animation / GUI event loops
         '''
         if len(self.env._pendingstandbylist) > 0:
             return self.env._now
@@ -2728,11 +2732,11 @@ class Environment(object):
 
         Note
         ----
-        Internally, salabim still works with the 'old time'. Only in the interface
+        Internally, salabim still works with the 'old' time. Only in the interface
         from and to the user program, a correction will be applied.
 
         The registered time in timestamped monitors will be always is the 'old' time.
-        This is only important when using the time value in MonitorTimestamp.xt() or
+        This is only relevant when using the time value in MonitorTimestamp.xt() or
         MonitorTimestamp.tx().
         '''
         offset_before = self._offset
@@ -3363,10 +3367,17 @@ class Environment(object):
 
         s4 : str
             part 4
+            
+        s0 : str
+            part 0. If omitted, the line number from where the call was given will be used at
+            the start of the line. Otherwise s0, left padded to 7 characters will be used at
+            the start of the line.
 
         Note
         ----
-        if the current component's suppress_trace is True, nothing is printed
+        if self.trace is False, nothing is printed
+        if the current component's suppress_trace is True, nothing is printed |n|
+        
         '''
         if self._trace:
             if not (hasattr(self, '_current_component') and self._current_component._suppress_trace):
@@ -4966,8 +4977,8 @@ class Component(object):
         if omitted, _default_env will be used
     '''
 
-    def __init__(self, name=omitted, at=omitted, delay=0, urgent=False,
-      process=omitted, suppress_trace=False, suppress_pause_at_step=False, mode=None, env=omitted, *args, **kwargs):
+    def __init__(self, name=omitted, at=omitted, delay=omitted, urgent=omitted,
+      process=omitted, suppress_trace=False, suppress_pause_at_step=False, mode=None, env=omitted, **kwargs):
         if env is omitted:
             self.env = _default_env
         else:
@@ -4988,18 +4999,65 @@ class Component(object):
         self._mode = mode
         self._mode_time = self.env._now
         self._aos = {}
-        if self.env._trace:
-            self.env.print_trace('', '', self.name() +
-                ' create', _modetxt(self._mode))
+
+        if mode is not omitted:
+            self._mode = mode
+            self._mode_time = self.env._now
+
         if process is omitted:
             if self.hasprocess():
-                process = 'process'
+                p = self.process
             else:
-                process = None
-        if process is not None:
-            self.activate(process=process, at=at, delay=delay, urgent=urgent)
-            # at not subject to offset as activate is 'external'.
-        self.setup(*args, **kwargs)
+                p = None
+        else:
+            if process is None:
+                p = None
+            else:
+                try:
+                    p = eval('self.' + process)
+                except:
+                    raise SalabimError('self.' + process + ' not found')
+        
+        if p is None:
+            if at is not omitted:
+                raise SalabimError('at is not allowed for a data component')
+            if delay is not omitted:
+                raise SalabimError('delay is not allowed for a data component')
+            if urgent is not omitted:
+                raise SalabimError('urgent is not allowed for a data component')
+            if self.env._trace:
+                if self._name == 'main':
+                    self.env.print_trace('', '', self.name() +
+                        ' create', _modetxt(self._mode))
+                else:
+                    self.env.print_trace('', '', self.name() +
+                       ' create data component', _modetxt(self._mode))
+        else:
+            self.env.print_trace('', '', self.name() +
+                ' create', _modetxt(self._mode))            
+            if not inspect.isgeneratorfunction(p):
+                raise SalabimError(process, 'has no yield statement')
+            
+            parameters = inspect.signature(p).parameters
+            kwargs_p = {}
+            for kwarg in list(kwargs.keys()):
+                if kwarg in parameters:
+                    kwargs_p[kwarg] = kwargs[kwarg]
+                    del kwargs[kwarg]  # here kwargs consumes the used arguments
+            self._process = p(**kwargs_p)
+            extra = 'process=' + self._process.__name__
+            if urgent is omitted:
+                urgent = False
+            if delay is omitted:
+                delay = 0
+            if at is omitted:
+                scheduled_time = self.env._now + delay
+            else:
+                scheduled_time = at + self.env._offset + delay
+    
+            self._reschedule(scheduled_time, urgent, 'activate', extra=extra)
+                
+        self.setup(**kwargs)
 
     def animation_objects(self, q):
         '''
@@ -5036,11 +5094,13 @@ class Component(object):
                 ao.remove()
             del self._aos[q]
 
-    def setup(self, *args, **kwargs):
+    def setup(self):
         '''
         called immediately after initialization of a component.
 
         by default this is a dummy method, but it can be overridden.
+
+        only keyword arguments will be passed
 
         Example
         -------
@@ -5054,15 +5114,15 @@ class Component(object):
             redcar=Car(color='red') |n|
             bluecar=Car(color='blue')
         '''
-        if args:
-            raise SalabimError('too many arguments: ' + str(args))
-        if kwargs:
-            raise SalabimError('too many keyword arguments: ' + str(kwargs))
+        pass
 
     def __repr__(self):
         return objectclass_to_str(self) + ' (' + self.name() + ')'
 
     def print_info(self):
+        '''
+        prints information about the queue
+        '''
         print(objectclass_to_str(self) + ' ' + hex(id(self)))
         print('  name=' + self.name())
         print('  class=' + str(type(self)).split('.')[-1].split("'")[0])
@@ -5174,7 +5234,7 @@ class Component(object):
                     extra))
 
     def activate(self, at=omitted, delay=0, urgent=False, process=omitted,
-      keep_request=False, keep_wait=False, mode=omitted):
+      keep_request=False, keep_wait=False, mode=omitted, **kwargs):
         '''
         activate component
 
@@ -5246,7 +5306,12 @@ class Component(object):
         else:
             if not inspect.isgeneratorfunction(p):
                 raise SalabimError(process, 'has no yield statement')
-            self._process = p()
+            
+            parameters = inspect.signature(p).parameters
+            for kwarg in kwargs:
+                if kwarg not in parameters:
+                    raise TypeError("unexpected keyword argument '" + kwarg + "'")
+            self._process = p(**kwargs)
             extra = 'process=' + self._process.__name__
 
         if self._status != current:
@@ -5807,7 +5872,7 @@ class Component(object):
                         honored = False
                         break
                 elif valuetype == 1:
-                    if eval(value.replace('$', 'state.value()')):
+                    if eval(value.replace('$', 'state._value')):
                         honored = False
                         break
                 elif valuetype == 2:
@@ -6495,7 +6560,7 @@ class _Distribution():
             if omitted, no upperbound check
 
         fail_value : float
-            value to be used if. after 100 retries, sample is still not within bounds |n|
+            value to be used if. after number_of_tries retries, sample is still not within bounds |n|
             default: lowerbound, if specified, otherwise upperbound
 
         number_of_tries : int
@@ -6601,6 +6666,9 @@ class Exponential(_Distribution):
         return('Exponential')
 
     def print_info(self):
+        '''
+        prints information about the distribution
+        '''
         print('Exponential distribution ' + hex(id(self)))
         print('  mean=' + str(self._mean))
         print('  rate (lambda)=' + str(1 / self._mean))
@@ -6655,7 +6723,7 @@ class Normal(_Distribution):
         self._mean = mean
         self._standard_deviation = standard_deviation
         if self._standard_deviation < 0:
-            raise SalabimError('standard_deviation<0')
+            raise SalabimError('standard_deviation < 0')
         if randomstream is omitted:
             self.randomstream = random
         else:
@@ -7488,8 +7556,9 @@ class Distribution(_Distribution):
     ----------
     spec : str
         - string containing a valid salabim distribution, where only the first
-          letters are relevant and casing is not important. Note that Erlang is
-          the only distribution that requires at leat two letters (Er)
+          letters are relevant and casing is not important. Note that Erlang
+          and Cdf are the only distributions that require at least two letters
+          (Er) and (Cd)
         - string containing one float (c1), resulting in Constant(c1)
         - string containing two floats seperated by a comma (c1,c2),
           resulting in a Uniform(c1,c2)
@@ -7674,16 +7743,15 @@ class State(object):
                 'value= ' + str(self._value))
         self.setup(*args, **kwargs)
 
-    def setup(self, *args, **kwargs):
+    def setup(self):
         '''
         called immediately after initialization of a state.
 
         by default this is a dummy method, but it can be overridden.
+        
+        only keyword arguments will be passed
         '''
-        if args:
-            raise SalabimError('too many arguments: ' + str(args))
-        if kwargs:
-            raise SalabimError('too many keyword arguments: ' + str(kwargs))
+        pass
 
     def animate(self, x=500, y=100, on=True):
         '''
@@ -7772,7 +7840,6 @@ class State(object):
             ... |n|
             print(level()) |n|
             print(level.get())  # identical |n|
-
         '''
         return self._value
 
@@ -8025,16 +8092,16 @@ class Resource(object):
                 'capacity=' + str(self._capacity) + (' anonymous' if self._anonymous else ''))
         self.setup(*args, **kwargs)
 
-    def setup(self, *args, **kwargs):
+    def setup(self):
         '''
         called immediately after initialization of a resource.
 
         by default this is a dummy method, but it can be overridden.
+
+        only keyword arguments are passed
         '''
-        if args:
-            raise SalabimError('too many arguments: ' + str(args))
-        if kwargs:
-            raise SalabimError('too many keyword arguments: ' + str(kwargs))
+        pass
+
 
     def reset_monitors(self, monitor=omitted):
         '''
@@ -8440,7 +8507,7 @@ def colorinterpolate(t, t0, t1, v0, v1):
 
     Note
     ----
-    Note that no extrapolation is for t<t0 (v0) and for t>t1 (v1) |n|
+    Note that no extrapolation is done, so if t<t0 ==> v0  and t>t1 ==> v1 |n|
     This function is heavily used during animation.
     '''
     vt0 = colorspec_to_tuple(v0)
@@ -8476,11 +8543,15 @@ def interpolate(t, t0, t1, v0, v1):
 
     Note
     ----
-    Note that no extrapolation is for t<t0 (v0) and for t>t1 (v1) |n|
+    Note that no extrapolation is done, so if t<t0 ==> v0  and t>t1 ==> v1 |n|
     This function is heavily used during animation.
     '''
+    if v0 == v1:
+        return v0
     if (v0 is None) or (v1 is None):
         return None
+    if t1 == inf:
+        return v0
     if t0 == t1:
         return v1
     if t0 > t1:
@@ -8490,8 +8561,6 @@ def interpolate(t, t0, t1, v0, v1):
         return v0
     if t >= t1:
         return v1
-    if t1 == inf:
-        return v0
     p = (0.0 + t - t0) / (t1 - t0)
     if isinstance(v0, (list, tuple)):
         return tuple((_i(p, x0, x1) for x0, x1 in zip(v0, v1)))
