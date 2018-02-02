@@ -6,7 +6,67 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test47()
+    test49()
+
+def test49():
+    l1 = []
+
+    test_input = '''
+    one two
+    three four
+    five
+    '''
+    with sim.ItemFile(test_input) as f:
+        while True:
+            try:
+                print(f.read_item())
+            except EOFError:
+                break
+    
+
+
+
+    with sim.ItemFile('test.txt') as f:
+        while True:
+            try:
+                l1.append(f.read_item_bool())
+            except EOFError:
+                break
+
+        print('------------------------')
+
+        f = sim.ItemFile('test.txt')
+        l2 = []
+        while True:
+            try:
+                l2.append(f.read_item())
+            except EOFError:
+                break
+
+    for x1, x2 in zip(l1,l2):
+        print(x1, x2)
+
+
+def test48():
+    class A(sim.Component):
+        def process(self):
+            while env.now()<5:
+                if env.now()>3:
+                    env.main().activate()
+                yield self.standby()
+
+
+    class B(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(1)
+    env = sim.Environment(trace=True)
+    env.trace_standby(True)
+    A()
+    B()
+    env.run(8)
+
+
 
 def test47():
     class Dodo(sim.Component):

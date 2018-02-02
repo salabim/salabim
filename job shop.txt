@@ -1,0 +1,18 @@
+{input file for the job shop model}
+           
+{job selection method: fifo or min_slack}
+min_slack
+
+#Group  number of  fraction color
+'Mill'      4          0.10 red 
+'Weld'      5          0.16 green
+'Drill'    10          0.30 blue
+'Fit'       8          0.24 orange
+'Transport' 7          0.20 purple
+//
+
+
+'Exponential(50)' # task_duration_dist
+'Exponential(8)'  # inter_arrival_time_dist
+'IntUniform(1,9)' # number_of_tasks_dist
+50                # slack

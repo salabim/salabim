@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.13A'
+__version__ = '2.2.14'
 
 import heapq
 import random
@@ -20,6 +20,8 @@ import inspect
 import platform
 import sys
 import itertools
+import string
+import io
 
 Pythonista = (sys.platform == 'ios')
 Windows = (sys.platform.startswith('win'))
@@ -66,6 +68,160 @@ omitted = ['omitted']
 
 class SalabimError(Exception):
     pass
+
+
+class ItemFile(object):
+
+    '''
+    define an item file to be used with read_item, read_item_int, read_item_float and read_item_bool
+
+    Parameters
+    ----------
+    filename : str
+        file to be used for subsequent read_item, read_item_int, read_item_float and read_item_bool calls |n|
+        or |n|
+        content to be interpreted used in subsequent read_item calls. The content should have at least one linefeed
+        character and will be usually  triple quoted.
+
+    Note
+    ----
+    It is advised to use ItemFile with a context manager, like ::
+
+        with sim.ItemFile('experiment0.txt') as f:
+            run_length = f.read_item_float() |n|
+            run_name = f.read_item() |n|
+
+    Alternatively, the file can be opened and closed explicitely, like ::
+
+        f = sim.ItemFile('experiment0.txt')
+        run_length = f.read_item_float()
+        run_name = f.read_item()
+        f.close()
+
+    Item files consists of individual items separated by whitespace
+    If a blank is required in an item, use single or double quotes
+    All text following # on a line is ignored
+    All texts on a line within curly brackets {} is ignored and considered white space
+
+    Example ::
+
+        Item1
+        'Item 2'
+           Item3 Item4 # comment
+        Item5 {five} Item6 {six}
+        'Double quote" in item'
+        "Single quote' in item"
+        True
+    '''
+
+    def __init__(self, filename):
+        self.iter = self._nextread()
+        if '\n' in filename:
+            self.open_file = io.StringIO(filename)
+        else:    
+            self.open_file = open(filename, 'r')
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.open_file.close()
+
+    def close(self):
+        self.open_file.close()
+
+    def read_item_int(self):
+        '''
+        read next field from the ItemFile as int.
+
+        if the end of file is reached, EOFError is raised
+        '''
+        return int(self.read_item().replace(',', '.'))
+
+    def read_item_float(self):
+        '''
+        read next item from the ItemFile as float
+
+        if the end of file is reached, EOFError is raised
+        '''
+
+        return float(self.read_item().replace(',', '.'))
+
+    def read_item_bool(self):
+        '''
+        read next item from the ItemFile as bool
+
+        A value of False (not case sensitive) will return False |n|
+        A value of 0 will return False |n|
+        The null string will return False |n|
+        Any other value will return True
+
+        if the end of file is reached, EOFError is raised
+        '''
+        result = self.read_item().strip().lower()
+        if result == 'false':
+            return False
+        try:
+            if float(result) == 0:
+                return False
+        except:
+            pass
+        if result == '':
+            return False
+        return True
+
+    def read_item(self):
+        '''
+        read next item from the ItemFile
+
+        if the end of file is reached, EOFError is raised
+        '''
+        try:
+            return next(self.iter)
+        except StopIteration:
+            raise EOFError
+
+    def _nextread(self):
+        remove = string.whitespace.replace(' ', '')
+        quotes = '\'"'
+
+        for line in self.open_file:
+            mode = '.'
+            result = ''
+            for c in line:
+                if c not in remove:
+                    if mode in quotes:
+                        if c == mode:
+                            mode = '.'
+                            yield result  # even return the null string
+                            result = ''
+                        else:
+                            result += c
+                    elif mode == '{':
+                        if c == '}':
+                            mode = '.'
+                    else:
+                        if c == '#':
+                            break
+                        if c in quotes:
+                            if result:
+                                yield result
+                            result = ''
+                            mode = c
+                        elif c == '{':
+                            if result:
+                                yield result
+                            result = ''
+                            mode = c
+
+                        elif c == ' ':
+                            if result:
+                                yield result
+                            result = ''
+                        else:
+                            result += c
+            if result:
+                yield result
 
 
 class Monitor(object):
@@ -2363,6 +2519,8 @@ class Environment(object):
                 random_seed = 1234567
             random.seed(random_seed)
         _set_name(name, Environment._nameserialize, self)
+        self._buffered_trace = False
+        self._suppress_trace_standby = True
         if self._trace:
             if print_trace_header:
                 self.print_trace_header()
@@ -2483,7 +2641,7 @@ class Environment(object):
                 self.env._current_component = c
                 if self._trace:
                     self.print_trace('{:10.3f}'.format(self._now - self.env._offset), c.name(),
-                        'current (standby)', s0=c.lineno_txt())
+                        'current (standby)', s0=c.lineno_txt(), _optional=self._suppress_trace_standby)
                 try:
                     next(c._process)
                     return
@@ -2768,7 +2926,33 @@ class Environment(object):
         '''
         if value is not omitted:
             self._trace = value
+            self._buffered_trace = False
         return self._trace
+
+    def suppress_trace_standby(self, value=omitted):
+        '''
+        suppress_trace_standby status
+
+        Parameters
+        ----------
+        value : bool
+            new suppress_trace_standby status |n|
+            if omitted, no change
+
+        Returns
+        -------
+        suppress trace status : bool
+
+        Note
+        ----
+        By default, suppress_trace_standby is True, meaning that standby components are
+        (apart from when they become non standby) suppressed from the trace. |n|
+        If you set suppress_trace_standby to False, standby components are fully traced.
+        '''
+        if value is not omitted:
+            self._suppress_trace_standby = value
+            self._buffered_trace = False
+        return self._suppress_trace_standby
 
     def current_component(self):
         '''
@@ -3315,7 +3499,7 @@ class Environment(object):
         not that the header is only printed if trace=True
         '''
         self.print_trace('      time', 'current component', 'action', 'information', 'line#')
-        self.print_trace(10 * '-', 20 * '-', 35 * '-', 48 * '-', 5 * '-')
+        self.print_trace(10 * '-', 20 * '-', 35 * '-', 48 * '-', 6 * '-')
         for ref in range(len(self._source_files)):
             for fullfilename, iref in self._source_files.items():
                 if ref == iref:
@@ -3348,7 +3532,7 @@ class Environment(object):
             self._print_legend(ref)
         return rpad(pre + str(frameinfo.lineno), 5)
 
-    def print_trace(self, s1='', s2='', s3='', s4='', s0=omitted):
+    def print_trace(self, s1='', s2='', s3='', s4='', s0=omitted, _optional=False):
         '''
         prints a trace line
 
@@ -3371,6 +3555,9 @@ class Environment(object):
             the start of the line. Otherwise s0, left padded to 7 characters will be used at
             the start of the line.
 
+        _optional : bool
+            for internal use only. Do not set this flag!
+
         Note
         ----
         if self.trace is False, nothing is printed
@@ -3388,8 +3575,15 @@ class Environment(object):
                             break
 
                     s0 = self._frame_to_lineno(_get_caller_frame())
-                print(pad(s0, 7), pad(s1, 10) + ' ' + pad(s2, 20) + ' ' +
-                  pad(s3, max(len(s3), 36)) + ' ' + s4.strip())
+                line = pad(s0, 7) + pad(s1, 10) + ' ' + pad(s2, 20) + ' ' + \
+                    pad(s3, max(len(s3), 36)) + ' ' + s4.strip()
+                if _optional:
+                    self._buffered_trace = line
+                else:
+                    if self._buffered_trace:
+                        print(self._buffered_trace)
+                        self._buffered_trace = False
+                    print(line)
 
     def beep(self):
         '''
@@ -5036,16 +5230,19 @@ class Component(object):
             if not inspect.isgeneratorfunction(p):
                 raise SalabimError(process, 'has no yield statement')
 
-            try:
-                parameters = inspect.signature(p).parameters
-            except AttributeError:
-                parameters = inspect.getargspec(p)[0]  # pre Python 3.4
-            kwargs_p = {}
-            for kwarg in list(kwargs.keys()):
-                if kwarg in parameters:
-                    kwargs_p[kwarg] = kwargs[kwarg]
-                    del kwargs[kwarg]  # here kwargs consumes the used arguments
-            self._process = p(**kwargs_p)
+            if kwargs:
+                try:
+                    parameters = inspect.signature(p).parameters
+                except AttributeError:
+                    parameters = inspect.getargspec(p)[0]  # pre Python 3.4
+                kwargs_p = {}
+                for kwarg in list(kwargs.keys()):
+                    if kwarg in parameters:
+                        kwargs_p[kwarg] = kwargs[kwarg]
+                        del kwargs[kwarg]  # here kwargs consumes the used arguments
+                self._process = p(**kwargs_p)
+            else:
+                self._process = p()
             extra = 'process=' + self._process.__name__
             if urgent is omitted:
                 urgent = False
@@ -5308,14 +5505,15 @@ class Component(object):
             if not inspect.isgeneratorfunction(p):
                 raise SalabimError(process, 'has no yield statement')
 
-            try:
-                parameters = inspect.signature(p).parameters
-            except AttributeError:
-                parameters = inspect.getargspec(p)[0]  # pre Python 3.4
-                
-            for kwarg in kwargs:
-                if kwarg not in parameters:
-                    raise TypeError("unexpected keyword argument '" + kwarg + "'")
+            if kwargs:
+                try:
+                    parameters = inspect.signature(p).parameters
+                except AttributeError:
+                    parameters = inspect.getargspec(p)[0]  # pre Python 3.4
+
+                for kwarg in kwargs:
+                    if kwarg not in parameters:
+                        raise TypeError("unexpected keyword argument '" + kwarg + "'")
             self._process = p(**kwargs)
             extra = 'process=' + self._process.__name__
 
@@ -5491,7 +5689,10 @@ class Component(object):
             self._mode = mode
             self._mode_time = self.env._now
         if self.env._trace:
-            self.env.print_trace('', '', 'standby', _modetxt(self._mode))
+            if self.env._buffered_trace:
+                self.env._buffered_trace = False
+            else:
+                self.env.print_trace('', '', 'standby', _modetxt(self._mode))
         self._status = standby
 
     def request(self, *args, **kwargs):
@@ -5642,7 +5843,7 @@ class Component(object):
                 r.available_quantity.tally(r._capacity - r._claimed_quantity)
             self._requests = collections.defaultdict(int)
             self._remove()
-            self._reschedule(self.env._now, False, 'request honour')
+            self._reschedule(self.env._now, False, 'request honor')
 
     def _release(self, r, q=None):
         if r not in self._claims:
@@ -8472,7 +8673,7 @@ def spec_to_image(spec):
         else:
             im = Image.open(spec)
             im = im.convert('RGBA')
-        return im
+            return im
     else:
         return spec
 
