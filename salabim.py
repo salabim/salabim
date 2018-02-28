@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.16'
+__version__ = '2.2.15'
 
 import heapq
 import random
