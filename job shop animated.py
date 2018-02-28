@@ -5,7 +5,7 @@ class AnimateMachineBox(sim.Animate):
     def __init__(self, machine):
         self.machine = machine
         x = groups.index(machine.group) * 70 + 100
-        y = env.height - 140 - (machine.group.machines.index(machine) * 15)
+        y = env.height() - 140 - (machine.group.machines.index(machine) * 15)
         sim.Animate.__init__(self, x0=x, y0=y, rectangle0=(0, 0, 60, 12), fillcolor0='red')
 
     def fillcolor(self, t):
@@ -16,7 +16,7 @@ class AnimateMachineText(sim.Animate):
     def __init__(self, machine):
         self.machine = machine
         x = groups.index(machine.group) * 70 + 100 + 2
-        y = env.height - 140 - (machine.group.machines.index(machine) * 15)
+        y = env.height() - 140 - (machine.group.machines.index(machine) * 15)
         sim.Animate.__init__(self, x0=x, y0=y + 2, anchor='sw',
             text=str(machine.group.machines.index(machine)), textcolor0='white', fontsize0=12)
 
@@ -27,21 +27,41 @@ class AnimateMachineText(sim.Animate):
 def animation_pre_tick(self, t):
     for i, job in enumerate(plant):
         y = env.y_top - 45 - i * 15
-        job.tasks.animate(x=200, y=y, direction='e')
-        job.task_in_execution.animate(x=100, y=y)
+        x = 200
+        slack = job.slack_t(t)
+        for task in job.tasks:
+            duration = task.duration
+            color = task.group.color
+            if task.start_execution is None:
+                color = (color, 80)
+            else:
+                duration -= (t - task.start_execution)
+            len = duration * scale_x
+
+            task.an_bar.update(rectangle0=(0, 0, len, 12), x0=x, y0=y, fillcolor0=color, linewidth0=0)
+            x += len
+            job.an_due.update(x0=x + slack * scale_x, y0=y)
+
+        if job.tasks.head().start_execution is None:
+            job.an_execute_text.update(text='', y0=y)
+            job.an_execute_bar.update(fillcolor0='', y0=y)
+        else:
+            task = job.tasks.head()
+            job.an_execute_text.update(text=task.machine.name(), y0=y)
+            job.an_execute_bar.update(fillcolor0=task.group.color, y0=y)
         slack = job.slack_t(t)
         job.an_slack.update(y0=y, text='{:7.2f}'.format(slack), textcolor0=('red' if slack < 0 else 'fg'))
         job.an_label.update(y0=y)
 
 
 def animation():
-    env.animation_parameters(synced=False, modelname='Job shop')
+    env.animation_parameters(synced=False, modelname='Job shop', background_color='20%gray')
     sim.Environment.animation_pre_tick = animation_pre_tick
 
     max_len = 0
     for i, group in enumerate(groups):
         x = i * 70 + 100 + 2
-        y = env.height - 140 + 20
+        y = env.height() - 140 + 20
         sim.Animate(text=group.name(), x0=x, y0=y, anchor='sw', fontsize0=12)
         for machine in group.machines:
             AnimateMachineBox(machine=machine)
@@ -51,8 +71,8 @@ def animation():
     sim.Animate(line0=(0, env.y_top, 2000, env.y_top))
     sim.Animate(text='job', x0=50, y0=env.y_top - 15, anchor='ne', fontsize0=12)
     sim.Animate(text='slack', x0=90, y0=env.y_top - 15, anchor='ne', fontsize0=12)
-    sim.Animate(text='in execution', x0=100, y0=env.y_top - 15, anchor='nw', fontsize0=12)
-    sim.Animate(text='waiting for execution -->', x0=200, y0=env.y_top - 15, anchor='nw', fontsize0=12)
+#    sim.Animate(text='in execution', x0=100, y0=env.y_top - 15, anchor='nw', fontsize0=12)
+#    sim.Animate(text='waiting for execution -->', x0=200, y0=env.y_top - 15, anchor='nw', fontsize0=12)
 
 
 class Group(sim.Component):
@@ -63,7 +83,7 @@ class Group(sim.Component):
             self.job_select = self.job_select_min_slack
         else:
             raise AssertionError('wrong selection_method:', job_select_method)
-        self.machines = [Machine(group=self, name=self.name() + '.machine.') for _ in range(number_of_machines)]
+        self.machines = [Machine(group=self, name=self.name() + '.') for _ in range(number_of_machines)]
 
         self.fraction = fraction
         self.color = color
@@ -92,10 +112,12 @@ class Machine(sim.Component):
             job = self.group.job_select()
             job.slack -= (env.now() - job.enter_time(self.group.jobs))
             job.leave(self.group.jobs)
-            self.task = job.tasks.pop()
-            self.task.enter(job.task_in_execution)
+            self.task = job.tasks.head()
+            self.task.machine = self
+            self.task.start_execution = env.now()
             yield self.hold(self.task.duration)
-            self.task.leave(job.task_in_execution)
+            self.task.leave(job.tasks)
+            self.task.an_bar.remove()
 
             if job.tasks:
                 task1 = job.tasks.head()
@@ -106,7 +128,9 @@ class Machine(sim.Component):
                 job.leave(plant)
                 job.an_slack.remove()
                 job.an_label.remove()
-                job.tasks.animate(on=False)
+                job.an_execute_text.remove()
+                job.an_execute_bar.remove()
+                job.an_due.remove()
 
 
 class JobGenerator(sim.Component):
@@ -131,29 +155,33 @@ class Job(sim.Component):
         self.slack = start_slack
         self.an_slack = sim.Animate(x0=90, text='', fontsize0=12, anchor='se')
         self.an_label = sim.Animate(x0=50, text=str(self.sequence_number()), fontsize0=12, anchor='se')
+        self.an_execute_bar = sim.Animate(x0=100, rectangle0=(0, 0, 70, 12))
+        self.an_execute_text = sim.Animate(
+            x0=100, text='', fontsize0=12, anchor='sw', textcolor0='white', offsetx0=2, offsety0=1)
+        self.an_due = sim.Animate(line0=(0, -1, 0, 13))
         self.enter(self.tasks[0].group.jobs)
         if self.tasks.head().group.idle_machines:
             self.tasks.head().group.idle_machines.head().activate()
         self.enter(plant)
 
     def slack_t(self, t):
-        if self.task_in_execution:
-            return self.slack
+        task1 = self.tasks.head()
+
+        if self in task1.group.jobs:
+            return self.slack - (t - self.enter_time(task1.group.jobs))
         else:
-            return self.slack - (t - self.enter_time(self.tasks.head().group.jobs))
+            return self.slack
 
 
 class Task(sim.Component):
     def setup(self, job_generator, job):
         self.group = job_generator.group_dist()
         self.duration = job_generator.duration_dist()
-
-    def animation_objects(self, q):
-        an1 = sim.Animate(rectangle0=(0, 0, 60, 12), fillcolor0=self.group.color)
-        an2 = sim.Animate(text=str(self.name()), anchor='sw', textcolor0='white', fontsize0=12, offsetx0=2, offsety0=2)
-        return (70, 15, an1, an2)
+        self.start_execution = None
+        self.an_bar = sim.Animate(rectangle0=(0, 0, 0, 0))
 
 
+sim.reset()
 env = sim.Environment(trace=False)
 
 groups = []
@@ -182,7 +210,10 @@ group_dist = sim.Pdf(groups, probabilities=[group.fraction for group in groups])
 JobGenerator(inter_arrival_time_dist=inter_arrival_time_dist, number_of_tasks_dist=number_of_tasks_dist,
     group_dist=group_dist, duration_dist=duration_dist)
 
+scale_x = 1
+
 animation()
 env.run(100000)
+
 plant.print_statistics()
 plant.print_info()
