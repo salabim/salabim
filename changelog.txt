@@ -6,10 +6,10 @@ Animation updates
 -----------------
 Overhaul of the way animation is organized. Now, the animation can be started and stopped during a run.
 When animation is off, the simulation model runs full speed without any overhead.
-It is possible to use different environmnent for the animation although not at the same time.
+It is possible to use different environmenta for the animation although not at the same time.
 
 The API for animation has changed slightly:
-center is now refered to as 'c'  (although 'center' is still accepted)
+center is now referred to as 'c'  (although 'center' is still accepted)
 xy_anchor allows x0, x1, y0 and y1 in Animate and x and y in AnimateButton or AnimateSlider object, to be
 relative to each of the wind directions 'n', 'nw', 'w', 'sw', 's', 'se', 'e' or 'ne' or 'c' (for center).
 This makes it, for instance, possible to define a button relative to the top right hand corner of the 
@@ -51,7 +51,7 @@ Functionality updates
 
 Updated animated sample files
 -----------------------------
-Please not that the animated sample models have been updated to use the new xy_anchor functionality.
+Please note that the animated sample models have been updated to use the new xy_anchor functionality.
 
 Bug fix
 -------
