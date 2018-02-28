@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.14'
+__version__ = '2.2.16'
 
 import heapq
 import random
@@ -22,39 +22,64 @@ import sys
 import itertools
 import string
 import io
+import pickle
 
 Pythonista = (sys.platform == 'ios')
 Windows = (sys.platform.startswith('win'))
 
-try:
-    import numpy as np
-except ImportError:
+
+class SalabimError(Exception):
     pass
 
-try:
-    import cv2
-except ImportError:
+
+class g():
     pass
+
+
+g.can_animate = True
+g.can_video = False
+g.reason_cannot_animate = ''
+g.reason_cannot_video = ''
 
 try:
     import PIL  # NOQA
     from PIL import Image
     from PIL import ImageDraw
     from PIL import ImageFont
-    if not Pythonista:
+    g.can_animate = True
+except ImportError:
+    g.can_animate = False
+    g.reason_cannot_animate = 'PIL is required for animation. Install with pip install Pillow'
+
+if Pythonista:
+    g.can_video = False
+    g.reason_cannot_video = 'video production not supported on Pythonista'
+else:
+    if g.can_animate:
         from PIL import ImageTk
-except ImportError:
-    pass
+        try:
+            import tkinter
+        except ImportError:
+            try:
+                import Tkinter as tkinter
+            except ImportError:
+                g.can_animate = False
+                g.reason_cannot_animate = 'tkinter is required for animation'
+    if g.can_animate:
+        try:
+            import cv2
+            import numpy as np
+            g.can_video = True
+        except ImportError:
+            g.can_video = False
+            if platform.python_implementation == 'PyPy':
+                g.reason_cannot_video = 'video production is not supported under PyPy.'
+            else:
+                g.reason_cannot_video = 'cv2 required for video production. Install with pip install opencv-python'
+    else:
+        g.can_video = False
+        g.reason_cannot_video = 'cannot animate, because ' + g.reason_cannot_animate
 
-try:
-    import tkinter
-except ImportError:
-    pass
-
-try:
-    import Tkinter as tkinter  # NOQA
-except ImportError:
-    pass
 
 if Pythonista:
     import scene
@@ -64,10 +89,6 @@ if Pythonista:
 inf = float('inf')
 nan = float('nan')
 omitted = ['omitted']
-
-
-class SalabimError(Exception):
-    pass
 
 
 class ItemFile(object):
@@ -118,7 +139,7 @@ class ItemFile(object):
         self.iter = self._nextread()
         if '\n' in filename:
             self.open_file = io.StringIO(filename)
-        else:    
+        else:
             self.open_file = open(filename, 'r')
 
     def __enter__(self):
@@ -270,7 +291,7 @@ class Monitor(object):
 
     def __init__(self, name=omitted, monitor=True, type='any', env=omitted, *args, **kwargs):
         if env is omitted:
-            self.env = _default_env
+            self.env = g.default_env
         else:
             self.env = env
         _set_name(name, self.env._nameserializeMonitor, self)
@@ -724,7 +745,7 @@ class Monitor(object):
         else:
             x = xall
 
-        Monitor.cached_x[ex0] = (hash, x)
+        Monitor.cached_x[ex0] = (thishash, x)
         return x
 
 
@@ -803,7 +824,7 @@ class MonitorTimestamp(Monitor):
 
     def __init__(self, name=omitted, initial_tally=0, monitor=True, type='any', env=omitted, *args, **kwargs):
         if env is omitted:
-            self.env = _default_env
+            self.env = g.default_env
         else:
             self.env = env
         try:
@@ -1292,108 +1313,97 @@ class MonitorTimestamp(Monitor):
 
 if Pythonista:
 
-    class MyScene(scene.Scene):
+    class AnimationScene(scene.Scene):
 
-        def __init__(self, *args, **kwargs):
+        def __init__(self, env, *args, **kwargs):
             scene.Scene.__init__(self, *args, **kwargs)
-            MyScene.this_scene = self
 
         def setup(self):
             pass
 
         def touch_ended(self, touch):
-            for uio in an_env.ui_objects:
-                if uio.type == 'button':
-                    if touch.location in \
-                            scene.Rect(uio.x - 2, uio.y - 2, uio.width + 2, uio.height + 2):
-                        uio.action()
-                        break  # new buttons might have been installed
-                if uio.type == 'slider':
-                    if touch.location in\
-                            scene.Rect(uio.x - 2, uio.y - 2, uio.width + 4, uio.height + 4):
-                        xsel = touch.location[0] - uio.x
-                        uio._v = uio.vmin + \
-                            round(-0.5 + xsel / uio.xdelta) * uio.resolution
-                        uio._v = max(min(uio._v, uio.vmax), uio.vmin)
-                        if uio.action is not None:
-                            uio.action(uio._v)
-                            break  # new items might have been installed
+            env = g.animation_env
+            if env is not None:
+                for uio in env.ui_objects:
+                    ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True)
+                    uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True)
+                    if uio.type == 'button':
+                        if touch.location in \
+                                scene.Rect(ux - 2, uy - 2, uio.width + 2, uio.height + 2):
+                            uio.action()
+                            break  # new buttons might have been installed
+                    if uio.type == 'slider':
+                        if touch.location in\
+                                scene.Rect(ux - 2, uy - 2, uio.width + 4, uio.height + 4):
+                            xsel = touch.location[0] - ux
+                            uio._v = uio.vmin + \
+                                round(-0.5 + xsel / uio.xdelta) * uio.resolution
+                            uio._v = max(min(uio._v, uio.vmax), uio.vmin)
+                            if uio.action is not None:
+                                uio.action(uio._v)
+                                break  # new items might have been installed
 
         def draw(self):
+            env = g.animation_env
+            g.in_draw = True
+            if (env is not None) and env._animate and env.running:
+                scene.background(env.pythonistacolor('bg'))
 
-            if an_env is not None:
-                scene.background(pythonistacolor('bg'))
-
-                if an_env._synced:
-                    if an_env.paused:
-                        an_env.t = an_env.start_animation_time
+                if env._synced:
+                    if env.paused:
+                        env.t = env.start_animation_time
                     else:
-                        an_env.t = \
-                            an_env.start_animation_time +\
+                        env.t = \
+                            env.start_animation_time +\
                             ((time.time() -
-                              an_env.start_animation_clocktime) * an_env.speed)
-                    while an_env.peek() < an_env.t:
-                        an_env.step()
-                        if an_env._current_component == an_env._main:
-                            if an_env._trace:
-                                an_env.print_trace(
-                                    '{:10.3f}'.format(an_env._now - an_env._offset),
-                                    an_env._main.name(), 'current', s0=an_env._main.lineno_txt())
-                            an_env._main._scheduled_time = inf
-                            an_env._main._status = current
-                            an_env.an_quit()
-                            return
+                              env.start_animation_clocktime) * env._speed)
+                    while (env.peek() < env.t) and env.running and env._animate:
+                        env.step()
                 else:
-                    if an_env._step_pressed or (not an_env.paused):
-                        an_env.step()
-                        if not an_env._current_component._suppress_pause_at_step:
-                            an_env._step_pressed = False
-                        an_env.t = an_env._now
-                        if an_env._current_component == an_env._main:
-                            if an_env._trace:
-                                an_env.print_trace('{:10.3f}'.format(an_env._now - an_env._offset),
-                                    an_env._main.name(), 'current', s0=an_env._main.lineno_txt())
-                            an_env._scheduled_time = inf
-                            an_env._status = current
-                            an_env.an_quit()
-                            return
-                if not an_env.paused:
-                    an_env.frametimes.append(time.time())
+                    if (env._step_pressed or (not env.paused)) and env._animate:
+                        env.step()
+                        if not env._current_component._suppress_pause_at_step:
+                            env._step_pressed = False
+                        env.t = env._now
+                if not env.paused:
+                    env.frametimes.append(time.time())
 
-                an_env.an_objects.sort(
-                    key=lambda obj: (-obj.layer(an_env.t), obj.sequence))
+                env.an_objects.sort(
+                    key=lambda obj: (-obj.layer(env.t), obj.sequence))
                 touchvalues = self.touches.values()
 
                 capture_image = Image.new('RGB',
-                    (an_env.width, an_env.height), colorspec_to_tuple('bg'))
+                    (env._width, env._height), env.colorspec_to_tuple('bg'))
 
-                an_env.animation_pre_tick(an_env.t)
-                for ao in an_env.an_objects:
-                    ao.make_pil_image(an_env.t)
+                env.animation_pre_tick(env.t)
+                for ao in env.an_objects:
+                    ao.make_pil_image(env.t)
                     if ao._image_visible:
                         capture_image.paste(ao._image,
                             (int(ao._image_x),
-                            int(an_env.height - ao._image_y - ao._image.size[1])),
+                            int(env._height - ao._image_y - ao._image.size[1])),
                             ao._image)
-                an_env.animation_post_tick(an_env.t)
+                env.animation_post_tick(env.t)
 
                 ims = scene.load_pil_image(capture_image)
                 scene.image(ims, 0, 0, *capture_image.size)
                 scene.unload_image(ims)
 
-                for uio in an_env.ui_objects:
+                for uio in env.ui_objects:
+                    ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True)
+                    uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True)
 
                     if uio.type == 'button':
                         linewidth = uio.linewidth
 
                         scene.push_matrix()
-                        scene.fill(pythonistacolor(uio.fillcolor))
-                        scene.stroke(pythonistacolor(uio.linecolor))
+                        scene.fill(env.pythonistacolor(uio.fillcolor))
+                        scene.stroke(env.pythonistacolor(uio.linecolor))
                         scene.stroke_weight(linewidth)
-                        scene.rect(uio.x - 4, uio.y + 2, uio.width + 8, uio.height - 4)
-                        scene.tint(pythonistacolor(uio.color))
-                        scene.translate(uio.x + uio.width / 2,
-                                        uio.y + uio.height / 2)
+                        scene.rect(ux - 4, uy + 2, uio.width + 8, uio.height - 4)
+                        scene.tint(env.pythonistacolor(uio.color))
+                        scene.translate(ux + uio.width / 2,
+                                        uy + uio.height / 2)
                         scene.text(uio.text(), uio.font,
                                    uio.fontsize, alignment=5)
                         scene.tint(1, 1, 1, 1)
@@ -1401,10 +1411,10 @@ if Pythonista:
                         scene.pop_matrix()
                     elif uio.type == 'slider':
                         scene.push_matrix()
-                        scene.tint(pythonistacolor(uio.labelcolor))
+                        scene.tint(env.pythonistacolor(uio.labelcolor))
                         v = uio.vmin
-                        x = uio.x + uio.xdelta / 2
-                        y = uio.y
+                        x = ux + uio.xdelta / 2
+                        y = uy
                         mindist = inf
                         v = uio.vmin
                         while v <= uio.vmax:
@@ -1415,12 +1425,12 @@ if Pythonista:
                         thisv = uio._v
                         for touch in touchvalues:
                             if touch.location in\
-                                    scene.Rect(uio.x, uio.y, uio.width, uio.height):
-                                xsel = touch.location[0] - uio.x
+                                    scene.Rect(ux, uy, uio.width, uio.height):
+                                xsel = touch.location[0] - ux
                                 vsel = round(-0.5 + xsel /
                                              uio.xdelta) * uio.resolution
                                 thisv = vsel
-                        scene.stroke(pythonistacolor(uio.linecolor))
+                        scene.stroke(env.pythonistacolor(uio.linecolor))
                         v = uio.vmin
                         xfirst = -1
                         while v <= uio.vmax:
@@ -1435,16 +1445,17 @@ if Pythonista:
                             x += uio.xdelta
 
                         scene.push_matrix()
-                        scene.translate(xfirst, uio.y + uio.height + 2)
+                        scene.translate(xfirst, uy + uio.height + 2)
                         scene.text(uio.label, uio.font,
                                    uio.fontsize, alignment=9)
                         scene.pop_matrix()
-                        scene.translate(uio.x + uio.width, y + uio.height + 2)
+                        scene.translate(ux + uio.width, uy + uio.height + 2)
                         scene.text(str(thisv) + ' ',
                                    uio.font, uio.fontsize, alignment=7)
                         scene.tint(1, 1, 1, 1)
                         # required for proper loading of images later
                         scene.pop_matrix()
+            g.in_draw = False
 
 
 class Qmember():
@@ -1505,7 +1516,7 @@ class Queue(object):
 
     def __init__(self, name=omitted, monitor=True, fill=omitted, env=omitted, _isinternal=False, *args, **kwargs):
         if env is omitted:
-            self.env = _default_env
+            self.env = g.default_env
         else:
             self.env = env
         _set_name(name, self.env._nameserializeQueue, self)
@@ -2447,14 +2458,6 @@ class Queue(object):
             self.env.print_trace('', '', self.name() + ' clear')
 
 
-def finish():
-    if Pythonista:
-        if MyScene.this_scene is not None:
-            MyScene.this_scene.view.close()
-    print('stopped by user')
-    exit()
-
-
 class Environment(object):
     '''
     environment object
@@ -2479,16 +2482,16 @@ class Environment(object):
         if the name end with a comma,
         auto serializing starting at 1 will be applied |n|
         if omitted, the name will be derived from the class (lowercased)
-        or 'default environment' if is_default_env is True.
+        or 'default environment' if isdefault_env is True.
 
     print_trace_header : bool
         if True (default) print a (two line) header line as a legend |n|
         if False, do not print a header |n|
         note that the header is only printed if trace=True
 
-    is_default_env : bool
-        if True, this environment becomes the default environment |n|
-        if False, no change |n|
+    isdefault_env : bool
+        if True (default), this environment becomes the default environment |n|
+        if False, this environment will not be the default environment |n|
         if omitted, this environment becomes the default environment |n|
 
     Note
@@ -2499,18 +2502,15 @@ class Environment(object):
     If required to be purely, not not reproducable, values, use
     random_seed=None.
     '''
-    global an_env
-
     _nameserialize = {}
-    an_env = None
+    cached_modelname_width = [None, None]
 
     def __init__(self, trace=False, random_seed=omitted, name=omitted,
-      print_trace_header=True, is_default_env=True, *args, **kwargs):
-        global _default_env
-        if is_default_env:
-            _default_env = self
+      print_trace_header=True, isdefault_env=True, *args, **kwargs):
+        if isdefault_env:
+            g.default_env = self
         if name is omitted:
-            if is_default_env:
+            if isdefault_env:
                 name = 'default environment'
         self._trace = trace
         self._source_files = {inspect.getframeinfo(_get_caller_frame()).filename: 0}
@@ -2549,30 +2549,38 @@ class Environment(object):
 
         self.an_objects = []
         self.ui_objects = []
-        self.menu_objects = []
         self.serial = 0
-        self.speed = 1
-        self.animate = False
+        self._speed = 1
+        self._animate = False
+        self.running = False
+        self.t = 0
         self._synced = True
         self._step_pressed = False
+        self.stopped = False
         if Pythonista:
-            self.width, self.height = ui.get_screen_size()
-            self.width = int(self.width)
-            self.height = int(self.height)
+            self._width, self._height = ui.get_screen_size()
+            self._width = int(self._width)
+            self._height = int(self._height)
         else:
-            self.width = 1024
-            self.height = 768
-        self.x0 = 0
-        self.y0 = 0
-        self.x1 = self.width
-        self.background_color = 'white'
-        self.foreground_color = 'black'
-        self.fps = 30
-        self.modelname = ''
+            self._width = 1024
+            self._height = 768
+        self._x0 = 0
+        self._y0 = 0
+        self._x1 = self._width
+        self.scale = 1
+        self._y1 = self._y0 + self._height
+        self._background_color = 'white'
+        self._foreground_color = 'black'
+        self._fps = 30
+        self._modelname = ''
         self.use_toplevel = False
-        self.show_fps = False
-        self.show_time = True
+        self._show_fps = False
+        self._show_time = True
         self.video = ''
+        self.video_out = None
+        self.an_modelname()
+        self.an_clocktext()
+
         self.setup(*args, **kwargs)
 
     def setup(self):
@@ -2621,8 +2629,7 @@ class Environment(object):
         prints information about the environment
         '''
         print(objectclass_to_str(self) + ' ' + hex(id(self)))
-        print('  name=' + self.name() +
-            (' (animation environment)' if self == an_env else ''))
+        print('  name=' + self.name())
         print('  now=' + time_to_string(self._now - self._offset))
         print('  current_component=' + self._current_component.name())
         print('  trace=' + str(self._trace))
@@ -2652,10 +2659,9 @@ class Environment(object):
                     c._status = data
                     c._scheduled_time = inf
                     c._process = None
-                    if an_env == self:
-                        for ao in self.an_objects[:]:
-                            if ao.parent == c:
-                                self.an_objects.remove(ao)
+                    for ao in self.an_objects[:]:
+                        if ao.parent == c:
+                            self.an_objects.remove(ao)
                     return
         if len(self.env._standbylist) > 0:
             self._pendingstandbylist = list(self.env._standbylist)
@@ -2669,17 +2675,18 @@ class Environment(object):
         c._on_event_list = False
         self.env._now = t
 
-        try:
-            self._current_component = c
-            if c._process is None:  # denotes end condition
-                return
+        self._current_component = c
 
-            c._status = current
-            if self._trace:
-                self.print_trace('{:10.3f}'.format(self._now - self._offset), c.name(),
+        c._status = current
+        c._scheduled_time = inf
+        if self._trace:
+            self.print_trace('{:10.3f}'.format(self._now - self._offset), c.name(),
               'current', s0=c.lineno_txt())
-            c._check_fail()
-            c._scheduled_time = inf
+        if c == self._main:
+            self.running = False
+            return
+        c._check_fail()
+        try:
             next(c._process)
             return
         except StopIteration:
@@ -2689,10 +2696,9 @@ class Environment(object):
             c._status = data
             c._scheduled_time = inf
             c._process = None
-            if an_env == self:
-                for ao in self.an_objects[:]:
-                    if ao.parent == c:
-                        self.an_objects.remove(ao)
+            for ao in self.an_objects[:]:
+                if ao.parent == c:
+                    self.an_objects.remove(ao)
             return
 
     def _print_event_list(self, s):
@@ -2701,7 +2707,7 @@ class Environment(object):
             print('{:10.3f} {}'.format(t, comp.name()))
 
     def animation_parameters(self,
-      animate=omitted, synced=omitted, speed=omitted, width=omitted, height=omitted,
+      animate=True, synced=omitted, speed=omitted, width=omitted, height=omitted,
       x0=omitted, y0=0, x1=omitted, background_color=omitted, foreground_color=omitted,
       fps=omitted, modelname=omitted, use_toplevel=omitted,
       show_fps=omitted, show_time=omitted,
@@ -2713,8 +2719,7 @@ class Environment(object):
         ----------
         animate : bool
             animate indicator |n|
-            if omitted, True, i.e. animation on |n|
-            Installation of PIL is required for animation.
+            if not specified, set animate on |n|
 
         synced : bool
             specifies whether animation is synced |n|
@@ -2793,58 +2798,411 @@ class Environment(object):
         ----
         The y-coordinate of the upper right corner is determined automatically
         in such a way that the x and scaling are the same. |n|
-
-        Note that changing the parameters x0, x1, y0, width, height, background_color, modelname,
-        use_toplevelmand video, animate has no effect on the current animation.
-        So to avoid confusion, do not use change these parameters when an animation is running. |n|
-        On the other hand, changing speed, show_fps, show_time, and fps can be useful in
-        a running animation.
         '''
+        frame_changed = False
         if speed is not omitted:
-            self.speed = speed
-            if an_env == self:
-                an_env.set_start_animation()
+            self._speed = speed
+            self.set_start_animation()
 
         if show_fps is not omitted:
-            self.show_fps = show_fps
+            self._show_fps = show_fps
 
         if show_time is not omitted:
-            self.show_time = show_time
+            self._show_time = show_time
 
-        if animate is omitted:
-            self.animate = True
-        else:
-            self.animate = animate
         if synced is not omitted:
             self._synced = synced
+            self.set_start_animation()
+
         if width is not omitted:
-            self.width = width
+            if self._width != width:
+                self._width = width
+                frame_changed = True
+
         if height is not omitted:
-            self.height = height
+            if self._height != height:
+                self._height = height
+                frame_changed = True
+
         if x0 is not omitted:
-            self.x0 = x0
+            if self._x0 != x0:
+                self._x0 = x0
+                self.uninstall_uios()
+
         if x1 is not omitted:
-            self.x1 = x1
+            if self._x1 != x1:
+                self._x1 = x1
+                self.uninstall_uios()
+
         if y0 is not omitted:
-            self.y0 = y0
+            if self._y0 != y0:
+                self._y0 = y0
+                self.uninstall_uios()
+
         if background_color is not omitted:
             if background_color in ('fg', 'bg'):
-                raise SalabimError(background_color + ' not allowed for background_color')
-            self.background_color = check_colorspec(background_color)
+                raise SalabimError(background_color + 'not allowed for background_color')
+            if self._background_color != background_color:
+                self._background_color = background_color
+                frame_changed = True
             if foreground_color is omitted:
-                self.foreground_color = contrast_color(self.background_color)
+                self._foreground_color = 'white' if self.is_dark('bg') else 'black'
+
         if foreground_color is not omitted:
-            if background_color in ('fg', 'bg'):
-                raise SalabimError(background_color + ' not allowed for foreground_color')
-            self.foreground_color = check_colorspec(foreground_color)
+            if foreground_color in ('fg', 'bg'):
+                raise SalabimError(foreground_color + 'not allowed for foreground_color')
+            self._foreground_color = foreground_color
+
         if fps is not omitted:
-            self.fps = fps
+            self._fps = fps
+
         if modelname is not omitted:
-            self.modelname = modelname
+            self._modelname = modelname
+
         if use_toplevel is not omitted:
             self.use_toplevel = use_toplevel
+
         if video is not omitted:
-            self.video = video
+            if video != self.video:
+                self.video_close()
+                if video:
+                    if not g.can_video:
+                        raise SalabimError(g.reason_cannot_video)
+                self.video = video
+
+        if animate is None:
+            animate = self._animate  # no change
+        else:
+            if animate != self._animate:
+                frame_changed = True
+
+        self.scale = self._width / (self._x1 - self._x0)
+        self._y1 = self._y0 + self._height / self.scale
+
+        if g.animation_env is not self:
+            if g.animation_env is not None:
+                g.animation_env.video_close()
+            if animate:
+                frame_changed = True
+            else:
+                frame_changed = False  # no animation required, so leave running animation_env untouched
+
+        if frame_changed:
+            if g.animation_env is not None:
+                g.animation_env._animate = animate
+                if not Pythonista:
+                    g.animation_env.root.destroy()
+                g.animation_env = None
+
+            if animate:
+                if not g.can_animate:
+                    raise SalabimError(g.reason_cannot_animate)
+
+                g.animation_env = self
+                self.t = self._now  # for the call to set_start_animation
+                self.set_start_animation()
+
+                self.paused = False
+
+                if Pythonista:
+                    if g.animation_scene is None:
+                        g.animation_scene = AnimationScene(env=self)
+                        scene.run(g.animation_scene, frame_interval=60 / self._fps, show_fps=False)
+
+                else:
+                    if self.use_toplevel:
+                        self.root = tkinter.Toplevel()
+                    else:
+                        self.root = tkinter.Tk()
+                    g.canvas = tkinter.Canvas(
+                        self.root, width=self._width, height=self._height)
+                    g.canvas.configure(background=self.colorspec_to_hex('bg', False))
+                    g.canvas.pack()
+                    g.canvas_objects = []
+
+                self.uninstall_uios()  # this causes all ui objects to be (re)installed
+
+                self.an_menu_buttons()
+
+                if self.video:
+                    if not self.video_out:
+                        self.video_width = self._width
+                        self.video_height = self._height
+                        self.video_fps = self._fps
+                        fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+                        self.video_out = cv2.VideoWriter(
+                            self.video, fourcc, self._fps, (self.video_width, self.video_height))
+                    self.video_t = self.t
+        self._animate = animate
+
+    def video_close(self):
+        if self.video_out:
+            self.video_out.release()
+            self.video_out = None
+
+    def uninstall_uios(self):
+        for uio in self.ui_objects:
+            uio.installed = False
+
+    def x0(self, value=omitted):
+        '''
+        x coordinate of lower left corner of animation
+
+        Parameters
+        ----------
+        value : float
+            new x coordinate
+
+        Returns
+        -------
+        x coordinate of lower left corner of animation : float
+        '''
+        if value is not omitted:
+            self.animation_parameters(x0=value, animate=None)
+        return self._x0
+
+    def x1(self, value=omitted):
+        '''
+        x coordinate of upper right corner of animation : float
+
+        Parameters
+        ----------
+        value : float
+            new x coordinate |n|
+            if not specified, no change
+
+        Returns
+        -------
+        x coordinate of upper right corner of animation : float
+        '''
+        if value is not omitted:
+            self.animation_parameters(x1=value, animate=None)
+        return self._x1
+
+    def y0(self, value=omitted):
+        '''
+        y coordinate of lower left corner of animation
+
+        Parameters
+        ----------
+        value : float
+            new y coordinate |n|
+            if not specified, no change
+
+        Returns
+        -------
+        y coordinate of lower left corner of animation : float
+        '''
+        if value is not omitted:
+            self.animation_parameters(y0=value, animate=None)
+        return self._y0
+
+    def y1(self):
+        '''
+        y coordinate of upper right corner of animation
+
+        Returns
+        -------
+        y coordinate of upper right corner of animation : float
+
+        Note
+        ----
+        It is not possible to set this value explicitely.
+        '''
+        return self._y1
+
+    def width(self, value=omitted):
+        '''
+        width of the animation in screen coordinates
+
+        Parameters
+        ----------
+        value : int
+            new width |n|
+            if not specified, no change
+
+
+        Returns
+        -------
+        width of animation : int
+        '''
+        if value is not omitted:
+            self.animation_parameters(width=value, animate=None)
+        return self._width
+
+    def height(self, value=omitted):
+        '''
+        height of the animation in screen coordinates
+
+        Parameters
+        ----------
+        value : int
+            new height |n|
+            if not specified, no change
+
+        Returns
+        -------
+        height of animation : int
+        '''
+        if value is not omitted:
+            self.animation_parameters(height=value, animate=None)
+        return self._height
+
+    def animate(self, value=omitted):
+        '''
+        animate indicator
+
+        Parameters
+        ----------
+        value : bool
+            new animate indicator |n|
+            if not specified, no change
+
+        Returns
+        -------
+        animate status : bool
+
+        Note
+        ----
+        When the run is not issued, no acction will be taken.
+        '''
+        if value is not omitted:
+            self.animation_parameters(animate=value)
+        return self._animate
+
+    def modelname(self, value=omitted):
+        '''
+        modelname
+
+        Parameters
+        ----------
+        value : str
+            new modelname |n|
+            if not specified, no change
+
+        Returns
+        -------
+        modelname : str
+
+        Note
+        ----
+        If modelname is the null string, nothing will be displayed.
+        '''
+        if value is not omitted:
+            self.animation_parameters(modelname=value, animate=None)
+        return self._modelname
+
+    def video(self, value=omitted):
+        '''
+        video name
+
+        Parameters
+        ----------
+        value : str
+            new video name |n|
+            if not specified, no change
+
+        Returns
+        -------
+        video : str
+
+        Note
+        ----
+        If video is the null string, the video (if any) will be closed.
+        '''
+        if value is not omitted:
+            self.animation_parameters(modelname=value, animate=None)
+        return self._modelname
+
+    def fps(self, value=omitted):
+        '''
+        fps
+
+        Parameters
+        ----------
+        value : bool
+            new fps |n|
+            if not specified, no change
+
+        Returns
+        -------
+        fps : bool
+        '''
+        if value is not omitted:
+            self.animation_parameters(fps=value, animate=None)
+        return self._fps
+
+    def show_time(self, value=omitted):
+        '''
+        show_time
+
+        Parameters
+        ----------
+        value : bool
+            new show_time |n|
+            if not specified, no change
+
+        Returns
+        -------
+        show_time : bool
+        '''
+        if value is not omitted:
+            self.animation_parameters(show_time=value, animate=None)
+        return self._show_time
+
+    def show_fps(self, value=omitted):
+        '''
+        show_fps
+
+        Parameters
+        ----------
+        value : bool
+            new show_fps |n|
+            if not specified, no change
+
+        Returns
+        -------
+        show_fps : bool
+        '''
+        if value is not omitted:
+            self.animation_parameters(show_fps=value, animate=None)
+        return self._show_fps
+
+    def synced(self, value=omitted):
+        '''
+        synced
+
+        Parameters
+        ----------
+        value : bool
+            new synced |n|
+            if not specified, no change
+
+        Returns
+        -------
+        synced : bool
+        '''
+        if value is not omitted:
+            self.animation_parameters(synced=value, animate=None)
+        return self._synced
+
+    def speed(self, value=omitted):
+        '''
+        speed
+
+        Parameters
+        ----------
+        value : float
+            new speed |n|
+            if not specified, no change
+
+        Returns
+        -------
+        speed : float
+        '''
+        if value is not omitted:
+            self.animation_parameters(speed=value, animate=None)
+        return self._speed
 
     def peek(self):
         '''
@@ -2980,7 +3338,6 @@ class Environment(object):
         ----
         only issue run() from the main level
         '''
-        global an_env
         if till is omitted:
             if duration is omitted:
                 scheduled_time = inf
@@ -2998,186 +3355,107 @@ class Environment(object):
         self._main.frame = _get_caller_frame()
         self._main._reschedule(scheduled_time, False, 'run')
 
-        if self.animate:
-            if 'PIL' not in sys.modules:
-                raise SalabimError('PIL is required for animation. Install with pip install Pillow.')
-            if not (('tkinter' in sys.modules) or ('Tkinter' in sys.modules) or Pythonista):
-                raise SalabimError('tkinter is required for animation.')
-            if self.video == '':
-                self.dovideo = False
+        self.running = True
+        while self.running:
+            if self._animate:
+                self.do_simulate_and_animate()
             else:
-                self.dovideo = True
-                if Pythonista:
-                    raise SalabimError(
-                        'video production is not supported under Pythonista.')
-                if platform.python_implementation == 'PyPy':
-                    raise SalabimError(
-                        'video production is not supported under PyPy.')
-                if 'cv2' not in sys.modules:
-                    raise SalabimError(
-                        'cv2 required for video production. Install with pip install opencv-python.')
-                if 'numpy' not in sys.modules:
-                    raise SalabimError(
-                        'numpy required for video production. Install with pip install numpy.')
+                self.do_simulate()
+        if self.stopped:
+            self.quit()
 
-            self.t = self._now  # for the call to set_start_animation
-            self.set_start_animation()
-            self.stopped = False
-            self.running = True
-            self.paused = False
-            self.scale = self.width / (self.x1 - self.x0)
-            an_env = self
-
-            if Pythonista:
-                try:
-                    scene.run(MyScene(), frame_interval=60 / self.fps, show_fps=False)
-                except:
-                    pass
-            else:
-                if self.use_toplevel:
-                    self.root = tkinter.Toplevel()
-                else:
-                    self.root = tkinter.Tk()
-                self.canvas = tkinter.Canvas(
-                    self.root, width=self.width, height=self.height)
-                self.canvas.configure(background=colorspec_to_hex(
-                    self.background_color, False))
-                self.canvas.pack()
-                self.canvas_objects = []
-
-            for uio in self.ui_objects:
-                if not Pythonista:
-                    uio.install()
-
-            self.system_an_objects = []
-            self.menu_objects = []
-
-            self.an_system_modelname()
-            self.an_system_run_buttons()
-            self.an_system_clocktext()
-
-            if self.dovideo:
-                self.video_sequence = 0
-                fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-                self.out = cv2.VideoWriter(
-                    self.video, fourcc, self.fps, (self.width, self.height))
-
-            if Pythonista:
-                while self.running:
-                    pass
-            else:
-                self.root.after(0, self.simulate_and_animate_loop)
-                self.root.mainloop()
-                if self.dovideo:
-                    self.out.release()
-            if self.stopped:
-                finish()
-        else:
-            self.simulate_loop()
-
-    def simulate_loop(self):
-        while True:
+    def do_simulate(self):
+        while g.in_draw:
+            pass
+        while self.running and not self._animate:
             self.step()
-            if self._current_component == self._main:
-                if self._trace:
-                    self.print_trace('{:10.3f}'.format(
-                        self._now - self._offset), self._main.name(), 'current', s0=self._main.lineno_txt())
-                self._scheduled_time = inf
-                self._status = current
-                return
+
+    def do_simulate_and_animate(self):
+        if Pythonista:
+            while self.running and self._animate:
+                pass
+        else:
+            self.root.after(0, self.simulate_and_animate_loop)
+            self.root.mainloop()
 
     def simulate_and_animate_loop(self):
-        self.running = True
-
-        while self.running:
+        while True:
             tick_start = time.time()
 
-            if self._synced:
-                if self.dovideo:
-                    self.t = self.start_animation_time + self.video_sequence * self.speed / self.fps
+            if self._synced or self.video:  # video forces synced
+                if self.video:
+                    self.t = self.video_t
                 else:
                     if self.paused:
                         self.t = self.start_animation_time
                     else:
                         self.t = self.start_animation_time +\
                             ((time.time() - self.start_animation_clocktime) *
-                            self.speed)
+                            self._speed)
 
                 while self.peek() < self.t:
                     self.step()
-                    if self._current_component == self._main:
-                        if self._trace:
-                            self.print_trace('{:10.3f}'.format(self._now - self._offset),
-                                self._main.name(), 'current', s0=self._main.lineno_txt())
-                        self._scheduled_time = inf
-                        self._status = current
-                        self.running = False
-                        self.an_quit()
+                    if not (self.running and self._animate):
+                        self.root.quit()
                         return
             else:
                 if self._step_pressed or (not self.paused):
                     self.step()
+
                     if not self._current_component._suppress_pause_at_step:
                         self._step_pressed = False
                     self.t = self._now
-                    if self._current_component == self._main:
-                        if self._trace:
-                            self.print_trace('{:10.3f}'.format(self._now - self._offset),
-                                self._main.name(), 'current', s0=self._main.lineno_txt())
-                        self._scheduled_time = inf
-                        self._status = current
-                        self.running = False
-                        self.an_quit()
-                        return
-            if not self.running:
-                break
 
-            if self.dovideo:
+            if not (self.running and self._animate):
+                self.root.quit()
+                return
+
+            if self.video:
                 capture_image = Image.new(
-                    'RGB', (self.width, self.height), colorspec_to_tuple('bg'))
-
+                    'RGB', (self.video_width, self.video_height), self.colorspec_to_tuple('bg'))
             if not self.paused:
                 self.frametimes.append(time.time())
 
             self.an_objects.sort(
                 key=lambda obj: (-obj.layer(self.t), obj.sequence))
 
-            canvas_objects_iter = iter(self.canvas_objects[:])
+            canvas_objects_iter = iter(g.canvas_objects[:])
             co = next(canvas_objects_iter, None)
             self.animation_pre_tick(self.t)
             for ao in self.an_objects:
                 ao.make_pil_image(self.t)
+
                 if ao._image_visible:
                     if co is None:
                         ao.im = ImageTk.PhotoImage(ao._image)
-                        co1 = self.canvas.create_image(
-                            ao._image_x, self.height - ao._image_y, image=ao.im, anchor=tkinter.SW)
-                        self.canvas_objects.append(co1)
+                        co1 = g.canvas.create_image(
+                            ao._image_x, self._height - ao._image_y, image=ao.im, anchor=tkinter.SW)
+                        g.canvas_objects.append(co1)
                         ao.canvas_object = co1
 
                     else:
                         if ao.canvas_object == co:
                             if ao._image_ident != ao._image_ident_prev:
                                 ao.im = ImageTk.PhotoImage(ao._image)
-                                self.canvas.itemconfig(
+                                g.canvas.itemconfig(
                                     ao.canvas_object, image=ao.im)
 
                             if (ao._image_x != ao._image_x_prev) or (ao._image_y != ao._image_y_prev):
-                                self.canvas.coords(
-                                    ao.canvas_object, (ao._image_x, self.height - ao._image_y))
+                                g.canvas.coords(
+                                    ao.canvas_object, (ao._image_x, self._height - ao._image_y))
 
                         else:
                             ao.im = ImageTk.PhotoImage(ao._image)
                             ao.canvas_object = co
-                            self.canvas.itemconfig(
+                            g.canvas.itemconfig(
                                 ao.canvas_object, image=ao.im)
-                            self.canvas.coords(
-                                ao.canvas_object, (ao._image_x, self.height - ao._image_y))
+                            g.canvas.coords(
+                                ao.canvas_object, (ao._image_x, self._height - ao._image_y))
                     co = next(canvas_objects_iter, None)
 
-                    if self.dovideo:
+                    if self.video:
                         capture_image.paste(ao._image,
-                            (int(ao._image_x), int(self.height - ao._image_y - ao._image.size[1])),
+                            (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])),
                             ao._image)
                 else:
                     ao.canvas_object = None
@@ -3185,8 +3463,8 @@ class Environment(object):
             self.animation_post_tick(self.t)
 
             for co in canvas_objects_iter:
-                self.canvas.delete(co)
-                self.canvas_objects.remove(co)
+                g.canvas.delete(co)
+                g.canvas_objects.remove(co)
 
             for uio in self.ui_objects:
                 if not uio.installed:
@@ -3199,173 +3477,192 @@ class Environment(object):
                         uio.lasttext = thistext
                         uio.button.config(text=thistext)
 
-            if self.dovideo:
+            if self.video and (not self.paused):
                 open_cv_image = cv2.cvtColor(
                     np.array(capture_image), cv2.COLOR_RGB2BGR)
-                self.out.write(open_cv_image)
-                self.video_sequence += 1
+                self.video_out.write(open_cv_image)
 
-            self.canvas.update()
-            if (not self.dovideo) and self._synced:
-                tick_duration = time.time() - tick_start
-                if tick_duration < 1 / self.fps:
-                    time.sleep(((1 / self.fps) - tick_duration) * 0.8)  # 0.8 compensation because of clock inaccuracy
+            g.canvas.update()
+            if self.video:
+                if not self.paused:
+                    self.video_t += self._speed / self.video_fps
+            else:
+                if self._synced:
+                    tick_duration = time.time() - tick_start
+                    if tick_duration < 1 / self._fps:
+                        time.sleep(((1 / self._fps) - tick_duration) * 0.8)
+                        # 0.8 compensation because of clock inaccuracy
 
-    def an_system_modelname(self):
+    def modelname_width(self):
+        if Environment.cached_modelname_width[0] != self._modelname:
+            Environment.cached_modelname_width = \
+                [self._modelname, self.env.getwidth(self._modelname + ' : a ', fontsize=18)]
+        return Environment.cached_modelname_width[1]
+
+    def modelname_text(self, t):
+        return self._modelname + ' : a'
+
+    def modelname_visible(self, t):
+        return self._modelname != ''
+
+    def modelname_x_logo(self, t):
+        return self.modelname_width() + 8
+
+    def modelname_x_model(self, t):
+        return self.modelname_width() + 69
+
+    def modelname_image(self, t):
+        return self.salabim_logo()
+
+    def an_modelname(self):
         '''
         function to show the modelname |n|
         called by run(), if animation is True. |n|
         may be overridden to change the standard behaviour.
         '''
 
-        if self.modelname != '':
-            ao = Animate(text=self.modelname,
-                         x0=8, y0=self.height - 60,
-                         anchor='w', fontsize0=30, textcolor0='fg',
-                         screen_coordinates=True, env=self)
-            self.system_an_objects.append(ao)
-            ao = Animate(text='a salabim model',
-                         x0=8, y0=self.height - 78,
-                         anchor='w', fontsize0=16, textcolor0='red',
-                         screen_coordinates=True, env=self)
-            self.system_an_objects.append(ao)
+        y = -68
+        an = Animate(text='',
+             x0=8, y0=y,
+             anchor='w', fontsize0=18,
+             screen_coordinates=True, xy_anchor='nw', env=self)
+        an.visible = self.modelname_visible
+        an.text = self.modelname_text
+        an = Animate(image=None,
+             y0=y, offsety0=5,
+             anchor='w', width0=61,
+             screen_coordinates=True, xy_anchor='nw', env=self)
+        an.visible = self.modelname_visible
+        an.x = self.modelname_x_logo
+        an.image = self.modelname_image
+        an = Animate(text=' model',
+             y0=y,
+             anchor='w', fontsize0=18,
+             screen_coordinates=True, xy_anchor='nw', env=self)
+        an.visible = self.modelname_visible
+        an.x = self.modelname_x_model
 
-    def an_system_run_buttons(self):
+    def an_menu_buttons(self):
         '''
-        function to initialize the run buttons |n|
-        called by run(), if animation is True. |n|
+        function to initialize the menu buttons |n|
         may be overridden to change the standard behaviour.
         '''
-        self.set_start_animation()
-        for ob in self.menu_objects[:]:
-            ob.remove()
-        uio = AnimateButton(x=35, y=self.height - 21, text='Menu',
-          width=50, action=self.env.an_pause, env=self, fillcolor='blue', color='white')
-        self.menu_objects.append(uio)
+        self.remove_topleft_buttons()
+        uio = AnimateButton(x=35, y=-21, text='Menu',
+          width=50, action=self.env.an_menu, env=self, fillcolor='blue', color='white', xy_anchor='nw')
+        uio.in_topleft = True
 
-    def an_system_unsynced_buttons(self):
+    def an_unsynced_buttons(self):
         '''
         function to initialize the unsynced buttons |n|
         may be overridden to change the standard behaviour.
         '''
-        for ob in self.menu_objects[:]:
-            ob.remove()
+        self.remove_topleft_buttons()
+        uio = AnimateButton(x=35, y=-21, text='Go',
+          width=50, action=self.env.an_go, env=self, fillcolor='green', color='white', xy_anchor='nw')
+        uio.in_topleft = True
 
-        uio = AnimateButton(x=35, y=self.height - 21, text='Go',
-          width=50, action=self.env.an_go, env=self, fillcolor='green', color='white')
-        self.menu_objects.append(uio)
+        uio = AnimateButton(x=35 + 1 * 60, y=-21, text='Step',
+          width=50, action=self.env.an_step, env=self, xy_anchor='nw')
+        uio.in_topleft = True
 
-        uio = AnimateButton(x=35 + 1 * 60, y=self.height - 21, text='Step',
-          width=50, action=self.env.an_step, env=self)
-        self.menu_objects.append(uio)
+        uio = AnimateButton(x=35 + 3 * 60, y=-21, text='Synced',
+          width=50, action=self.env.an_synced_on, env=self, xy_anchor='nw')
+        uio.in_topleft = True
 
-        uio = AnimateButton(x=35 + 3 * 60, y=self.height - 21, text='Synced',
-          width=50, action=self.env.an_synced_on, env=self)
-        self.menu_objects.append(uio)
+        uio = AnimateButton(x=35 + 4 * 60, y=-21, text='Trace',
+          width=50, action=self.env.an_trace, env=self, xy_anchor='nw')
+        uio.in_topleft = True
 
-        uio = AnimateButton(x=35 + 4 * 60, y=self.height - 21, text='Trace',
-          width=50, action=self.env.an_trace, env=self)
-        self.menu_objects.append(uio)
+        uio = AnimateButton(x=35 + 5 * 60, y=-21, text='Stop',
+          width=50, action=self.env.quit, env=self, fillcolor='red', color='white', xy_anchor='nw')
+        uio.in_topleft = True
 
-        uio = AnimateButton(x=35 + 5 * 60, y=self.height - 21, text='Stop',
-          width=50, action=self.env.an_stop, env=self, fillcolor='red', color='white')
-        self.menu_objects.append(uio)
-
-        uio = Animate(x0=35 + 3 * 60, y0=self.height - 35, text='',
-          textcolor0='fg', anchor='N', fontsize0=15,
-          screen_coordinates=True)
+        uio = Animate(x0=35 + 3 * 60, y0=-35, text='',
+          anchor='N', fontsize0=15,
+          screen_coordinates=True, xy_anchor='nw')
         uio.text = self.syncedtext
-        self.menu_objects.append(uio)
+        uio.in_topleft = True
 
-        uio = Animate(x0=35 + 4 * 60, y0=self.height - 35, text='',
-          textcolor0=colorspec_to_tuple('fg'), anchor='N', fontsize0=15,
-          screen_coordinates=True)
+        uio = Animate(x0=35 + 4 * 60, y0=-35, text='',
+          anchor='N', fontsize0=15,
+          screen_coordinates=True, xy_anchor='nw')
         uio.text = self.tracetext
-        self.menu_objects.append(uio)
+        uio.in_topleft = True
 
-    def an_system_synced_buttons(self):
+    def an_synced_buttons(self):
         '''
         function to initialize the synced buttons |n|
         may be overridden to change the standard behaviour.
         '''
-        for ob in self.menu_objects[:]:
-            ob.remove()
+        self.remove_topleft_buttons()
+        uio = AnimateButton(x=35, y=-21, text='Go',
+          width=50, action=self.env.an_go, env=self, fillcolor='green', color='white', xy_anchor='nw')
+        uio.in_topleft = True
 
-        uio = AnimateButton(x=35, y=self.height - 21, text='Go',
-          width=50, action=self.env.an_go, env=self, fillcolor='green', color='white')
-        self.menu_objects.append(uio)
+        uio = AnimateButton(x=35 + 1 * 60, y=-21, text='/2',
+          width=50, action=self.env.an_half, env=self, xy_anchor='nw')
+        uio.in_topleft = True
 
-        uio = AnimateButton(x=35 + 1 * 60, y=self.height - 21, text='/2',
-          width=50, action=self.env.an_half, env=self)
-        self.menu_objects.append(uio)
+        uio = AnimateButton(x=35 + 2 * 60, y=-21, text='*2',
+          width=50, action=self.env.an_double, env=self, xy_anchor='nw')
+        uio.in_topleft = True
 
-        uio = AnimateButton(x=35 + 2 * 60, y=self.height - 21, text='*2',
-          width=50, action=self.env.an_double, env=self)
-        self.menu_objects.append(uio)
+        uio = AnimateButton(x=35 + 3 * 60, y=-21, text='Synced',
+          width=50, action=self.env.an_synced_off, env=self, xy_anchor='nw')
+        uio.in_topleft = True
 
-        uio = AnimateButton(x=35 + 3 * 60, y=self.height - 21, text='Synced',
-          width=50, action=self.env.an_synced_off, env=self)
-        self.menu_objects.append(uio)
+        uio = AnimateButton(x=35 + 4 * 60, y=-21, text='Trace',
+          width=50, action=self.env.an_trace, env=self, xy_anchor='nw')
+        uio.in_topleft = True
 
-        uio = AnimateButton(x=35 + 4 * 60, y=self.height - 21, text='Trace',
-          width=50, action=self.env.an_trace, env=self)
-        self.menu_objects.append(uio)
+        uio = AnimateButton(x=35 + 5 * 60, y=-21, text='Stop',
+          width=50, action=self.env.an_quit, env=self, fillcolor='red', color='white', xy_anchor='nw')
+        uio.in_topleft = True
 
-        uio = AnimateButton(x=35 + 5 * 60, y=self.height - 21, text='Stop',
-          width=50, action=self.env.an_stop, env=self, fillcolor='red', color='white')
-        self.menu_objects.append(uio)
-
-        uio = Animate(x0=35 + 1.5 * 60, y0=self.height - 35, text='',
+        uio = Animate(x0=35 + 1.5 * 60, y0=-35, text='',
           textcolor0='fg', anchor='N', fontsize0=15,
-          screen_coordinates=True)
+          screen_coordinates=True, xy_anchor='nw')
         uio.text = self.speedtext
-        self.menu_objects.append(uio)
+        uio.in_topleft = True
 
-        uio = Animate(x0=35 + 3 * 60, y0=self.height - 35, text='',
-          textcolor0='fg', anchor='N', fontsize0=15,
-          screen_coordinates=True)
+        uio = Animate(x0=35 + 3 * 60, y0=-35, text='',
+          anchor='N', fontsize0=15,
+          screen_coordinates=True, xy_anchor='nw')
         uio.text = self.syncedtext
-        self.menu_objects.append(uio)
+        uio.in_topleft = True
 
-        uio = Animate(x0=35 + 4 * 60, y0=self.height - 35, text='',
-          textcolor0='fg', anchor='N', fontsize0=15,
-          screen_coordinates=True)
+        uio = Animate(x0=35 + 4 * 60, y0=-35, text='',
+          anchor='N', fontsize0=15,
+          screen_coordinates=True, xy_anchor='nw')
         uio.text = self.tracetext
-        self.menu_objects.append(uio)
+        uio.in_topleft = True
 
-    def an_system_clocktext(self):
+    def remove_topleft_buttons(self):
+        for uio in self.ui_objects[:]:
+            if getattr(uio, 'in_topleft', False):
+                uio.remove()
+
+        for ao in self.an_objects[:]:
+            if getattr(ao, 'in_topleft', False):
+                ao.remove()
+
+    def an_clocktext(self):
         '''
         function to initialize the system clocktext |n|
         called by run(), if animation is True. |n|
         may be overridden to change the standard behaviour.
         '''
-        ao = Animate(x0=self.width, y0=self.height - 5, textcolor0='fg',
-                     text='', fontsize0=15, font='narrow', anchor='ne',
-                     screen_coordinates=True, env=self)
-        self.system_an_objects.append(ao)
+        ao = Animate(x0=0, y0=-5, textcolor0='fg',
+            text='', fontsize0=15, font='narrow', anchor='ne',
+            screen_coordinates=True, xy_anchor='ne', env=self)
         ao.text = self.clocktext
 
-    def an_quit(self):
-        global an_env
-        self.running = False
-
-        for ao in self.system_an_objects:
-            ao.remove()
-
-        for uio in self.ui_objects:
-            if uio.type == 'slider':
-                uio._v = uio.v
-            uio.installed = False
-
-        if not Pythonista:
-            self.root.destroy()
-        an_env = None
-
     def an_half(self):
-        self.speed /= 2
+        self._speed /= 2
 
     def an_double(self):
-        self.speed *= 2
+        self._speed *= 2
 
     def an_go(self):
         self.paused = False
@@ -3373,37 +3670,47 @@ class Environment(object):
             self.set_start_animation()
         else:
             self._step_pressed = True  # force to next event
-        self.an_system_run_buttons()
+        self.an_menu_buttons()
 
-    def an_stop(self):
-        self.an_quit()
+    def an_quit(self):
+        self._animate = False
+        self.running = False
         self.stopped = True
+        self.quit()
+
+    def quit(self):
+        if g.animation_env is not None:
+            g.animation_env.animation_parameters(animate=False, video='')  # stop animation
+        if Pythonista:
+            if g.animation_scene is not None:
+                g.animation_scene.view.close()
+        quit()
 
     def an_trace(self):
         self._trace = not self._trace
 
     def an_synced_on(self):
         self._synced = True
-        self.an_system_synced_buttons()
+        self.an_synced_buttons()
 
     def an_synced_off(self):
         self._synced = False
-        self.an_system_unsynced_buttons()
+        self.an_unsynced_buttons()
 
     def an_step(self):
         self._step_pressed = True
 
-    def an_pause(self):
+    def an_menu(self):
         self.paused = True
         self.set_start_animation()
         if self._synced:
-            self.an_system_synced_buttons()
+            self.an_synced_buttons()
         else:
-            self.an_system_unsynced_buttons()
+            self.an_unsynced_buttons()
 
     def clocktext(self, t):
         s = ''
-        if self._synced and (not self.paused) and self.show_fps:
+        if self._synced and (not self.paused) and self._show_fps:
             if len(self.frametimes) >= 2:
                 fps = (len(self.frametimes) - 1) / \
                     (self.frametimes[-1] - self.frametimes[0])
@@ -3411,7 +3718,7 @@ class Environment(object):
                 fps = 0
             s += 'fps={:.1f}'.format(fps)
 
-        if self.show_time:
+        if self._show_time:
             if s != '':
                 s += ' '
             s += 't={:.3f}'.format(t - self.env._offset)
@@ -3430,17 +3737,195 @@ class Environment(object):
             return '= off'
 
     def speedtext(self, t):
-        return 'speed = {:.3f}'.format(self.speed)
+        return 'speed = {:.3f}'.format(self._speed)
 
     def set_start_animation(self):
         self.frametimes = collections.deque(maxlen=30)
         self.start_animation_time = self.t
         self.start_animation_clocktime = time.time()
 
+    def xy_anchor_to_x(self, xy_anchor, screen_coordinates):
+        if xy_anchor in ('nw', 'w', 'sw'):
+            if screen_coordinates:
+                return 0
+            else:
+                return self._x0
+
+        if xy_anchor in ('n', 'c', 'center', 's'):
+            if screen_coordinates:
+                return self._width / 2
+            else:
+                return (self._x0 + self._x1) / 2
+
+        if xy_anchor in ('ne', 'e', 'se', ''):
+            if screen_coordinates:
+                return self._width
+            else:
+                return self._x1
+
+        raise SalabimError('incorrect xy_anchor', xy_anchor)
+
+    def xy_anchor_to_y(self, xy_anchor, screen_coordinates):
+        if xy_anchor in ('nw', 'n', 'ne'):
+            if screen_coordinates:
+                return self._height
+            else:
+                return self._y1
+
+        if xy_anchor in ('w', 'c', 'center', 'e'):
+            if screen_coordinates:
+                return self._height / 2
+            else:
+                return (self._y0 + self._y1) / 2
+
+        if xy_anchor in ('sw', 's', 'se', ''):
+            if screen_coordinates:
+                return 0
+            else:
+                return self._y0
+
+        raise SalabimError('incorrect xy_anchor', xy_anchor)
+
+    def salabim_logo(self):
+        if self.is_dark('bg'):
+            return salabim_logo_red_white_200()
+        else:
+            return salabim_logo_red_black_200()
+
+    def colorspec_to_tuple(self, colorspec):
+        '''
+        translates a colorspec to a tuple
+
+        Parameters
+        ----------
+        colorspec: tuple, list or str
+            #rrggbb ==> alpha =255 (rr, gg, bb in hex) |n|
+            #rrggbbaa ==> alpha = aa (rr, gg, bb, aa in hex) |n|
+            colorname ==> alpha = 255 |n|
+            (colorname, alpha) |n|
+            (r, g, b) ==> alpha = 255 |n|
+            (r, g, b, alpha) |n|
+            if tuple of list: |n|
+            'fg' ==> foreground_color |n|
+            'bg' ==> background_color
+
+        Returns
+        -------
+        (r, g, b, a)
+        '''
+        if colorspec == 'fg':
+            colorspec = self._foreground_color
+        elif colorspec == 'bg':
+            colorspec = self._background_color
+        if isinstance(colorspec, (tuple, list)):
+            if len(colorspec) == 2:
+                c = self.colorspec_to_tuple(colorspec[0])
+                return (c[0], c[1], c[2], colorspec[1])
+            elif len(colorspec) == 3:
+                return (colorspec[0], colorspec[1], colorspec[2], 255)
+            elif len(colorspec) == 4:
+                return colorspec
+        else:
+            if (colorspec != '') and (colorspec[0]) == '#':
+                if len(colorspec) == 7:
+                    return (int(colorspec[1:3], 16), int(colorspec[3:5], 16),
+                            int(colorspec[5:7], 16))
+                elif len(colorspec) == 9:
+                    return (int(colorspec[1:3], 16), int(colorspec[3:5], 16),
+                            int(colorspec[5:7], 16), int(colorspec[7:9], 16))
+            else:
+                s = colorspec.split('#')
+                if len(s) == 2:
+                    alpha = s[1]
+                    colorspec = s[0]
+                else:
+                    alpha = 'FF'
+                try:
+                    colorhex = colornames()[colorspec.replace(' ', '').lower()]
+                    if len(colorhex) == 7:
+                        colorhex = colorhex + alpha
+                    return self.colorspec_to_tuple(colorhex)
+                except:
+                    pass
+
+        raise SalabimError('wrong color specification: ' + str(colorspec))
+
+    def colorinterpolate(self, t, t0, t1, v0, v1):
+        '''
+        does linear interpolation of colorspecs
+
+        Parameters
+        ----------
+        t : float
+            value to be interpolated from
+
+        t0: float
+            f(t0)=v0
+
+        t1: float
+            f(t1)=v1
+
+        v0: colorspec
+            f(t0)=v0
+
+        v1: colorspec
+            f(t1)=v1
+
+        Returns
+        -------
+        linear interpolation between v0 and v1 based on t between t0 and t : colorspec
+
+        Note
+        ----
+        Note that no extrapolation is done, so if t<t0 ==> v0  and t>t1 ==> v1 |n|
+        This function is heavily used during animation
+        '''
+        if v0 == v1:
+            return v0
+        if t1 == inf:
+            return v0
+        if t0 == t1:
+            return v1
+        vt0 = self.colorspec_to_tuple(v0)
+        vt1 = self.colorspec_to_tuple(v1)
+        return tuple(int(c) for c in interpolate(t, t0, t1, vt0, vt1))
+
+    def colorspec_to_hex(self, colorspec, withalpha=True):
+        v = self.colorspec_to_tuple(colorspec)
+        if withalpha:
+            return '#{:02x}{:02x}{:02x}{:02x}'.\
+                format(int(v[0]), int(v[1]), int(v[2]), int(v[3]))
+        else:
+            return '#{:02x}{:02x}{:02x}'.\
+                format(int(v[0]), int(v[1]), int(v[2]))
+
+    def pythonistacolor(self, colorspec):
+        c = self.colorspec_to_tuple(colorspec)
+        return (c[0] / 255, c[1] / 255, c[2] / 255, c[3] / 255)
+
+    def is_dark(self, colorspec):
+        '''
+        Arguments
+        ---------
+        colorspec : colorspec
+            color to check
+
+        Returns
+        -------
+        True, if the color is dark (rather black than white) |n|
+        False, if the color is light (rather white than black
+        '''
+        rgb = self.colorspec_to_tuple(colorspec)
+        luma = ((0.299 * rgb[0]) + (0.587 * rgb[1]) + (0.114 * rgb[2])) / 255
+        if luma > 0.5:
+            return False
+        else:
+            return True
+
     def getwidth(self, text, font='', fontsize=20, screen_coordinates=False):
         if not screen_coordinates:
             fontsize = fontsize * self.scale
-        f = self.getfont(font, fontsize)
+        f, heightA = getfont(font, fontsize)
         if text == '':  # necessary because of bug in PIL >= 4.2.1
             thiswidth, thisheight = (0, 0)
         else:
@@ -3639,6 +4124,14 @@ class Animate(object):
         objects. |n|
         if True, screen_coordinates will be used instead.
 
+    xy_anchor : str
+        specifies where x and y (i.e. x0, y0, x1 and y1) are relative to |n|
+        possible values are (default: sw) |n|:
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se`` |n|
+        If '', the given coordimates are used untranslated
+
     t0 : float
         time of start of the animation (default: now)
 
@@ -3684,19 +4177,19 @@ class Animate(object):
         anchor position |n|
         specifies where to put images or texts relative to the anchor
         point |n|
-        possible values are (default: center) |n|:
+        possible values are (default: c) |n|:
         ``nw    n    ne`` |n|
-        ``w   center  e`` |n|
+        ``w     c     e`` |n|
         ``sw    s    se``
 
     linewidth0 : float
-        linewidth of the contour at time t0 (default 0 = no contour)
+        linewidth of the contour at time t0 (default 0 = no contour, 1 for lines)
 
     fillcolor0 : colorspec
         color of interior at time t0 (default foreground_color)
 
     linecolor0 : colorspec
-        color of the contour at time t0 (default foreground_color
+        color of the contour at time t0 (default foreground_color)
 
     textcolor0 : colorspec
         color of the text at time 0 (default foreground_color)
@@ -3777,8 +4270,7 @@ class Animate(object):
         - valid colorname
         - hexname
         - tuple (R,G,B) or (R,G,B,A)
-        - 'fg' for the foreground color
-        - 'bg' for the background color
+        - 'fg' or 'bg'
 
     colornames may contain an additional alpha, like ``red#7f``
     hexnames may be either 3 of 4 bytes long (RGB or RGBA)
@@ -3794,7 +4286,8 @@ class Animate(object):
     parent                  -         -         -         -         -         -
     layer                   -         -         -         -         -         -
     keep                    -         -         -         -         -         -
-    scree_coordinates       -         -         -         -         -         -
+    screen_coordinates      -         -         -         -         -         -
+    xy_anchor               -         -         -         -         -         -
     t0,t1                   -         -         -         -         -         -
     x0,x1                   -         -         -         -         -         -
     y0,y1                   -         -         -         -         -         -
@@ -3824,15 +4317,15 @@ class Animate(object):
                  t0=omitted, x0=0, y0=0, offsetx0=0, offsety0=0,
                  circle0=omitted, line0=omitted, polygon0=omitted, rectangle0=omitted,
                  image=omitted, text=omitted,
-                 font='', anchor='center',
-                 linewidth0=1, fillcolor0='fg', linecolor0='fg', textcolor0='fg',
+                 font='', anchor='c',
+                 linewidth0=omitted, fillcolor0='fg', linecolor0='fg', textcolor0='fg',
                  angle0=0, fontsize0=20, width0=omitted,
                  t1=omitted, x1=omitted, y1=omitted, offsetx1=omitted, offsety1=omitted,
                  circle1=omitted, line1=omitted, polygon1=omitted, rectangle1=omitted,
                  linewidth1=omitted, fillcolor1=omitted, linecolor1=omitted, textcolor1=omitted,
-                 angle1=omitted, fontsize1=omitted, width1=omitted, env=omitted):
+                 angle1=omitted, fontsize1=omitted, width1=omitted, xy_anchor='', env=omitted):
 
-        self.env = _default_env if env is omitted else env
+        self.env = g.default_env if env is omitted else env
         self._image_ident = None  # denotes no image yet
         self._image = None
         self._image_x = 0
@@ -3869,16 +4362,23 @@ class Animate(object):
 
         self.font0 = font
         self.anchor0 = anchor
+        self.xy_anchor0 = xy_anchor
 
         self.x0 = x0
         self.y0 = y0
         self.offsetx0 = offsetx0
         self.offsety0 = offsety0
 
-        self.fillcolor0 = check_colorspec(fillcolor0)
-        self.linecolor0 = check_colorspec(linecolor0)
-        self.textcolor0 = check_colorspec(textcolor0)
-        self.linewidth0 = linewidth0
+        self.fillcolor0 = fillcolor0
+        self.linecolor0 = linecolor0
+        self.textcolor0 = textcolor0
+        if linewidth0 is omitted:
+            if self.type == 'line':
+                self.linewidth0 = 1
+            else:
+                self.linewidth0 = 0
+        else:
+            self.linewidth0 = linewidth0
         self.angle0 = angle0
         self.fontsize0 = fontsize0
 
@@ -3894,11 +4394,11 @@ class Animate(object):
         self.offsetx1 = self.offsetx0 if offsetx1 is omitted else offsetx1
         self.offsety1 = self.offsety0 if offsety1 is omitted else offsety1
         self.fillcolor1 =\
-            self.fillcolor0 if fillcolor1 is omitted else check_colorspec(fillcolor1)
+            self.fillcolor0 if fillcolor1 is omitted else fillcolor1
         self.linecolor1 =\
-            self.linecolor0 if linecolor1 is omitted else check_colorspec(linecolor1)
+            self.linecolor0 if linecolor1 is omitted else linecolor1
         self.textcolor1 =\
-            self.textcolor0 if textcolor1 is omitted else check_colorspec(textcolor1)
+            self.textcolor0 if textcolor1 is omitted else textcolor1
         self.linewidth1 =\
             self.linewidth0 if linewidth1 is omitted else linewidth1
         self.angle1 = self.angle0 if angle1 is omitted else angle1
@@ -3919,7 +4419,7 @@ class Animate(object):
                t1=omitted, x1=omitted, y1=omitted, offsetx1=omitted, offsety1=omitted,
                circle1=omitted, line1=omitted, polygon1=omitted, rectangle1=omitted,
                linewidth1=omitted, fillcolor1=omitted, linecolor1=omitted, textcolor1=omitted,
-               angle1=omitted, fontsize1=omitted, width1=omitted):
+               angle1=omitted, fontsize1=omitted, width1=omitted, xy_anchor=omitted):
         '''
         updates an animation object
 
@@ -3984,9 +4484,9 @@ class Animate(object):
             anchor position |n|
             specifies where to put images or texts relative to the anchor
             point (default see below) |n|
-            possible values are (default: center) |n|:
+            possible values are (default: c) |n|:
             ``nw    n    ne`` |n|
-            ``w   center  e`` |n|
+            ``w     c     e`` |n|
             ``sw    s    se``
 
         linewidth0 : float
@@ -4102,11 +4602,11 @@ class Animate(object):
         self.offsety0 = self.offsety(t) if offsety0 is omitted else offsety0
 
         self.fillcolor0 =\
-            self.fillcolor(t) if fillcolor0 is omitted else check_colorspec(fillcolor0)
+            self.fillcolor(t) if fillcolor0 is omitted else fillcolor0
         self.linecolor0 =\
-            self.linecolor(t) if linecolor0 is omitted else check_colorspec(linecolor0)
+            self.linecolor(t) if linecolor0 is omitted else linecolor0
         self.textcolor0 =\
-            self.textcolor(t) if textcolor0 is omitted else check_colorspec(textcolor0)
+            self.textcolor(t) if textcolor0 is omitted else textcolor0
         self.linewidth0 =\
             self.linewidth(t) if linewidth0 is omitted else linewidth0
         self.angle0 = self.angle(t) if angle0 is omitted else angle0
@@ -4124,11 +4624,11 @@ class Animate(object):
         self.offsetx1 = self.offsetx0 if offsetx1 is omitted else offsetx1
         self.offsety1 = self.offsety0 if offsety1 is omitted else offsety1
         self.fillcolor1 =\
-            self.fillcolor0 if fillcolor1 is omitted else check_colorspec(fillcolor1)
+            self.fillcolor0 if fillcolor1 is omitted else fillcolor1
         self.linecolor1 =\
-            self.linecolor0 if linecolor1 is omitted else check_colorspec(linecolor1)
+            self.linecolor0 if linecolor1 is omitted else linecolor1
         self.textcolor1 =\
-            self.textcolor0 if textcolor1 is omitted else check_colorspec(textcolor1)
+            self.textcolor0 if textcolor1 is omitted else textcolor1
         self.linewidth1 =\
             self.linewidth0 if linewidth1 is omitted else linewidth1
         self.angle1 = self.angle0 if angle1 is omitted else angle1
@@ -4151,8 +4651,6 @@ class Animate(object):
         '''
         if self in self.env.ui_objects:
             self.env.ui_objects.remove(self)
-        if self in self.env.menu_objects:
-            self.env.menu_objects.remove(self)
         if self in self.env.an_objects:
             self.env.an_objects.remove(self)
 
@@ -4272,7 +4770,7 @@ class Animate(object):
         linecolor : colorspec
             default behaviour: linear interpolation between self.linecolor0 and self.linecolor1
         '''
-        return colorinterpolate((self.env._now if t is omitted else t),
+        return self.env.colorinterpolate((self.env._now if t is omitted else t),
                                 self.t0, self.t1, self.linecolor0, self.linecolor1)
 
     def fillcolor(self, t=omitted):
@@ -4289,7 +4787,7 @@ class Animate(object):
         fillcolor : colorspec
             default behaviour: linear interpolation between self.fillcolor0 and self.fillcolor1
         '''
-        return colorinterpolate((self.env._now if t is omitted else t),
+        return self.env.colorinterpolate((self.env._now if t is omitted else t),
                                 self.t0, self.t1, self.fillcolor0, self.fillcolor1)
 
     def circle(self, t=omitted):
@@ -4324,7 +4822,7 @@ class Animate(object):
         textcolor : colorspec
             default behaviour: linear interpolation between self.textcolor0 and self.textcolor1
         '''
-        return colorinterpolate((self.env._now if t is omitted else t),
+        return self.env.colorinterpolate((self.env._now if t is omitted else t),
                                 self.t0, self.t1, self.textcolor0, self.textcolor1)
 
     def line(self, t=omitted):
@@ -4481,6 +4979,22 @@ class Animate(object):
         '''
         return self.font0
 
+    def xy_anchor(self, t=omitted):
+        '''
+        xy_anchor attribute of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        xy_anchor : str
+            default behaviour: self.xy_anchor0 (xy_anchor given at creation or update)
+        '''
+        return self.xy_anchor0
+
     def visible(self, t=omitted):
         '''
         visible attribute of an animate object. May be overridden.
@@ -4551,14 +5065,23 @@ class Animate(object):
 
             x = self.x(t)
             y = self.y(t)
+            xy_anchor = self.xy_anchor(t)
+            if xy_anchor:
+                x += self.env.xy_anchor_to_x(xy_anchor, screen_coordinates=self.screen_coordinates)
+                y += self.env.xy_anchor_to_y(xy_anchor, screen_coordinates=self.screen_coordinates)
+
             offsetx = self.offsetx(t)
             offsety = self.offsety(t)
             angle = self.angle(t)
 
             if (self.type == 'polygon') or (self.type == 'rectangle') or (self.type == 'line'):
-                linewidth = self.linewidth(t) * self.env.scale
-                linecolor = colorspec_to_tuple(self.linecolor(t))
-                fillcolor = colorspec_to_tuple(self.fillcolor(t))
+                if self.screen_coordinates:
+                    linewidth = self.linewidth(t)
+                else:
+                    linewidth = self.linewidth(t) * self.env.scale
+
+                linecolor = self.env.colorspec_to_tuple(self.linecolor(t))
+                fillcolor = self.env.colorspec_to_tuple(self.fillcolor(t))
 
                 cosa = math.cos(angle * math.pi / 180)
                 sina = math.sin(angle * math.pi / 180)
@@ -4583,8 +5106,8 @@ class Animate(object):
                     qx = x
                     qy = y
                 else:
-                    qx = (x - self.env.x0) * self.env.scale
-                    qy = (y - self.env.y0) * self.env.scale
+                    qx = (x - self.env._x0) * self.env.scale
+                    qy = (y - self.env._y0) * self.env.scale
 
                 r = []
                 minrx = inf
@@ -4635,9 +5158,12 @@ class Animate(object):
                     (offsetx * sina + offsety * cosa)
 
             elif self.type == 'circle':
-                linewidth = self.linewidth(t) * self.env.scale
-                fillcolor = colorspec_to_tuple(self.fillcolor(t))
-                linecolor = colorspec_to_tuple(self.linecolor(t))
+                if self.screen_coordinates:
+                    linewidth = self.linewidth(t)
+                else:
+                    linewidth = self.linewidth(t) * self.env.scale
+                fillcolor = self.env.colorspec_to_tuple(self.fillcolor(t))
+                linecolor = self.env.colorspec_to_tuple(self.linecolor(t))
                 circle = self.circle(t)
                 radius = circle[0]
 
@@ -4645,8 +5171,8 @@ class Animate(object):
                     qx = x
                     qy = y
                 else:
-                    qx = (x - self.env.x0) * self.env.scale
-                    qy = (y - self.env.y0) * self.env.scale
+                    qx = (x - self.env._x0) * self.env.scale
+                    qy = (y - self.env._y0) * self.env.scale
                     linewidth *= self.env.scale
                     radius *= self.env.scale
 
@@ -4699,10 +5225,11 @@ class Animate(object):
                     qx = x
                     qy = y
                 else:
-                    qx = (x - self.env.x0) * self.env.scale
-                    qy = (y - self.env.y0) * self.env.scale
+                    qx = (x - self.env._x0) * self.env.scale
+                    qy = (y - self.env._y0) * self.env.scale
                     offsetx = offsetx * self.env.scale
                     offsety = offsety * self.env.scale
+                    width = width * self.env.scale
 
                 self._image_ident = (image, width, height, angle)
                 if self._image_ident != self._image_ident_prev:
@@ -4721,6 +5248,7 @@ class Animate(object):
                     'nw': (0.5, -0.5),
                     'e': (-0.5, 0),
                     'center': (0, 0),
+                    'c': (0, 0),
                     'w': (0.5, 0),
                     'se': (-0.5, 0.5),
                     's': (0, 0.5),
@@ -4738,7 +5266,7 @@ class Animate(object):
                 self._image_y = qy + ey - imrheight / 2
 
             elif self.type == 'text':
-                textcolor = colorspec_to_tuple(self.textcolor(t))
+                textcolor = self.env.colorspec_to_tuple(self.textcolor(t))
                 fontsize = self.fontsize(t)
                 angle = self.angle(t)
                 anchor = self.anchor(t)
@@ -4749,8 +5277,8 @@ class Animate(object):
                     qx = x
                     qy = y
                 else:
-                    qx = (x - self.env.x0) * self.env.scale
-                    qy = (y - self.env.y0) * self.env.scale
+                    qx = (x - self.env._x0) * self.env.scale
+                    qy = (y - self.env._y0) * self.env.scale
                     fontsize = fontsize * self.env.scale
                     offsetx = offsetx * self.env.scale
                     offsety = offsety * self.env.scale
@@ -4758,7 +5286,7 @@ class Animate(object):
                 self._image_ident = (
                     text, fontname, fontsize, angle, textcolor)
                 if self._image_ident != self._image_ident_prev:
-                    font = getfont(fontname, fontsize)
+                    font, heightA = getfont(fontname, fontsize)
                     if text == '':  # this code is a workaround for a bug in PIL >= 4.2.1
                         im = Image.new(
                             'RGBA', (0, 0), (0, 0, 0, 0))
@@ -4782,23 +5310,25 @@ class Animate(object):
                         # end of code to correct bug
 
                     self.imwidth, self.imheight = im.size
+                    self.heightA = heightA
 
                     self._image = im.rotate(angle, expand=1)
 
                 anchor_to_dis = {
-                    'ne': (-0.5, -0.5),
-                    'n': (0, -0.5),
-                    'nw': (0.5, -0.5),
-                    'e': (-0.5, 0),
-                    'center': (0, 0),
-                    'w': (0.5, 0),
-                    'se': (-0.5, 0.5),
-                    's': (0, 0.5),
-                    'sw': (0.5, 0.5)}
+                    'ne': (-0.5, 0),
+                    'n': (0, 0),
+                    'nw': (0.5, 0),
+                    'e': (-0.5, 0.5),
+                    'center': (0, 0.5),
+                    'c': (0, 0.5),
+                    'w': (0.5, 0.5),
+                    'se': (-0.5, 1),
+                    's': (0, 1),
+                    'sw': (0.5, 1)}
 
                 dx, dy = anchor_to_dis[anchor.lower()]
                 dx = dx * self.imwidth + offsetx
-                dy = dy * self.imheight + offsety
+                dy = -0.5 * self.imheight + dy * self.heightA + offsety
                 cosa = math.cos(angle * math.pi / 180)
                 sina = math.sin(angle * math.pi / 180)
                 ex = dx * cosa - dy * sina
@@ -4870,6 +5400,17 @@ class AnimateButton(object):
         executed when the button is pressed (default None)
         the function should have no arguments |n|
 
+    xy_anchor : str
+        specifies where x and y are relative to |n|
+        possible values are (default: sw) |n|:
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
+
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
+
     Note
     ----
     On CPython/PyPy platforms, the tkinter functionality is used.
@@ -4879,9 +5420,9 @@ class AnimateButton(object):
     def __init__(self, x=0, y=0, width=80, height=30,
                  linewidth=0, fillcolor='fg',
                  linecolor='fg', color='bg', text='', font='',
-                 fontsize=15, action=None, env=omitted):
+                 fontsize=15, action=None, env=omitted, xy_anchor='sw'):
 
-        self.env = _default_env if env is omitted else env
+        self.env = g.default_env if env is omitted else env
         self.type = 'button'
         self.t0 = -inf
         self.t1 = inf
@@ -4894,15 +5435,16 @@ class AnimateButton(object):
         self.y = y - height / 2
         self.width = width
         self.height = height
-        self.fillcolor = check_colorspec(fillcolor)
-        self.linecolor = check_colorspec(linecolor)
-        self.color = check_colorspec(color)
+        self.fillcolor = self.env.colorspec_to_tuple(fillcolor)
+        self.linecolor = self.env.colorspec_to_tuple(linecolor)
+        self.color = self.env.colorspec_to_tuple(color)
         self.linewidth = linewidth
         self.font = font
         self.fontsize = fontsize
         self.text0 = text
         self.lasttext = '*'
         self.action = action
+        self.xy_anchor = xy_anchor
 
         self.env.ui_objects.append(self)
         self.installed = False
@@ -4911,15 +5453,18 @@ class AnimateButton(object):
         return self.text0
 
     def install(self):
+        x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
+        y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
+
         self.button = tkinter.Button(
             self.env.root, text=self.lasttext, command=self.action, anchor=tkinter.CENTER)
         self.button.configure(
             width=int(2.2 * self.width / self.fontsize),
-            foreground=colorspec_to_hex(self.color, False),
-            background=colorspec_to_hex(self.fillcolor, False),
+            foreground=self.env.colorspec_to_hex(self.color, False),
+            background=self.env.colorspec_to_hex(self.fillcolor, False),
             relief=tkinter.FLAT)
-        self.button_window = self.env.canvas.create_window(
-            self.x + self.width, self.env.height - self.y - self.height,
+        self.button_window = g.canvas.create_window(
+            x + self.width, self.env._height - y - self.height,
             anchor=tkinter.NE, window=self.button)
         self.installed = True
 
@@ -4931,10 +5476,10 @@ class AnimateButton(object):
         '''
         if self in self.env.ui_objects:
             self.env.ui_objects.remove(self)
-        if self in self.env.menu_objects:
-            self.env.menu_objects.remove(self)
-        if not Pythonista:
-            self.button.destroy()
+        if self.installed:
+            if not Pythonista:
+                self.button.destroy()
+            self.installed = False
 
 
 class AnimateSlider(object):
@@ -4994,6 +5539,17 @@ class AnimateSlider(object):
          the function should one arguments, being the new value |n|
          if None (default), no action
 
+    xy_anchor : str
+        specifies where x and y are relative to |n|
+        possible values are (default: sw) |n|:
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
+
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
+
     Note
     ----
     The current value of the slider is the v attibute of the slider. |n|
@@ -5004,9 +5560,9 @@ class AnimateSlider(object):
     def __init__(self, layer=0, x=0, y=0, width=100, height=20,
                  vmin=0, vmax=10, v=omitted, resolution=1,
                  linecolor='fg', labelcolor='fg', label='',
-                 font='', fontsize=12, action=None, env=omitted):
+                 font='', fontsize=12, action=None, xy_anchor='sw', env=omitted):
 
-        self.env = _default_env if env is omitted else env
+        self.env = g.default_env if env is omitted else env
         n = round((vmax - vmin) / resolution) + 1
         self.vmin = vmin
         self.vmax = vmin + (n - 1) * resolution
@@ -5026,13 +5582,14 @@ class AnimateSlider(object):
         self.y = y - height / 2
         self.width = width
         self.height = height
-        self.linecolor = check_colorspec(linecolor)
-        self.labelcolor = check_colorspec(labelcolor)
+        self.linecolor = self.env.colorspec_to_tuple(linecolor)
+        self.labelcolor = self.env.colorspec_to_tuple(labelcolor)
         self.font = font
         self.fontsize = fontsize
         self.label = label
         self.action = action
         self.installed = False
+        self.xy_anchor = xy_anchor
 
         if Pythonista:
             self.y = self.y - height * 1.5
@@ -5057,7 +5614,7 @@ class AnimateSlider(object):
             if Pythonista:
                 self._v = value
             else:
-                if an_env == self.env:
+                if self._animate:
                     self.slider.set(value)
                 else:
                     self._v = value
@@ -5065,12 +5622,14 @@ class AnimateSlider(object):
         if Pythonista:
             return self._v
         else:
-            if an_env == self.env:
+            if self._animate:
                 return self.slider.get()
             else:
                 return self._v
 
     def install(self):
+        x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
+        y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
         self.slider = tkinter.Scale(
             self.env.root,
             from_=self.vmin, to=self.vmax,
@@ -5078,14 +5637,14 @@ class AnimateSlider(object):
             label=self.label,
             resolution=self.resolution,
             command=self.action)
-        self.slider.window = self.env.canvas.create_window(
-            self.x, self.env.height - self.y,
+        self.slider.window = g.canvas.create_window(
+            x, self.env._height - y,
             anchor=tkinter.NW, window=self.slider)
         self.slider.config(
             font=(self.font, int(self.fontsize * 0.8)),
-            foreground=colorspec_to_hex('fg', False),
-            background=colorspec_to_hex('bg', False),
-            highlightbackground=colorspec_to_hex('bg', False))
+            foreground=self.env.colorspec_to_hex('fg', False),
+            background=self.env.colorspec_to_hex('bg', False),
+            highlightbackground=self.env.colorspec_to_hex('bg', False))
         self.slider.set(self._v)
         self.installed = True
 
@@ -5097,10 +5656,10 @@ class AnimateSlider(object):
         '''
         if self in self.env.ui_objects:
             self.env.ui_objects.remove(self)
-        if self in self.env.menu_objects:
-            self.env.menu_objects.remove(self)
-        if not Pythonista:
-            self.slider.destroy()
+        if self.installed:
+            if not Pythonista:
+                self.button.quit()
+            self.installed = False
 
 
 class Component(object):
@@ -5166,13 +5725,13 @@ class Component(object):
 
     env : Environment
         environment where the component is defined |n|
-        if omitted, _default_env will be used
+        if omitted, default_env will be used
     '''
 
     def __init__(self, name=omitted, at=omitted, delay=omitted, urgent=omitted,
       process=omitted, suppress_trace=False, suppress_pause_at_step=False, mode=None, env=omitted, **kwargs):
         if env is omitted:
-            self.env = _default_env
+            self.env = g.default_env
         else:
             self.env = env
         _set_name(name, self.env._nameserializeComponent, self)
@@ -5259,7 +5818,7 @@ class Component(object):
 
     def animation_objects(self, q):
         '''
-        defines how to display a component when animating a queue
+        defines how to display a component when animate a queue
 
         Parameters
         ----------
@@ -5282,8 +5841,8 @@ class Component(object):
         '''
         size_x = 50
         size_y = 50
-        ao1 = Animate(rectangle0=(-20, -20, 20, 20), linewidth0=0, fillcolor0='fg')
-        ao2 = Animate(text=str(self.sequence_number()), textcolor0='bg', anchor='center')
+        ao1 = Animate(rectangle0=(-20, -20, 20, 20), linewidth0=0, fillcolor0=self.env._foreground_color)
+        ao2 = Animate(text=str(self.sequence_number()), textcolor0=self.env._background_color, anchor='c')
         return (size_x, size_y, ao1, ao2)
 
     def _remove_from_aos(self, q):
@@ -5653,10 +6212,9 @@ class Component(object):
             self.env.print_trace('', '', 'cancel ' +
                 self.name() + ' ' + _modetxt(self._mode))
         self._status = data
-        if an_env == self.env:
-            for ao in self.env.an_objects[:]:
-                if ao.parent == self:
-                    self.env.an_objects.remove(ao)
+        for ao in self.env.an_objects[:]:
+            if ao.parent == self:
+                self.env.an_objects.remove(ao)
 
     def standby(self, mode=omitted):
         '''
@@ -7236,6 +7794,77 @@ class Constant(_Distribution):
         return self._mean
 
 
+class Poisson(_Distribution):
+    '''
+    Poisson distribution
+
+    Parameters
+    ----------
+    lambda_: float
+        lambda of the distribution
+
+    randomstream: randomstream
+        randomstream to be used |n|
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
+
+    Note
+    ----
+    The run time of this function increases when lambda_ increases. |n|
+    It is not recommended to use lambdas > 100
+    '''
+
+    def __init__(self, lambda_, randomstream=omitted):
+        self._lambda_ = lambda_
+        if lambda_ <= 0:
+            raise SalabimError('lambda_<=0')
+
+        if randomstream is omitted:
+            self.randomstream = random
+        else:
+            randomstream_check(randomstream)
+            self.randomstream = randomstream
+
+        self._mean = 1 / self._lambda_
+
+    def __repr__(self):
+        return 'Poisson'
+
+    def print_info(self):
+        print('Poissonl distribution ' + hex(id(self)))
+        print('  lambda' + str(self._lambda_))
+
+    def sample(self):
+        '''
+        Returns
+        -------
+        Sample of the distribution : int
+        '''
+        t = math.exp(- self._lambda_)
+        s = t
+        k = 0
+
+        u = self.randomstream.random()
+        last_s = inf
+        while s < u:
+            k += 1
+            t *= self._lambda_ / k
+            s += t
+            if last_s == s:  # avoid infinite loops
+                break
+            last_s = s
+        return k
+
+    def mean(self):
+        '''
+        Returns
+        -------
+        Mean of the distribution : float
+        '''
+        return self._mean
+
+
 class Weibull(_Distribution):
     '''
     weibull distribution
@@ -7762,9 +8391,9 @@ class Distribution(_Distribution):
     ----------
     spec : str
         - string containing a valid salabim distribution, where only the first
-          letters are relevant and casing is not important. Note that Erlang
-          and Cdf are the only distributions that require at least two letters
-          (Er) and (Cd)
+          letters are relevant and casing is not important. Note that Erlang,
+          Cdf and Poisson require at least two letters
+          (Er, Cd and Po)
         - string containing one float (c1), resulting in Constant(c1)
         - string containing two floats seperated by a comma (c1,c2),
           resulting in a Uniform(c1,c2)
@@ -7827,7 +8456,7 @@ class Distribution(_Distribution):
 
         else:
             for distype in ('Uniform', 'Constant', 'Triangular', 'Exponential', 'Normal',
-              'Cdf', 'Pdf', 'Weibull', 'Gamma', 'Erlang', 'Beta', 'IntUniform'):
+              'Cdf', 'Pdf', 'Weibull', 'Gamma', 'Erlang', 'Beta', 'IntUniform', 'Poisson'):
                 if pre == distype.upper()[:len(pre)]:
                     sp[0] = distype
                     spec = '('.join(sp)
@@ -7923,12 +8552,12 @@ class State(object):
 
     env : Environment
         environment to be used |n|
-        if omitted, _default_env is used
+        if omitted, default_env is used
     '''
     def __init__(self, name=omitted, value=False, type='any',
       monitor=True, animation_objects=omitted, env=omitted, *args, **kwargs):
         if env is omitted:
-            self.env = _default_env
+            self.env = g.default_env
         else:
             self.env = env
         _set_name(name, self.env._nameserializeState, self)
@@ -7992,11 +8621,11 @@ class State(object):
 
     def animation_objects(self, value):
         if str(value).lower() in colornames():
-            ao1 = Animate(rectangle0=(-20, -20, 20, 20), fillcolor0=check_colorspec(value), linewidth0=0)
+            ao1 = Animate(rectangle0=(-20, -20, 20, 20), fillcolor0=value, linewidth0=0)
             return (ao1,)
         else:
-            ao1 = Animate(rectangle0=(-20, -20, 20, 20), fillcolor0='fg', linewidth0=0)
-            ao2 = Animate(text=str(value), textcolor0='bg', anchor='center')
+            ao1 = Animate(rectangle0=(-20, -20, 20, 20), fillcolor0=self.env._foreground_color, linewidth0=0)
+            ao2 = Animate(text=str(value), textcolor0=self.env._background_color, anchor='c')
             return ao1, ao2
 
     def _animate_update(self):
@@ -8263,13 +8892,13 @@ class Resource(object):
 
     env : Environment
         environment to be used |n|
-        if omitted, _default_env is used
+        if omitted, default_env is used
     '''
 
     def __init__(self, name=omitted, capacity=1,
                  anonymous=False, monitor=True, env=omitted, *args, **kwargs):
         if env is omitted:
-            self.env = _default_env
+            self.env = g.default_env
         else:
             self.env = env
         self._capacity = capacity
@@ -8517,117 +9146,33 @@ class Resource(object):
 
 
 def colornames():
-    return {'': '#00000000', '10%gray': '#191919', '20%gray': '#333333',
-     '30%gray': '#464646', '40%gray': '#666666', '50%gray': '#7F7F7F',
-     '60%gray': '#999999', '70%gray': '#B2B2B2', '80%gray': '#CCCCCC',
-     '90%gray': '#E6E6E6', 'aliceblue': '#F0F8FF', 'antiquewhite': '#FAEBD7',
-     'aqua': '#00FFFF', 'aquamarine': '#7FFFD4', 'azure': '#F0FFFF',
-     'beige': '#F5F5DC', 'bisque': '#FFE4C4', 'black': '#000000',
-     'blanchedalmond': '#FFEBCD', 'blue': '#0000FF', 'blueviolet': '#8A2BE2',
-     'brown': '#A52A2A', 'burlywood': '#DEB887', 'cadetblue': '#5F9EA0',
-     'chartreuse': '#7FFF00', 'chocolate': '#D2691E', 'coral': '#FF7F50',
-     'cornflowerblue': '#6495ED', 'cornsilk': '#FFF8DC', 'crimson': '#DC143C',
-     'cyan': '#00FFFF', 'darkblue': '#00008B', 'darkcyan': '#008B8B',
-     'darkgoldenrod': '#B8860B', 'darkgray': '#A9A9A9',
-     'darkgreen': '#006400', 'darkkhaki': '#BDB76B', 'darkmagenta': '#8B008B',
-     'darkolivegreen': '#556B2F', 'darkorange': '#FF8C00',
-     'darkorchid': '#9932CC', 'darkred': '#8B0000', 'darksalmon': '#E9967A',
-     'darkseagreen': '#8FBC8F', 'darkslateblue': '#483D8B',
-     'darkslategray': '#2F4F4F', 'darkturquoise': '#00CED1',
-     'darkviolet': '#9400D3', 'deeppink': '#FF1493', 'deepskyblue': '#00BFFF',
-     'dimgray': '#696969', 'dodgerblue': '#1E90FF', 'firebrick': '#B22222',
-     'floralwhite': '#FFFAF0', 'forestgreen': '#228B22', 'fuchsia': '#FF00FF',
-     'gainsboro': '#DCDCDC', 'ghostwhite': '#F8F8FF', 'gold': '#FFD700',
-     'goldenrod': '#DAA520', 'gray': '#808080', 'green': '#008000',
-     'greenyellow': '#ADFF2F', 'honeydew': '#F0FFF0', 'hotpink': '#FF69B4',
-     'indianred': '#CD5C5C', 'indigo': '#4B0082', 'ivory': '#FFFFF0',
-     'khaki': '#F0E68C', 'lavender': '#E6E6FA', 'lavenderblush': '#FFF0F5',
-     'lawngreen': '#7CFC00', 'lemonchiffon': '#FFFACD',
-     'lightblue': '#ADD8E6', 'lightcoral': '#F08080', 'lightcyan': '#E0FFFF',
-     'lightgoldenrodyellow': '#FAFAD2', 'lightgray': '#D3D3D3',
-     'lightgreen': '#90EE90', 'lightpink': '#FFB6C1',
-     'lightsalmon': '#FFA07A', 'lightseagreen': '#20B2AA',
-     'lightskyblue': '#87CEFA', 'lightslategray': '#778899',
-     'lightsteelblue': '#B0C4DE', 'lightyellow': '#FFFFE0', 'lime': '#00FF00',
-     'limegreen': '#32CD32', 'linen': '#FAF0E6', 'magenta': '#FF00FF',
-     'maroon': '#800000', 'mediumaquamarine': '#66CDAA',
-     'mediumblue': '#0000CD', 'mediumorchid': '#BA55D3',
-     'mediumpurple': '#9370DB', 'mediumseagreen': '#3CB371',
-     'mediumslateblue': '#7B68EE', 'mediumspringgreen': '#00FA9A',
-     'mediumturquoise': '#48D1CC', 'mediumvioletred': '#C71585',
-     'midnightblue': '#191970', 'mintcream': '#F5FFFA',
-     'mistyrose': '#FFE4E1', 'moccasin': '#FFE4B5', 'navajowhite': '#FFDEAD',
-     'navy': '#000080', 'none': '#00000000', 'oldlace': '#FDF5E6',
-     'olive': '#808000', 'olivedrab': '#6B8E23', 'orange': '#FFA500',
-     'orangered': '#FF4500', 'orchid': '#DA70D6', 'palegoldenrod': '#EEE8AA',
-     'palegreen': '#98FB98', 'paleturquoise': '#AFEEEE',
-     'palevioletred': '#DB7093', 'papayawhip': '#FFEFD5',
-     'peachpuff': '#FFDAB9', 'peru': '#CD853F', 'pink': '#FFC0CB',
-     'plum': '#DDA0DD', 'powderblue': '#B0E0E6', 'purple': '#800080',
-     'red': '#FF0000', 'rosybrown': '#BC8F8F', 'royalblue': '#4169E1',
-     'saddlebrown': '#8B4513', 'salmon': '#FA8072', 'sandybrown': '#FAA460',
-     'seagreen': '#2E8B57', 'seashell': '#FFF5EE', 'sienna': '#A0522D',
-     'silver': '#C0C0C0', 'skyblue': '#87CEEB', 'slateblue': '#6A5ACD',
-     'slategray': '#708090', 'snow': '#FFFAFA', 'springgreen': '#00FF7F',
-     'steelblue': '#4682B4', 'tan': '#D2B48C', 'teal': '#008080',
-     'thistle': '#D8BFD8', 'tomato': '#FF6347', 'transparent': '#00000000',
-     'turquoise': '#40E0D0', 'violet': '#EE82EE', 'wheat': '#F5DEB3',
-     'white': '#FFFFFF', 'whitesmoke': '#F5F5F5', 'yellow': '#FFFF00',
-     'yellowgreen': '#9ACD32'}
+    if not hasattr(colornames, 'cached'):
+        colornames.cached = pickle.loads(b'(dp0\nVfuchsia\np1\nV#FF00FF\np2\nsV\np3\nV#00000000\np4\nsVtransparent\np5\ng4\nsVpalevioletred\np6\nV#DB7093\np7\nsVskyblue\np8\nV#87CEEB\np9\nsVpaleturquoise\np10\nV#AFEEEE\np11\nsVcadetblue\np12\nV#5F9EA0\np13\nsVorangered\np14\nV#FF4500\np15\nsVsteelblue\np16\nV#4682B4\np17\nsVdimgray\np18\nV#696969\np19\nsVdarkseagreen\np20\nV#8FBC8F\np21\nsV60%gray\np22\nV#999999\np23\nsVroyalblue\np24\nV#4169E1\np25\nsVmediumblue\np26\nV#0000CD\np27\nsVgoldenrod\np28\nV#DAA520\np29\nsVmediumvioletred\np30\nV#C71585\np31\nsVblueviolet\np32\nV#8A2BE2\np33\nsVgainsboro\np34\nV#DCDCDC\np35\nsVdarkred\np36\nV#8B0000\np37\nsVrosybrown\np38\nV#BC8F8F\np39\nsVgold\np40\nV#FFD700\np41\nsVcoral\np42\nV#FF7F50\np43\nsVwhite\np44\nV#FFFFFF\np45\nsVdarkcyan\np46\nV#008B8B\np47\nsVblack\np48\nV#000000\np49\nsVorchid\np50\nV#DA70D6\np51\nsVmediumturquoise\np52\nV#48D1CC\np53\nsVlightgreen\np54\nV#90EE90\np55\nsVlime\np56\nV#00FF00\np57\nsVpapayawhip\np58\nV#FFEFD5\np59\nsVchocolate\np60\nV#D2691E\np61\nsV40%gray\np62\nV#666666\np63\nsVoldlace\np64\nV#FDF5E6\np65\nsVdarkblue\np66\nV#00008B\np67\nsVsilver\np68\nV#C0C0C0\np69\nsVaquamarine\np70\nV#7FFFD4\np71\nsVlightcoral\np72\nV#F08080\np73\nsVcyan\np74\nV#00FFFF\np75\nsVdodgerblue\np76\nV#1E90FF\np77\nsV10%gray\np78\nV#191919\np79\nsVmidnightblue\np80\nV#191970\np81\nsVgreen\np82\nV#008000\np83\nsVlightsalmon\np84\nV#FFA07A\np85\nsVazure\np86\nV#F0FFFF\np87\nsVred\np88\nV#FF0000\np89\nsVlightpink\np90\nV#FFB6C1\np91\nsVwhitesmoke\np92\nV#F5F5F5\np93\nsVyellow\np94\nV#FFFF00\np95\nsVlawngreen\np96\nV#7CFC00\np97\nsVmagenta\np98\ng2\nsVlightsteelblue\np99\nV#B0C4DE\np100\nsVolivedrab\np101\nV#6B8E23\np102\nsVlightslategray\np103\nV#778899\np104\nsVslategray\np105\nV#708090\np106\nsVlightblue\np107\nV#ADD8E6\np108\nsVmoccasin\np109\nV#FFE4B5\np110\nsVmediumspringgreen\np111\nV#00FA9A\np112\nsVlightgray\np113\nV#D3D3D3\np114\nsVseashell\np115\nV#FFF5EE\np116\nsVdarkkhaki\np117\nV#BDB76B\np118\nsVslateblue\np119\nV#6A5ACD\np120\nsVaqua\np121\ng75\nsVpalegoldenrod\np122\nV#EEE8AA\np123\nsVdeeppink\np124\nV#FF1493\np125\nsVdarkgreen\np126\nV#006400\np127\nsVblanchedalmond\np128\nV#FFEBCD\np129\nsVturquoise\np130\nV#40E0D0\np131\nsVnavy\np132\nV#000080\np133\nsVtomato\np134\nV#FF6347\np135\nsVyellowgreen\np136\nV#9ACD32\np137\nsVpeachpuff\np138\nV#FFDAB9\np139\nsV30%gray\np140\nV#464646\np141\nsVpink\np142\nV#FFC0CB\np143\nsVpalegreen\np144\nV#98FB98\np145\nsVlightskyblue\np146\nV#87CEFA\np147\nsVchartreuse\np148\nV#7FFF00\np149\nsVmediumorchid\np150\nV#BA55D3\np151\nsVolive\np152\nV#808000\np153\nsVdarkorange\np154\nV#FF8C00\np155\nsVbeige\np156\nV#F5F5DC\np157\nsVforestgreen\np158\nV#228B22\np159\nsVmediumpurple\np160\nV#9370DB\np161\nsVmintcream\np162\nV#F5FFFA\np163\nsVhotpink\np164\nV#FF69B4\np165\nsVdarkgoldenrod\np166\nV#B8860B\np167\nsVpowderblue\np168\nV#B0E0E6\np169\nsVhoneydew\np170\nV#F0FFF0\np171\nsVsalmon\np172\nV#FA8072\np173\nsVsnow\np174\nV#FFFAFA\np175\nsVmistyrose\np176\nV#FFE4E1\np177\nsVkhaki\np178\nV#F0E68C\np179\nsVmediumaquamarine\np180\nV#66CDAA\np181\nsVdarksalmon\np182\nV#E9967A\np183\nsValiceblue\np184\nV#F0F8FF\np185\nsVdarkturquoise\np186\nV#00CED1\np187\nsVlightyellow\np188\nV#FFFFE0\np189\nsVwheat\np190\nV#F5DEB3\np191\nsVlightseagreen\np192\nV#20B2AA\np193\nsVlightcyan\np194\nV#E0FFFF\np195\nsVantiquewhite\np196\nV#FAEBD7\np197\nsVsaddlebrown\np198\nV#8B4513\np199\nsVmediumseagreen\np200\nV#3CB371\np201\nsV70%gray\np202\nV#B2B2B2\np203\nsVsienna\np204\nV#A0522D\np205\nsVcornflowerblue\np206\nV#6495ED\np207\nsVseagreen\np208\nV#2E8B57\np209\nsVfloralwhite\np210\nV#FFFAF0\np211\nsVivory\np212\nV#FFFFF0\np213\nsVcornsilk\np214\nV#FFF8DC\np215\nsVindianred\np216\nV#CD5C5C\np217\nsVplum\np218\nV#DDA0DD\np219\nsV90%gray\np220\nV#E6E6E6\np221\nsVgreenyellow\np222\nV#ADFF2F\np223\nsVteal\np224\nV#008080\np225\nsVbrown\np226\nV#A52A2A\np227\nsVdarkslategray\np228\nV#2F4F4F\np229\nsVpurple\np230\nV#800080\np231\nsVviolet\np232\nV#EE82EE\np233\nsVdeepskyblue\np234\nV#00BFFF\np235\nsVghostwhite\np236\nV#F8F8FF\np237\nsVburlywood\np238\nV#DEB887\np239\nsVblue\np240\nV#0000FF\np241\nsVcrimson\np242\nV#DC143C\np243\nsVindigo\np244\nV#4B0082\np245\nsV20%gray\np246\nV#333333\np247\nsVdarkmagenta\np248\nV#8B008B\np249\nsV80%gray\np250\nV#CCCCCC\np251\nsVlightgoldenrodyellow\np252\nV#FAFAD2\np253\nsVtan\np254\nV#D2B48C\np255\nsVlimegreen\np256\nV#32CD32\np257\nsVlemonchiffon\np258\nV#FFFACD\np259\nsVbisque\np260\nV#FFE4C4\np261\nsVfirebrick\np262\nV#B22222\np263\nsVnavajowhite\np264\nV#FFDEAD\np265\nsVnone\np266\ng4\nsVmaroon\np267\nV#800000\np268\nsV50%gray\np269\nV#7F7F7F\np270\nsVdarkgray\np271\nV#A9A9A9\np272\nsVorange\np273\nV#FFA500\np274\nsVlavenderblush\np275\nV#FFF0F5\np276\nsVdarkorchid\np277\nV#9932CC\np278\nsVlavender\np279\nV#E6E6FA\np280\nsVspringgreen\np281\nV#00FF7F\np282\nsVthistle\np283\nV#D8BFD8\np284\nsVlinen\np285\nV#FAF0E6\np286\nsVdarkolivegreen\np287\nV#556B2F\np288\nsVdarkslateblue\np289\nV#483D8B\np290\nsVgray\np291\nV#808080\np292\nsVdarkviolet\np293\nV#9400D3\np294\nsVperu\np295\nV#CD853F\np296\nsVsandybrown\np297\nV#FAA460\np298\nsVmediumslateblue\np299\nV#7B68EE\np300\ns.')  # NOQA
+    return colornames.cached
 
 
-def check_colorspec(colorspec):
-    if colorspec not in ('fg', 'bg'):  # do not check for fg and bg, because an_env might not be set yet
-        return colorspec_to_tuple(colorspec)  # will raise a SalabimError if incorrect
-    return colorspec
+def salabim_logo_red_white_200():
+    #  picture created from salabim logo red white 200.png
+    from PIL import Image
+    import io
+    import base64
+    if not hasattr(salabim_logo_red_white_200, 'cached'):
+        salabim_logo_red_white_200.cached = Image.open(io.BytesIO(base64.b64decode(''
+           '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'  # NOQA
+           ''.encode('ascii')))).convert('RGBA')
+    return salabim_logo_red_white_200.cached
 
 
-def colorspec_to_tuple(colorspec):
-    if colorspec == 'fg':
-        return colorspec_to_tuple(an_env.foreground_color)
-    if colorspec == 'bg':
-        return colorspec_to_tuple(an_env.background_color)
-    if isinstance(colorspec, (tuple, list)):
-        if len(colorspec) == 2:
-            c = colorspec_to_tuple(colorspec[0])
-            return (c[0], c[1], c[2], colorspec[1])
-        elif len(colorspec) == 3:
-            return (colorspec[0], colorspec[1], colorspec[2], 255)
-        elif len(colorspec) == 4:
-            return colorspec
-    else:
-        if (colorspec != '') and (colorspec[0]) == '#':
-            if len(colorspec) == 7:
-                return (int(colorspec[1:3], 16), int(colorspec[3:5], 16),
-                        int(colorspec[5:7], 16))
-            elif len(colorspec) == 9:
-                return (int(colorspec[1:3], 16), int(colorspec[3:5], 16),
-                        int(colorspec[5:7], 16), int(colorspec[7:9], 16))
-        else:
-            s = colorspec.split('#')
-            if len(s) == 2:
-                alpha = s[1]
-                colorspec = s[0]
-            else:
-                alpha = 'FF'
-            try:
-                colorhex = colornames()[colorspec.replace(' ', '').lower()]
-                if len(colorhex) == 7:
-                    colorhex = colorhex + alpha
-                return colorspec_to_tuple(colorhex)
-            except:
-                pass
-
-    raise SalabimError('wrong color specification: ' + str(colorspec))
-
-
-def contrast_color(colorspec):
-    rgb = colorspec_to_tuple(colorspec)
-    luma = ((0.299 * rgb[0]) + (0.587 * rgb[1]) + (0.114 * rgb[2])) / 255
-    if luma > 0.5:
-        return 'black'
-    else:
-        return 'white'
+def salabim_logo_red_black_200():
+    #  picture created from salabim logo red black 200.png
+    from PIL import Image
+    import io
+    import base64
+    if not hasattr(salabim_logo_red_black_200, 'cached'):
+        salabim_logo_red_black_200.cached = Image.open(io.BytesIO(base64.b64decode(''
+           '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'  # NOQA
+           ''.encode('ascii')))).convert('RGBA')
+    return salabim_logo_red_black_200.cached
 
 
 def hex_to_rgb(v):
@@ -8640,16 +9185,6 @@ def hex_to_rgb(v):
     if len(v) == 8:
         return int(v[:2], 16), int(v[2:4], 16), int(v[4:6], 16), int(v[6:8], 16)
     raise SalabimError('Incorrect value' + str(v))
-
-
-def colorspec_to_hex(colorspec, withalpha=True):
-    v = colorspec_to_tuple(colorspec)
-    if withalpha:
-        return '#{:02x}{:02x}{:02x}{:02x}'.\
-            format(int(v[0]), int(v[1]), int(v[2]), int(v[3]))
-    else:
-        return '#{:02x}{:02x}{:02x}'.\
-            format(int(v[0]), int(v[1]), int(v[2]))
 
 
 def spec_to_image(spec):
@@ -8680,44 +9215,8 @@ def spec_to_image(spec):
 
 def _i(p, v0, v1):
     if v0 == v1:
-        v = v0  # avoid rounding problems
-    v = (1 - p) * v0 + p * v1
-    return v
-
-
-def colorinterpolate(t, t0, t1, v0, v1):
-    '''
-    does linear interpolation of colorspecs
-
-    Parameters
-    ----------
-    t : float
-        value to be interpolated from
-
-    t0: float
-        f(t0)=v0
-
-    t1: float
-        f(t1)=v1
-
-    v0: colorspec
-        f(t0)=v0
-
-    v1: colorspec
-        f(t1)=v1
-
-    Returns
-    -------
-    linear interpolation between v0 and v1 based on t between t0 and t : colorspec
-
-    Note
-    ----
-    Note that no extrapolation is done, so if t<t0 ==> v0  and t>t1 ==> v1 |n|
-    This function is heavily used during animation.
-    '''
-    vt0 = colorspec_to_tuple(v0)
-    vt1 = colorspec_to_tuple(v1)
-    return tuple(int(c) for c in interpolate(t, t0, t1, vt0, vt1))
+        return v0  # avoid rounding problems
+    return (1 - p) * v0 + p * v1
 
 
 def interpolate(t, t0, t1, v0, v1):
@@ -8994,314 +9493,11 @@ def random_seed(seed, randomstream=omitted):
     randomstream.seed(seed)
 
 
-def pythonistacolor(colorspec):
-    c = colorspec_to_tuple(colorspec)
-    return (c[0] / 255, c[1] / 255, c[2] / 255, c[3] / 255)
-
-
 def _std_fonts():
     # the names of the standard fonts are generated by ttf fontdict.py on the standard development machine
-    return {'18cents': '18thCentury', 'Acme____': 'AcmeFont',
-     'AGENCYB': 'Agency FB Bold', 'AGENCYR': 'Agency FB',
-     'Alfredo_': 'Alfredo', 'ALGER': 'Algerian',
-     'aliee13': 'Alien Encounters', 'almosnow': 'Almonte Snow',
-     'Ameth___': 'Amethyst', 'ANTIC___': 'AnticFont',
-     'ANTQUAB': 'Book Antiqua Bold', 'ANTQUABI': 'Book Antiqua Bold Italic',
-     'ANTQUAI': 'Book Antiqua Italic',
-     'ArchitectsDaughter': 'Architects Daughter', 'arial': 'Arial',
-     'arialbd': 'Arial Bold', 'arialbi': 'Arial Bold Italic',
-     'ariali': 'Arial Italic', 'ARIALN': 'Arial Narrow',
-     'ARIALNB': 'Arial Narrow Bold', 'ARIALNBI': 'Arial Narrow Bold Italic',
-     'ARIALNI': 'Arial Narrow Italic', 'ARIALUNI': 'Arial Unicode MS',
-     'ariblk': 'Arial Black', 'ARLRDBD': 'Arial Rounded MT Bold',
-     'asimov': 'Asimov', 'Autumn__': 'Autumn', 'babyk___': 'Baby Kruffy',
-     'BALTH___': 'Balthazar', 'BASKVILL': 'Baskerville Old Face',
-     'BASTION_': 'Bastion', 'BAUHS93': 'Bauhaus 93', 'BELL': 'Bell MT',
-     'BELLB': 'Bell MT Bold', 'BELLI': 'Bell MT Italic',
-     'BERNHC': 'Bernard MT Condensed', 'bgothl': 'BankGothic Lt BT Light',
-     'bgothm': 'BankGothic Md BT Medium', 'BKANT': 'Book Antiqua',
-     'Blackout-2am': 'Blackout 2 AM', 'bnjinx': 'BN Jinx',
-     'bnmachine': 'BN Machine', 'bobcat': 'Bobcat Normal',
-     'BOD_B': 'Bodoni MT Bold', 'BOD_BI': 'Bodoni MT Bold Italic',
-     'BOD_BLAI': 'Bodoni MT Black Italic', 'BOD_BLAR': 'Bodoni MT Black',
-     'BOD_CB': 'Bodoni MT Condensed Bold',
-     'BOD_CBI': 'Bodoni MT Condensed Bold Italic',
-     'BOD_CI': 'Bodoni MT Condensed Italic', 'BOD_CR': 'Bodoni MT Condensed',
-     'BOD_I': 'Bodoni MT Italic', 'BOD_PSTC': 'Bodoni MT Poster Compressed',
-     'BOD_R': 'Bodoni MT', 'Bolstbo_': 'BolsterBold Bold',
-     'BOOKOS': 'Bookman Old Style', 'BOOKOSB': 'Bookman Old Style Bold',
-     'BOOKOSBI': 'Bookman Old Style Bold Italic',
-     'BOOKOSI': 'Bookman Old Style Italic', 'Borea___': 'Borealis',
-     'BOUTON_International_symbols': 'BOUTON International Symbols',
-     'BRADHITC': 'Bradley Hand ITC', 'Brand___': 'Brandish',
-     'BRITANIC': 'Britannic Bold', 'BRLNSB': 'Berlin Sans FB Bold',
-     'BRLNSDB': 'Berlin Sans FB Demi Bold', 'BRLNSR': 'Berlin Sans FB',
-     'BROADW': 'Broadway', 'BRUSHSCI': 'Brush Script MT Italic',
-     'Bruss___': 'Brussels', 'BSSYM7': 'Bookshelf Symbol 7',
-     'CabinSketch-Bold': 'CabinSketch Bold', 'calibri': 'Calibri',
-     'calibrib': 'Calibri Bold', 'calibrii': 'Calibri Italic',
-     'calibril': 'Calibri Light', 'calibrili': 'Calibri Light Italic',
-     'calibriz': 'Calibri Bold Italic', 'CALIFB': 'Californian FB Bold',
-     'CALIFI': 'Californian FB Italic', 'CALIFR': 'Californian FB',
-     'CALIST': 'Calisto MT', 'CALISTB': 'Calisto MT Bold',
-     'CALISTBI': 'Calisto MT Bold Italic', 'CALISTI': 'Calisto MT Italic',
-     'CALLI___': 'Calligraphic', 'CALVIN__': 'Calvin',
-     'cambriab': 'Cambria Bold', 'cambriai': 'Cambria Italic',
-     'cambriaz': 'Cambria Bold Italic', 'Candara': 'Candara',
-     'Candarab': 'Candara Bold', 'Candarai': 'Candara Italic',
-     'Candaraz': 'Candara Bold Italic', 'candles_': 'Candles',
-     'CASTELAR': 'Castellar', 'CENSCBK': 'Century Schoolbook',
-     'CENTAUR': 'Centaur', 'CENTURY': 'Century', 'CHILLER': 'Chiller',
-     'chinyen': 'Chinyen Normal', 'cityb___': 'CityBlueprint',
-     'CLARE___': 'Clarendon', 'Colbert_': 'Colbert', 'COLONNA': 'Colonna MT',
-     'Comfortaa-Bold': 'Comfortaa Bold', 'Comfortaa-Light': 'Comfortaa Light',
-     'Comfortaa-Regular': 'Comfortaa', 'comic': 'Comic Sans MS',
-     'comicbd': 'Comic Sans MS Bold', 'comici': 'Comic Sans MS Italic',
-     'comicz': 'Comic Sans MS Bold Italic', 'COMMONS_': 'Commons',
-     'compi': 'CommercialPi BT', 'complex_': 'Complex',
-     'comsc': 'CommercialScript BT', 'consola': 'Consolas',
-     'consolab': 'Consolas Bold', 'consolai': 'Consolas Italic',
-     'consolaz': 'Consolas Bold Italic', 'constan': 'Constantia',
-     'constanb': 'Constantia Bold', 'constani': 'Constantia Italic',
-     'constanz': 'Constantia Bold Italic', 'Cools___': 'Coolsville',
-     'COOPBL': 'Cooper Black', 'COPRGTB': 'Copperplate Gothic Bold',
-     'COPRGTL': 'Copperplate Gothic Light', 'corbel': 'Corbel',
-     'corbelb': 'Corbel Bold', 'corbeli': 'Corbel Italic',
-     'corbelz': 'Corbel Bold Italic', 'Corpo___': 'Corporate',
-     'counb___': 'CountryBlueprint', 'cour': 'Courier New',
-     'courbd': 'Courier New Bold', 'courbi': 'Courier New Bold Italic',
-     'couri': 'Courier New Italic', 'cracj___': 'Cracked Johnnie',
-     'creerg__': 'Creepygirl', 'CreteRound-Italic': 'Crete Round Italic',
-     'CreteRound-Regular': 'Crete Round', 'CURLZ___': 'Curlz MT',
-     'DAYTON__': 'Dayton', 'DejaVuSansMono': 'DejaVu Sans Mono Book',
-     'DejaVuSansMono-Bold': 'DejaVu Sans Mono Bold',
-     'DejaVuSansMono-BoldOblique': 'DejaVu Sans Mono Bold Oblique',
-     'DejaVuSansMono-Oblique': 'DejaVu Sans Mono Oblique',
-     'Deneane_': 'Deneane', 'Detente_': 'Detente',
-     'digifit': 'Digifit Normal', 'distant galaxy 2': 'Distant Galaxy',
-     'DOMIN___': 'Dominican', 'dutch': 'Dutch801 Rm BT Roman',
-     'dutchb': 'Dutch801 Rm BT Bold', 'dutchbi': 'Dutch801 Rm BT Bold Italic',
-     'dutcheb': 'Dutch801 XBd BT Extra Bold',
-     'dutchi': 'Dutch801 Rm BT Italic', 'ebrima': 'Ebrima',
-     'ebrimabd': 'Ebrima Bold', 'ELEPHNT': 'Elephant',
-     'ELEPHNTI': 'Elephant Italic', 'Emmett__': 'Emmett',
-     'ENGR': 'Engravers MT', 'Enliven_': 'Enliven', 'ERASBD': 'Eras Bold ITC',
-     'ERASDEMI': 'Eras Demi ITC', 'ERASLGHT': 'Eras Light ITC',
-     'ERASMD': 'Eras Medium ITC', 'ethnocen': 'Ethnocentric',
-     'eurro___': 'EuroRoman Oblique', 'eurr____': 'EuroRoman',
-     'FELIXTI': 'Felix Titling', 'fingerpop2': 'Fingerpop',
-     'flubber': 'Flubber', 'FORTE': 'Forte', 'FRABK': 'Franklin Gothic Book',
-     'FRABKIT': 'Franklin Gothic Book Italic',
-     'FRADM': 'Franklin Gothic Demi', 'FRADMCN': 'Franklin Gothic Demi Cond',
-     'FRADMIT': 'Franklin Gothic Demi Italic',
-     'FRAHV': 'Franklin Gothic Heavy',
-     'FRAHVIT': 'Franklin Gothic Heavy Italic',
-     'framd': 'Franklin Gothic Medium',
-     'FRAMDCN': 'Franklin Gothic Medium Cond',
-     'framdit': 'Franklin Gothic Medium Italic',
-     'FREESCPT': 'Freestyle Script', 'Frnkvent': 'Frankfurter Venetian TT',
-     'FRSCRIPT': 'French Script MT', 'FTLTLT': 'Footlight MT Light',
-     'Gabriola': 'Gabriola', 'gadugi': 'Gadugi', 'gadugib': 'Gadugi Bold',
-     'GARA': 'Garamond', 'GARABD': 'Garamond Bold',
-     'GARAIT': 'Garamond Italic', 'gazzarelli': 'Gazzarelli',
-     'gdt_____': 'GDT', 'georgia': 'Georgia', 'georgiab': 'Georgia Bold',
-     'georgiai': 'Georgia Italic', 'georgiaz': 'Georgia Bold Italic',
-     'Geotype': 'Geotype TT', 'GIGI': 'Gigi',
-     'GILBI___': 'Gill Sans MT Bold Italic', 'GILB____': 'Gill Sans MT Bold',
-     'GILC____': 'Gill Sans MT Condensed', 'GILI____': 'Gill Sans MT Italic',
-     'GILLUBCD': 'Gill Sans Ultra Bold Condensed',
-     'GILSANUB': 'Gill Sans Ultra Bold', 'GIL_____': 'Gill Sans MT',
-     'GLECB': 'Gloucester MT Extra Condensed', 'Glock___': 'Glockenspiel',
-     'GLSNECB': 'Gill Sans MT Ext Condensed Bold', 'goodtime': 'Good Times',
-     'GOTHIC': 'Century Gothic', 'GOTHICB': 'Century Gothic Bold',
-     'GOTHICBI': 'Century Gothic Bold Italic', 'gothice_': 'GothicE',
-     'gothicg_': 'GothicG', 'GOTHICI': 'Century Gothic Italic',
-     'gothici_': 'GothicI', 'GOUDOS': 'Goudy Old Style',
-     'GOUDOSB': 'Goudy Old Style Bold', 'GOUDOSI': 'Goudy Old Style Italic',
-     'GOUDYSTO': 'Goudy Stout', 'greekc__': 'GreekC', 'greeks__': 'GreekS',
-     'Greek_i': 'Greek Diner Inline TT', 'handmeds': 'Hand Me Down S (BRK)',
-     'Hansen__': 'Hansen', 'HARLOWSI': 'Harlow Solid Italic Italic',
-     'HARNGTON': 'Harrington', 'HARVEIT_': 'HarvestItal',
-     'HARVEST_': 'Harvest', 'HATTEN': 'Haettenschweiler',
-     'Haxton': 'Haxton Logos TT', 'heavyhea2': 'Heavy Heap',
-     'himalaya': 'Microsoft Himalaya', 'hollh___': 'Hollywood Hills',
-     'holomdl2': 'HoloLens MDL2 Assets', 'Hombre__': 'Hombre',
-     'HTOWERT': 'High Tower Text', 'HTOWERTI': 'High Tower Text Italic',
-     'Huxley_Titling': 'Huxley Titling', 'impact': 'Impact',
-     'IMPRISHA': 'Imprint MT Shadow', 'inductio': 'Induction Normal',
-     'INFROMAN': 'Informal Roman', 'isocp2__': 'ISOCP2', 'isocp3__': 'ISOCP3',
-     'isocpeui': 'ISOCPEUR Italic', 'isocpeur': 'ISOCPEUR',
-     'isocp___': 'ISOCP', 'isoct2__': 'ISOCT2', 'isoct3__': 'ISOCT3',
-     'isocteui': 'ISOCTEUR Italic', 'isocteur': 'ISOCTEUR',
-     'isoct___': 'ISOCT', 'italicc_': 'ItalicC', 'italict_': 'ItalicT',
-     'italic__': 'Italic', 'Itali___': 'Italianate',
-     'ITCBLKAD': 'Blackadder ITC', 'ITCEDSCR': 'Edwardian Script ITC',
-     'ITCKRIST': 'Kristen ITC', 'javatext': 'Javanese Text',
-     'JOKERMAN': 'Jokerman', 'JosefinSlab-Bold': 'Josefin Slab Bold',
-     'JosefinSlab-BoldItalic': 'Josefin Slab Bold Italic',
-     'JosefinSlab-Italic': 'Josefin Slab Italic',
-     'JosefinSlab-Light': 'Josefin Slab Light',
-     'JosefinSlab-LightItalic': 'Josefin Slab Light Italic',
-     'JosefinSlab-Regular': 'Josefin Slab',
-     'JosefinSlab-SemiBold': 'Josefin Slab SemiBold',
-     'JosefinSlab-SemiBoldItalic': 'Josefin Slab SemiBold Italic',
-     'JosefinSlab-Thin': 'Josefin Slab Thin',
-     'JosefinSlab-ThinItalic': 'Josefin Slab Thin Italic',
-     'JUICE___': 'Juice ITC', 'KUNSTLER': 'Kunstler Script',
-     'LATINWD': 'Wide Latin', 'Lato-Black': 'Lato Black',
-     'Lato-BlackItalic': 'Lato Black Italic', 'Lato-Bold': 'Lato Bold',
-     'Lato-BoldItalic': 'Lato Bold Italic', 'Lato-Hairline': 'Lato Hairline',
-     'Lato-HairlineItalic': 'Lato Hairline Italic',
-     'Lato-Italic': 'Lato Italic', 'Lato-Light': 'Lato Light',
-     'Lato-LightItalic': 'Lato Light Italic', 'Lato-Regular': 'Lato',
-     'LBRITE': 'Lucida Bright', 'LBRITED': 'Lucida Bright Demibold',
-     'LBRITEDI': 'Lucida Bright Demibold Italic',
-     'LBRITEI': 'Lucida Bright Italic',
-     'LCALLIG': 'Lucida Calligraphy Italic', 'LeelaUIb': 'Leelawadee UI Bold',
-     'LEELAWAD': 'Leelawadee', 'LEELAWDB': 'Leelawadee Bold',
-     'LeelawUI': 'Leelawadee UI', 'LeelUIsl': 'Leelawadee UI Semilight',
-     'LFAX': 'Lucida Fax', 'LFAXD': 'Lucida Fax Demibold',
-     'LFAXDI': 'Lucida Fax Demibold Italic', 'LFAXI': 'Lucida Fax Italic',
-     'LHANDW': 'Lucida Handwriting Italic', 'Limou___': 'Limousine',
-     'littlelo': 'LittleLordFontleroy', 'LSANS': 'Lucida Sans',
-     'LSANSD': 'Lucida Sans Demibold Roman',
-     'LSANSDI': 'Lucida Sans Demibold Italic', 'LSANSI': 'Lucida Sans Italic',
-     'ltromatic': 'LetterOMatic!', 'LTYPE': 'Lucida Sans Typewriter',
-     'LTYPEB': 'Lucida Sans Typewriter Bold',
-     'LTYPEBO': 'Lucida Sans Typewriter Bold Oblique',
-     'LTYPEO': 'Lucida Sans Typewriter Oblique', 'lucon': 'Lucida Console',
-     'l_10646': 'Lucida Sans Unicode', 'mael____': 'Mael',
-     'MAGNETOB': 'Magneto Bold', 'MAIAN': 'Maiandra GD',
-     'malgun': 'Malgun Gothic', 'malgunbd': 'Malgun Gothic Bold',
-     'malgunsl': 'Malgun Gothic Semilight', 'Manorly_': 'Manorly',
-     'marlett': 'Marlett', 'marlett_0': 'Marlett', 'Martina_': 'Martina',
-     'MATURASC': 'Matura MT Script Capitals', 'Melodbo_': 'MelodBold Bold',
-     'micross': 'Microsoft Sans Serif', 'Minerva_': 'Minerva',
-     'MISTRAL': 'Mistral', 'mmrtext': 'Myanmar Text',
-     'mmrtextb': 'Myanmar Text Bold', 'MOD20': 'Modern No. 20',
-     'monbaiti': 'Mongolian Baiti', 'monos': 'Monospac821 BT Roman',
-     'monosb': 'Monospac821 BT Bold', 'monosbi': 'Monospac821 BT Bold Italic',
-     'monosi': 'Monospac821 BT Italic', 'monotxt_': 'Monotxt',
-     'MOONB___': 'Moonbeam', 'mplus-1m-bold': 'M+ 1m bold',
-     'mplus-1m-light': 'M+ 1m light', 'mplus-1m-medium': 'M+ 1m medium',
-     'mplus-1m-regular': 'M+ 1m', 'mplus-1m-thin': 'M+ 1m thin',
-     'MSUIGHUB': 'Microsoft Uighur Bold', 'MSUIGHUR': 'Microsoft Uighur',
-     'msyi': 'Microsoft Yi Baiti', 'MTCORSVA': 'Monotype Corsiva',
-     'MTEXTRA': 'MT Extra', 'mtproxy1': 'Proxy 1', 'mtproxy2': 'Proxy 2',
-     'mtproxy3': 'Proxy 3', 'mtproxy4': 'Proxy 4', 'mtproxy5': 'Proxy 5',
-     'mtproxy6': 'Proxy 6', 'mtproxy7': 'Proxy 7', 'mtproxy8': 'Proxy 8',
-     'mtproxy9': 'Proxy 9', 'mvboli': 'MV Boli', 'Mycalc__': 'Mycalc',
-     'narrow': 'PR Celtic Narrow Normal', 'nasaliza': 'Nasalization Medium',
-     'neon2': 'Neon Lights', 'NIAGENG': 'Niagara Engraved',
-     'NIAGSOL': 'Niagara Solid', 'Nirmala': 'Nirmala UI',
-     'NirmalaB': 'Nirmala UI Bold', 'NirmalaS': 'Nirmala UI Semilight',
-     'nobile': 'Nobile', 'nobile_bold': 'Nobile Bold',
-     'nobile_bold_italic': 'Nobile Bold Italic',
-     'nobile_italic': 'Nobile Italic', 'Notram__': 'Notram',
-     'Novem___': 'November', 'ntailu': 'Microsoft New Tai Lue',
-     'ntailub': 'Microsoft New Tai Lue Bold', 'Nunito-Light': 'Nunito Light',
-     'Nunito-Regular': 'Nunito', 'OCRAEXT': 'OCR A Extended',
-     'OLDENGL': 'Old English Text MT', 'ONYX': 'Onyx',
-     'Opinehe_': 'OpineHeavy', 'ostrich-black': 'Ostrich Sans Black',
-     'ostrich-bold': 'Ostrich Sans Bold',
-     'ostrich-dashed': 'Ostrich Sans Dashed Medium',
-     'ostrich-light': 'Ostrich Sans Condensed Light',
-     'ostrich-regular': 'Ostrich Sans Medium',
-     'ostrich-rounded': 'Ostrich Sans Rounded Medium',
-     'OUTLOOK': 'MS Outlook', 'Pacifico': 'Pacifico',
-     'pala': 'Palatino Linotype', 'palab': 'Palatino Linotype Bold',
-     'palabi': 'Palatino Linotype Bold Italic',
-     'palai': 'Palatino Linotype Italic', 'PALSCRI': 'Palace Script MT',
-     'panroman': 'PanRoman', 'PAPYRUS': 'Papyrus', 'PARCHM': 'Parchment',
-     'parryhotter': 'Parry Hotter', 'PENLIIT_': 'PenultimateLightItal',
-     'PENULLI_': 'PenultimateLight', 'PENUL___': 'Penultimate',
-     'PERBI___': 'Perpetua Bold Italic', 'PERB____': 'Perpetua Bold',
-     'PERI____': 'Perpetua Italic', 'PermanentMarker': 'Permanent Marker',
-     'PERTIBD': 'Perpetua Titling MT Bold',
-     'PERTILI': 'Perpetua Titling MT Light', 'PER_____': 'Perpetua',
-     'phagspa': 'Microsoft PhagsPa', 'phagspab': 'Microsoft PhagsPa Bold',
-     'Phrasme_': 'PhrasticMedium', 'Pirate__': 'Pirate',
-     'PLAYBILL': 'Playbill', 'POORICH': 'Poor Richard',
-     'PRISTINA': 'Pristina', 'QUIVEIT_': 'QuiverItal', 'RAGE': 'Rage Italic',
-     'RAVIE': 'Ravie', 'REFSAN': 'MS Reference Sans Serif',
-     'REFSPCL': 'MS Reference Specialty',
-     'ROCCB___': 'Rockwell Condensed Bold', 'ROCC____': 'Rockwell Condensed',
-     'ROCK': 'Rockwell', 'ROCKB': 'Rockwell Bold',
-     'ROCKBI': 'Rockwell Bold Italic', 'ROCKEB': 'Rockwell Extra Bold',
-     'ROCKI': 'Rockwell Italic', 'Roland__': 'Roland',
-     'romab___': 'Romantic Bold', 'romai___': 'Romantic Italic',
-     'romanc__': 'RomanC', 'romand__': 'RomanD', 'romans__': 'RomanS',
-     'romantic': 'Romantic', 'romant__': 'RomanT', 'RONDALO_': 'Rondalo',
-     'Rowdyhe_': 'RowdyHeavy', 'Russrite': 'Russel Write TT',
-     'Salina__': 'Salina', 'SamsungIF_Md': 'Samsung InterFace Medium',
-     'SamsungIF_Md_0': 'Samsung InterFace Medium',
-     'SamsungIF_Rg': 'Samsung InterFace',
-     'SamsungIF_Rg_0': 'Samsung InterFace',
-     'sanssbo_': 'SansSerif BoldOblique', 'sanssb__': 'SansSerif Bold',
-     'sansso__': 'SansSerif Oblique', 'sanss___': 'SansSerif',
-     'SCHLBKB': 'Century Schoolbook Bold',
-     'SCHLBKBI': 'Century Schoolbook Bold Italic',
-     'SCHLBKI': 'Century Schoolbook Italic', 'SCRIPTBL': 'Script MT Bold',
-     'scriptc_': 'ScriptC', 'scripts_': 'ScriptS',
-     'segmdl2': 'Segoe MDL2 Assets', 'segoepr': 'Segoe Print',
-     'segoeprb': 'Segoe Print Bold', 'segoesc': 'Segoe Script',
-     'segoescb': 'Segoe Script Bold', 'segoeui': 'Segoe UI',
-     'segoeuib': 'Segoe UI Bold', 'segoeuii': 'Segoe UI Italic',
-     'segoeuil': 'Segoe UI Light', 'segoeuisl': 'Segoe UI Semilight',
-     'segoeuiz': 'Segoe UI Bold Italic', 'seguibl': 'Segoe UI Black',
-     'seguibli': 'Segoe UI Black Italic', 'seguiemj': 'Segoe UI Emoji',
-     'seguihis': 'Segoe UI Historic', 'seguili': 'Segoe UI Light Italic',
-     'seguisb': 'Segoe UI Semibold', 'seguisbi': 'Segoe UI Semibold Italic',
-     'seguisli': 'Segoe UI Semilight Italic', 'seguisym': 'Segoe UI Symbol',
-     'sf movie poster2': 'SF Movie Poster', 'SHOWG': 'Showcard Gothic',
-     'simplex_': 'Simplex', 'simsunb': 'SimSun-ExtB', 'Skinny__': 'Skinny',
-     'SNAP____': 'Snap ITC', 'snowdrft': 'Snowdrift', 'SPLASH__': 'Splash',
-     'STENCIL': 'Stencil', 'Stephen_': 'Stephen', 'Steppes': 'Steppes TT',
-     'stylu': 'Stylus BT Roman', 'supef___': 'SuperFrench',
-     'swiss': 'Swis721 BT Roman', 'swissb': 'Swis721 BT Bold',
-     'swissbi': 'Swis721 BT Bold Italic', 'swissbo': 'Swis721 BdOul BT Bold',
-     'swissc': 'Swis721 Cn BT Roman', 'swisscb': 'Swis721 Cn BT Bold',
-     'swisscbi': 'Swis721 Cn BT Bold Italic',
-     'swisscbo': 'Swis721 BdCnOul BT Bold Outline',
-     'swissci': 'Swis721 Cn BT Italic', 'swissck': 'Swis721 BlkCn BT Black',
-     'swisscki': 'Swis721 BlkCn BT Black Italic',
-     'swisscl': 'Swis721 LtCn BT Light',
-     'swisscli': 'Swis721 LtCn BT Light Italic',
-     'swisse': 'Swis721 Ex BT Roman', 'swisseb': 'Swis721 Ex BT Bold',
-     'swissek': 'Swis721 BlkEx BT Black', 'swissel': 'Swis721 LtEx BT Light',
-     'swissi': 'Swis721 BT Italic', 'swissk': 'Swis721 Blk BT Black',
-     'swisski': 'Swis721 Blk BT Black Italic',
-     'swissko': 'Swis721 BlkOul BT Black', 'swissl': 'Swis721 Lt BT Light',
-     'swissli': 'Swis721 Lt BT Light Italic', 'Swkeys1': 'SWGamekeys MT',
-     'syastro_': 'Syastro', 'sylfaen': 'Sylfaen', 'symap___': 'Symap',
-     'symath__': 'Symath', 'symbol': 'Symbol', 'symeteo_': 'Symeteo',
-     'symusic_': 'Symusic', 'tahoma': 'Tahoma', 'tahomabd': 'Tahoma Bold',
-     'taile': 'Microsoft Tai Le', 'taileb': 'Microsoft Tai Le Bold',
-     'Tangerine_Bold': 'Tangerine Bold', 'Tangerine_Regular': 'Tangerine',
-     'Tarzan__': 'Tarzan', 'TCBI____': 'Tw Cen MT Bold Italic',
-     'TCB_____': 'Tw Cen MT Bold', 'TCCB____': 'Tw Cen MT Condensed Bold',
-     'TCCEB': 'Tw Cen MT Condensed Extra Bold',
-     'TCCM____': 'Tw Cen MT Condensed', 'TCMI____': 'Tw Cen MT Italic',
-     'TCM_____': 'Tw Cen MT', 'techb___': 'TechnicBold',
-     'techl___': 'TechnicLite', 'technic_': 'Technic',
-     'TEMPSITC': 'Tempus Sans ITC', 'terminat': 'Terminator Two',
-     'times': 'Times New Roman', 'timesbd': 'Times New Roman Bold',
-     'timesbi': 'Times New Roman Bold Italic',
-     'timesi': 'Times New Roman Italic', 'Toledo__': 'Toledo',
-     'trebuc': 'Trebuchet MS', 'trebucbd': 'Trebuchet MS Bold',
-     'trebucbi': 'Trebuchet MS Bold Italic',
-     'trebucit': 'Trebuchet MS Italic', 'txt_____': 'Txt',
-     'umath': 'UniversalMath1 BT', 'VALKEN__': 'Valken', 'verdana': 'Verdana',
-     'verdanab': 'Verdana Bold', 'verdanai': 'Verdana Italic',
-     'verdanaz': 'Verdana Bold Italic', 'VINERITC': 'Viner Hand ITC',
-     'vinet': 'Vineta BT', 'VIVALDII': 'Vivaldi Italic', 'Vivian__': 'Vivian',
-     'VLADIMIR': 'Vladimir Script', 'Vollkorn-Bold': 'Vollkorn Bold',
-     'Vollkorn-BoldItalic': 'Vollkorn Bold Italic',
-     'Vollkorn-Italic': 'Vollkorn Italic', 'Vollkorn-Regular': 'Vollkorn',
-     'Waverly_': 'Waverly', 'webdings': 'Webdings', 'Whimsy': 'Whimsy TT',
-     'wingding': 'Wingdings', 'WINGDNG2': 'Wingdings 2',
-     'WINGDNG3': 'Wingdings 3', 'woodcut': 'Woodcut', 'xfiles': 'X-Files',
-     'yearsupplyoffairycakes': 'Year supply of fairy cakes'}
+    if not hasattr(_std_fonts, 'cached'):
+        _std_fonts.cached = pickle.loads(b'(dp0\nVHuxley_Titling\np1\nVHuxley Titling\np2\nsVGlock___\np3\nVGlockenspiel\np4\nsVPENLIIT_\np5\nVPenultimateLightItal\np6\nsVERASMD\np7\nVEras Medium ITC\np8\nsVNirmala\np9\nVNirmala UI\np10\nsVebrimabd\np11\nVEbrima Bold\np12\nsVostrich-dashed\np13\nVOstrich Sans Dashed Medium\np14\nsVLato-Hairline\np15\nVLato Hairline\np16\nsVLTYPEO\np17\nVLucida Sans Typewriter Oblique\np18\nsVbnmachine\np19\nVBN Machine\np20\nsVLTYPEB\np21\nVLucida Sans Typewriter Bold\np22\nsVBOOKOSI\np23\nVBookman Old Style Italic\np24\nsVEmmett__\np25\nVEmmett\np26\nsVCURLZ___\np27\nVCurlz MT\np28\nsVhandmeds\np29\nVHand Me Down S (BRK)\np30\nsVsegoesc\np31\nVSegoe Script\np32\nsVTCM_____\np33\nVTw Cen MT\np34\nsVJosefinSlab-ThinItalic\np35\nVJosefin Slab Thin Italic\np36\nsVSTENCIL\np37\nVStencil\np38\nsVsanss___\np39\nVSansSerif\np40\nsVBOD_CI\np41\nVBodoni MT Condensed Italic\np42\nsVGreek_i\np43\nVGreek Diner Inline TT\np44\nsVHTOWERT\np45\nVHigh Tower Text\np46\nsVTCCB____\np47\nVTw Cen MT Condensed Bold\np48\nsVCools___\np49\nVCoolsville\np50\nsVbnjinx\np51\nVBN Jinx\np52\nsVFREESCPT\np53\nVFreestyle Script\np54\nsVGARA\np55\nVGaramond\np56\nsVDejaVuSansMono\np57\nVDejaVu Sans Mono Book\np58\nsVCALVIN__\np59\nVCalvin\np60\nsVGIL_____\np61\nVGill Sans MT\np62\nsVCandaraz\np63\nVCandara Bold Italic\np64\nsVVollkorn-Bold\np65\nVVollkorn Bold\np66\nsVariblk\np67\nVArial Black\np68\nsVGOTHIC\np69\nVCentury Gothic\np70\nsVMAIAN\np71\nVMaiandra GD\np72\nsVBSSYM7\np73\nVBookshelf Symbol 7\np74\nsVAcme____\np75\nVAcmeFont\np76\nsVDetente_\np77\nVDetente\np78\nsVCandarai\np79\nVCandara Italic\np80\nsVFTLTLT\np81\nVFootlight MT Light\np82\nsVGILC____\np83\nVGill Sans MT Condensed\np84\nsVLFAXD\np85\nVLucida Fax Demibold\np86\nsVNIAGSOL\np87\nVNiagara Solid\np88\nsVLFAXI\np89\nVLucida Fax Italic\np90\nsVCandarab\np91\nVCandara Bold\np92\nsVFRSCRIPT\np93\nVFrench Script MT\np94\nsVLBRITE\np95\nVLucida Bright\np96\nsVFRABK\np97\nVFranklin Gothic Book\np98\nsVostrich-bold\np99\nVOstrich Sans Bold\np100\nsVTCCM____\np101\nVTw Cen MT Condensed\np102\nsVcorbelz\np103\nVCorbel Bold Italic\np104\nsVTCMI____\np105\nVTw Cen MT Italic\np106\nsVethnocen\np107\nVEthnocentric\np108\nsVVINERITC\np109\nVViner Hand ITC\np110\nsVROCKB\np111\nVRockwell Bold\np112\nsVconsola\np113\nVConsolas\np114\nsVcorbeli\np115\nVCorbel Italic\np116\nsVPENUL___\np117\nVPenultimate\np118\nsVMAGNETOB\np119\nVMagneto Bold\np120\nsVisocp___\np121\nVISOCP\np122\nsVQUIVEIT_\np123\nVQuiverItal\np124\nsVARLRDBD\np125\nVArial Rounded MT Bold\np126\nsVJosefinSlab-SemiBold\np127\nVJosefin Slab SemiBold\np128\nsVntailub\np129\nVMicrosoft New Tai Lue Bold\np130\nsVflubber\np131\nVFlubber\np132\nsVBASKVILL\np133\nVBaskerville Old Face\np134\nsVGILB____\np135\nVGill Sans MT Bold\np136\nsVPERTILI\np137\nVPerpetua Titling MT Light\np138\nsVLato-HairlineItalic\np139\nVLato Hairline Italic\np140\nsVComfortaa-Light\np141\nVComfortaa Light\np142\nsVtrebucit\np143\nVTrebuchet MS Italic\np144\nsVmalgunbd\np145\nVMalgun Gothic Bold\np146\nsVITCBLKAD\np147\nVBlackadder ITC\np148\nsVsansso__\np149\nVSansSerif Oblique\np150\nsVCALISTBI\np151\nVCalisto MT Bold Italic\np152\nsVsyastro_\np153\nVSyastro\np154\nsVSamsungIF_Md\np155\nVSamsung InterFace Medium\np156\nsVHombre__\np157\nVHombre\np158\nsVseguiemj\np159\nVSegoe UI Emoji\np160\nsVFRAHVIT\np161\nVFranklin Gothic Heavy Italic\np162\nsVJUICE___\np163\nVJuice ITC\np164\nsVFRAMDCN\np165\nVFranklin Gothic Medium Cond\np166\nsVseguisb\np167\nVSegoe UI Semibold\np168\nsVconsolai\np169\nVConsolas Italic\np170\nsVGLECB\np171\nVGloucester MT Extra Condensed\np172\nsVframd\np173\nVFranklin Gothic Medium\np174\nsVSCHLBKI\np175\nVCentury Schoolbook Italic\np176\nsVCENTAUR\np177\nVCentaur\np178\nsVromantic\np179\nVRomantic\np180\nsVBOD_CB\np181\nVBodoni MT Condensed Bold\np182\nsVverdana\np183\nVVerdana\np184\nsVTangerine_Regular\np185\nVTangerine\np186\nsVseguili\np187\nVSegoe UI Light Italic\np188\nsVNunito-Regular\np189\nVNunito\np190\nsVSCHLBKB\np191\nVCentury Schoolbook Bold\np192\nsVGOTHICB\np193\nVCentury Gothic Bold\np194\nsVpalai\np195\nVPalatino Linotype Italic\np196\nsVBKANT\np197\nVBook Antiqua\np198\nsVLato-Italic\np199\nVLato Italic\np200\nsVPERBI___\np201\nVPerpetua Bold Italic\np202\nsVGOTHICI\np203\nVCentury Gothic Italic\np204\nsVROCKBI\np205\nVRockwell Bold Italic\np206\nsVLTYPEBO\np207\nVLucida Sans Typewriter Bold Oblique\np208\nsVAmeth___\np209\nVAmethyst\np210\nsVyearsupplyoffairycakes\np211\nVYear supply of fairy cakes\np212\nsVGILBI___\np213\nVGill Sans MT Bold Italic\np214\nsVBOOKOS\np215\nVBookman Old Style\np216\nsVVollkorn-Italic\np217\nVVollkorn Italic\np218\nsVswiss\np219\nVSwis721 BT Roman\np220\nsVcomsc\np221\nVCommercialScript BT\np222\nsVchinyen\np223\nVChinyen Normal\np224\nsVeurr____\np225\nVEuroRoman\np226\nsVROCK\np227\nVRockwell\np228\nsVPERTIBD\np229\nVPerpetua Titling MT Bold\np230\nsVCHILLER\np231\nVChiller\np232\nsVtechb___\np233\nVTechnicBold\np234\nsVLato-Light\np235\nVLato Light\np236\nsVOUTLOOK\np237\nVMS Outlook\np238\nsVmtproxy6\np239\nVProxy 6\np240\nsVdutcheb\np241\nVDutch801 XBd BT Extra Bold\np242\nsVgadugib\np243\nVGadugi Bold\np244\nsVBOD_CR\np245\nVBodoni MT Condensed\np246\nsVmtproxy7\np247\nVProxy 7\np248\nsVnobile_bold\np249\nVNobile Bold\np250\nsVELEPHNT\np251\nVElephant\np252\nsVCOPRGTL\np253\nVCopperplate Gothic Light\np254\nsVMTCORSVA\np255\nVMonotype Corsiva\np256\nsVconsolaz\np257\nVConsolas Bold Italic\np258\nsVBOOKOSBI\np259\nVBookman Old Style Bold Italic\np260\nsVtrebuc\np261\nVTrebuchet MS\np262\nsVcomici\np263\nVComic Sans MS Italic\np264\nsVJosefinSlab-BoldItalic\np265\nVJosefin Slab Bold Italic\np266\nsVMycalc__\np267\nVMycalc\np268\nsVmarlett\np269\nVMarlett\np270\nsVsymeteo_\np271\nVSymeteo\np272\nsVcandles_\np273\nVCandles\np274\nsVbobcat\np275\nVBobcat Normal\np276\nsVLSANSDI\np277\nVLucida Sans Demibold Italic\np278\nsVINFROMAN\np279\nVInformal Roman\np280\nsVsf movie poster2\np281\nVSF Movie Poster\np282\nsVcomicz\np283\nVComic Sans MS Bold Italic\np284\nsVcracj___\np285\nVCracked Johnnie\np286\nsVcourbd\np287\nVCourier New Bold\np288\nsVItali___\np289\nVItalianate\np290\nsVITCEDSCR\np291\nVEdwardian Script ITC\np292\nsVcourbi\np293\nVCourier New Bold Italic\np294\nsVcalibrili\np295\nVCalibri Light Italic\np296\nsVgazzarelli\np297\nVGazzarelli\np298\nsVGabriola\np299\nVGabriola\np300\nsVVollkorn-BoldItalic\np301\nVVollkorn Bold Italic\np302\nsVromant__\np303\nVRomanT\np304\nsVisoct3__\np305\nVISOCT3\np306\nsVsegoeuib\np307\nVSegoe UI Bold\np308\nsVtimesbd\np309\nVTimes New Roman Bold\np310\nsVgoodtime\np311\nVGood Times\np312\nsVsegoeuii\np313\nVSegoe UI Italic\np314\nsVBOD_BLAR\np315\nVBodoni MT Black\np316\nsVhimalaya\np317\nVMicrosoft Himalaya\np318\nsVsegoeuil\np319\nVSegoe UI Light\np320\nsVPermanentMarker\np321\nVPermanent Marker\np322\nsVBOD_BLAI\np323\nVBodoni MT Black Italic\np324\nsVTCBI____\np325\nVTw Cen MT Bold Italic\np326\nsVarial\np327\nVArial\np328\nsVBrand___\np329\nVBrandish\np330\nsVsegoeuiz\np331\nVSegoe UI Bold Italic\np332\nsVswisscb\np333\nVSwis721 Cn BT Bold\np334\nsVPAPYRUS\np335\nVPapyrus\np336\nsVANTIC___\np337\nVAnticFont\np338\nsVGIGI\np339\nVGigi\np340\nsVENGR\np341\nVEngravers MT\np342\nsVsegmdl2\np343\nVSegoe MDL2 Assets\np344\nsVBRLNSDB\np345\nVBerlin Sans FB Demi Bold\np346\nsVLato-BoldItalic\np347\nVLato Bold Italic\np348\nsVholomdl2\np349\nVHoloLens MDL2 Assets\np350\nsVBRITANIC\np351\nVBritannic Bold\np352\nsVNirmalaB\np353\nVNirmala UI Bold\np354\nsVVollkorn-Regular\np355\nVVollkorn\np356\nsVStephen_\np357\nVStephen\np358\nsVbabyk___\np359\nVBaby Kruffy\np360\nsVHARVEST_\np361\nVHarvest\np362\nsVKUNSTLER\np363\nVKunstler Script\np364\nsVstylu\np365\nVStylus BT Roman\np366\nsVWINGDNG3\np367\nVWingdings 3\np368\nsVWINGDNG2\np369\nVWingdings 2\np370\nsVlucon\np371\nVLucida Console\np372\nsVCandara\np373\nVCandara\np374\nsVBERNHC\np375\nVBernard MT Condensed\np376\nsVtechnic_\np377\nVTechnic\np378\nsVLimou___\np379\nVLimousine\np380\nsVTCB_____\np381\nVTw Cen MT Bold\np382\nsVPirate__\np383\nVPirate\np384\nsVFrnkvent\np385\nVFrankfurter Venetian TT\np386\nsVromand__\np387\nVRomanD\np388\nsVLTYPE\np389\nVLucida Sans Typewriter\np390\nsVSHOWG\np391\nVShowcard Gothic\np392\nsVMOD20\np393\nVModern No. 20\np394\nsVostrich-rounded\np395\nVOstrich Sans Rounded Medium\np396\nsVJosefinSlab-Italic\np397\nVJosefin Slab Italic\np398\nsVneon2\np399\nVNeon Lights\np400\nsVpalabi\np401\nVPalatino Linotype Bold Italic\np402\nsVwoodcut\np403\nVWoodcut\np404\nsVToledo__\np405\nVToledo\np406\nsVverdanai\np407\nVVerdana Italic\np408\nsVSamsungIF_Rg\np409\nVSamsung InterFace\np410\nsVtrebucbd\np411\nVTrebuchet MS Bold\np412\nsVPALSCRI\np413\nVPalace Script MT\np414\nsVComfortaa-Regular\np415\nVComfortaa\np416\nsVmicross\np417\nVMicrosoft Sans Serif\np418\nsVseguisli\np419\nVSegoe UI Semilight Italic\np420\nsVtaile\np421\nVMicrosoft Tai Le\np422\nsVcour\np423\nVCourier New\np424\nsVparryhotter\np425\nVParry Hotter\np426\nsVgreekc__\np427\nVGreekC\np428\nsVRAGE\np429\nVRage Italic\np430\nsVMATURASC\np431\nVMatura MT Script Capitals\np432\nsVBASTION_\np433\nVBastion\np434\nsVREFSAN\np435\nVMS Reference Sans Serif\np436\nsVterminat\np437\nVTerminator Two\np438\nsVmmrtextb\np439\nVMyanmar Text Bold\np440\nsVgothici_\np441\nVGothicI\np442\nsVmonotxt_\np443\nVMonotxt\np444\nsVcorbelb\np445\nVCorbel Bold\np446\nsVVALKEN__\np447\nVValken\np448\nsVRowdyhe_\np449\nVRowdyHeavy\np450\nsVLato-Black\np451\nVLato Black\np452\nsVswisski\np453\nVSwis721 Blk BT Black Italic\np454\nsVcouri\np455\nVCourier New Italic\np456\nsVMTEXTRA\np457\nVMT Extra\np458\nsVsanssbo_\np459\nVSansSerif BoldOblique\np460\nsVl_10646\np461\nVLucida Sans Unicode\np462\nsVLato-BlackItalic\np463\nVLato Black Italic\np464\nsVseguibli\np465\nVSegoe UI Black Italic\np466\nsVGeotype\np467\nVGeotype TT\np468\nsVxfiles\np469\nVX-Files\np470\nsVjavatext\np471\nVJavanese Text\np472\nsVseguisym\np473\nVSegoe UI Symbol\np474\nsVverdanaz\np475\nVVerdana Bold Italic\np476\nsVGILI____\np477\nVGill Sans MT Italic\np478\nsVALGER\np479\nVAlgerian\np480\nsVAGENCYR\np481\nVAgency FB\np482\nsVnobile\np483\nVNobile\np484\nsVHaxton\np485\nVHaxton Logos TT\np486\nsVswissbo\np487\nVSwis721 BdOul BT Bold\np488\nsVBELLI\np489\nVBell MT Italic\np490\nsVBROADW\np491\nVBroadway\np492\nsVsegoepr\np493\nVSegoe Print\np494\nsVGILLUBCD\np495\nVGill Sans Ultra Bold Condensed\np496\nsVverdanab\np497\nVVerdana Bold\np498\nsVSalina__\np499\nVSalina\np500\nsVAGENCYB\np501\nVAgency FB Bold\np502\nsVAutumn__\np503\nVAutumn\np504\nsVGOUDOS\np505\nVGoudy Old Style\np506\nsVconstanz\np507\nVConstantia Bold Italic\np508\nsVPOORICH\np509\nVPoor Richard\np510\nsVPRISTINA\np511\nVPristina\np512\nsVLATINWD\np513\nVWide Latin\np514\nsVromanc__\np515\nVRomanC\np516\nsVLeelawUI\np517\nVLeelawadee UI\np518\nsVitalict_\np519\nVItalicT\np520\nsVostrich-regular\np521\nVOstrich Sans Medium\np522\nsVmonosbi\np523\nVMonospac821 BT Bold Italic\np524\nsVcambriai\np525\nVCambria Italic\np526\nsVisocp2__\np527\nVISOCP2\np528\nsVltromatic\np529\nVLetterOMatic!\np530\nsVbgothm\np531\nVBankGothic Md BT Medium\np532\nsVbgothl\np533\nVBankGothic Lt BT Light\np534\nsVSwkeys1\np535\nVSWGamekeys MT\np536\nsVCENSCBK\np537\nVCentury Schoolbook\np538\nsVgothicg_\np539\nVGothicG\np540\nsValmosnow\np541\nVAlmonte Snow\np542\nsVTangerine_Bold\np543\nVTangerine Bold\np544\nsVswisseb\np545\nVSwis721 Ex BT Bold\np546\nsVCOLONNA\np547\nVColonna MT\np548\nsVsupef___\np549\nVSuperFrench\np550\nsVTCCEB\np551\nVTw Cen MT Condensed Extra Bold\np552\nsVsylfaen\np553\nVSylfaen\np554\nsVcomicbd\np555\nVComic Sans MS Bold\np556\nsVRoland__\np557\nVRoland\np558\nsVELEPHNTI\np559\nVElephant Italic\np560\nsVmmrtext\np561\nVMyanmar Text\np562\nsVsymap___\np563\nVSymap\np564\nsVswissko\np565\nVSwis721 BlkOul BT Black\np566\nsVswissck\np567\nVSwis721 BlkCn BT Black\np568\nsVWhimsy\np569\nVWhimsy TT\np570\nsVsanssb__\np571\nVSansSerif Bold\np572\nsVtaileb\np573\nVMicrosoft Tai Le Bold\np574\nsVcomic\np575\nVComic Sans MS\np576\nsVGLSNECB\np577\nVGill Sans MT Ext Condensed Bold\np578\nsVColbert_\np579\nVColbert\np580\nsVJOKERMAN\np581\nVJokerman\np582\nsVARIALNB\np583\nVArial Narrow Bold\np584\nsVDOMIN___\np585\nVDominican\np586\nsVBRUSHSCI\np587\nVBrush Script MT Italic\np588\nsVCALLI___\np589\nVCalligraphic\np590\nsVFRADM\np591\nVFranklin Gothic Demi\np592\nsVJosefinSlab-LightItalic\np593\nVJosefin Slab Light Italic\np594\nsVsimplex_\np595\nVSimplex\np596\nsVphagspab\np597\nVMicrosoft PhagsPa Bold\np598\nsVswissek\np599\nVSwis721 BlkEx BT Black\np600\nsVscripts_\np601\nVScriptS\np602\nsVswisscl\np603\nVSwis721 LtCn BT Light\np604\nsVCASTELAR\np605\nVCastellar\np606\nsVdutchi\np607\nVDutch801 Rm BT Italic\np608\nsVnasaliza\np609\nVNasalization Medium\np610\nsVariali\np611\nVArial Italic\np612\nsVOpinehe_\np613\nVOpineHeavy\np614\nsVPLAYBILL\np615\nVPlaybill\np616\nsVROCCB___\np617\nVRockwell Condensed Bold\np618\nsVCALIST\np619\nVCalisto MT\np620\nsVCALISTB\np621\nVCalisto MT Bold\np622\nsVHATTEN\np623\nVHaettenschweiler\np624\nsVntailu\np625\nVMicrosoft New Tai Lue\np626\nsVCALISTI\np627\nVCalisto MT Italic\np628\nsVsegoeprb\np629\nVSegoe Print Bold\np630\nsVDAYTON__\np631\nVDayton\np632\nsVswissel\np633\nVSwis721 LtEx BT Light\np634\nsVmael____\np635\nVMael\np636\nsVisoct2__\np637\nVISOCT2\np638\nsVBorea___\np639\nVBorealis\np640\nsVwingding\np641\nVWingdings\np642\nsVONYX\np643\nVOnyx\np644\nsVmonosi\np645\nVMonospac821 BT Italic\np646\nsVtimesi\np647\nVTimes New Roman Italic\np648\nsVostrich-light\np649\nVOstrich Sans Condensed Light\np650\nsVseguihis\np651\nVSegoe UI Historic\np652\nsVNovem___\np653\nVNovember\np654\nsVOCRAEXT\np655\nVOCR A Extended\np656\nsVostrich-black\np657\nVOstrich Sans Black\np658\nsVnarrow\np659\nVPR Celtic Narrow Normal\np660\nsVitalic__\np661\nVItalic\np662\nsVmonosb\np663\nVMonospac821 BT Bold\np664\nsVPERB____\np665\nVPerpetua Bold\np666\nsVCreteRound-Regular\np667\nVCrete Round\np668\nsVcalibri\np669\nVCalibri\np670\nsVSCRIPTBL\np671\nVScript MT Bold\np672\nsVComfortaa-Bold\np673\nVComfortaa Bold\np674\nsVARIALN\np675\nVArial Narrow\np676\nsVHARNGTON\np677\nVHarrington\np678\nsVJosefinSlab-Bold\np679\nVJosefin Slab Bold\np680\nsVVIVALDII\np681\nVVivaldi Italic\np682\nsVhollh___\np683\nVHollywood Hills\np684\nsVBOD_R\np685\nVBodoni MT\np686\nsVSkinny__\np687\nVSkinny\np688\nsVLBRITED\np689\nVLucida Bright Demibold\np690\nsVframdit\np691\nVFranklin Gothic Medium Italic\np692\nsVsymusic_\np693\nVSymusic\np694\nsVgadugi\np695\nVGadugi\np696\nsVswissbi\np697\nVSwis721 BT Bold Italic\np698\nsVBOD_B\np699\nVBodoni MT Bold\np700\nsVERASDEMI\np701\nVEras Demi ITC\np702\nsVWaverly_\np703\nVWaverly\np704\nsVcompi\np705\nVCommercialPi BT\np706\nsVBOD_I\np707\nVBodoni MT Italic\np708\nsVconstan\np709\nVConstantia\np710\nsVARIALNBI\np711\nVArial Narrow Bold Italic\np712\nsVarialbi\np713\nVArial Bold Italic\np714\nsVJosefinSlab-Light\np715\nVJosefin Slab Light\np716\nsVBOD_CBI\np717\nVBodoni MT Condensed Bold Italic\np718\nsVwebdings\np719\nVWebdings\np720\nsVRAVIE\np721\nVRavie\np722\nsVROCC____\np723\nVRockwell Condensed\np724\nsVFELIXTI\np725\nVFelix Titling\np726\nsVRussrite\np727\nVRussel Write TT\np728\nsVisocteur\np729\nVISOCTEUR\np730\nsVLSANSD\np731\nVLucida Sans Demibold Roman\np732\nsVmalgun\np733\nVMalgun Gothic\np734\nsVheavyhea2\np735\nVHeavy Heap\np736\nsVGOUDYSTO\np737\nVGoudy Stout\np738\nsVVLADIMIR\np739\nVVladimir Script\np740\nsVARIALUNI\np741\nVArial Unicode MS\np742\nsVJosefinSlab-Thin\np743\nVJosefin Slab Thin\np744\nsVFRADMCN\np745\nVFranklin Gothic Demi Cond\np746\nsVBlackout-2am\np747\nVBlackout 2 AM\np748\nsVpalab\np749\nVPalatino Linotype Bold\np750\nsVDejaVuSansMono-Oblique\np751\nVDejaVu Sans Mono Oblique\np752\nsVANTQUABI\np753\nVBook Antiqua Bold Italic\np754\nsVswissc\np755\nVSwis721 Cn BT Roman\np756\nsVSPLASH__\np757\nVSplash\np758\nsVNIAGENG\np759\nVNiagara Engraved\np760\nsVCOPRGTB\np761\nVCopperplate Gothic Bold\np762\nsVBruss___\np763\nVBrussels\np764\nsVconsolab\np765\nVConsolas Bold\np766\nsVGOTHICBI\np767\nVCentury Gothic Bold Italic\np768\nsVmtproxy4\np769\nVProxy 4\np770\nsVmtproxy5\np771\nVProxy 5\np772\nsVromai___\np773\nVRomantic Italic\np774\nsVFRABKIT\np775\nVFranklin Gothic Book Italic\np776\nsVBELL\np777\nVBell MT\np778\nsVmtproxy1\np779\nVProxy 1\np780\nsVmtproxy2\np781\nVProxy 2\np782\nsVmtproxy3\np783\nVProxy 3\np784\nsVLCALLIG\np785\nVLucida Calligraphy Italic\np786\nsVphagspa\np787\nVMicrosoft PhagsPa\np788\nsVANTQUAI\np789\nVBook Antiqua Italic\np790\nsVmtproxy8\np791\nVProxy 8\np792\nsVmtproxy9\np793\nVProxy 9\np794\nsVLato-Bold\np795\nVLato Bold\np796\nsVtxt_____\np797\nVTxt\np798\nsVconstanb\np799\nVConstantia Bold\np800\nsVERASBD\np801\nVEras Bold ITC\np802\nsVLato-LightItalic\np803\nVLato Light Italic\np804\nsVRONDALO_\np805\nVRondalo\np806\nsVconstani\np807\nVConstantia Italic\np808\nsVBRLNSB\np809\nVBerlin Sans FB Bold\np810\nsVgeorgiaz\np811\nVGeorgia Bold Italic\np812\nsVgothice_\np813\nVGothicE\np814\nsVcalibriz\np815\nVCalibri Bold Italic\np816\nsVgeorgiab\np817\nVGeorgia Bold\np818\nsVLeelaUIb\np819\nVLeelawadee UI Bold\np820\nsVtimesbi\np821\nVTimes New Roman Bold Italic\np822\nsVPERI____\np823\nVPerpetua Italic\np824\nsVromab___\np825\nVRomantic Bold\np826\nsVBRLNSR\np827\nVBerlin Sans FB\np828\nsVBELLB\np829\nVBell MT Bold\np830\nsVgeorgiai\np831\nVGeorgia Italic\np832\nsVNirmalaS\np833\nVNirmala UI Semilight\np834\nsVdutchb\np835\nVDutch801 Rm BT Bold\np836\nsVdigifit\np837\nVDigifit Normal\np838\nsVROCKEB\np839\nVRockwell Extra Bold\np840\nsVgdt_____\np841\nVGDT\np842\nsVmonbaiti\np843\nVMongolian Baiti\np844\nsVsegoescb\np845\nVSegoe Script Bold\np846\nsVsymath__\np847\nVSymath\np848\nsVisoct___\np849\nVISOCT\np850\nsVTarzan__\np851\nVTarzan\np852\nsVsnowdrft\np853\nVSnowdrift\np854\nsVHTOWERTI\np855\nVHigh Tower Text Italic\np856\nsVCENTURY\np857\nVCentury\np858\nsVmalgunsl\np859\nVMalgun Gothic Semilight\np860\nsVseguibl\np861\nVSegoe UI Black\np862\nsVCreteRound-Italic\np863\nVCrete Round Italic\np864\nsVAlfredo_\np865\nVAlfredo\np866\nsVCOMMONS_\np867\nVCommons\np868\nsVLFAX\np869\nVLucida Fax\np870\nsVLBRITEI\np871\nVLucida Bright Italic\np872\nsVFRAHV\np873\nVFranklin Gothic Heavy\np874\nsVisocteui\np875\nVISOCTEUR Italic\np876\nsVManorly_\np877\nVManorly\np878\nsVBolstbo_\np879\nVBolsterBold Bold\np880\nsVsegoeui\np881\nVSegoe UI\np882\nsVNunito-Light\np883\nVNunito Light\np884\nsVIMPRISHA\np885\nVImprint MT Shadow\np886\nsVgeorgia\np887\nVGeorgia\np888\nsV18cents\np889\nV18thCentury\np890\nsVMOONB___\np891\nVMoonbeam\np892\nsVPER_____\np893\nVPerpetua\np894\nsVHansen__\np895\nVHansen\np896\nsVLato-Regular\np897\nVLato\np898\nsVBOUTON_International_symbols\np899\nVBOUTON International Symbols\np900\nsVCOOPBL\np901\nVCooper Black\np902\nsVmonos\np903\nVMonospac821 BT Roman\np904\nsVtahoma\np905\nVTahoma\np906\nsVcityb___\np907\nVCityBlueprint\np908\nsVswisscbi\np909\nVSwis721 Cn BT Bold Italic\np910\nsVEnliven_\np911\nVEnliven\np912\nsVLeelUIsl\np913\nVLeelawadee UI Semilight\np914\nsVCALIFR\np915\nVCalifornian FB\np916\nsVumath\np917\nVUniversalMath1 BT\np918\nsVswisscbo\np919\nVSwis721 BdCnOul BT Bold Outline\np920\nsVcomplex_\np921\nVComplex\np922\nsVBOOKOSB\np923\nVBookman Old Style Bold\np924\nsVMartina_\np925\nVMartina\np926\nsVromans__\np927\nVRomanS\np928\nsVmvboli\np929\nVMV Boli\np930\nsVCALIFI\np931\nVCalifornian FB Italic\np932\nsVGARABD\np933\nVGaramond Bold\np934\nsVebrima\np935\nVEbrima\np936\nsVTEMPSITC\np937\nVTempus Sans ITC\np938\nsVCALIFB\np939\nVCalifornian FB Bold\np940\nsVitalicc_\np941\nVItalicC\np942\nsVisocp3__\np943\nVISOCP3\np944\nsVscriptc_\np945\nVScriptC\np946\nsValiee13\np947\nVAlien Encounters\np948\nsVnobile_italic\np949\nVNobile Italic\np950\nsVGARAIT\np951\nVGaramond Italic\np952\nsVswissli\np953\nVSwis721 Lt BT Light Italic\np954\nsVCabinSketch-Bold\np955\nVCabinSketch Bold\np956\nsVcorbel\np957\nVCorbel\np958\nsVseguisbi\np959\nVSegoe UI Semibold Italic\np960\nsVSCHLBKBI\np961\nVCentury Schoolbook Bold Italic\np962\nsVasimov\np963\nVAsimov\np964\nsVLFAXDI\np965\nVLucida Fax Demibold Italic\np966\nsVBRADHITC\np967\nVBradley Hand ITC\np968\nsVswisscki\np969\nVSwis721 BlkCn BT Black Italic\np970\nsVGILSANUB\np971\nVGill Sans Ultra Bold\np972\nsVHARLOWSI\np973\nVHarlow Solid Italic Italic\np974\nsVHARVEIT_\np975\nVHarvestItal\np976\nsVcambriab\np977\nVCambria Bold\np978\nsVswissci\np979\nVSwis721 Cn BT Italic\np980\nsVcounb___\np981\nVCountryBlueprint\np982\nsVNotram__\np983\nVNotram\np984\nsVPENULLI_\np985\nVPenultimateLight\np986\nsVtahomabd\np987\nVTahoma Bold\np988\nsVMISTRAL\np989\nVMistral\np990\nsVpala\np991\nVPalatino Linotype\np992\nsVOLDENGL\np993\nVOld English Text MT\np994\nsVinductio\np995\nVInduction Normal\np996\nsVJosefinSlab-SemiBoldItalic\np997\nVJosefin Slab SemiBold Italic\np998\nsVMinerva_\np999\nVMinerva\np1000\nsVsymbol\np1001\nVSymbol\np1002\nsVcambriaz\np1003\nVCambria Bold Italic\np1004\nsVtrebucbi\np1005\nVTrebuchet MS Bold Italic\np1006\nsVtimes\np1007\nVTimes New Roman\np1008\nsVERASLGHT\np1009\nVEras Light ITC\np1010\nsVSteppes\np1011\nVSteppes TT\np1012\nsVREFSPCL\np1013\nVMS Reference Specialty\np1014\nsVPARCHM\np1015\nVParchment\np1016\nsVDejaVuSansMono-Bold\np1017\nVDejaVu Sans Mono Bold\np1018\nsVswisscli\np1019\nVSwis721 LtCn BT Light Italic\np1020\nsVLSANS\np1021\nVLucida Sans\np1022\nsVPhrasme_\np1023\nVPhrasticMedium\np1024\nsVDejaVuSansMono-BoldOblique\np1025\nVDejaVu Sans Mono Bold Oblique\np1026\nsVarialbd\np1027\nVArial Bold\np1028\nsVSNAP____\np1029\nVSnap ITC\np1030\nsVArchitectsDaughter\np1031\nVArchitects Daughter\np1032\nsVCorpo___\np1033\nVCorporate\np1034\nsVeurro___\np1035\nVEuroRoman Oblique\np1036\nsVimpact\np1037\nVImpact\np1038\nsVlittlelo\np1039\nVLittleLordFontleroy\np1040\nsVsimsunb\np1041\nVSimSun-ExtB\np1042\nsVARIALNI\np1043\nVArial Narrow Italic\np1044\nsVdutchbi\np1045\nVDutch801 Rm BT Bold Italic\np1046\nsVcalibrii\np1047\nVCalibri Italic\np1048\nsVDeneane_\np1049\nVDeneane\np1050\nsVFRADMIT\np1051\nVFranklin Gothic Demi Italic\np1052\nsVANTQUAB\np1053\nVBook Antiqua Bold\np1054\nsVcalibril\np1055\nVCalibri Light\np1056\nsVisocpeui\np1057\nVISOCPEUR Italic\np1058\nsVpanroman\np1059\nVPanRoman\np1060\nsVMelodbo_\np1061\nVMelodBold Bold\np1062\nsVcalibrib\np1063\nVCalibri Bold\np1064\nsVdistant galaxy 2\np1065\nVDistant Galaxy\np1066\nsVPacifico\np1067\nVPacifico\np1068\nsVnobile_bold_italic\np1069\nVNobile Bold Italic\np1070\nsVmsyi\np1071\nVMicrosoft Yi Baiti\np1072\nsVBOD_PSTC\np1073\nVBodoni MT Poster Compressed\np1074\nsVLSANSI\np1075\nVLucida Sans Italic\np1076\nsVcreerg__\np1077\nVCreepygirl\np1078\nsVsegoeuisl\np1079\nVSegoe UI Semilight\np1080\nsVvinet\np1081\nVVineta BT\np1082\nsVisocpeur\np1083\nVISOCPEUR\np1084\nsVtechl___\np1085\nVTechnicLite\np1086\nsVswissb\np1087\nVSwis721 BT Bold\np1088\nsVCLARE___\np1089\nVClarendon\np1090\nsVdutch\np1091\nVDutch801 Rm BT Roman\np1092\nsVLBRITEDI\np1093\nVLucida Bright Demibold Italic\np1094\nsVswisse\np1095\nVSwis721 Ex BT Roman\np1096\nsVswissk\np1097\nVSwis721 Blk BT Black\np1098\nsVswissi\np1099\nVSwis721 BT Italic\np1100\nsVfingerpop2\np1101\nVFingerpop\np1102\nsVswissl\np1103\nVSwis721 Lt BT Light\np1104\nsVBAUHS93\np1105\nVBauhaus 93\np1106\nsVVivian__\np1107\nVVivian\np1108\nsVgreeks__\np1109\nVGreekS\np1110\nsVGOUDOSI\np1111\nVGoudy Old Style Italic\np1112\nsVBOD_BI\np1113\nVBodoni MT Bold Italic\np1114\nsVLHANDW\np1115\nVLucida Handwriting Italic\np1116\nsVITCKRIST\np1117\nVKristen ITC\np1118\nsVBALTH___\np1119\nVBalthazar\np1120\nsVFORTE\np1121\nVForte\np1122\nsVJosefinSlab-Regular\np1123\nVJosefin Slab\np1124\nsVROCKI\np1125\nVRockwell Italic\np1126\nsVGOUDOSB\np1127\nVGoudy Old Style Bold\np1128\nsVLEELAWAD\np1129\nVLeelawadee\np1130\nsVLEELAWDB\np1131\nVLeelawadee Bold\np1132\nsVmarlett_0\np1133\nVMarlett\np1134\nsVmplus-1m-bold\np1135\nVM+ 1m bold\np1136\nsVmplus-1m-light\np1137\nVM+ 1m light\np1138\nsVmplus-1m-medium\np1139\nVM+ 1m medium\np1140\nsVmplus-1m-regular\np1141\nVM+ 1m\np1142\nsVmplus-1m-thin\np1143\nVM+ 1m thin\np1144\nsVMSUIGHUB\np1145\nVMicrosoft Uighur Bold\np1146\nsVMSUIGHUR\np1147\nVMicrosoft Uighur\np1148\nsVSamsungIF_Md_0\np1149\nVSamsung InterFace Medium\np1150\nsVSamsungIF_Rg_0\np1151\nVSamsung InterFace\np1152\nsVbahnschrift\np1153\nVBahnschrift\np1154\nsVBowlbyOneSC-Regular\np1155\nVBowlby One SC\np1156\nsVCabinSketch-Regular\np1157\nVCabin Sketch\np1158\nsVCookie-Regular\np1159\nVCookie\np1160\nsVCourgette-Regular\np1161\nVCourgette\np1162\nsVdead\np1163\nVDead Kansas\np1164\nsVDoppioOne-Regular\np1165\nVDoppio One\np1166\nsVeuphorig\np1167\nVEuphorigenic\np1168\nsVGreatVibes-Regular\np1169\nVGreat Vibes\np1170\nsVKalam-Bold\np1171\nVKalam Bold\np1172\nsVKalam-Light\np1173\nVKalam Light\np1174\nsVKalam-Regular\np1175\nVKalam\np1176\nsVLemon-Regular\np1177\nVLemon\np1178\nsVLimelight-Regular\np1179\nVLimelight\np1180\nsVMegrim\np1181\nVMegrim Medium\np1182\nsVMontserratSubrayada-Bold\np1183\nVMontserrat Subrayada Bold\np1184\nsVNotoSans-Regular\np1185\nVNoto Sans\np1186\nsVRussoOne-Regular\np1187\nVRusso One\np1188\nsVSigmarOne-Regular\np1189\nVSigmar One\np1190\nsVYellowtail-Regular\np1191\nVYellowtail\np1192\ns.')  # NOQA
+    return _std_fonts.cached
 
 
 def fonts():
@@ -9400,10 +9596,11 @@ def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
                 pass
 
     if result is None:
-        result = ImageFont.load_default()  # last resort
+        result = ImageFont.loaddefault()  # last resort
 
-    getfont.lookup[(fontname, fontsize)] = result
-    return result
+    heightA = result.getsize('A')[1]
+    getfont.lookup[(fontname, fontsize)] = result, heightA
+    return result, heightA
 
 
 def show_fonts():
@@ -9431,14 +9628,48 @@ def show_colornames():
         print('{:22s}{}'.format(name, colornames()[name]))
 
 
+def can_animate():
+    '''
+    Returns
+    -------
+    True if animation is supported, False otherwise : bool
+    '''
+    return g.can_animate
+
+
+def can_video():
+    '''
+    Returns
+    -------
+    True if video production is supported, False otherwise : bool
+    '''
+    return g.can_video
+
+
 def default_env():
     '''
     Returns
     -------
     default environment : Environment
     '''
-    return _default_env
+    return g.default_env
 
+
+def reset():
+    '''
+    resets global variables
+
+    used internally at import of salabim
+
+    might be useful for REPLs or for Pythonista
+    '''
+    g.default_env = None
+    g.animation_env = None
+    g.animation_scene = None
+    g.in_draw = False
+
+
+reset()
 
 if __name__ == '__main__':
     try:

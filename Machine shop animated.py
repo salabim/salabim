@@ -158,7 +158,7 @@ def xrepairman(i, t):
 
 def do_animation():
 
-    env.animation_parameters(modelname='Machine shop', speed=4)
+    env.animation_parameters(modelname='Machine shop', speed=4, background_color='20%gray')
     for machine in machines:
         MachineBarAnimate(machine)
         MachineTextAnimate(machine)

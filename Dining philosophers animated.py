@@ -10,14 +10,14 @@ class AnimatePhilosopher(sim.Animate):
         r2 = r1 * sin(radians(alpha) / 4)
         angle = i * alpha
         sim.Animate.__init__(self, x0=r1 * cos(radians(angle)), y0=r1 * sin(radians(angle)),
-            circle0=(r2,), linewidth0=0)
+            circle0=(r2,), linewidth0=0, xy_anchor='c')
         self.i = i
 
     def fillcolor(self, t):
         if philosopher[self.i].mode() == 'eating':
             return 'green'
         if philosopher[self.i].mode() == 'thinking':
-            return 'black'
+            return 'fg'
         return 'red'
 
 
@@ -46,17 +46,18 @@ class AnimateFork(sim.Animate):
 def do_animation():
     global nphilosophers, eatingtime_mean, thinkingtime_mean
     global nphilosophers_last
-    env.animation_parameters(x0=-50 * env.width / env.height, y0=-50, x1=+50 * env.width / env.height,
-                             modelname='Dining philosophers',
-                             speed=8)
+    env.animation_parameters(x0=-50 * env.width() / env.height(), y0=-50,
+        x1=+50 * env.width() / env.height(),
+        modelname='Dining philosophers',
+        speed=8, background_color='20%gray')
     for i, _ in enumerate(philosopher):
         AnimatePhilosopher(i=i)
         AnimateFork(i=i)
-    sim.AnimateSlider(x=520, y=env.height, width=100, height=20,
+    sim.AnimateSlider(x=520, y=env.height(), width=100, height=20,
         vmin=10, vmax=40, resolution=5, v=eatingtime_mean, label='eating time', action=set_eatingtime_mean)
-    sim.AnimateSlider(x=660, y=env.height, width=100, height=20,
+    sim.AnimateSlider(x=660, y=env.height(), width=100, height=20,
         vmin=10, vmax=40, resolution=5, v=thinkingtime_mean, label='thinking time', action=set_thinkingtime_mean)
-    sim.AnimateSlider(x=520 + 50, y=env.height - 50, width=200, height=20,
+    sim.AnimateSlider(x=520 + 50, y=env.height() - 50, width=200, height=20,
         vmin=3, vmax=40, resolution=1, v=nphilosophers, label='# philosophers', action=set_nphilosophers)
     nphilosophers_last = nphilosophers
 
@@ -98,9 +99,11 @@ eatingtime_mean = 20
 thinkingtime_mean = 20
 nphilosophers = 8
 sim.random_seed(1234567)
+env = sim.Environment()
+
 
 while True:
-    env = sim.Environment()
+    env.__init__()
     philosopher = []
     fork = []
     for i in range(nphilosophers):
@@ -113,5 +116,4 @@ while True:
     philosopher[0].leftfork = fork[nphilosophers - 1]
 
     do_animation()
-
-    env.run()
+    env.run(500)

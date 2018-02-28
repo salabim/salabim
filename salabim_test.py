@@ -1,12 +1,79 @@
 import salabim as sim
 import math
 import random
+import string
+import time
 
 import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test49()
+    test52()
+
+def test52():
+    class X(sim.Component):
+        def process(self):
+#            env.animation_parameters(animate=False)
+            while env.now()<=6:
+                an.update(text=str(env.now()), x0=env.now()*10)
+                yield self.hold(1)
+            env.animate(True)
+            while env.now()<=12:
+                an.update(text=str(env.now()),x0=env.now()*10)
+                yield self.hold(1)
+            env.animation_parameters(animate=False)
+            while env.now()<=20:
+                an.update(text=str(env.now()),x0=env.now()*10)
+                yield self.hold(1)
+            env.animation_parameters(animate=True, modelname='something else', background_color='90%gray',x0=-100, width =500, height=500)
+            env.x0(-100)
+            while env.now()<=25:
+                an.update(text=str(env.now()),x0=env.now()*10, textcolor0='red')
+                yield self.hold(1)
+
+
+    sim.reset()
+    env=sim.Environment(trace=True)
+    env.animation_parameters(animate=True, modelname='test52')
+    s = sim.AnimateSlider(x=300,y=-50,xy_anchor='nw')
+    a=sim.Animate(line0=(0,-50,300,-50), xy_anchor='nw',screen_coordinates=True)
+#    env.animate(True)
+
+    X()
+    an = sim.Animate(text='Test',x0=100, y0 =100)
+    r = sim.Animate(rectangle0=(100,100,200,200),x0=0,y0=10)
+    r = sim.Animate(circle0=(1.11,),x0=0,y0=10,fillcolor0='red')
+    l = sim.Animate(polygon0=(10,10,20,20,10,20), fillcolor0='bg',linecolor0='fg',linewidth0=0.1)
+    b = sim.AnimateButton(text='My button', x=-100, y=-20, xy_anchor='ne')
+    env.run(10)
+    env.run(20)
+    env.quit()
+
+
+
+def test51():
+    env = sim.Environment()
+    d = sim.Poisson(100)
+    x = []
+    m = sim.Monitor(name='samples')
+    for i in range(10000):
+        m.tally(d.sample())
+    m.print_histogram(30, 0, 1)
+
+def test50():
+    env=sim.Environment()
+    for i, c in enumerate(string.printable):
+        if i <= 94:
+            print(i,c)
+            sim.Animate(text=c,x0=10+i*10,y0=100,anchor='w')
+    sim.Animate(line0=(0, 100, 1024, 100), linecolor0='red')
+
+    env.animation_parameters(modelname='Test')
+    env.animating = True
+    env.trace(True)
+    env.run(5)
+    print (env.main()._scheduled_time)
+
 
 def test49():
     l1 = []
@@ -22,7 +89,7 @@ def test49():
                 print(f.read_item())
             except EOFError:
                 break
-    
+
 
 
 
@@ -51,9 +118,9 @@ def test48():
     class A(sim.Component):
         def process(self):
             while env.now()<5:
-                if env.now()>3:
+                if env.now()>30:
                     env.main().activate()
-                yield self.standby()
+                yield self.hold(1)
 
 
     class B(sim.Component):
@@ -61,10 +128,11 @@ def test48():
             while True:
                 yield self.hold(1)
     env = sim.Environment(trace=True)
-    env.trace_standby(True)
+    env.suppress_trace_standby(True)
     A()
     B()
     env.run(8)
+    print('ready')
 
 
 

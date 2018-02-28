@@ -49,9 +49,6 @@ def do_animation():
             show_fps=False, background_color='20%gray')
     else:
         env.animation_parameters(modelname='Elevator', speed=32, background_color='20%gray')
-        
-    print(env)
-    print(env.foreground_color)
 
     sim.Environment.animation_pre_tick = animation_pre_tick
 
@@ -62,7 +59,7 @@ def do_animation():
     xcar = {}
     xled = {}
 
-    x = env.width
+    x = env.width()
     for car in cars:
         x -= (capacity + 1) * xvisitor_dim
         xcar[car] = x
@@ -90,29 +87,37 @@ def do_animation():
     for car in cars:
         x = xcar[car]
         car.pic = sim.Animate(x0=x,
-           rectangle0=(0, 0, capacity * xvisitor_dim, yvisitor_dim), fillcolor0='lightblue')
+           rectangle0=(0, 0, capacity * xvisitor_dim, yvisitor_dim), fillcolor0='lightblue', linewidth0=0)
         car.visitors.animate(x=xcar[car], y=600, direction='e')
 
     ncars_last = ncars
-    sim.AnimateSlider(x=510, y=env.height, width=90, height=20,
-        vmin=1, vmax=5, resolution=1, v=ncars, label='#elevators', action=set_ncars)
+    sim.AnimateSlider(x=510, y=0, width=90, height=20,
+        vmin=1, vmax=5, resolution=1, v=ncars, label='#elevators', action=set_ncars,
+        xy_anchor='nw')
 
     topfloor_last = topfloor
-    sim.AnimateSlider(x=610, y=env.height, width=90, height=20,
-        vmin=5, vmax=20, resolution=1, v=topfloor, label='top floor', action=set_topfloor)
+    sim.AnimateSlider(x=610, y=0, width=90, height=20,
+        vmin=5, vmax=20, resolution=1, v=topfloor, label='top floor', action=set_topfloor,
+        xy_anchor='nw')
 
     capacity_last = capacity
-    sim.AnimateSlider(x=710, y=env.height, width=90, height=20,
-        vmin=2, vmax=6, resolution=1, v=capacity, label='capacity', action=set_capacity)
+    sim.AnimateSlider(x=710, y=0, width=90, height=20,
+        vmin=2, vmax=6, resolution=1, v=capacity, label='capacity', action=set_capacity,
+        xy_anchor='nw')
 
-    sim.AnimateSlider(x=510, y=env.height - 50, width=90, height=25,
-        vmin=0, vmax=400, resolution=25, v=load_0_n, label='Load 0->n', action=set_load_0_n)
+    sim.AnimateSlider(x=510, y=-50, width=90, height=25,
+        vmin=0, vmax=400, resolution=25, v=load_0_n, label='Load 0->n', action=set_load_0_n,
+        xy_anchor='nw')
 
-    sim.AnimateSlider(x=610, y=env.height - 50, width=90, height=25,
-        vmin=0, vmax=400, resolution=25, v=load_n_n, label='Load n->n', action=set_load_n_n)
+    sim.AnimateSlider(x=610, y=-50, width=90, height=25,
+        vmin=0, vmax=400, resolution=25, v=load_n_n, label='Load n->n', action=set_load_n_n,
+        xy_anchor='nw')
 
-    sim.AnimateSlider(x=710, y=env.height - 50, width=90, height=25,
-        vmin=0, vmax=400, resolution=25, v=load_n_0, label='Load n->0', action=set_load_n_0)
+    sim.AnimateSlider(x=710, y=-50, width=90, height=25,
+        vmin=0, vmax=400, resolution=25, v=load_n_0, label='Load n->0', action=set_load_n_0,
+        xy_anchor='nw')
+
+    env.animating = True
 
 
 def set_load_0_n(val):
@@ -350,7 +355,7 @@ ncars = 3
 topfloor = 15
 
 while True:
-    env = sim.Environment(trace=True)
+    env = sim.Environment(trace=False)
 
     vg_0_n = VisitorGenerator(
         from_=(0, 0), to=(1, topfloor), id='0_n', name='vg_0_n')
@@ -373,3 +378,4 @@ while True:
         break
     else:
         env.run()
+    env.animation_parameters(animate=False)

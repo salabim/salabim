@@ -15,6 +15,7 @@ def shortname(ship):
             s = s + c
     return s
 
+
 def shipcolor(side):
     if side == left:
         return 'blue'
@@ -72,20 +73,20 @@ def do_animation():
 
     sim.Environment.animation_pre_tick = animation_pre_tick
     env.animation_parameters(
-        x0=xbound[left], y0=-waterdepth, x1=xbound[right], modelname='Lock', speed=8, fps=30)
+        x0=xbound[left], y0=-waterdepth, x1=xbound[right], modelname='Lock', speed=8, background_color='20%gray')
 
     for side in [left, right]:
         wait[side].animate(x=xdoor[side], y=10 + ylevel[side], direction='n')
 
     sim.Animate(rectangle0=(xbound[left], ylevel[left] - waterdepth,
-                            xdoor[left], ylevel[left]), fillcolor0='aqua', linewidth0=0)
+                            xdoor[left], ylevel[left]), fillcolor0='aqua')
     sim.Animate(rectangle0=(xdoor[right], ylevel[right] - waterdepth,
-                            xbound[right], ylevel[right]), fillcolor0='aqua', linewidth0=0)
-    a = sim.Animate(rectangle0=(0, 0, 0, 0), fillcolor0='aqua', linewidth0=0)
+                            xbound[right], ylevel[right]), fillcolor0='aqua')
+    a = sim.Animate(rectangle0=(0, 0, 0, 0), fillcolor0='aqua')
     a.rectangle = lock_water_rectangle
-    a = sim.Animate(rectangle0=(0, 0, 0, 0), fillcolor0='black', linewidth0=0)
+    a = sim.Animate(rectangle0=(0, 0, 0, 0))
     a.rectangle = lock_door_left_rectangle
-    a = sim.Animate(rectangle0=(0, 0, 0, 0), fillcolor0='black', linewidth0=0)
+    a = sim.Animate(rectangle0=(0, 0, 0, 0))
     a.rectangle = lock_door_right_rectangle
 
     a = sim.Animate(text='', x0=10, y0=650, screen_coordinates=True,
@@ -105,10 +106,10 @@ def do_animation():
         fontsize0=15, font='narrow', anchor='w')
     a.text = lambda t: '  nr waiting right: {:3d}'.format(wait[right].length())
 
-    sim.AnimateSlider(x=520, y=env.height, width=100, height=20,
-          vmin=16, vmax=60, resolution=4, v=iat, label='iat', action=set_iat)
-    sim.AnimateSlider(x=660, y=env.height, width=100, height=20,
-          vmin=10, vmax=60, resolution=5, v=meanlength, label='mean length', action=set_meanlength)
+    sim.AnimateSlider(x=520, y=0, width=100, height=20,
+          vmin=16, vmax=60, resolution=4, v=iat, label='iat', action=set_iat, xy_anchor='nw')
+    sim.AnimateSlider(x=660, y=0, width=100, height=20,
+          vmin=10, vmax=60, resolution=5, v=meanlength, label='mean length', action=set_meanlength, xy_anchor='nw')
 
 
 def set_iat(val):
@@ -144,7 +145,7 @@ class Ship(sim.Component):
         an1 = sim.Animate(polygon0=ship_polygon(self),
             fillcolor0=shipcolor(self.side), anchor=anchor, linewidth0=0)
         an2 = sim.Animate(text=shortname(self), textcolor0='white',
-            anchor=anchor, fontsize0=2.5, offsetx0=self.side * 5)
+            anchor=anchor, fontsize0=2.4, offsetx0=self.side * 5, offsety0=0.7)
         return (size_x, size_y, an1, an2)
 
     def process(self):

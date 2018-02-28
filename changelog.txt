@@ -1,5 +1,63 @@
 salabim  changelog
 
+version 2.2.15  2018-02-28
+==========================
+Animation updates
+-----------------
+Overhaul of the way animation is organized. Now, the animation can be started and stopped during a run.
+When animation is off, the simulation model runs full speed without any overhead.
+It is possible to use different environmnent for the animation although not at the same time.
+
+The API for animation has changed slightly:
+center is now refered to as 'c'  (although 'center' is still accepted)
+xy_anchor allows x0, x1, y0 and y1 in Animate and x and y in AnimateButton or AnimateSlider object, to be
+relative to each of the wind directions 'n', 'nw', 'w', 'sw', 's', 'se', 'e' or 'ne' or 'c' (for center).
+This makes it, for instance, possible to define a button relative to the top right hand corner of the 
+animation frame:
+b = sim.AnimateButton(text='My button', x=-100, y=-20, xy_anchor='ne')
+
+All arguments of Environment.animation_parameters have now a corresponding function that
+can be used to set or query one of the animation parameters:
+  Environment.x0() to set/query x-coordinate of lower left corner of animation frame 
+  Environment.x1() to set/query x-coordinate of upper right corner of animation frame
+  Environment.y0() to set/query y-coordinate of lower left corner of animation frame
+  Environment.y1() to query y-coordinate of upper right corner of animation frame
+  Environment.width() to set/query width of animation frame
+  Environment.height() to set/query height of animation frame
+  Environment.fps() to set/query the number of frames per second
+  Environment.show_time() to set/query whether time should be shown
+  Environment.show_fps() to set/query whether fps should be shown
+  Environment.modelname() to set/query the model name ('' to show nothing)
+  Environment.animate() to start/stop the animation and to query the current status
+  Environment.speed() to set/query the speed of the animation
+  Environment.video() to set/query the name of the video ('' for no video)
+
+New functionality
+-----------------
+The Poisson distribution is now supported.
+
+Enhancements
+------------
+Text alignment in text Animate is significantly improved. Now the text is always aligned according to the 
+(estimated) 'cap line', which is derived from a capital A.
+So, when aligning south, the descender of the g is below the baseline.
+When aligning north, top of the capline is the given y-position.
+Finally, aligning w, c or e means given y-position is the middle of the cap line.
+
+Functionality updates
+---------------------
+- linewidth0 defaults to 1 for lines, 0 for rectangles, polygons and circles.
+- When a modelname is given, that is presented in a different way along with a salabim logo.
+
+Updated animated sample files
+-----------------------------
+Please not that the animated sample models have been updated to use the new xy_anchor functionality.
+
+Bug fix
+-------
+Collected tallies for monitors were not cached properly, resulting in non optimal performance of Monitor.x() and
+querying the monitor, e.g. print_histogram.
+
 version 2.2.14  2018-02-02         
 ==========================
 New functionality
@@ -49,7 +107,7 @@ So, a typical input file is:
      
      #end of file 
 
-Insted of filename as a parameter to ItemFile, also a string with the content can be given. In that
+Instead of the filename as a parameter to ItemFile, also a string with the content can be given. In that
 case, at least one linefeed has to be in the content string. Usually, the content string will be triple
 quoted. This can be very useful during testing as the input is part of the source file and not external, e.g.
 
