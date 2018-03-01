@@ -33,8 +33,10 @@ def test52():
 
 
     sim.reset()
+    print('***can_animate',sim.can_animate())
+    print('***can_video',sim.can_video())
     env=sim.Environment(trace=True)
-    env.animation_parameters(animate=True, modelname='test52')
+    env.animation_parameters(animate=True, modelname='test52', video='test.mp4')
     s = sim.AnimateSlider(x=300,y=-50,xy_anchor='nw')
     a=sim.Animate(line0=(0,-50,300,-50), xy_anchor='nw',screen_coordinates=True)
 #    env.animate(True)

@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.15'
+__version__ = '2.2.16'
 
 import heapq
 import random
@@ -34,51 +34,6 @@ class SalabimError(Exception):
 
 class g():
     pass
-
-
-g.can_animate = True
-g.can_video = False
-g.reason_cannot_animate = ''
-g.reason_cannot_video = ''
-
-try:
-    import PIL  # NOQA
-    from PIL import Image
-    from PIL import ImageDraw
-    from PIL import ImageFont
-    g.can_animate = True
-except ImportError:
-    g.can_animate = False
-    g.reason_cannot_animate = 'PIL is required for animation. Install with pip install Pillow'
-
-if Pythonista:
-    g.can_video = False
-    g.reason_cannot_video = 'video production not supported on Pythonista'
-else:
-    if g.can_animate:
-        from PIL import ImageTk
-        try:
-            import tkinter
-        except ImportError:
-            try:
-                import Tkinter as tkinter
-            except ImportError:
-                g.can_animate = False
-                g.reason_cannot_animate = 'tkinter is required for animation'
-    if g.can_animate:
-        try:
-            import cv2
-            import numpy as np
-            g.can_video = True
-        except ImportError:
-            g.can_video = False
-            if platform.python_implementation == 'PyPy':
-                g.reason_cannot_video = 'video production is not supported under PyPy.'
-            else:
-                g.reason_cannot_video = 'cv2 required for video production. Install with pip install opencv-python'
-    else:
-        g.can_video = False
-        g.reason_cannot_video = 'cannot animate, because ' + g.reason_cannot_animate
 
 
 if Pythonista:
@@ -1446,8 +1401,8 @@ if Pythonista:
 
                         scene.push_matrix()
                         scene.translate(xfirst, uy + uio.height + 2)
-                        scene.text(uio.label, uio.font,
-                                   uio.fontsize, alignment=9)
+                        if uio.label:
+                            scene.text(uio.label, uio.font, uio.fontsize, alignment=9)
                         scene.pop_matrix()
                         scene.translate(ux + uio.width, uy + uio.height + 2)
                         scene.text(str(thisv) + ' ',
@@ -2866,8 +2821,7 @@ class Environment(object):
             if video != self.video:
                 self.video_close()
                 if video:
-                    if not g.can_video:
-                        raise SalabimError(g.reason_cannot_video)
+                    can_video(try_only=False)
                 self.video = video
 
         if animate is None:
@@ -2895,8 +2849,7 @@ class Environment(object):
                 g.animation_env = None
 
             if animate:
-                if not g.can_animate:
-                    raise SalabimError(g.reason_cannot_animate)
+                can_animate(try_only=False)  # install modules
 
                 g.animation_env = self
                 self.t = self._now  # for the call to set_start_animation
@@ -9628,22 +9581,82 @@ def show_colornames():
         print('{:22s}{}'.format(name, colornames()[name]))
 
 
-def can_animate():
+def can_animate(try_only=True):
     '''
+    Tests whether animation is supported.
+
+    Parameters
+    ----------
+    try_only : bool
+        if True (default), the function does not raise an error when the required modules cannot be imported |n|
+        if False, the function will only return if the required modules could be imported.
+
     Returns
     -------
-    True if animation is supported, False otherwise : bool
+    True, if required modules could be imported, False otherwise : bool
     '''
-    return g.can_animate
+    global Image
+    global ImageDraw
+    global ImageFont
+    global ImageTk
+    global tkinter
+    try:
+        import PIL  # NOQA
+        from PIL import Image
+        from PIL import ImageDraw
+        from PIL import ImageFont
+        if not Pythonista:
+            from PIL import ImageTk
+    except ImportError:
+        if try_only:
+            return False
+        raise SalabimError('PIL is required for animation. Install with pip install Pillow or see salabim manual')
+
+    if not Pythonista:
+        try:
+            import tkinter
+        except ImportError:
+            try:
+                import Tkinter as tkinter
+            except ImportError:
+                if try_only:
+                    return False
+                raise SalabimError('tkinter is required for animation')
+    return True
 
 
-def can_video():
+def can_video(try_only=True):
     '''
+    Tests whether video is supported.
+
+    Parameters
+    ----------
+    try_only : bool
+        if True (default), the function does not raise an error when the required modules cannot be imported |n|
+        if False, the function will only return if the required modules could be imported.
+
     Returns
     -------
-    True if video production is supported, False otherwise : bool
+    True, if required modules could be imported, False otherwise : bool
     '''
-    return g.can_video
+    global cv2
+    global np
+    if Pythonista:
+        if try_only:
+            return False
+        raise SalabimError('video production not supported on Pythonista')
+    else:
+        try:
+            import cv2
+            import numpy as np
+        except ImportError:
+            if try_only:
+                return False
+            if platform.python_implementation == 'PyPy':
+                raise SalabimError('video production is not supported under PyPy.')
+            else:
+                raise SalabimError('cv2 required for video production. Install with pip install opencv-python')
+    return True
 
 
 def default_env():
