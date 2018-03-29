@@ -10,7 +10,7 @@ class AnimatePhilosopher(sim.Animate):
         r2 = r1 * sin(radians(alpha) / 4)
         angle = i * alpha
         sim.Animate.__init__(self, x0=r1 * cos(radians(angle)), y0=r1 * sin(radians(angle)),
-            circle0=(r2,), linewidth0=0, xy_anchor='c')
+            circle0=r2, linewidth0=0, xy_anchor='c')
         self.i = i
 
     def fillcolor(self, t):

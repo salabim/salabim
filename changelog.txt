@@ -1,5 +1,55 @@
 salabim  changelog
 
+version 2.2.17  2018-03-31
+==========================
+New functionality
+-----------------
+Normal distribution now supports specification of coefficient_of_variation as an alternative
+  to standard_deviation.
+Note that it is not allowed to specify both standard_deviation and cooeficient_of_variation.
+The coefficient_of_variation is now also shown in Normal.print_info().
+The coefficient_of_variation is defined as the standard deviation divided by the mean.
+
+Method Environment.scale() introduced, returning the scale of the animation, i.e. (x1 - x0) / width
+
+sim.Animate and sim.update now allows and prefers circle0 or circle1 to be specified as a scalar.
+The functionality to the specify the radius as a one element tuple/list is still supported.
+E.g. sim.Animate(circle0=(30,)) is equivalent to sim.Animate(circle0=30) now.
+Note that Animate.circle may also return a one item tuple/list or a scalar.
+
+sim.Animate() and sim.update() now allows the specification of
+  line0, line1, rectangle0, rectangle1, poloygon0 and polygon1 to include None values
+The None values will repeat the previous x or y value. E.g.
+sim.Animate(line0=(10, 20, None, 30, 40, None)) is equivalent to sim.Animate(line0=(10, 20, 10, 30, 40, 30))
+
+Function polygon_arrow() added.
+Function rectangle_centered() added.
+
+Video production now supports .MP4 and .AVI extensions. Other extensions are not accepted.
+
+Environment.is_dark(colorspec) now returns the is_dark value of the background color
+  if the alpha value of the colorspec is 0.
+
+Changed API
+-----------
+The parameter lambda_ for the Poisson distribution is renamed to mean, in order to avoid problems
+with the online documentation.
+
+Bug fixes
+---------
+Bug in handling width/height of images when using a redefined coordinate system fixed.
+Bug in method Queue.add_at_head() fixed.
+Bug with default font handling on Pythonista fixed.
+Bug in Environment.animation_parameters() and Environment.video() fixed.
+Work around a PIL bug where rendering the first letter of some italic font texts chopped the lefthand serif.
+
+Sample files
+----------------
+Show colornames.py shows all available colors.
+Demo using process interaction in method.py gives an example of how to use hold in a separate method.
+Dining philsophers animated.py updated to use the new circle specification.
+
+
 version 2.2.16  2018--03-01
 ===========================
 From this version, neither animation modules (PIL, tkinter) nor video modules (cv2, numpy) will

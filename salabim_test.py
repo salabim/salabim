@@ -3,13 +3,175 @@ import math
 import random
 import string
 import time
+import logging
 
 import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test52()
+    test59()
+    
+    
+def test59():
+    def do_next():
+        global ans
+        global min_n
+        
+        for an in ans:
+            an.remove()
+        ans = []
+    
+        x=10
+        y=env.height() - 80
+        sx= 230
+        sy=14
+        y -= 30
+        fontnames = []
+        n=0
+        
+        for fns, ifilename in sim.fonts():
+            for fn in fns:
+                fontnames.append(fn)
+        fontnames.extend(sim.standardfonts().keys())
+        last = ''
+        any = False
+        for font in sorted(fontnames, key=sim.normalize):
+            if font != last:  # remove duplicates
+                last = font
+                n += 1
+                if n >= min_n:
+                    any = True
+                    ans.append(sim.Animate(text=font, x0=x, y0=y, anchor='sw', fontsize0=15, font=font))
+                    x += sx + 5
+                    if x + sx > 1024:
+                        y -= sy + 4
+                        x = 10
+                        if y<0:
+                            break
+        min_n = n + 1
+        if not any:
+            env.quit()
+        
+    global ans
+    global min_n
+    
+    env = sim.Environment()
+    sim.AnimateButton(x=500,y=-21, width=50, xy_anchor='nw', text='Next', fillcolor='red', action=do_next)
+    ans = []
+    min_n = 0
+#    sim.Animate(text='Salabim fontnames', x0=x, y0=y, fontsize0=20, anchor='sw', textcolor0='white')
 
+    do_next()    
+    env.background_color('20%gray')
+
+    env.animate(True)
+    env.run()    
+
+def test58():
+    env = sim.Environment()
+    names = sorted(sim.colornames().keys())
+    x=10
+    y=env.height() - 80
+    sx= 155
+    sy=23
+    sim.Animate(text='Salabim colornames', x0=x, y0=y, fontsize0=20, anchor='sw', textcolor0='white')
+    y -= 30
+    for name in names:
+        if env.is_dark(name):
+            textcolor = 'white'
+        else:
+            textcolor = 'black'
+        sim.Animate(rectangle0=(x, y, x + sx, y + sy), fillcolor0=name)
+        sim.Animate(text='<null string>' if name =='' else name, x0=x + sx / 2, y0=y + sy /2, anchor='c', textcolor0=textcolor, fontsize0=15)
+        x += sx + 5
+        if x + sx > 1024:
+            y -= sy + 4
+            x = 10
+
+    env.background_color('20%gray')
+    env.animate(True)
+    env.run()
+    
+def test57():
+    class X(sim.Component):
+        def process(self):
+            while True:
+                an.update(text=str(run_length - env.now()))
+                yield self.hold(1)
+                if env.now() > 100:
+                    env.grab()
+                    env.main().activate()
+     
+    env = sim.Environment()
+    env.animation_parameters(background_color='blue' )
+    sim.show_colornames()
+    env.video('test.avi')
+#    env.animation_parameters(video='test.avi', speed=0.5)
+    an = sim.Animate(text='', x0=100,y0=100, fontsize0=100)
+    run_length = 5
+    X()
+    sim.Animate(line0=(0,50,None,None), line1=(0,50,1024,None), linewidth0=4,t1=run_length)
+    sim.Animate(circle0=(40,), x0=200, y0=200)
+    sim.Animate(circle0=40, x0=300, y0=200)
+    env.run(run_length)
+    env.video('')
+    
+def test56():
+    env = sim.Environment()
+    mon = sim.Monitor('number per second')
+    for i in range(100):
+        sample = sim.Normal(0.083,0.00166)()
+        mon.tally(sample)
+        
+    mon = sim.Monitor('number per second')
+    env.run(100)
+    mon.print_histogram()
+    
+    
+def test55():
+    class X(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(sim.Exponential(rate=0.83)())
+                env.count += 1
+            
+    class Y(sim.Component):
+        def process(self):
+            while True:
+                env.count=0
+                yield self.hold(1)
+                print(env.count)
+                mon.tally(env.count)
+
+    env = sim.Environment()
+    env.count = 0
+    X()
+    Y()
+    mon = sim.Monitor('number per second')
+    env.run(100)
+    mon.print_histogram()    
+    
+def test54():
+    import test_a
+    import test_b
+    env = sim.Environment(trace=True)
+    test_a.X()
+    test_b.X()
+    
+    
+    env.run(10)
+    
+def test53():
+    en =sim.Environment()
+    d=sim.Normal(10, 3)
+    d.print_info()
+    d=sim.Normal(10, coefficient_of_variation=0.3)
+    d.print_info()    
+    d=sim.Normal(0, standard_deviation=3)
+    d.print_info()
+    d=sim.Normal(0, coefficient_of_variation=4)
+    d.print_info()    
+    
 def test52():
     class X(sim.Component):
         def process(self):
@@ -31,12 +193,21 @@ def test52():
                 an.update(text=str(env.now()),x0=env.now()*10, textcolor0='red')
                 yield self.hold(1)
 
-
+    def printt(str2prn):
+        return '['+str(env.now())+']',str2prn
     sim.reset()
-    print('***can_animate',sim.can_animate())
+    logging.basicConfig(filename='sim.log', filemode='w', level=logging.DEBUG)
+    print('***can_animate',sim.can_animate(try_only=True))
+
+    try:
+        print('***can_animate',sim.can_animate(try_only=False))
+    except:
+        print('failed')
     print('***can_video',sim.can_video())
+    print('passed.')
     env=sim.Environment(trace=True)
-    env.animation_parameters(animate=True, modelname='test52', video='test.mp4')
+    logging.debug(printt('piet'))
+    env.animation_parameters(animate=True, modelname='test52', video='')
     s = sim.AnimateSlider(x=300,y=-50,xy_anchor='nw')
     a=sim.Animate(line0=(0,-50,300,-50), xy_anchor='nw',screen_coordinates=True)
 #    env.animate(True)
@@ -51,16 +222,14 @@ def test52():
     env.run(20)
     env.quit()
 
-
-
 def test51():
     env = sim.Environment()
-    d = sim.Poisson(100)
+    d = sim.Poisson(2)
     x = []
     m = sim.Monitor(name='samples')
     for i in range(10000):
-        m.tally(d.sample())
-    m.print_histogram(30, 0, 1)
+        m.tally(d())
+    m.print_histogram(15, 0, 1)
 
 def test50():
     env=sim.Environment()
@@ -117,11 +286,18 @@ def test49():
 
 
 def test48():
+    
     class A(sim.Component):
+        def myhold(self, t):
+            print('**')
+            yield self.hold(t)
+
         def process(self):
             while env.now()<5:
                 if env.now()>30:
                     env.main().activate()
+                print('aa')
+                self.myhold(1)
                 yield self.hold(1)
 
 
@@ -266,10 +442,7 @@ def test43():
 
     env=sim.Environment()
 
-
     test(sim.IntUniform(1,6))
-    assert False
-
     test(sim.Weibull(2,1))
     test(sim.Gamma(5,9))
     test(sim.Erlang(2,scale=3))
@@ -278,7 +451,7 @@ def test43():
     test(sim.Normal(5,7))
     test(sim.Normal(5,7,use_gauss=True))
 
-    test(sim.Distribution('N(5,7,use_gauss=False)'))
+    test(sim.Distribution('Exponential(rate=2)'))
     test(sim.Normal(5,5))
 
 def test42():
@@ -895,13 +1068,23 @@ def test3():
     sample_and_print(n,5)
     sample_and_print(n,5)
 
+    print('poisson')
+    n=sim.Poisson(2)
+    sample_and_print(n,5)
+    sample_and_print(n,5)
+
     print('cdf')
     cdf=sim.Cdf((1,0,2,25,2,75,3,100))
     sample_and_print(cdf,5)
     sample_and_print(cdf,5)
 
-    print('pdf')
+    print('pdf list')
     pdf=sim.Pdf((1,2),1)
+    sample_and_print(pdf,5)
+
+    print('pdf dict')
+    d = {1:'een', 2:'twee'}
+    pdf=sim.Pdf(d,1)
     sample_and_print(pdf,5)
 
     print('pdf x')

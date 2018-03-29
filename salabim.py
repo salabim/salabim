@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.16'
+__version__ = '2.2.17'
 
 import heapq
 import random
@@ -23,6 +23,7 @@ import itertools
 import string
 import io
 import pickle
+import logging
 
 Pythonista = (sys.platform == 'ios')
 Windows = (sys.platform.startswith('win'))
@@ -47,7 +48,6 @@ omitted = ['omitted']
 
 
 class ItemFile(object):
-
     '''
     define an item file to be used with read_item, read_item_int, read_item_float and read_item_bool
 
@@ -74,16 +74,16 @@ class ItemFile(object):
         run_name = f.read_item()
         f.close()
 
-    Item files consists of individual items separated by whitespace
-    If a blank is required in an item, use single or double quotes
-    All text following # on a line is ignored
-    All texts on a line within curly brackets {} is ignored and considered white space
+    Item files consists of individual items separated by whitespace |n|
+    If a blank is required in an item, use single or double quotes |n|
+    All text following # on a line is ignored |n|
+    All texts on a line within curly brackets {} is ignored and considered white space.
 
     Example ::
-
+    
         Item1
         'Item 2'
-           Item3 Item4 # comment
+            Item3 Item4 # comment
         Item5 {five} Item6 {six}
         'Double quote" in item'
         "Single quote' in item"
@@ -456,7 +456,8 @@ class Monitor(object):
 
         Returns
         -------
-        q-th percentile: float
+        : float
+            q-th percentile |n|
             0 returns the minimum, 50 the median and 100 the maximum
         '''
 
@@ -1738,7 +1739,7 @@ class Queue(object):
         the priority of the head of the queue, if any
         or 0 if queue is empty
         '''
-        component.enter_to_head(self)
+        component.enter_at_head(self)
 
     def add_in_front_of(self, component, poscomponent):
         '''
@@ -1892,7 +1893,7 @@ class Queue(object):
         The i-th component or head : Component
             None if not existing
         '''
-        if index == omitted:
+        if index is omitted:
             c = self._head.successor.component
         else:
             c = self[index]
@@ -2522,7 +2523,7 @@ class Environment(object):
         self._x0 = 0
         self._y0 = 0
         self._x1 = self._width
-        self.scale = 1
+        self._scale = 1
         self._y1 = self._y0 + self._height
         self._background_color = 'white'
         self._foreground_color = 'black'
@@ -2531,8 +2532,8 @@ class Environment(object):
         self.use_toplevel = False
         self._show_fps = False
         self._show_time = True
-        self.video = ''
-        self.video_out = None
+        self._video = ''
+        self._video_out = None
         self.an_modelname()
         self.an_clocktext()
 
@@ -2663,7 +2664,7 @@ class Environment(object):
 
     def animation_parameters(self,
       animate=True, synced=omitted, speed=omitted, width=omitted, height=omitted,
-      x0=omitted, y0=0, x1=omitted, background_color=omitted, foreground_color=omitted,
+      x0=omitted, y0=omitted, x1=omitted, background_color=omitted, foreground_color=omitted,
       fps=omitted, modelname=omitted, use_toplevel=omitted,
       show_fps=omitted, show_time=omitted,
       video=omitted):
@@ -2755,12 +2756,14 @@ class Environment(object):
         in such a way that the x and scaling are the same. |n|
         '''
         frame_changed = False
+        video_parameters_changed = False
         if speed is not omitted:
             self._speed = speed
             self.set_start_animation()
 
         if show_fps is not omitted:
-            self._show_fps = show_fps
+            if show_fps != show_fps:
+                self._show_fps = show_fps
 
         if show_time is not omitted:
             self._show_time = show_time
@@ -2773,11 +2776,18 @@ class Environment(object):
             if self._width != width:
                 self._width = width
                 frame_changed = True
+                width_changed = True
 
         if height is not omitted:
             if self._height != height:
                 self._height = height
                 frame_changed = True
+                height_changed = True
+
+        if fps is not omitted:
+            if self._fps != fps:
+                self._fps = fps
+                fps_changed = True
 
         if x0 is not omitted:
             if self._x0 != x0:
@@ -2808,21 +2818,11 @@ class Environment(object):
                 raise SalabimError(foreground_color + 'not allowed for foreground_color')
             self._foreground_color = foreground_color
 
-        if fps is not omitted:
-            self._fps = fps
-
         if modelname is not omitted:
             self._modelname = modelname
 
         if use_toplevel is not omitted:
             self.use_toplevel = use_toplevel
-
-        if video is not omitted:
-            if video != self.video:
-                self.video_close()
-                if video:
-                    can_video(try_only=False)
-                self.video = video
 
         if animate is None:
             animate = self._animate  # no change
@@ -2830,8 +2830,8 @@ class Environment(object):
             if animate != self._animate:
                 frame_changed = True
 
-        self.scale = self._width / (self._x1 - self._x0)
-        self._y1 = self._y0 + self._height / self.scale
+        self._scale = self._width / (self._x1 - self._x0)
+        self._y1 = self._y0 + self._height / self._scale
 
         if g.animation_env is not self:
             if g.animation_env is not None:
@@ -2840,6 +2840,39 @@ class Environment(object):
                 frame_changed = True
             else:
                 frame_changed = False  # no animation required, so leave running animation_env untouched
+
+        video_opened = False
+        if video is not omitted:
+            if video != self._video:
+                if self._video:
+                    self.video_close()
+                self._video = video
+                if self._video:
+                    video_opened = True
+                    can_animate(try_only=False)
+                    can_video(try_only=False)
+                    extension = os.path.splitext(self._video)[1].lower()
+                    if extension == '.mp4':
+                        self.video_fourcc = 'MP4V'
+                    elif extension == '.avi':
+                        self.video_fourcc = 'MP4V'
+                    else:
+                        raise SalabimError('unsupported video file extension')
+
+                    fourcc = cv2.VideoWriter_fourcc(*self.video_fourcc)
+                    self._video_out = cv2.VideoWriter(
+                        self._video, fourcc, self._fps, (self._width, self._height))
+
+        if self._video and (not video_opened):
+            if height_changed:
+                raise SalabimError('height changed while recording video.')
+            if width_changed:
+                raise SalabimError('width changed while recording video.')
+            if fos_changed:
+                raise SalabimError('fps changed while recording video.')
+                
+        if self._video:
+            self.video_t = self.t
 
         if frame_changed:
             if g.animation_env is not None:
@@ -2877,21 +2910,16 @@ class Environment(object):
 
                 self.an_menu_buttons()
 
-                if self.video:
-                    if not self.video_out:
-                        self.video_width = self._width
-                        self.video_height = self._height
-                        self.video_fps = self._fps
-                        fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-                        self.video_out = cv2.VideoWriter(
-                            self.video, fourcc, self._fps, (self.video_width, self.video_height))
-                    self.video_t = self.t
         self._animate = animate
 
     def video_close(self):
-        if self.video_out:
-            self.video_out.release()
-            self.video_out = None
+        '''
+        closes the current animation video recording, if any.
+        '''
+        if self._video_out:
+            self._video_out.release()
+            self._video_out = None
+            self._video = ''
 
     def uninstall_uios(self):
         for uio in self.ui_objects:
@@ -2964,6 +2992,20 @@ class Environment(object):
         '''
         return self._y1
 
+    def scale(self):
+        '''
+        scale of the animation, i.e. width / (x1 - x0)
+
+        Returns
+        -------
+        scale : float
+
+        Note
+        ----
+        It is not possible to set this value explicitely.
+        '''
+        return self._scale
+
     def width(self, value=omitted):
         '''
         width of the animation in screen coordinates
@@ -3000,6 +3042,42 @@ class Environment(object):
         if value is not omitted:
             self.animation_parameters(height=value, animate=None)
         return self._height
+
+    def background_color(self, value=omitted):
+        '''
+        background_color of the animation
+
+        Parameters
+        ----------
+        value : colorspec
+            new background_color |n|
+            if not specified, no change
+
+        Returns
+        -------
+        background_color : colorspec
+        '''
+        if value is not omitted:
+            self.animation_parameters(background_color=value, animate=None)
+        return self._background_color
+
+    def foreground_color(self, value=omitted):
+        '''
+        foreground_color of the animation
+
+        Parameters
+        ----------
+        value : colorspec
+            new foreground_color |n|
+            if not specified, no change
+
+        Returns
+        -------
+        foreground_color : colorspec
+        '''
+        if value is not omitted:
+            self.animation_parameters(foreground_color=value, animate=None)
+        return self.foreground_color
 
     def animate(self, value=omitted):
         '''
@@ -3064,8 +3142,8 @@ class Environment(object):
         If video is the null string, the video (if any) will be closed.
         '''
         if value is not omitted:
-            self.animation_parameters(modelname=value, animate=None)
-        return self._modelname
+            self.animation_parameters(video=value, animate=None)
+        return self._video
 
     def fps(self, value=omitted):
         '''
@@ -3335,8 +3413,8 @@ class Environment(object):
         while True:
             tick_start = time.time()
 
-            if self._synced or self.video:  # video forces synced
-                if self.video:
+            if self._synced or self._video:  # video forces synced
+                if self._video:
                     self.t = self.video_t
                 else:
                     if self.paused:
@@ -3363,9 +3441,9 @@ class Environment(object):
                 self.root.quit()
                 return
 
-            if self.video:
+            if self._video:
                 capture_image = Image.new(
-                    'RGB', (self.video_width, self.video_height), self.colorspec_to_tuple('bg'))
+                    'RGB', (self._width, self._height), self.colorspec_to_tuple('bg'))
             if not self.paused:
                 self.frametimes.append(time.time())
 
@@ -3406,7 +3484,7 @@ class Environment(object):
                                 ao.canvas_object, (ao._image_x, self._height - ao._image_y))
                     co = next(canvas_objects_iter, None)
 
-                    if self.video:
+                    if self._video:
                         capture_image.paste(ao._image,
                             (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])),
                             ao._image)
@@ -3430,15 +3508,15 @@ class Environment(object):
                         uio.lasttext = thistext
                         uio.button.config(text=thistext)
 
-            if self.video and (not self.paused):
+            if self._video and (not self.paused):
                 open_cv_image = cv2.cvtColor(
                     np.array(capture_image), cv2.COLOR_RGB2BGR)
-                self.video_out.write(open_cv_image)
+                self._video_out.write(open_cv_image)
 
             g.canvas.update()
-            if self.video:
+            if self._video:
                 if not self.paused:
-                    self.video_t += self._speed / self.video_fps
+                    self.video_t += self._speed / self._fps
             else:
                 if self._synced:
                     tick_duration = time.time() - tick_start
@@ -3752,15 +3830,14 @@ class Environment(object):
         Parameters
         ----------
         colorspec: tuple, list or str
-            #rrggbb ==> alpha =255 (rr, gg, bb in hex) |n|
-            #rrggbbaa ==> alpha = aa (rr, gg, bb, aa in hex) |n|
-            colorname ==> alpha = 255 |n|
-            (colorname, alpha) |n|
-            (r, g, b) ==> alpha = 255 |n|
-            (r, g, b, alpha) |n|
-            if tuple of list: |n|
-            'fg' ==> foreground_color |n|
-            'bg' ==> background_color
+            ``#rrggbb`` ==> alpha = 255 (rr, gg, bb in hex) |n|
+            ``#rrggbbaa`` ==> alpha = aa (rr, gg, bb, aa in hex) |n|
+            ``colorname`` ==> alpha = 255 |n|
+            ``(colorname, alpha)`` |n|
+            ``(r, g, b)`` ==> alpha = 255 |n|
+            ``(r, g, b, alpha)`` |n|
+            ``'fg'`` ==> foreground_color |n|
+            ``'bg'`` ==> background_color
 
         Returns
         -------
@@ -3865,11 +3942,16 @@ class Environment(object):
 
         Returns
         -------
-        True, if the color is dark (rather black than white) |n|
-        False, if the color is light (rather white than black
+        : bool
+            True, if colorspec is dark (rather black than white) |n|
+            False, if colorspec is light (rather white than black |n|
+            if the alpha value of colorspec is 0 (total transparent),
+            the is_dark value of the foreground_color will be returned
         '''
-        rgb = self.colorspec_to_tuple(colorspec)
-        luma = ((0.299 * rgb[0]) + (0.587 * rgb[1]) + (0.114 * rgb[2])) / 255
+        rgba = self.colorspec_to_tuple(colorspec)
+        if rgba[3] == 0:
+            return not self.is_dark(('bg', 255))  # alpha needs to be set to avoid an infinite loop
+        luma = ((0.299 * rgba[0]) + (0.587 * rgba[1]) + (0.114 * rgba[2])) / 255
         if luma > 0.5:
             return False
         else:
@@ -3877,7 +3959,7 @@ class Environment(object):
 
     def getwidth(self, text, font='', fontsize=20, screen_coordinates=False):
         if not screen_coordinates:
-            fontsize = fontsize * self.scale
+            fontsize = fontsize * self._scale
         f, heightA = getfont(font, fontsize)
         if text == '':  # necessary because of bug in PIL >= 4.2.1
             thiswidth, thisheight = (0, 0)
@@ -3886,11 +3968,11 @@ class Environment(object):
         if screen_coordinates:
             return thiswidth
         else:
-            return thiswidth / self.scale
+            return thiswidth / self._scale
 
     def getfontsize_to_fit(self, text, width, font='', screen_coordinates=False):
         if not screen_coordinates:
-            width = width * self.scale
+            width = width * self._scale
 
         lastwidth = 0
         for fontsize in range(1, 300):
@@ -3904,7 +3986,7 @@ class Environment(object):
         if screen_coordinates:
             return fontsize
         else:
-            return fontsize / self.scale
+            return fontsize / self._scale
 
     def name(self):
         '''
@@ -3922,11 +4004,13 @@ class Environment(object):
 
     def sequence_number(self):
         '''
-        returns the sequence_number of the environment
-        (the sequence number at initialization) |n|
-        normally this will be the integer value of a serialized name,
-        but also non serialized names (without a dot or a comma at the end)
-        will be numbered)
+        Returns
+        -------
+        sequence_number of the environment : int
+            (the sequence number at initialization) |n|
+            normally this will be the integer value of a serialized name,
+            but also non serialized names (without a dot or a comma at the end)
+            will be numbered)
         '''
         return self._sequence_number
 
@@ -3998,7 +4082,7 @@ class Environment(object):
 
         Note
         ----
-        if self.trace is False, nothing is printed
+        if self.trace is False, nothing is printed |n|
         if the current component's suppress_trace is True, nothing is printed |n|
 
         '''
@@ -4020,8 +4104,10 @@ class Environment(object):
                 else:
                     if self._buffered_trace:
                         print(self._buffered_trace)
+                        logging.debug(self.buffered_trace)
                         self._buffered_trace = False
                     print(line)
+                    logging.debug(line)
 
     def beep(self):
         '''
@@ -4101,18 +4187,17 @@ class Animate(object):
         offsets the y-coordinate of the object (default 0) at time t0
 
     circle0 : tuple
-         the circle at time t0 specified as a one element tuple (radius,)
+         the radius of the circle at time t0
 
     line0 : tuple
-        the line(s) at time t0 (xa,ya,xb,yb,xc,yc, ...)
+        the line(s) (xa,ya,xb,yb,xc,yc, ...) at time t0 
 
     polygon0 : tuple
-        the polygon at time t0 (xa,ya,xb,yb,xc,yc, ...) |n|
+        the polygon (xa,ya,xb,yb,xc,yc, ...) at time t0 |n|
         the last point will be auto connected to the start
 
     rectangle0 : tuple
-        the rectangle at time t0 |n|
-        (xlowerleft,ylowerlef,xupperright,yupperright)
+        the rectangle (xlowerleft,ylowerleft,xupperright,yupperright) at time t0 |n|
 
     image : str or PIL image
         the image to be displayed |n|
@@ -4136,7 +4221,7 @@ class Animate(object):
         ``sw    s    se``
 
     linewidth0 : float
-        linewidth of the contour at time t0 (default 0 = no contour, 1 for lines)
+        linewidth of the contour at time t0 (default 0 for polygon, rectangle and circle, 1 for line)
 
     fillcolor0 : colorspec
         color of interior at time t0 (default foreground_color)
@@ -4151,42 +4236,42 @@ class Animate(object):
         angle of the polygon at time t0 (in degrees) (default 0)
 
     fontsize0 : float
-        fontsize of text at time t0 (default: 20)
+        fontsize of text at time t0 (default 20)
 
     width0 : float
        width of the image to be displayed at time t0 |n|
        if omitted or None, no scaling
 
     t1 : float
-        time of end of the animation (default: inf) |n|
+        time of end of the animation (default inf) |n|
         if keep=True, the animation will continue (frozen) after t1
 
     x1 : float
-        x-coordinate of the origin (default x0) at time t1
+        x-coordinate of the origin at time t1(default x0)
 
     y1 : float
-        y-coordinate of the origin (default y0) at time t1
+        y-coordinate of the origin at time t1 (default y0)
 
     offsetx1 : float
-        offsets the x-coordinate of the object (default offsetx0) at time t1
+        offsets the x-coordinate of the object at time t1 (default offsetx0)
 
     offsety1 : float
-        offsets the y-coordinate of the object (default offsety0) at time t1
+        offsets the y-coordinate of the object at time t1 (default offsety0)
 
     circle1 : tuple
-         the circle at time t1 specified as a tuple (radius,)
+         the radius of the circle at time t1 (default circle0)
 
     line1 : tuple
         the line(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: line0) |n|
-        should have the same length as line0
+        should have the same number of elements as line0
 
     polygon1 : tuple
         the polygon at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: polygon0) |n|
-        should have the same length as polygon0
+        should have the same number of elements as polygon0
 
     rectangle1 : tuple
-        the rectangle at time t1 (default: rectangle0) |n|
-        (xlowerleft,ylowerlef,xupperright,yupperright)
+        the rectangle (xlowerleft,ylowerleft,xupperright,yupperright) at time t1
+        (default: rectangle0)
 
     linewidth1 : float
         linewidth of the contour at time t1 (default linewidth0)
@@ -4225,11 +4310,13 @@ class Animate(object):
         - tuple (R,G,B) or (R,G,B,A)
         - 'fg' or 'bg'
 
-    colornames may contain an additional alpha, like ``red#7f``
-    hexnames may be either 3 of 4 bytes long (RGB or RGBA)
+    colornames may contain an additional alpha, like ``red#7f`` |n|
+    hexnames may be either 3 of 4 bytes long (#rrggbb or #rrggbbaa) |n|
     both colornames and hexnames may be given as a tuple with an
     additional alpha between 0 and 255,
     e.g. ``(255,0,255,128)``, ('red',127)`` or ``('#ff00ff',128)``
+    fg is the foreground color
+    bg is the background color
 
     Permitted parameters
 
@@ -4302,9 +4389,9 @@ class Animate(object):
         self.sequence = self.env.serialize()
 
         self.circle0 = circle0
-        self.line0 = line0
-        self.polygon0 = polygon0
-        self.rectangle0 = rectangle0
+        self.line0 = de_none(line0)
+        self.polygon0 = de_none(polygon0)
+        self.rectangle0 = de_none(rectangle0)
         self.text0 = text
 
         if image is omitted:
@@ -4338,9 +4425,9 @@ class Animate(object):
         self.t0 = self.env._now if t0 is omitted else t0
 
         self.circle1 = self.circle0 if circle1 is omitted else circle1
-        self.line1 = self.line0 if line1 is omitted else line1
-        self.polygon1 = self.polygon0 if polygon1 is omitted else polygon1
-        self.rectangle1 = self.rectangle0 if rectangle1 is omitted else rectangle1
+        self.line1 = self.line0 if line1 is omitted else de_none(line1)
+        self.polygon1 = self.polygon0 if polygon1 is omitted else de_none(polygon1)
+        self.rectangle1 = self.rectangle0 if rectangle1 is omitted else de_none(rectangle1)
 
         self.x1 = self.x0 if x1 is omitted else x1
         self.y1 = self.y0 if y1 is omitted else y1
@@ -4396,19 +4483,19 @@ class Animate(object):
             time of start of the animation (default: now)
 
         x0 : float
-            x-coordinate of the origin (default see below) at time t0
+            x-coordinate of the origin at time t0 (default see below) 
 
         y0 : float
-            y-coordinate of the origin (default see below) at time t0
+            y-coordinate of the origin at time t0 (default see below) 
 
         offsetx0 : float
-            offsets the x-coordinate of the object (default see below) at time t0
+            offsets the x-coordinate of the object at time t0 (default see below) 
 
         offsety0 : float
-            offsets the y-coordinate of the object (default see below) at time t0
+            offsets the y-coordinate of the object at time t0 (default see below) 
 
         circle0 : tuple
-            the circle at time t0 specified as a tuple (radius,) (default see below)
+            the radius of the circle at time t0 (default see below)
 
         line0 : tuple
             the line(s) at time t0 (xa,ya,xb,yb,xc,yc, ...) (default see below)
@@ -4466,31 +4553,31 @@ class Animate(object):
             if keep=True, the animation will continue (frozen) after t1
 
         x1 : float
-            x-coordinate of the origin (default x0) at time t1
+            x-coordinate of the origin at time t1 (default x0)
 
         y1 : float
-            y-coordinate of the origin (default y0) at time t1
+            y-coordinate of the origin at time t1 (default y0)
 
         offsetx1 : float
-            offsets the x-coordinate of the object (default offsetx0) at time t1
+            offsets the x-coordinate of the object at time t1 (default offsetx0)
 
         offsety1 : float
-            offsets the y-coordinate of the object (default offsety0) at time t1
+            offsets the y-coordinate of the object at time t1 (default offset0)
 
         circle1: tuple
-             the circle at time t1 specified as a tuple (radius,)
+             the radius of the circle at time t1 (default circle0)
 
         line1 : tuple
             the line(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: line0) |n|
-            should have the same length as line0
+            should have the same number of elements as line0
 
         polygon1 : tuple
             the polygon at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: polygon0) |n|
-            should have the same length as polygon0
+            should have the same number of elements as polygon0
 
         rectangle1 : tuple
-            the rectangle at time t1 (default: rectangle0) |n|
-            (xlowerleft,ylowerlef,xupperright,yupperright)
+            the rectangle at time t (xlowerleft,ylowerleft,xupperright,yupperright)
+            (default: rectangle0) |n|
 
         linewidth1 : float
             linewidth of the contour at time t1 (default linewidth0)
@@ -4533,10 +4620,10 @@ class Animate(object):
         if visible is not omitted:
             self.visible0 = visible
         self.circle0 = self.circle() if circle0 is omitted else circle0
-        self.line0 = self.line() if line0 is omitted else line0
-        self.polygon0 = self.polygon() if polygon0 is omitted else polygon0
+        self.line0 = self.line() if line0 is omitted else de_none(line0)
+        self.polygon0 = self.polygon() if polygon0 is omitted else de_none(polygon0)
         self.rectangle0 =\
-            self.rectangle() if rectangle0 is omitted else rectangle0
+            self.rectangle() if rectangle0 is omitted else de_none(rectangle0)
         if text is not omitted:
             self.text0 = text
         self.width0 = self.width() if width0 is omitted else width0
@@ -4567,10 +4654,10 @@ class Animate(object):
         self.t0 = self.env._now if t0 is omitted else t0
 
         self.circle1 = self.circle0 if circle1 is omitted else circle1
-        self.line1 = self.line0 if line1 is omitted else line1
-        self.polygon1 = self.polygon0 if polygon1 is omitted else polygon1
+        self.line1 = self.line0 if line1 is omitted else de_none(line1)
+        self.polygon1 = self.polygon0 if polygon1 is omitted else de_none(polygon1)
         self.rectangle1 =\
-            self.rectangle0 if rectangle1 is omitted else rectangle1
+            self.rectangle0 if rectangle1 is omitted else de_none(rectangle1)
 
         self.x1 = self.x0 if x1 is omitted else x1
         self.y1 = self.y0 if y1 is omitted else y1
@@ -4758,8 +4845,11 @@ class Animate(object):
             one element tuple with the radius |n|
             default behaviour: linear interpolation between self.circle0 and self.circle1
         '''
+
         return interpolate((self.env._now if t is omitted else t),
-                           self.t0, self.t1, self.circle0, self.circle1)
+           self.t0, self.t1,
+           self.circle0 if isinstance(self.circle0, (list, tuple)) else (self.circle0,),
+           self.circle1 if isinstance(self.circle1, (list, tuple)) else (self.circle1,))
 
     def textcolor(self, t=omitted):
         '''
@@ -5031,7 +5121,7 @@ class Animate(object):
                 if self.screen_coordinates:
                     linewidth = self.linewidth(t)
                 else:
-                    linewidth = self.linewidth(t) * self.env.scale
+                    linewidth = self.linewidth(t) * self.env._scale
 
                 linecolor = self.env.colorspec_to_tuple(self.linecolor(t))
                 fillcolor = self.env.colorspec_to_tuple(self.fillcolor(t))
@@ -5059,8 +5149,8 @@ class Animate(object):
                     qx = x
                     qy = y
                 else:
-                    qx = (x - self.env._x0) * self.env.scale
-                    qy = (y - self.env._y0) * self.env.scale
+                    qx = (x - self.env._x0) * self.env._scale
+                    qy = (y - self.env._y0) * self.env._scale
 
                 r = []
                 minrx = inf
@@ -5073,8 +5163,8 @@ class Animate(object):
                     rx = px * cosa - py * sina
                     ry = px * sina + py * cosa
                     if not self.screen_coordinates:
-                        rx = rx * self.env.scale
-                        ry = ry * self.env.scale
+                        rx = rx * self.env._scale
+                        ry = ry * self.env._scale
                     minrx = min(minrx, rx)
                     maxrx = max(maxrx, rx)
                     minry = min(minry, ry)
@@ -5082,7 +5172,7 @@ class Animate(object):
                     r.append(rx)
                     r.append(ry)
                 if self.type == 'polygon':
-                    if (r[0] != r[len(r) - 2]) or (r[1] != r[len(r) - 1]):
+                    if r[0:1] != r[-2:-1]:
                         r.append(r[0])
                         r.append(r[1])
 
@@ -5114,20 +5204,19 @@ class Animate(object):
                 if self.screen_coordinates:
                     linewidth = self.linewidth(t)
                 else:
-                    linewidth = self.linewidth(t) * self.env.scale
+                    linewidth = self.linewidth(t) * self.env._scale
                 fillcolor = self.env.colorspec_to_tuple(self.fillcolor(t))
                 linecolor = self.env.colorspec_to_tuple(self.linecolor(t))
                 circle = self.circle(t)
-                radius = circle[0]
-
+                radius = circle[0] if isinstance(circle, (list, tuple)) else circle
                 if self.screen_coordinates:
                     qx = x
                     qy = y
                 else:
-                    qx = (x - self.env._x0) * self.env.scale
-                    qy = (y - self.env._y0) * self.env.scale
-                    linewidth *= self.env.scale
-                    radius *= self.env.scale
+                    qx = (x - self.env._x0) * self.env._scale
+                    qy = (y - self.env._y0) * self.env._scale
+                    linewidth *= self.env._scale
+                    radius *= self.env._scale
 
                 self._image_ident = (radius, linewidth, linecolor, fillcolor)
                 if self._image_ident != self._image_ident_prev:
@@ -5171,6 +5260,10 @@ class Animate(object):
                     width = image.size[0]
 
                 height = width * image.size[1] / image.size[0]
+                if not self.screen_coordinates:
+                    width *= self.env._scale
+                    height *= self.env._scale
+
                 angle = self.angle(t)
 
                 anchor = self.anchor(t)
@@ -5178,17 +5271,13 @@ class Animate(object):
                     qx = x
                     qy = y
                 else:
-                    qx = (x - self.env._x0) * self.env.scale
-                    qy = (y - self.env._y0) * self.env.scale
-                    offsetx = offsetx * self.env.scale
-                    offsety = offsety * self.env.scale
-                    width = width * self.env.scale
+                    qx = (x - self.env._x0) * self.env._scale
+                    qy = (y - self.env._y0) * self.env._scale
+                    offsetx = offsetx * self.env._scale
+                    offsety = offsety * self.env._scale
 
                 self._image_ident = (image, width, height, angle)
                 if self._image_ident != self._image_ident_prev:
-                    if not self.screen_coordinates:
-                        width *= self.env.scale
-                        height *= self.env.scale
                     im1 = image.resize(
                         (int(width), int(height)), Image.ANTIALIAS)
                     self.imwidth, self.imheight = im1.size
@@ -5230,11 +5319,11 @@ class Animate(object):
                     qx = x
                     qy = y
                 else:
-                    qx = (x - self.env._x0) * self.env.scale
-                    qy = (y - self.env._y0) * self.env.scale
-                    fontsize = fontsize * self.env.scale
-                    offsetx = offsetx * self.env.scale
-                    offsety = offsety * self.env.scale
+                    qx = (x - self.env._x0) * self.env._scale
+                    qy = (y - self.env._y0) * self.env._scale
+                    fontsize = fontsize * self.env._scale
+                    offsetx = offsetx * self.env._scale
+                    offsety = offsety * self.env._scale
 
                 self._image_ident = (
                     text, fontname, fontsize, angle, textcolor)
@@ -5246,10 +5335,11 @@ class Animate(object):
                     else:
                         width, height = font.getsize(text)
                         im = Image.new(
-                            'RGBA', (int(width), int(height)), (0, 0, 0, 0))
+                            'RGBA', (int(width + 0.1 * fontsize), int(height)), (0, 0, 0, 0))
+                        # the compensation with 0.1 * fontsize is to allow fonts that overhang to the left
                         imwidth, imheight = im.size
                         draw = ImageDraw.Draw(im)
-                        draw.text(xy=(0, 0), text=text, font=font, fill=textcolor)
+                        draw.text(xy=(0.1 * fontsize, 0), text=text, font=font, fill=textcolor)
                         # this code is to correct a bug in the rendering of text,
                         # leaving a kind of shadow around the text
                         del draw
@@ -5280,7 +5370,7 @@ class Animate(object):
                     'sw': (0.5, 1)}
 
                 dx, dy = anchor_to_dis[anchor.lower()]
-                dx = dx * self.imwidth + offsetx
+                dx = dx * self.imwidth + offsetx - 0.1 * fontsize
                 dy = -0.5 * self.imheight + dy * self.heightA + offsety
                 cosa = math.cos(angle * math.pi / 180)
                 sina = math.sin(angle * math.pi / 180)
@@ -5583,7 +5673,7 @@ class AnimateSlider(object):
     def install(self):
         x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
         y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
-        self.slider = tkinter.Scale(
+        self.slider = tkinter._scale(
             self.env.root,
             from_=self.vmin, to=self.vmax,
             orient=tkinter.HORIZONTAL,
@@ -5781,10 +5871,10 @@ class Component(object):
         Returns
         -------
         List or tuple containg |n|
-            size_x : how much to displace the next component in x-direction, if applicable|n|
+            size_x : how much to displace the next component in x-direction, if applicable |n|
             size_y : how much to displace the next component in y-direction, if applicable |n|
             animation objects0 : instance of Animate class |n|
-            ...|n|
+            ... |n|
             default behaviour: |n|
             green square of size 40 (displacements 50), with the sequence number centered in white.
 
@@ -6111,6 +6201,8 @@ class Component(object):
         '''
         passivate the component
 
+        Parameters
+        ----------
         mode : str preferred
             mode |n|
             will be used in trace and can be used in animations |n|
@@ -6255,15 +6347,14 @@ class Component(object):
 
         Example
         -------
-        yield self.request(r1) |n|
+        ``yield self.request(r1)`` |n|
         --> requests 1 from r1 |n|
-        yield self.request(r1,r2) |n|
+        ``yield self.request(r1,r2)`` |n|
         --> requests 1 from r1 and 1 from r2 |n|
-        yield self.request(r1,(r2,2),(r3,3,100)) |n|
+        ``yield self.request(r1,(r2,2),(r3,3,100))`` |n|
         --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100 |n|
-        yield self.request((r1,1),(r2,2)) |n|
+        ``yield self.request((r1,1),(r2,2))`` |n|
         --> requests 1 from r1, 2 from r2 |n|
-
         '''
         fail_at = kwargs.pop('fail_at', omitted)
         fail_delay = kwargs.pop('fail_delay', omitted)
@@ -6500,14 +6591,14 @@ class Component(object):
 
         Example
         -------
-        yield self.wait(s1) |n|
+        ``yield self.wait(s1)`` |n|
         --> waits for s1.value()==True |n|
-        yield self.wait(s1,s2) |n|
+        ``yield self.wait(s1,s2)`` |n|
         --> waits for s1.value()==True or s2.value==True |n|
-        yield self.wait((s1,False,100),(s2,'on'),s3) |n|
-        --> waits for s1.value()==False or s2.value=='on' or s3.value()==True
-        s1 is at the tail of waiters, because of the set priority
-        yield self.wait(s1,s2,all=True) |n|
+        ``yield self.wait((s1,False,100),(s2,'on'),s3)`` |n|
+        --> waits for s1.value()==False or s2.value=='on' or s3.value()==True |n|
+        s1 is at the tail of waiters, because of the set priority |n|
+        ``yield self.wait(s1,s2,all=True)`` |n|
         --> waits for s1.value()==True and s2.value==True |n|
         '''
         fail_at = kwargs.pop('fail_at', omitted)
@@ -7753,8 +7844,8 @@ class Poisson(_Distribution):
 
     Parameters
     ----------
-    lambda_: float
-        lambda of the distribution
+    mean: float
+        mean (lambda) of the distribution
 
     randomstream: randomstream
         randomstream to be used |n|
@@ -7764,14 +7855,15 @@ class Poisson(_Distribution):
 
     Note
     ----
-    The run time of this function increases when lambda_ increases. |n|
-    It is not recommended to use lambdas > 100
+    The run time of this function increases when mean (lambda) increases. |n|
+    It is not recommended to use mean (lambda) > 100
     '''
 
-    def __init__(self, lambda_, randomstream=omitted):
-        self._lambda_ = lambda_
-        if lambda_ <= 0:
-            raise SalabimError('lambda_<=0')
+    def __init__(self, mean, randomstream=omitted):
+        if mean <= 0:
+            raise SalabimError('mean (lambda) <=0')
+
+        self._mean = mean
 
         if randomstream is omitted:
             self.randomstream = random
@@ -7779,14 +7871,12 @@ class Poisson(_Distribution):
             randomstream_check(randomstream)
             self.randomstream = randomstream
 
-        self._mean = 1 / self._lambda_
-
     def __repr__(self):
         return 'Poisson'
 
     def print_info(self):
         print('Poissonl distribution ' + hex(id(self)))
-        print('  lambda' + str(self._lambda_))
+        print('  mean (lambda)' + str(self._lambda_))
 
     def sample(self):
         '''
@@ -7794,7 +7884,7 @@ class Poisson(_Distribution):
         -------
         Sample of the distribution : int
         '''
-        t = math.exp(- self._lambda_)
+        t = math.exp(-self._mean)
         s = t
         k = 0
 
@@ -7802,7 +7892,7 @@ class Poisson(_Distribution):
         last_s = inf
         while s < u:
             k += 1
-            t *= self._lambda_ / k
+            t *= self._mean / k
             s += t
             if last_s == s:  # avoid infinite loops
                 break
@@ -9099,6 +9189,14 @@ class Resource(object):
 
 
 def colornames():
+    '''
+    Available colornames
+    
+    Returns
+    -------
+    : dict
+        Dictionary containg the colorname as the key and the hex code (rrggbb or rrggbbaa) as the key
+    '''
     if not hasattr(colornames, 'cached'):
         colornames.cached = pickle.loads(b'(dp0\nVfuchsia\np1\nV#FF00FF\np2\nsV\np3\nV#00000000\np4\nsVtransparent\np5\ng4\nsVpalevioletred\np6\nV#DB7093\np7\nsVskyblue\np8\nV#87CEEB\np9\nsVpaleturquoise\np10\nV#AFEEEE\np11\nsVcadetblue\np12\nV#5F9EA0\np13\nsVorangered\np14\nV#FF4500\np15\nsVsteelblue\np16\nV#4682B4\np17\nsVdimgray\np18\nV#696969\np19\nsVdarkseagreen\np20\nV#8FBC8F\np21\nsV60%gray\np22\nV#999999\np23\nsVroyalblue\np24\nV#4169E1\np25\nsVmediumblue\np26\nV#0000CD\np27\nsVgoldenrod\np28\nV#DAA520\np29\nsVmediumvioletred\np30\nV#C71585\np31\nsVblueviolet\np32\nV#8A2BE2\np33\nsVgainsboro\np34\nV#DCDCDC\np35\nsVdarkred\np36\nV#8B0000\np37\nsVrosybrown\np38\nV#BC8F8F\np39\nsVgold\np40\nV#FFD700\np41\nsVcoral\np42\nV#FF7F50\np43\nsVwhite\np44\nV#FFFFFF\np45\nsVdarkcyan\np46\nV#008B8B\np47\nsVblack\np48\nV#000000\np49\nsVorchid\np50\nV#DA70D6\np51\nsVmediumturquoise\np52\nV#48D1CC\np53\nsVlightgreen\np54\nV#90EE90\np55\nsVlime\np56\nV#00FF00\np57\nsVpapayawhip\np58\nV#FFEFD5\np59\nsVchocolate\np60\nV#D2691E\np61\nsV40%gray\np62\nV#666666\np63\nsVoldlace\np64\nV#FDF5E6\np65\nsVdarkblue\np66\nV#00008B\np67\nsVsilver\np68\nV#C0C0C0\np69\nsVaquamarine\np70\nV#7FFFD4\np71\nsVlightcoral\np72\nV#F08080\np73\nsVcyan\np74\nV#00FFFF\np75\nsVdodgerblue\np76\nV#1E90FF\np77\nsV10%gray\np78\nV#191919\np79\nsVmidnightblue\np80\nV#191970\np81\nsVgreen\np82\nV#008000\np83\nsVlightsalmon\np84\nV#FFA07A\np85\nsVazure\np86\nV#F0FFFF\np87\nsVred\np88\nV#FF0000\np89\nsVlightpink\np90\nV#FFB6C1\np91\nsVwhitesmoke\np92\nV#F5F5F5\np93\nsVyellow\np94\nV#FFFF00\np95\nsVlawngreen\np96\nV#7CFC00\np97\nsVmagenta\np98\ng2\nsVlightsteelblue\np99\nV#B0C4DE\np100\nsVolivedrab\np101\nV#6B8E23\np102\nsVlightslategray\np103\nV#778899\np104\nsVslategray\np105\nV#708090\np106\nsVlightblue\np107\nV#ADD8E6\np108\nsVmoccasin\np109\nV#FFE4B5\np110\nsVmediumspringgreen\np111\nV#00FA9A\np112\nsVlightgray\np113\nV#D3D3D3\np114\nsVseashell\np115\nV#FFF5EE\np116\nsVdarkkhaki\np117\nV#BDB76B\np118\nsVslateblue\np119\nV#6A5ACD\np120\nsVaqua\np121\ng75\nsVpalegoldenrod\np122\nV#EEE8AA\np123\nsVdeeppink\np124\nV#FF1493\np125\nsVdarkgreen\np126\nV#006400\np127\nsVblanchedalmond\np128\nV#FFEBCD\np129\nsVturquoise\np130\nV#40E0D0\np131\nsVnavy\np132\nV#000080\np133\nsVtomato\np134\nV#FF6347\np135\nsVyellowgreen\np136\nV#9ACD32\np137\nsVpeachpuff\np138\nV#FFDAB9\np139\nsV30%gray\np140\nV#464646\np141\nsVpink\np142\nV#FFC0CB\np143\nsVpalegreen\np144\nV#98FB98\np145\nsVlightskyblue\np146\nV#87CEFA\np147\nsVchartreuse\np148\nV#7FFF00\np149\nsVmediumorchid\np150\nV#BA55D3\np151\nsVolive\np152\nV#808000\np153\nsVdarkorange\np154\nV#FF8C00\np155\nsVbeige\np156\nV#F5F5DC\np157\nsVforestgreen\np158\nV#228B22\np159\nsVmediumpurple\np160\nV#9370DB\np161\nsVmintcream\np162\nV#F5FFFA\np163\nsVhotpink\np164\nV#FF69B4\np165\nsVdarkgoldenrod\np166\nV#B8860B\np167\nsVpowderblue\np168\nV#B0E0E6\np169\nsVhoneydew\np170\nV#F0FFF0\np171\nsVsalmon\np172\nV#FA8072\np173\nsVsnow\np174\nV#FFFAFA\np175\nsVmistyrose\np176\nV#FFE4E1\np177\nsVkhaki\np178\nV#F0E68C\np179\nsVmediumaquamarine\np180\nV#66CDAA\np181\nsVdarksalmon\np182\nV#E9967A\np183\nsValiceblue\np184\nV#F0F8FF\np185\nsVdarkturquoise\np186\nV#00CED1\np187\nsVlightyellow\np188\nV#FFFFE0\np189\nsVwheat\np190\nV#F5DEB3\np191\nsVlightseagreen\np192\nV#20B2AA\np193\nsVlightcyan\np194\nV#E0FFFF\np195\nsVantiquewhite\np196\nV#FAEBD7\np197\nsVsaddlebrown\np198\nV#8B4513\np199\nsVmediumseagreen\np200\nV#3CB371\np201\nsV70%gray\np202\nV#B2B2B2\np203\nsVsienna\np204\nV#A0522D\np205\nsVcornflowerblue\np206\nV#6495ED\np207\nsVseagreen\np208\nV#2E8B57\np209\nsVfloralwhite\np210\nV#FFFAF0\np211\nsVivory\np212\nV#FFFFF0\np213\nsVcornsilk\np214\nV#FFF8DC\np215\nsVindianred\np216\nV#CD5C5C\np217\nsVplum\np218\nV#DDA0DD\np219\nsV90%gray\np220\nV#E6E6E6\np221\nsVgreenyellow\np222\nV#ADFF2F\np223\nsVteal\np224\nV#008080\np225\nsVbrown\np226\nV#A52A2A\np227\nsVdarkslategray\np228\nV#2F4F4F\np229\nsVpurple\np230\nV#800080\np231\nsVviolet\np232\nV#EE82EE\np233\nsVdeepskyblue\np234\nV#00BFFF\np235\nsVghostwhite\np236\nV#F8F8FF\np237\nsVburlywood\np238\nV#DEB887\np239\nsVblue\np240\nV#0000FF\np241\nsVcrimson\np242\nV#DC143C\np243\nsVindigo\np244\nV#4B0082\np245\nsV20%gray\np246\nV#333333\np247\nsVdarkmagenta\np248\nV#8B008B\np249\nsV80%gray\np250\nV#CCCCCC\np251\nsVlightgoldenrodyellow\np252\nV#FAFAD2\np253\nsVtan\np254\nV#D2B48C\np255\nsVlimegreen\np256\nV#32CD32\np257\nsVlemonchiffon\np258\nV#FFFACD\np259\nsVbisque\np260\nV#FFE4C4\np261\nsVfirebrick\np262\nV#B22222\np263\nsVnavajowhite\np264\nV#FFDEAD\np265\nsVnone\np266\ng4\nsVmaroon\np267\nV#800000\np268\nsV50%gray\np269\nV#7F7F7F\np270\nsVdarkgray\np271\nV#A9A9A9\np272\nsVorange\np273\nV#FFA500\np274\nsVlavenderblush\np275\nV#FFF0F5\np276\nsVdarkorchid\np277\nV#9932CC\np278\nsVlavender\np279\nV#E6E6FA\np280\nsVspringgreen\np281\nV#00FF7F\np282\nsVthistle\np283\nV#D8BFD8\np284\nsVlinen\np285\nV#FAF0E6\np286\nsVdarkolivegreen\np287\nV#556B2F\np288\nsVdarkslateblue\np289\nV#483D8B\np290\nsVgray\np291\nV#808080\np292\nsVdarkviolet\np293\nV#9400D3\np294\nsVperu\np295\nV#CD853F\np296\nsVsandybrown\np297\nV#FAA460\np298\nsVmediumslateblue\np299\nV#7B68EE\np300\ns.')  # NOQA
     return colornames.cached
@@ -9398,6 +9496,16 @@ def _get_caller_frame():
     return frame
 
 
+def de_none(l):
+    result = []
+    for index, item in enumerate(l):
+        if item is None:
+            result.append(l[index - 2])
+        else:
+            result.append(item)
+    return result
+
+
 def data():
     return 'data'
 
@@ -9517,9 +9625,11 @@ def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
         getfont.lookup = {}
 
     if isinstance(fontname, str):
-        fontlist1 = (fontname,)
+        fontlist1 = [fontname]
     else:
-        fontlist1 = fontname
+        fontlist1 = list(fontname)
+
+    fontlist1.extend(['calibri', 'arial'])
 
     fontlist = [standardfonts().get(f.lower(), f) for f in fontlist1]
 
@@ -9549,7 +9659,7 @@ def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
                 pass
 
     if result is None:
-        result = ImageFont.loaddefault()  # last resort
+        result = ImageFont.load_default()  # last resort
 
     heightA = result.getsize('A')[1]
     getfont.lookup[(fontname, fontsize)] = result, heightA
@@ -9579,6 +9689,34 @@ def show_colornames():
     names = sorted(colornames().keys())
     for name in names:
         print('{:22s}{}'.format(name, colornames()[name]))
+
+
+def arrow_polygon(size):
+    '''
+    creates a polygon tuple with a centerd arrow for use with sim.Animate
+
+    Parameters
+    ----------
+    size : float
+        length of the arrow
+    '''
+    size /= 4
+    return (-2 * size, -size, 0, -size, 0, -2 * size, 2 * size, 0, 0, 2 * size, 0, size, -2 * size, size)
+
+
+def centered_rectangle(width, height):
+    '''
+    creates a rectangle tuple with a centered rectangle for use with sim.Animate
+
+    Parameters
+    ----------
+    width : float
+        width of the rectangle
+
+    height : float
+        height of the rectangle
+    '''
+    return -width / 2, -height / 2, width / 2, height / 2
 
 
 def can_animate(try_only=True):
@@ -9676,6 +9814,11 @@ def reset():
 
     might be useful for REPLs or for Pythonista
     '''
+    try:
+        g.default_env.video_close()
+    except:
+        pass
+        
     g.default_env = None
     g.animation_env = None
     g.animation_scene = None
