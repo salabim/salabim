@@ -105,7 +105,7 @@ def test57():
     env = sim.Environment()
     env.animation_parameters(background_color='blue' )
     sim.show_colornames()
-    env.video('test.avi')
+#    env.video('test.mp4')
 #    env.animation_parameters(video='test.avi', speed=0.5)
     an = sim.Animate(text='', x0=100,y0=100, fontsize0=100)
     run_length = 5

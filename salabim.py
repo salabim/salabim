@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.17'
+__version__ = '2.2.18'
 
 import heapq
 import random
@@ -2176,7 +2176,7 @@ class Queue(object):
         ----
         the priority will be set to 0 for all components in the
         resulting  queue |n|
-        the order of the resulting queue is as follows |n|:
+        the order of the resulting queue is as follows: |n|
         first all components of self, in that order,
         followed by all components in q that are not in self,
         in that order. |n|
@@ -2494,7 +2494,7 @@ class Environment(object):
             self.print_trace('{:10.3f}'.format(0), 'main', 'current')
         self._nameserializeQueue = {}
         self._nameserializeComponent = {}
-        self.ameserializeResource = {}
+        self._nameserializeResource = {}
         self._nameserializeState = {}
         self._nameserializeMonitor = {}
         self._nameserializeMonitorTimestamp = {}
@@ -2756,7 +2756,9 @@ class Environment(object):
         in such a way that the x and scaling are the same. |n|
         '''
         frame_changed = False
-        video_parameters_changed = False
+        width_changed = False
+        height_changed = False
+        fps_changed = False
         if speed is not omitted:
             self._speed = speed
             self.set_start_animation()
@@ -2776,18 +2778,18 @@ class Environment(object):
             if self._width != width:
                 self._width = width
                 frame_changed = True
-                video_parameters_changed = True
+                width_changed = True
 
         if height is not omitted:
             if self._height != height:
                 self._height = height
                 frame_changed = True
-                video_parameters_changed = True
+                height_changed = True
 
         if fps is not omitted:
             if self._fps != fps:
                 self._fps = fps
-                video_parameters_changed = True
+                fps_changed = True
 
         if x0 is not omitted:
             if self._x0 != x0:
@@ -2863,8 +2865,13 @@ class Environment(object):
                     self._video_out = cv2.VideoWriter(
                         self._video, fourcc, self._fps, (self._width, self._height))
 
-        if video_parameters_changed and (not video_opened) and self._video:
-            raise SalabimError('width, height and/or background changed while recording video.')
+        if self._video and (not video_opened):
+            if width_changed:
+                raise SalabimError('width changed while recording video.')
+            if height_changed:
+                raise SalabimError('height changed while recording video.')
+            if fps_changed:
+                raise SalabimError('fps changed while recording video.')
 
         if self._video:
             self.video_t = self.t
@@ -3050,11 +3057,11 @@ class Environment(object):
 
         Returns
         -------
-        background_color of animation : int
+        background_color of animation : colorspec
         '''
         if value is not omitted:
             self.animation_parameters(background_color=value, animate=None)
-        return self._background_color    
+        return self._background_color
 
     def foreground_color(self, value=omitted):
         '''
@@ -3068,11 +3075,11 @@ class Environment(object):
 
         Returns
         -------
-        foreground_color of animation : int
+        foreground_color of animation : colorspec
         '''
         if value is not omitted:
             self.animation_parameters(foreground_color=value, animate=None)
-        return self._foreground_color    
+        return self._foreground_color
 
     def animate(self, value=omitted):
         '''
@@ -3582,7 +3589,7 @@ class Environment(object):
             color = 'white'
         uio = AnimateButton(x=38, y=-21, text='Menu',
             width=50, action=self.env.an_menu, env=self, fillcolor=fillcolor, color=color, xy_anchor='nw')
-        
+
         uio.in_topleft = True
 
     def an_unsynced_buttons(self):
@@ -3970,11 +3977,14 @@ class Environment(object):
         Returns
         -------
         : bool
-            True, if the color is dark (rather black than white) |n|
-            False, if the color is light (rather white than black
+            True, if the colorspec is dark (rather black than white) |n|
+            False, if the colorspec is light (rather white than black |n|
+            if colorspec has alpha=0 (total transparent), the background_color will be tested
         '''
-        rgb = self.colorspec_to_tuple(colorspec)
-        luma = ((0.299 * rgb[0]) + (0.587 * rgb[1]) + (0.114 * rgb[2])) / 255
+        rgba = self.colorspec_to_tuple(colorspec)
+        if rgba[3] == 0:
+            return self.is_dark(self.colorspec_to_tuple(('bg', 255)))
+        luma = ((0.299 * rgba[0]) + (0.587 * rgba[1]) + (0.114 * rgba[2])) / 255
         if luma > 0.5:
             return False
         else:
@@ -4188,7 +4198,7 @@ class Animate(object):
 
     xy_anchor : str
         specifies where x and y (i.e. x0, y0, x1 and y1) are relative to |n|
-        possible values are (default: sw) |n|:
+        possible values are (default: sw) : |n|
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se`` |n|
@@ -4198,16 +4208,16 @@ class Animate(object):
         time of start of the animation (default: now)
 
     x0 : float
-        x-coordinate of the origin (default 0) at time t0
+        x-coordinate of the origin at time t0 (default 0)
 
     y0 : float
-        y-coordinate of the origin (default 0) at time t0
+        y-coordinate of the origin at time t0 (default 0)
 
     offsetx0 : float
-        offsets the x-coordinate of the object (default 0) at time t0
+        offsets the x-coordinate of the object at time t0 (default 0)
 
     offsety0 : float
-        offsets the y-coordinate of the object (default 0) at time t0
+        offsets the y-coordinate of the object at time t0 (default 0)
 
     circle0 : tuple
          the radius of the circle at time t0
@@ -4238,7 +4248,7 @@ class Animate(object):
         anchor position |n|
         specifies where to put images or texts relative to the anchor
         point |n|
-        possible values are (default: c) |n|:
+        possible values are (default: c): |n|
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se``
@@ -4502,6 +4512,15 @@ class Animate(object):
             if False, animation object is not shown, shown otherwise
             (default see below)
 
+        xy_anchor : str
+            specifies where x and y (i.e. x0, y0, x1 and y1) are relative to |n|
+            possible values are: |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se`` |n|
+            If '', the given coordimates are used untranslated |n|
+            default see below
+
         t0 : float
             time of start of the animation (default: now)
 
@@ -4547,7 +4566,7 @@ class Animate(object):
             anchor position |n|
             specifies where to put images or texts relative to the anchor
             point (default see below) |n|
-            possible values are (default: c) |n|:
+            possible values are (default: c): |n|
             ``nw    n    ne`` |n|
             ``w     c     e`` |n|
             ``sw    s    se``
@@ -4864,15 +4883,16 @@ class Animate(object):
 
         Returns
         -------
-        circle : tuple
-            one element tuple with the radius |n|
+        circle : float or tuple
+            radius or one element tuple with the radius |n|
             default behaviour: linear interpolation between self.circle0 and self.circle1
         '''
 
-        return interpolate((self.env._now if t is omitted else t),
-           self.t0, self.t1,
-           self.circle0 if isinstance(self.circle0, (list, tuple)) else (self.circle0,),
-           self.circle1 if isinstance(self.circle1, (list, tuple)) else (self.circle1,))
+        return interpolate(
+            (self.env._now if t is omitted else t),
+            self.t0, self.t1,
+            self.circle0[0] if isinstance(self.circle0, (list, tuple)) else self.circle0,
+            self.circle1[0] if isinstance(self.circle1, (list, tuple)) else self.circle1)
 
     def textcolor(self, t=omitted):
         '''
@@ -5358,10 +5378,10 @@ class Animate(object):
                     else:
                         width, height = font.getsize(text)
                         im = Image.new(
-                            'RGBA', (int(width), int(height)), (0, 0, 0, 0))
+                            'RGBA', (int(width + 0.1 * fontsize), int(height)), (0, 0, 0, 0))
                         imwidth, imheight = im.size
                         draw = ImageDraw.Draw(im)
-                        draw.text(xy=(0, 0), text=text, font=font, fill=textcolor)
+                        draw.text(xy=(0.1 * fontsize, 0), text=text, font=font, fill=textcolor)
                         # this code is to correct a bug in the rendering of text,
                         # leaving a kind of shadow around the text
                         del draw
@@ -5392,7 +5412,7 @@ class Animate(object):
                     'sw': (0.5, 1)}
 
                 dx, dy = anchor_to_dis[anchor.lower()]
-                dx = dx * self.imwidth + offsetx
+                dx = dx * self.imwidth + offsetx - 0.1 * fontsize
                 dy = -0.5 * self.imheight + dy * self.heightA + offsety
                 cosa = math.cos(angle * math.pi / 180)
                 sina = math.sin(angle * math.pi / 180)
@@ -5467,7 +5487,7 @@ class AnimateButton(object):
 
     xy_anchor : str
         specifies where x and y are relative to |n|
-        possible values are (default: sw) |n|:
+        possible values are (default: sw): |n|
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se``
@@ -5606,7 +5626,7 @@ class AnimateSlider(object):
 
     xy_anchor : str
         specifies where x and y are relative to |n|
-        possible values are (default: sw) |n|:
+        possible values are (default: sw): |n|
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se``
@@ -5695,7 +5715,7 @@ class AnimateSlider(object):
     def install(self):
         x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
         y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
-        self.slider = tkinter._scale(
+        self.slider = tkinter.Scale(
             self.env.root,
             from_=self.vmin, to=self.vmax,
             orient=tkinter.HORIZONTAL,
@@ -5895,8 +5915,7 @@ class Component(object):
         List or tuple containg |n|
             size_x : how much to displace the next component in x-direction, if applicable |n|
             size_y : how much to displace the next component in y-direction, if applicable |n|
-            animation objects0 : instance of Animate class |n|
-            ... |n|
+            animation objects : instances of Animate class |n|
             default behaviour: |n|
             green square of size 40 (displacements 50), with the sequence number centered in white.
 
@@ -6972,7 +6991,7 @@ class Component(object):
         '''
         Returns
         -------
-        set of queues where the component belongs to
+        set of queues where the component belongs to : set
         '''
         return set(self._qmembers)
 
@@ -7555,7 +7574,8 @@ class Normal(_Distribution):
         it assigns a new stream with the specified seed
     '''
 
-    def __init__(self, mean, standard_deviation=omitted, coefficient_of_variation=omitted, use_gauss=False, randomstream=omitted):
+    def __init__(self, mean, standard_deviation=omitted, coefficient_of_variation=omitted,
+      use_gauss=False, randomstream=omitted):
         self._use_gauss = use_gauss
         self._mean = mean
         if standard_deviation is omitted:
@@ -8347,10 +8367,10 @@ class Pdf(_Distribution):
     spec : list or tuple
         either
 
-        -   if no probabilities specified |n|:
+        -   if no probabilities specified: |n|
             list with x-values and corresponding probability
             (x0, p0, x1, p1, ...xn,pn) |n|
-        -   if probabilities is specified |n|:
+        -   if probabilities is specified: |n|
             list with x-values
 
     probabilities : list, tuple or float
@@ -9233,6 +9253,13 @@ class Resource(object):
 
 
 def colornames():
+    '''
+    available colornames
+
+    Returns
+    -------
+    dict with name of color as key, #rrggbb or #rrggbbaa as value : dict
+    '''
     if not hasattr(colornames, 'cached'):
         colornames.cached = pickle.loads(b'(dp0\nVfuchsia\np1\nV#FF00FF\np2\nsV\np3\nV#00000000\np4\nsVtransparent\np5\ng4\nsVpalevioletred\np6\nV#DB7093\np7\nsVskyblue\np8\nV#87CEEB\np9\nsVpaleturquoise\np10\nV#AFEEEE\np11\nsVcadetblue\np12\nV#5F9EA0\np13\nsVorangered\np14\nV#FF4500\np15\nsVsteelblue\np16\nV#4682B4\np17\nsVdimgray\np18\nV#696969\np19\nsVdarkseagreen\np20\nV#8FBC8F\np21\nsV60%gray\np22\nV#999999\np23\nsVroyalblue\np24\nV#4169E1\np25\nsVmediumblue\np26\nV#0000CD\np27\nsVgoldenrod\np28\nV#DAA520\np29\nsVmediumvioletred\np30\nV#C71585\np31\nsVblueviolet\np32\nV#8A2BE2\np33\nsVgainsboro\np34\nV#DCDCDC\np35\nsVdarkred\np36\nV#8B0000\np37\nsVrosybrown\np38\nV#BC8F8F\np39\nsVgold\np40\nV#FFD700\np41\nsVcoral\np42\nV#FF7F50\np43\nsVwhite\np44\nV#FFFFFF\np45\nsVdarkcyan\np46\nV#008B8B\np47\nsVblack\np48\nV#000000\np49\nsVorchid\np50\nV#DA70D6\np51\nsVmediumturquoise\np52\nV#48D1CC\np53\nsVlightgreen\np54\nV#90EE90\np55\nsVlime\np56\nV#00FF00\np57\nsVpapayawhip\np58\nV#FFEFD5\np59\nsVchocolate\np60\nV#D2691E\np61\nsV40%gray\np62\nV#666666\np63\nsVoldlace\np64\nV#FDF5E6\np65\nsVdarkblue\np66\nV#00008B\np67\nsVsilver\np68\nV#C0C0C0\np69\nsVaquamarine\np70\nV#7FFFD4\np71\nsVlightcoral\np72\nV#F08080\np73\nsVcyan\np74\nV#00FFFF\np75\nsVdodgerblue\np76\nV#1E90FF\np77\nsV10%gray\np78\nV#191919\np79\nsVmidnightblue\np80\nV#191970\np81\nsVgreen\np82\nV#008000\np83\nsVlightsalmon\np84\nV#FFA07A\np85\nsVazure\np86\nV#F0FFFF\np87\nsVred\np88\nV#FF0000\np89\nsVlightpink\np90\nV#FFB6C1\np91\nsVwhitesmoke\np92\nV#F5F5F5\np93\nsVyellow\np94\nV#FFFF00\np95\nsVlawngreen\np96\nV#7CFC00\np97\nsVmagenta\np98\ng2\nsVlightsteelblue\np99\nV#B0C4DE\np100\nsVolivedrab\np101\nV#6B8E23\np102\nsVlightslategray\np103\nV#778899\np104\nsVslategray\np105\nV#708090\np106\nsVlightblue\np107\nV#ADD8E6\np108\nsVmoccasin\np109\nV#FFE4B5\np110\nsVmediumspringgreen\np111\nV#00FA9A\np112\nsVlightgray\np113\nV#D3D3D3\np114\nsVseashell\np115\nV#FFF5EE\np116\nsVdarkkhaki\np117\nV#BDB76B\np118\nsVslateblue\np119\nV#6A5ACD\np120\nsVaqua\np121\ng75\nsVpalegoldenrod\np122\nV#EEE8AA\np123\nsVdeeppink\np124\nV#FF1493\np125\nsVdarkgreen\np126\nV#006400\np127\nsVblanchedalmond\np128\nV#FFEBCD\np129\nsVturquoise\np130\nV#40E0D0\np131\nsVnavy\np132\nV#000080\np133\nsVtomato\np134\nV#FF6347\np135\nsVyellowgreen\np136\nV#9ACD32\np137\nsVpeachpuff\np138\nV#FFDAB9\np139\nsV30%gray\np140\nV#464646\np141\nsVpink\np142\nV#FFC0CB\np143\nsVpalegreen\np144\nV#98FB98\np145\nsVlightskyblue\np146\nV#87CEFA\np147\nsVchartreuse\np148\nV#7FFF00\np149\nsVmediumorchid\np150\nV#BA55D3\np151\nsVolive\np152\nV#808000\np153\nsVdarkorange\np154\nV#FF8C00\np155\nsVbeige\np156\nV#F5F5DC\np157\nsVforestgreen\np158\nV#228B22\np159\nsVmediumpurple\np160\nV#9370DB\np161\nsVmintcream\np162\nV#F5FFFA\np163\nsVhotpink\np164\nV#FF69B4\np165\nsVdarkgoldenrod\np166\nV#B8860B\np167\nsVpowderblue\np168\nV#B0E0E6\np169\nsVhoneydew\np170\nV#F0FFF0\np171\nsVsalmon\np172\nV#FA8072\np173\nsVsnow\np174\nV#FFFAFA\np175\nsVmistyrose\np176\nV#FFE4E1\np177\nsVkhaki\np178\nV#F0E68C\np179\nsVmediumaquamarine\np180\nV#66CDAA\np181\nsVdarksalmon\np182\nV#E9967A\np183\nsValiceblue\np184\nV#F0F8FF\np185\nsVdarkturquoise\np186\nV#00CED1\np187\nsVlightyellow\np188\nV#FFFFE0\np189\nsVwheat\np190\nV#F5DEB3\np191\nsVlightseagreen\np192\nV#20B2AA\np193\nsVlightcyan\np194\nV#E0FFFF\np195\nsVantiquewhite\np196\nV#FAEBD7\np197\nsVsaddlebrown\np198\nV#8B4513\np199\nsVmediumseagreen\np200\nV#3CB371\np201\nsV70%gray\np202\nV#B2B2B2\np203\nsVsienna\np204\nV#A0522D\np205\nsVcornflowerblue\np206\nV#6495ED\np207\nsVseagreen\np208\nV#2E8B57\np209\nsVfloralwhite\np210\nV#FFFAF0\np211\nsVivory\np212\nV#FFFFF0\np213\nsVcornsilk\np214\nV#FFF8DC\np215\nsVindianred\np216\nV#CD5C5C\np217\nsVplum\np218\nV#DDA0DD\np219\nsV90%gray\np220\nV#E6E6E6\np221\nsVgreenyellow\np222\nV#ADFF2F\np223\nsVteal\np224\nV#008080\np225\nsVbrown\np226\nV#A52A2A\np227\nsVdarkslategray\np228\nV#2F4F4F\np229\nsVpurple\np230\nV#800080\np231\nsVviolet\np232\nV#EE82EE\np233\nsVdeepskyblue\np234\nV#00BFFF\np235\nsVghostwhite\np236\nV#F8F8FF\np237\nsVburlywood\np238\nV#DEB887\np239\nsVblue\np240\nV#0000FF\np241\nsVcrimson\np242\nV#DC143C\np243\nsVindigo\np244\nV#4B0082\np245\nsV20%gray\np246\nV#333333\np247\nsVdarkmagenta\np248\nV#8B008B\np249\nsV80%gray\np250\nV#CCCCCC\np251\nsVlightgoldenrodyellow\np252\nV#FAFAD2\np253\nsVtan\np254\nV#D2B48C\np255\nsVlimegreen\np256\nV#32CD32\np257\nsVlemonchiffon\np258\nV#FFFACD\np259\nsVbisque\np260\nV#FFE4C4\np261\nsVfirebrick\np262\nV#B22222\np263\nsVnavajowhite\np264\nV#FFDEAD\np265\nsVnone\np266\ng4\nsVmaroon\np267\nV#800000\np268\nsV50%gray\np269\nV#7F7F7F\np270\nsVdarkgray\np271\nV#A9A9A9\np272\nsVorange\np273\nV#FFA500\np274\nsVlavenderblush\np275\nV#FFF0F5\np276\nsVdarkorchid\np277\nV#9932CC\np278\nsVlavender\np279\nV#E6E6FA\np280\nsVspringgreen\np281\nV#00FF7F\np282\nsVthistle\np283\nV#D8BFD8\np284\nsVlinen\np285\nV#FAF0E6\np286\nsVdarkolivegreen\np287\nV#556B2F\np288\nsVdarkslateblue\np289\nV#483D8B\np290\nsVgray\np291\nV#808080\np292\nsVdarkviolet\np293\nV#9400D3\np294\nsVperu\np295\nV#CD853F\np296\nsVsandybrown\np297\nV#FAA460\np298\nsVmediumslateblue\np299\nV#7B68EE\np300\ns.')  # NOQA
     return colornames.cached
@@ -9287,7 +9314,7 @@ def spec_to_image(spec):
 
     Returns
     -------
-    image : PIL.Image..Image
+    image : PIL.Image.Image
     '''
     if isinstance(spec, str):
         if spec == '':
@@ -9695,7 +9722,7 @@ def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
                 pass
 
     if result is None:
-        result = ImageFont.loaddefault()  # last resort
+        result = ImageFont.load_default()  # last resort
 
     heightA = result.getsize('A')[1]
     getfont.lookup[(fontname, fontsize)] = result, heightA
@@ -9850,6 +9877,11 @@ def reset():
 
     might be useful for REPLs or for Pythonista
     '''
+    try:
+        g.default_env.video_close()
+    except:
+        pass
+
     g.default_env = None
     g.animation_env = None
     g.animation_scene = None

@@ -7,7 +7,7 @@ class X(sim.Component):
         Holds double the time t given. Needs to be called with yield from.
         '''
         yield self.hold(t*2)
-        
+
     def process(self):
         yield from self.hold2(sim.Uniform(0,3)())
         

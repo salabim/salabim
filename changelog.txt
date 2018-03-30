@@ -1,5 +1,24 @@
 salabim  changelog
 
+version 2.2.18  2018-03-31
+==========================
+New functionality
+-----------------
+Function reset() resets all global variables and closes a video recording, if any
+It can be useful to start a script with sim.reset() when used in REPLs and under Pythonista (iPad).
+
+Release notes 2.2.17 corrections
+--------------------------------
+Method Environment.scale() introduced, returning the scale of the animation, i.e. width / (x1 - x0)
+  (not (x1 - x0) / width).
+
+Function arrow_polygon added (not polygon_arrow).
+Function centered_rectangle() added (not rectangle_centered).
+
+Bug fixes
+---------
+Bug in AnimateSlider corrected.
+
 version 2.2.17  2018-03-31
 ==========================
 New functionality
@@ -44,10 +63,15 @@ Bug in Environment.animation_parameters() and Environment.video() fixed.
 Work around a PIL bug where rendering the first letter of some italic font texts chopped the lefthand serif.
 
 Sample files
-----------------
+------------
 Show colornames.py shows all available colors.
 Demo using process interaction in method.py gives an example of how to use hold in a separate method.
 Dining philsophers animated.py updated to use the new circle specification.
+
+Documentation
+-------------
+Documentation updated and improved. Although still work in progress ...
+
 
 
 version 2.2.16  2018--03-01
