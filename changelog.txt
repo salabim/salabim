@@ -1,5 +1,77 @@
 salabim  changelog
 
+version 2.2.19  2018-04-13
+==========================
+New functionality
+-----------------
+Support for animated GIF production. If Environment.animation.parameters(video=...) of Environment.video() 
+gets a filename with .gif as extension, an animated GIF is created.
+Note that GIF production does not require numpy nor opencv, and therefore Environment.can_video() does not
+have to be True to produce an animated GIF.
+This feature is particularly useful on Pythonista platforms, where opencv is not supported.
+
+For animated GIFs, Environment.animation_parameters() has two extra parameters:
+  video_repeat   ==> how many times the animated GIF will be repeated (default 1)
+  video_pingpong ==> whether all frames should be appended in reverse order at the end of the animated GIF
+                   resulting in a smooth repeating video (default: False)
+
+Two methods have been added to Environment to support GIF file production:
+  Environment.video_repeat()
+  Environment,video_pingpong()
+               
+                   
+For ordinary video files (non GIF), it is now possible to specify a codec, by adding a plus sign and 
+the name of the codec after the extension of the file, like
+  video='myvideo.avi+DIVX'
+  
+
+Introduced Resource.occupancy timestamped monitor. The occupancy is defined as the claimed quantity
+divided by the capacity. Note that when the capacity of r changes over time, r.occupancy.mean() may differ
+from r.claimed_quantity.mean() / r.capacity.mean(). Also, in that case, the occupancy may be even greater than 1.
+If the capacity is <=0, the occupancy is assumed to be 0.
+
+
+Improvements
+------------
+The time in the upper right-hand corner is now displayed with the mono font, which is better legible and
+not as 'nervous' as the narrow font that was used previously. Also, on Pythonista, the text is moved a bit
+to the left in order not to coincide with the closing symbol X.
+
+
+Clarification
+-------------
+When a process ends, all claimed resources will be automatically released.
+If that functionality is not desired, the process should be prematurely cancelled, with
+    yield self.cancel()
+    
+Compare these two components:
+    class X(sim.Component):
+        def process(self):
+            yield self.request(r)
+            yield self.hold(1)
+            # automatically releases r at the end of the process
+
+    class Y(sim.Component):
+        def process(self):
+            yield self.request(r)
+            yield self.hold(1)
+            yield self.cancel()  # process ends here and r is NOT released!
+            
+Also, all animation objects that have set the parent field to a component will be removed automatically
+when the process of that component ends. Again, this can be prevented by yield self.cancel().            
+
+This information will be included in the documentation.
+    
+
+Bug fixes
+---------
+Bugs in AnimateSlider fixed (thanks to John Hutchinson).
+
+Bug when honoring a resource request of a component that was already claiming that resource fixed.
+
+Bug in the line number of the trace when auto releasing claimed resources at end of a process fixed.
+
+
 version 2.2.18  2018-03-31
 ==========================
 New functionality

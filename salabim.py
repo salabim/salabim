@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.18'
+__version__ = '2.2.19'
 
 import heapq
 import random
@@ -1305,14 +1305,17 @@ if Pythonista:
             if (env is not None) and env._animate and env.running:
                 scene.background(env.pythonistacolor('bg'))
 
-                if env._synced:
-                    if env.paused:
-                        env.t = env.start_animation_time
+                if env._synced or env._video:  # video forces synced
+                    if env._video:
+                        env.t = env.video_t
                     else:
-                        env.t = \
-                            env.start_animation_time +\
-                            ((time.time() -
-                              env.start_animation_clocktime) * env._speed)
+                        if env.paused:
+                            env.t = env.start_animation_time
+                        else:
+                            env.t = \
+                                env.start_animation_time +\
+                                ((time.time() -
+                                  env.start_animation_clocktime) * env._speed)
                     while (env.peek() < env.t) and env.running and env._animate:
                         env.step()
                 else:
@@ -1344,7 +1347,9 @@ if Pythonista:
                 ims = scene.load_pil_image(capture_image)
                 scene.image(ims, 0, 0, *capture_image.size)
                 scene.unload_image(ims)
-
+                if env._video and (not env.paused):
+                    if env._video_out == 'gif':  # just to be sure
+                        env._images.append(capture_image.convert('RGB'))
                 for uio in env.ui_objects:
                     ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True)
                     uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True)
@@ -1411,6 +1416,18 @@ if Pythonista:
                         scene.tint(1, 1, 1, 1)
                         # required for proper loading of images later
                         scene.pop_matrix()
+            else:
+                width, height = ui.get_screen_size()
+                scene.pop_matrix()
+                scene.tint(1, 1, 1, 1)
+                scene.translate(width / 2, height / 2)
+                scene.text('salabim animation paused/stopped')
+                scene.pop_matrix()
+                scene.tint(1, 1, 1, 1)
+            if env is not None:
+                if env._video:
+                    if not env.paused:
+                        env.video_t += env._speed / env._fps
             g.in_draw = False
 
 
@@ -2534,6 +2551,8 @@ class Environment(object):
         self._show_time = True
         self._video = ''
         self._video_out = None
+        self._video_repeat = 1
+        self._video_pingpong = False
         self.an_modelname()
         self.an_clocktext()
 
@@ -2609,7 +2628,8 @@ class Environment(object):
                     next(c._process)
                     return
                 except StopIteration:
-                    c.release()
+                    for r in list(c._claims):
+                        c._release(r, s0='')
                     if self._trace:
                         self.print_trace('', '', c.name() + ' ended', s0='')
                     c._status = data
@@ -2646,7 +2666,8 @@ class Environment(object):
             next(c._process)
             return
         except StopIteration:
-            c.release()
+            for r in list(c._claims):
+                c._release(r, s0='')
             if self._trace:
                 self.print_trace('', '', c.name() + ' ended', s0='')
             c._status = data
@@ -2667,7 +2688,7 @@ class Environment(object):
       x0=omitted, y0=omitted, x1=omitted, background_color=omitted, foreground_color=omitted,
       fps=omitted, modelname=omitted, use_toplevel=omitted,
       show_fps=omitted, show_time=omitted,
-      video=omitted):
+      video=omitted, video_repeat=omitted, video_pingpong=omitted):
         '''
         set animation parameters
 
@@ -2745,10 +2766,23 @@ class Environment(object):
             if False, do not show the time
 
         video : str
-            if video is not omitted, a mp4 format video with the name video
+            if video is not omitted, a video with the name video
             will be created. |n|
-            The video has to have a .mp4 etension |n|
-            This requires installation of opencv (cv2) and numpy.
+            If the video extension is not .gif, a codec may be added
+            by appending a plus sign and the four letter code name,
+            like 'myvideo.avi+DIVX'.
+            If no codec is given, MP4V will be used.
+
+        video_repeat : int
+            number of times gif should be repeated |n|
+            0 means inifinite |n|
+            at init of the environment video_repeat is 1 |n|
+            this only applies to gif files production.
+
+        video_pingpong : bool
+            if True, all frames will be added reversed at the end of the video (useful for smooth loops)
+            at init of the environment video_pingpong is False |n|
+            this only applies to gif files production.
 
         Note
         ----
@@ -2843,34 +2877,44 @@ class Environment(object):
             else:
                 frame_changed = False  # no animation required, so leave running animation_env untouched
 
+        if video_repeat is not omitted:
+            self._video_repeat = video_repeat
+
+        if video_pingpong is not omitted:
+            self._video_pingpong = video_pingpong
+
         video_opened = False
         if video is not omitted:
             if video != self._video:
                 if self._video:
                     self.video_close()
                 self._video = video
-                if self._video:
-                    video_opened = True
-                    can_animate(try_only=False)
-                    can_video(try_only=False)
-                    extension = os.path.splitext(self._video)[1].lower()
-                    if extension == '.mp4':
-                        self.video_fourcc = 'MP4V'
-                    elif extension == '.avi':
-                        self.video_fourcc = 'MP4V'
-                    else:
-                        raise SalabimError('unsupported video file extension')
 
-                    fourcc = cv2.VideoWriter_fourcc(*self.video_fourcc)
-                    self._video_out = cv2.VideoWriter(
-                        self._video, fourcc, self._fps, (self._width, self._height))
+                if video:
+                    video_opened = True
+                    extension = os.path.splitext(video)[1].lower()
+                    if extension == '.gif':
+                        self._video_name = video
+                        can_animate(try_only=False)
+                        self._video_out = 'gif'
+                        self._images = []
+                    else:
+                        if len(video.split('+')) == 2:
+                            self._video_name, codec = video.split('+')
+                        else:
+                            self._video_name = video
+                            codec = 'MP4V'
+                        can_video(try_only=False)
+                        fourcc = cv2.VideoWriter_fourcc(*codec)
+                        self._video_out = cv2.VideoWriter(
+                            self._video_name, fourcc, self._fps, (self._width, self._height))
 
         if self._video and (not video_opened):
             if width_changed:
                 raise SalabimError('width changed while recording video.')
             if height_changed:
                 raise SalabimError('height changed while recording video.')
-            if fps_changed:
+            if fps_changed and self._video_out != 'gif':
                 raise SalabimError('fps changed while recording video.')
 
         if self._video:
@@ -2895,7 +2939,7 @@ class Environment(object):
                 if Pythonista:
                     if g.animation_scene is None:
                         g.animation_scene = AnimationScene(env=self)
-                        scene.run(g.animation_scene, frame_interval=60 / self._fps, show_fps=False)
+                        scene.run(g.animation_scene, frame_interval=1, show_fps=False)
 
                 else:
                     if self.use_toplevel:
@@ -2919,7 +2963,20 @@ class Environment(object):
         closes the current animation video recording, if any.
         '''
         if self._video_out:
-            self._video_out.release()
+            if self._video_out == 'gif':
+                if self._images:
+                    if self._video_pingpong:
+                        self._images.extend(self._images[::-1])
+                    if Pythonista:
+                        import images2gif
+                        images2gif.writeGif(self._video_name, self._images,
+                           duration=1 / self._fps, repeat=self._video_repeat)
+                    else:
+                        self._images[0].save(self._video_name, save_all=True,
+                            append_images=self._images[1:], loop=self._video_repeat, duration=1000 / self._fps)
+                    self._images = []  # release memory
+            else:
+                self._video_out.release()
             self._video_out = None
             self._video = ''
 
@@ -3131,13 +3188,14 @@ class Environment(object):
 
         Parameters
         ----------
-        value : str
+        value : str, list or tuple
             new video name |n|
-            if not specified, no change
+            if not specified, no change |n|
+            for explanation see animation_parameters()
 
         Returns
         -------
-        video : str
+        video : str, list or tuple
 
         Note
         ----
@@ -3147,13 +3205,57 @@ class Environment(object):
             self.animation_parameters(video=value, animate=None)
         return self._video
 
+    def video_repeat(self, value=omitted):
+        '''
+        video repeat
+
+        Parameters
+        ----------
+        value : int
+            new video repeat |n|
+            if not specified, no change
+
+        Returns
+        -------
+        video repeat : int
+
+        Note
+        ----
+        Applies only to gif animation.
+        '''
+        if value is not omitted:
+            self.animation_parameters(video_repeat=value, animate=None)
+        return self._video_repeat
+
+    def video_pingpong(self, value=omitted):
+        '''
+        video pingponf
+
+        Parameters
+        ----------
+        value : bool
+            new video pingpong |n|
+            if not specified, no change
+
+        Returns
+        -------
+        video pingpong : bool
+
+        Note
+        ----
+        Applies only to gif animation.
+        '''
+        if value is not omitted:
+            self.animation_parameters(video_pingpong=value, animate=None)
+        return self._video_pingpong
+
     def fps(self, value=omitted):
         '''
         fps
 
         Parameters
         ----------
-        value : bool
+        value : int
             new fps |n|
             if not specified, no change
 
@@ -3511,9 +3613,12 @@ class Environment(object):
                         uio.button.config(text=thistext)
 
             if self._video and (not self.paused):
-                open_cv_image = cv2.cvtColor(
-                    np.array(capture_image), cv2.COLOR_RGB2BGR)
-                self._video_out.write(open_cv_image)
+                if self._video_out == 'gif':
+                    self._images.append(capture_image)
+                else:
+                    open_cv_image = cv2.cvtColor(
+                        np.array(capture_image), cv2.COLOR_RGB2BGR)
+                    self._video_out.write(open_cv_image)
 
             g.canvas.update()
             if self._video:
@@ -3718,8 +3823,8 @@ class Environment(object):
         called by run(), if animation is True. |n|
         may be overridden to change the standard behaviour.
         '''
-        ao = Animate(x0=0, y0=-5, textcolor0='fg',
-            text='', fontsize0=15, font='narrow', anchor='ne',
+        ao = Animate(x0=-30 if Pythonista else 0, y0=-11 if Pythonista else 0, textcolor0='fg',
+            text='', fontsize0=15, font='mono', anchor='ne',
             screen_coordinates=True, xy_anchor='ne', env=self)
         ao.text = self.clocktext
 
@@ -4966,8 +5071,6 @@ class Animate(object):
                            self.t0, self.t1, self.rectangle0, self.rectangle1)
 
     def width(self, t=omitted):
-        return interpolate((self.env._now if t is omitted else t),
-                           self.t0, self.t1, self.width0, self.width1)
         '''
         width position of an animated image object. May be overridden.
 
@@ -4982,6 +5085,8 @@ class Animate(object):
             default behaviour: linear interpolation between self.width0 and self.width1 |n|
             if None, the original width of the image will be used
         '''
+        return interpolate((self.env._now if t is omitted else t),
+                           self.t0, self.t1, self.width0, self.width1)
 
     def fontsize(self, t=omitted):
         '''
@@ -5699,7 +5804,7 @@ class AnimateSlider(object):
             if Pythonista:
                 self._v = value
             else:
-                if self._animate:
+                if self.env._animate:
                     self.slider.set(value)
                 else:
                     self._v = value
@@ -5707,7 +5812,7 @@ class AnimateSlider(object):
         if Pythonista:
             return self._v
         else:
-            if self._animate:
+            if self.env._animate:
                 return self.slider.get()
             else:
                 return self._v
@@ -5743,7 +5848,7 @@ class AnimateSlider(object):
             self.env.ui_objects.remove(self)
         if self.installed:
             if not Pythonista:
-                self.button.quit()
+                self.slider.quit()
             self.installed = False
 
 
@@ -5880,7 +5985,7 @@ class Component(object):
                 except AttributeError:
                     parameters = inspect.getargspec(p)[0]  # pre Python 3.4
                 kwargs_p = {}
-                for kwarg in list(kwargs.keys()):
+                for kwarg in list(kwargs):
                     if kwarg in parameters:
                         kwargs_p[kwarg] = kwargs[kwarg]
                         del kwargs[kwarg]  # here kwargs consumes the used arguments
@@ -6040,7 +6145,7 @@ class Component(object):
         if self._requests:
             if self.env._trace:
                 self.env.print_trace('', '', self.name(), 'request failed')
-            for r in list(self._requests.keys()):
+            for r in list(self._requests):
                 self._leave(r._requesters)
                 if r._requesters._length == 0:
                     r._minq = inf
@@ -6119,13 +6224,13 @@ class Component(object):
 
         mode : str preferred
             mode |n|
-            will be used in trace and can be used in animations |n|
+            will be used in the trace and can be used in animations |n|
             if nothing specified, the mode will be unchanged. |n|
             also mode_time will be set to now, if mode is set.
 
         Note
         ----
-        if to be applied for the current component, use yield self.activate(). |n|
+        if to be applied to the current component, use ``yield self.activate()``. |n|
         if both at and delay are specified, the component becomes current at the sum
         of the two values.
         '''
@@ -6252,7 +6357,7 @@ class Component(object):
 
         Note
         ----
-        if to be used for the current component (nearly always the case), use ``yield self.passivate(...)``.
+        if to be used for the current component (nearly always the case), use ``yield self.passivate()``.
         '''
         if self._status == current:
             self._remaining_duration = 0
@@ -6283,7 +6388,7 @@ class Component(object):
 
         Note
         ----
-        if to be used for the current component, use ``yield self.cancel(...)``.
+        if to be used for the current component, use ``yield self.cancel()``.
         '''
         if self._status != current:
             self._checkisnotdata()
@@ -6320,7 +6425,7 @@ class Component(object):
 
         if to be used for the current component
         (which will be nearly always the case),
-        use ``yield self.standby(...)``.
+        use ``yield self.standby()``.
         '''
         if self._status != current:
             self._checkisnotdata()
@@ -6401,7 +6506,7 @@ class Component(object):
         fail_delay = kwargs.pop('fail_delay', omitted)
         mode = kwargs.pop('mode', omitted)
         if kwargs:
-            raise TypeError("request() got an expected keyword argument '" + tuple(kwargs.keys())[0] + "'")
+            raise TypeError("request() got an expected keyword argument '" + tuple(kwargs)[0] + "'")
 
         if self._status != current:
             self._checkisnotdata()
@@ -6479,16 +6584,19 @@ class Component(object):
                 self._leave(r._requesters)
                 if not r._anonymous:
                     self._claims[r] += self._requests[r]
-                    self._enter(r._claimers)
+                    mx = self._member(r._claimers)
+                    if mx is None:
+                        self._enter(r._claimers)
                 if r._requesters._length == 0:
                     r._minq = inf
                 r.claimed_quantity.tally(r._claimed_quantity)
+                r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
                 r.available_quantity.tally(r._capacity - r._claimed_quantity)
             self._requests = collections.defaultdict(int)
             self._remove()
             self._reschedule(self.env._now, False, 'request honor')
 
-    def _release(self, r, q=None):
+    def _release(self, r, q=None, s0=omitted):
         if r not in self._claims:
             raise SalabimError(self.name() +
                 ' not claiming from resource ' + r.name())
@@ -6504,10 +6612,11 @@ class Component(object):
                 r._claimed_quantity = 0  # to avoid rounding problems
             del self._claims[r]
         r.claimed_quantity.tally(r._claimed_quantity)
+        r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
         r.available_quantity.tally(r._capacity - r._claimed_quantity)
         if self.env._trace:
             self.env.print_trace('', '', self.name(),
-                'release ' + str(q) + ' from ' + r.name())
+                'release ' + str(q) + ' from ' + r.name(), s0=s0)
         r._tryrequest()
 
     def release(self, *args):
@@ -6557,7 +6666,7 @@ class Component(object):
                         'not possible to release anonymous resources ' + r.name())
                 self._release(r, q)
         else:
-            for r in list(self._claims.keys()):
+            for r in list(self._claims):
                 self._release(r)
 
     def wait(self, *args, **kwargs):
@@ -6647,7 +6756,7 @@ class Component(object):
         all = kwargs.pop('all', False)
         mode = kwargs.pop('mode', omitted)
         if kwargs:
-            raise TypeError("wait() got an expected keyword argument '" + tuple(kwargs.keys())[0] + "'")
+            raise TypeError("wait() got an expected keyword argument '" + tuple(kwargs)[0] + "'")
 
         if self._status != current:
             self._checkisnotdata()
@@ -6775,7 +6884,7 @@ class Component(object):
         -------
         list of claimed resources : list
         '''
-        return self._claims.keys()
+        return list(self._claims)
 
     def requested_resources(self):
         '''
@@ -6783,7 +6892,7 @@ class Component(object):
         -------
         list of requested resources : list
         '''
-        return self._requests.keys()
+        return list(self._requests)
 
     def requested_quantity(self, resource):
         '''
@@ -9028,6 +9137,9 @@ class Resource(object):
         self.available_quantity = MonitorTimestamp(
             'Available quantity of ' + self.name(),
             initial_tally=capacity, monitor=monitor, type='float', env=self.env)
+        self.occupancy = MonitorTimestamp(
+            'Occupancy of ' + self.name(),
+            initial_tally=0, monitor=monitor, type='float', env=self.env)
         if self.env._trace:
             self.env.print_trace(
                 '', '', self.name() + ' create',
@@ -9062,14 +9174,14 @@ class Resource(object):
             requesters().reset_monitors,
             capacity.reset(),
             available_quantity.reset() or
-            claimed_quantity.reset()
+            claimed_quantity.reset() or
+            occupancy.reset()
         '''
 
         self.requesters().reset_monitors(monitor)
         self.claimers().reset_monitors(monitor)
-        self.capacity.reset(monitor)
-        self.available_quantity.reset(monitor)
-        self.claimed_quantity.reset(monitor)
+        for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
+            m.reset(monitor)
 
     def print_statistics(self):
         '''
@@ -9084,7 +9196,7 @@ class Resource(object):
             q.length_of_stay.print_statistics(show_header=False, show_legend=show_legend, do_indent=True)
             print()
 
-        for m in [self.capacity, self.available_quantity, self.claimed_quantity]:
+        for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
             m.print_statistics(show_header=False, show_legend=show_legend, do_indent=True)
             print()
 
@@ -9101,14 +9213,13 @@ class Resource(object):
         Note
         ----
         it is possible to individually control monitoring with claimers().monitor()
-        and requesters().monitor(), capacity.monitor(), available_quantity.monitor)
-        or claimed_quantity.monitor()
+        and requesters().monitor(), capacity.monitor(), available_quantity.monitor),
+        claimed_quantity.monitor() or occupancy.monitor()
         '''
         self.requesters().monitor(value)
         self.claimers().monitor(value)
-        self.capacity.monitor(value)
-        self.available_quantity.monitor(value)
-        self.claimed_quantity.monitor(value)
+        for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
+            m.monitor(value)
 
     def __repr__(self):
         return objectclass_to_str(self) + ' (' + self.name() + ')'
@@ -9178,6 +9289,7 @@ class Resource(object):
             if self._claimed_quantity < 1e-8:
                 self._claimed_quantity = 0
             self.claimed_quantity.tally(self._claimed_quantity)
+            self.occupancy.tally(0 if self._capacity <= 0 else self._claimed_quantity / self._capacity)
             self.available_quantity.tally(self._capacity - self._claimed_quantity)
             self._tryrequest()
 
@@ -9221,6 +9333,7 @@ class Resource(object):
         self._capacity = cap
         self.capacity.tally(self._capacity)
         self.available_quantity.tally(self._capacity - self._claimed_quantity)
+        self.occupancy.tally(0 if self._capacity <= 0 else self._claimed_quantity / self._capacity)
         self._tryrequest()
 
     def name(self):
@@ -9737,7 +9850,7 @@ def show_fonts():
     for fns, ifilename in fonts():
         for fn in fns:
             fontnames.append(fn)
-    fontnames.extend(standardfonts().keys())
+    fontnames.extend(list(standardfonts()))
     last = ''
     for font in sorted(fontnames, key=normalize):
         if font != last:  # remove duplicates
@@ -9749,7 +9862,7 @@ def show_colornames():
     '''
     show (print) all available color names and their value.
     '''
-    names = sorted(colornames().keys())
+    names = sorted(colornames())
     for name in names:
         print('{:22s}{}'.format(name, colornames()[name]))
 
@@ -9799,6 +9912,7 @@ def can_animate(try_only=True):
     global Image
     global ImageDraw
     global ImageFont
+    global GifImagePlugin
     global ImageTk
     global tkinter
     try:
@@ -9806,6 +9920,7 @@ def can_animate(try_only=True):
         from PIL import Image
         from PIL import ImageDraw
         from PIL import ImageFont
+        from PIL import GifImagePlugin
         if not Pythonista:
             from PIL import ImageTk
     except ImportError:

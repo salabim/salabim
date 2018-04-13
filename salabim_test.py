@@ -9,7 +9,42 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test59()
+    test61()
+    
+def test61():
+    class X(sim.Component):
+        def process(self):
+            yield self.request(r)
+            yield self.hold(1)
+
+    class Y(sim.Component):
+        def process(self):
+            yield self.request(r)
+            yield self.hold(1)
+            self.cancel()
+
+    env = sim.Environment(trace=True)
+    r = sim.Resource('r', capacity=2)
+    X()
+    Y()
+    env.run()
+    print(r.claimed_quantity())
+    
+def test60():
+    class X(sim.Component):
+        def process(self):
+            yield self.request(r)
+            yield self.hold(sim.Uniform(0,2)())
+            
+    env = sim.Environment()
+    r = sim.Resource(name='r',capacity=1)
+    for i in range(5):
+        X()
+    env.trace(True)
+    env.run(10)
+    occupancy = r.claimed_quantity.mean() / r.capacity.mean()
+    r.print_statistics()
+    env.run()
     
     
 def test59():
@@ -95,26 +130,32 @@ def test58():
 def test57():
     class X(sim.Component):
         def process(self):
-            while True:
+            while env.now()<run_length:
                 an.update(text=str(run_length - env.now()))
                 yield self.hold(1)
-                if env.now() > 100:
-                    env.grab()
-                    env.main().activate()
+            env.animation_parameters(animate=False)
+            print(self.env._animate)
+#            yield self.hold(0)
+            env.video('')
+            env.main().activate()
      
     env = sim.Environment()
-    env.animation_parameters(background_color='blue' )
-    sim.show_colornames()
-#    env.video('test.mp4')
-#    env.animation_parameters(video='test.avi', speed=0.5)
+    env.animation_parameters(background_color='blue', modelname='test')
+    env.video('test.gif')
+    env.video_pingpong(False)
+    env.video_repeat(2)
+
+#    env.animation_parameters(video='test.avi+MP4V', speed=0.5)
     an = sim.Animate(text='', x0=100,y0=100, fontsize0=100)
-    run_length = 5
+    run_length = 1
+    
     X()
     sim.Animate(line0=(0,50,None,None), line1=(0,50,1024,None), linewidth0=4,t1=run_length)
     sim.Animate(circle0=(40,), x0=200, y0=200)
     sim.Animate(circle0=40, x0=300, y0=200)
-    env.run(run_length)
-    env.video('')
+    env.run()
+    print('done')
+    env.quit()
     
 def test56():
     env = sim.Environment()
