@@ -1,7 +1,11 @@
 salabim  changelog
 
 
-version 2.2.20
+version 2.2.21
+==========================
+
+
+version 2.2.20  2018-04-28
 ==========================
 New functionality
 -----------------
@@ -9,7 +13,7 @@ New process interaction methods Component.interrupt() and Component.resume() int
 This is particularly useful for simulating breakdowns.
 
 When a component is interrupted, the component is removed from the event chain (if applicable) and
-the status becomed interrupted. For scheduled, waiting and requesting component, the remaining
+the status becomes interrupted. For scheduled, waiting and requesting component, the remaining
 duration will be calculated.
 Upon resume, the action depends on the original status:
 - passive: the component gets passive
@@ -33,9 +37,9 @@ The action depends on the status where the component is in:
 - waiting or requesting: the fail_at is set according to the given value
 - interrupted: the remaining_duration is updated according to the given value
 The method returns:
-- passive: the remaining time (if applicable) at the moment passivate() was given, unless overriden
+- passive: the remaining time (if applicable) at the moment passivate() was given, unless overridden
 - scheduled, waiting or requesting: the scheduled time minus now
-- interrupted: the remaining time (if applicable) at the the moment interrupt was given, unless overridden
+- interrupted: the remaining time (if applicable) at the the moment interrupt was given unless overridden
 - otherwise: 0
 
 
@@ -45,7 +49,7 @@ Improvement
 -----------
 When a process ends the trace now shows the line number of the last line in the process,
 postpended with a plus symbol. Previously no line number was shown.
-Also any auto resource releases at the end of a process will show the same information now.
+Also, any auto resource releases at the end of a process will show the same information now.
 
 version 2.2.19  2018-04-13
 ==========================
