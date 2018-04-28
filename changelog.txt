@@ -1,5 +1,52 @@
 salabim  changelog
 
+
+version 2.2.20
+==========================
+New functionality
+-----------------
+New process interaction methods Component.interrupt() and Component.resume() introduced to interrupt a component.
+This is particularly useful for simulating breakdowns.
+
+When a component is interrupted, the component is removed from the event chain (if applicable) and
+the status becomed interrupted. For scheduled, waiting and requesting component, the remaining
+duration will be calculated.
+Upon resume, the action depends on the original status:
+- passive: the component gets passive
+- standby: the component gets standby
+- requesting: if the request can be honored, it will.
+  If not, the fail_at time will be updated according to the remaining duration
+- waiting: if the wait can be honored, it will.
+  If not, the fail_at time will be updated according to the remaining duration
+- scheduled: the scheduled time will be updated according to the remaining duration
+Note that an interrupted component cannot be interrupted.
+Also, only interrupted components can be resumed.
+Interrupted components can leave the interrupted state with the all process activation methods:
+  activate, hold, passivate, wait, request, standby or cancel.
+  
+The functionality of method Component.remaining_duration() has been extended.
+Now the method has a value parameter which allows setting the remaining_duration.
+The action depends on the status where the component is in:
+- passive: the remaining duration is update according to the given value
+- standby and current: not allowed
+- scheduled: the component is rescheduled according to the given value
+- waiting or requesting: the fail_at is set according to the given value
+- interrupted: the remaining_duration is updated according to the given value
+The method returns:
+- passive: the remaining time (if applicable) at the moment passivate() was given, unless overriden
+- scheduled, waiting or requesting: the scheduled time minus now
+- interrupted: the remaining time (if applicable) at the the moment interrupt was given, unless overridden
+- otherwise: 0
+
+
+Environment.run() now allows main to be scheduled urgent, by specifying urgent=True.
+
+Improvement
+-----------
+When a process ends the trace now shows the line number of the last line in the process,
+postpended with a plus symbol. Previously no line number was shown.
+Also any auto resource releases at the end of a process will show the same information now.
+
 version 2.2.19  2018-04-13
 ==========================
 New functionality
@@ -70,6 +117,8 @@ Bugs in AnimateSlider fixed (thanks to John Hutchinson).
 Bug when honoring a resource request of a component that was already claiming that resource fixed.
 
 Bug in the line number of the trace when auto releasing claimed resources at end of a process fixed.
+
+Bug in wait with a fail_at parameter fixed.
 
 
 version 2.2.18  2018-03-31

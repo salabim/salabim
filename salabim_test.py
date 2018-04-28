@@ -4,12 +4,77 @@ import random
 import string
 import time
 import logging
+import inspect
 
 import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test61()
+    test62()
+    
+def test62():
+    class X1(sim.Component):
+        def process(self):
+            yield self.hold(100)
+            
+    class X2(sim.Component):
+        def process(self):
+            yield self.request(res, fail_at=100)
+            yield self.hold(50)
+            
+    class X3(sim.Component):
+        def process(self):
+            yield self.passivate()
+            
+    class X4(sim.Component):
+        def process(self):
+            while True:
+                yield self.standby()
+                        
+    class X5(sim.Component):
+        def process(self):
+            yield self.wait(st, fail_at=100)
+            yield self.hold(50)
+            
+    class Z(sim.Component):
+        def process(self):
+            for i in range(20):
+                yield self.hold(1)
+            
+    class Y(sim.Component):
+        def process(self):
+            yield self.hold(4)
+            x1.remaining_duration(100)
+            yield self.hold(1)
+            x1.interrupt()
+            x2.interrupt()
+            x3.interrupt()
+            x4.interrupt()
+            x5.interrupt()
+            yield self.hold(2)
+            res.set_capacity(0)
+            st.set()
+            yield self.hold(3)
+            x1.resume()
+            x2.resume()
+            x3.resume()
+            x4.resume()
+            x5.resume()
+
+    env = sim.Environment(trace=True)
+    env.suppress_trace_standby(False)
+    x1 = X1()
+    x2 = X2()
+    x3 = X3()
+    x4 = X4()
+    x5 = X5()
+    
+    y = Y()
+    z = Z()
+    res = sim.Resource('res', capacity=0)
+    st = sim.State('st')
+    
+    env.run(urgent=True)
     
 def test61():
     class X(sim.Component):
@@ -19,9 +84,10 @@ def test61():
 
     class Y(sim.Component):
         def process(self):
-            yield self.request(r)
+            yield self.request(r)            
             yield self.hold(1)
-            self.cancel()
+#            self.cancel()
+            a=1
 
     env = sim.Environment(trace=True)
     r = sim.Resource('r', capacity=2)
@@ -44,7 +110,7 @@ def test60():
     env.run(10)
     occupancy = r.claimed_quantity.mean() / r.capacity.mean()
     r.print_statistics()
-    env.run()
+    env.run(urgent=True)
     
     
 def test59():
@@ -512,7 +578,7 @@ def test42():
     for i in range(15):
         c = sim.Component(name='c.')
         if i < 10:
-            q1.add_sorted(c, priority=i)
+            q1.add_sorted(c, priority=20-i)
         if i > 5:
             q2.add_sorted(c, priority=i+100)
     env.run(1000)

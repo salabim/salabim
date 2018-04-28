@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.19'
+__version__ = '2.2.20'
 
 import heapq
 import random
@@ -674,7 +674,7 @@ class Monitor(object):
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
 
-        convert_to_numeric : bool
+        force_numeric : bool
             if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
             if False, do not interpret x-values, return as list if type is list
 
@@ -2628,10 +2628,16 @@ class Environment(object):
                     next(c._process)
                     return
                 except StopIteration:
-                    for r in list(c._claims):
-                        c._release(r, s0='')
                     if self._trace:
-                        self.print_trace('', '', c.name() + ' ended', s0='')
+                        gi_code = c._process.gi_code
+                        gs = inspect.getsourcelines(gi_code)
+                        s0 = self.filename_lineno_to_str(gi_code.co_filename, len(gs[0]) + gs[1] - 1) + '+'
+                    else:
+                        s0 = None
+                    for r in list(c._claims):
+                        c._release(r, s0=s0)
+                    if self._trace:
+                        self.print_trace('', '', c.name() + ' ended', s0=s0)
                     c._status = data
                     c._scheduled_time = inf
                     c._process = None
@@ -2666,10 +2672,16 @@ class Environment(object):
             next(c._process)
             return
         except StopIteration:
-            for r in list(c._claims):
-                c._release(r, s0='')
             if self._trace:
-                self.print_trace('', '', c.name() + ' ended', s0='')
+                gi_code = c._process.gi_code
+                gs = inspect.getsourcelines(gi_code)
+                s0 = self.filename_lineno_to_str(gi_code.co_filename, len(gs[0]) + gs[1] - 1) + '+'
+            else:
+                s0 = None
+            for r in list(c._claims):
+                c._release(r, s0=s0)
+            if self._trace:
+                self.print_trace('', '', c.name() + ' ended', s0=s0)
             c._status = data
             c._scheduled_time = inf
             c._process = None
@@ -3455,7 +3467,7 @@ class Environment(object):
         '''
         return self._current_component
 
-    def run(self, duration=omitted, till=omitted):
+    def run(self, duration=omitted, till=omitted, urgent=False):
         '''
         start execution of the simulation
 
@@ -3468,6 +3480,15 @@ class Environment(object):
         till : float
             schedule time |n|
             if omitted, inf is assumed
+
+        urgent : bool
+            urgency indicator |n|
+            if False (default), main will be scheduled
+            behind all other components scheduled
+            for the same time |n|
+            if True, main will be scheduled
+            in front of all components scheduled
+            for the same time
 
         Note
         ----
@@ -3488,7 +3509,7 @@ class Environment(object):
                 raise SalabimError('both duration and till specified')
 
         self._main.frame = _get_caller_frame()
-        self._main._reschedule(scheduled_time, False, 'run')
+        self._main._reschedule(scheduled_time, urgent, 'run')
 
         self.running = True
         while self.running:
@@ -4177,12 +4198,15 @@ class Environment(object):
 
     def _frame_to_lineno(self, frame):
         frameinfo = inspect.getframeinfo(frame)
-        ref = self._source_files.get(frameinfo.filename)
+        return self.filename_lineno_to_str(frameinfo.filename, frameinfo.lineno)
+
+    def filename_lineno_to_str(self, filename, lineno):
+        ref = self._source_files.get(filename)
         new_entry = False
         if ref is None:
             if self._source_files:
                 ref = len(self._source_files)
-            self._source_files[frameinfo.filename] = ref
+            self._source_files[filename] = ref
             new_entry = True
         if ref == 0:
             pre = ''
@@ -4190,7 +4214,7 @@ class Environment(object):
             pre = chr(ref + ord('A') - 1)
         if new_entry:
             self._print_legend(ref)
-        return rpad(pre + str(frameinfo.lineno), 5)
+        return rpad(pre + str(lineno), 5)
 
     def print_trace(self, s1='', s2='', s3='', s4='', s0=omitted, _optional=False):
         '''
@@ -6361,7 +6385,6 @@ class Component(object):
         '''
         if self._status == current:
             self._remaining_duration = 0
-        else:
             self._checkisnotdata()
             self._remove()
             self._check_fail()
@@ -6373,6 +6396,91 @@ class Component(object):
         if self.env._trace:
             self.env.print_trace('', '', self.name() + ' passivate', merge_blanks(_modetxt(self._mode)))
         self._status = passive
+
+    def interrupt(self, mode=omitted):
+        '''
+        interrupt the component
+
+        Parameters
+        ----------
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations |n|
+            if nothing is specified, the mode will be unchanged. |n|
+            also mode_time will be set to now, if mode is set.
+
+        Note
+        ----
+        Cannot be applied on the current component. |n|
+        Use resume() to resume
+        '''
+        if self._status == current:
+            pass
+        else:
+            if self._status == interrupted:
+                raise SalabimError(self.name() + ' already interrupted')
+            else:
+                self._checkisnotdata()
+                self._remove()
+                self._remaining_duration = self._scheduled_time - self.env._now
+                self._interrupted_status = self._status
+                self._status = interrupted
+                if mode is not omitted:
+                    self._mode = mode
+                    self._mode_time = self.env._now
+                self.env.print_trace('', '', self.name() + ' interrupt', merge_blanks(_modetxt(self._mode)))
+
+    def resume(self, mode=omitted, urgent=False):
+        '''
+        resumes an interrupted component
+
+        Parameters
+        ----------
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations |n|
+            if nothing is specified, the mode will be unchanged. |n|
+            also mode_time will be set to now, if mode is set.
+
+        urgent : bool
+            urgency indicator |n|
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time |n|
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time
+
+        Note
+        ----
+        Can be only applied to interrupted components. |n|
+        '''
+        if self._status == interrupted:
+            self._status = self._interrupted_status
+            self.env.print_trace(
+                '', '', self.name() + ' resume (' + self.status()() + ')', merge_blanks(_modetxt(self._mode)))
+            if self._status == passive:
+                self.env.print_trace('', '', self.name() + ' passivate', merge_blanks(_modetxt(self._mode)))
+            elif self._status == standby:
+                self._scheduled_time = self.env._now
+                self.env._standbylist.append(self)
+                self.env.print_trace('', '', self.name() + ' standby', merge_blanks(_modetxt(self._mode)))
+            elif self._status == scheduled:
+                if self._waits:
+                    if self._trywait():
+                        return
+                    reason = 'wait'
+                elif self._requests:
+                    if self._tryrequest():
+                        return
+                    reason = 'request'
+                else:
+                    reason = 'hold'
+                self._reschedule(self.env._now + self._remaining_duration, urgent, reason)
+            else:
+                raise SalabimError(self.name() + ' unexpected interrupted_status', self._status())
+        else:
+            raise SalabimError(self.name() + ' not interrupted')
 
     def cancel(self, mode=omitted):
         '''
@@ -6572,6 +6680,8 @@ class Component(object):
             self._reschedule(scheduled_time, False, 'request')
 
     def _tryrequest(self):
+        if self._status == interrupted:
+            return False
         honored = True
         for r in self._requests:
             if self._requests[r] > (r._capacity - r._claimed_quantity + 1e-8):
@@ -6595,6 +6705,7 @@ class Component(object):
             self._requests = collections.defaultdict(int)
             self._remove()
             self._reschedule(self.env._now, False, 'request honor')
+        return honored
 
     def _release(self, r, q=None, s0=omitted):
         if r not in self._claims:
@@ -6777,7 +6888,7 @@ class Component(object):
                     scheduled_time = self.env._now + fail_delay
         else:
             if fail_delay is omitted:
-                scheduled_time = fail_at + self._env._offset
+                scheduled_time = fail_at + self.env._offset
             else:
                 raise SalabimError('both fail_at and fail_delay specified')
 
@@ -6822,6 +6933,8 @@ class Component(object):
             self._reschedule(scheduled_time, False, 'wait')
 
     def _trywait(self):
+        if self._status == interrupted:
+            return False
         if self._wait_all:
             honored = True
             for state, value, valuetype in self._waits:
@@ -7412,8 +7525,28 @@ class Component(object):
         '''
         return self._scheduled_time - self.env._offset
 
-    def remaining_duration(self):
+    def remaining_duration(self, value=omitted, urgent=False):
         '''
+        Parameters
+        ----------
+        value : float
+            set the remaining_duration |n|
+            The action depends on the status where the component is in: |n|
+            - passive: the remaining duration is update according to the given value |n|
+            - standby and current: not allowed |n|
+            - scheduled: the component is rescheduled according to the given value |n|
+            - waiting or requesting: the fail_at is set according to the given value |n|
+            - interrupted: the remaining_duration is updated according to the given value |n|
+
+        urgent : bool
+            urgency indicator |n|
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time |n|
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time
+
         Returns
         -------
         remaining duration : float
@@ -7424,10 +7557,23 @@ class Component(object):
 
         Note
         ----
-        This method is very handy for interrupting a process and then resuming it,
+        This method is usefu for interrupting a process and then resuming it,
         after some (breakdown) time
         '''
-        if self._status == passive:
+        if value is not omitted:
+            if self._status in (passive, interrupted):
+                self._remaining_duration = value
+            elif self._status == current:
+                raise SalabimError(
+                    'setting remaining_duration not allowed for current component (' + self.name() + ')')
+            elif self._status == standby:
+                raise SalabimError(
+                    'setting remaining_duration not allowed for standby component (' + self.name() + ')')
+            else:
+                self._remove()
+                self._reschedule(value + self.env._now, urgent, 'set remaining_duration', extra='')
+
+        if self._status in (passive, interrupted):
             return self._remaining_duration
         elif self._status == scheduled:
             return self._scheduled_time - self.env._now
@@ -7457,13 +7603,32 @@ class Component(object):
             - waiting
             - current
             - standby
+            - interrupted
         '''
-
         if len(self._requests) > 0:
             return requesting
         if len(self._waits) > 0:
             return waiting
         return self._status
+
+    def interrupted_status(self):
+        '''
+        returns the original status of an interrupted component
+
+        possible values are
+            - passive
+            - scheduled
+            - requesting
+            - waiting
+            - standby
+        '''
+        if self._status != interrupted:
+            raise SalabimError(self.name() + 'not interrupted')
+        if len(self._requests) > 0:
+            return requesting
+        if len(self._waits) > 0:
+            return waiting
+        return self._interrupted_status
 
     def _member(self, q):
         return self._qmembers.get(q, None)
@@ -9698,6 +9863,10 @@ def passive():
     return 'passive'
 
 
+def interrupted():
+    return 'interrupted'
+
+
 def scheduled():
     return 'scheduled'
 
@@ -10009,6 +10178,6 @@ if __name__ == '__main__':
     try:
         import salabim_test
     except:
-        print('test.py not found')
+        print('salabim_test.py not found')
     else:
         salabim_test.test()
