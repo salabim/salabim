@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.20'
+__version__ = '2.2.21'
 
 import heapq
 import random
@@ -3652,6 +3652,42 @@ class Environment(object):
                         time.sleep(((1 / self._fps) - tick_duration) * 0.8)
                         # 0.8 compensation because of clock inaccuracy
 
+    def snaphot(self, filename):
+        '''
+        Takes a snapshot of the current animated frame (at time = now()) and saves it to a file
+
+        Parameters
+        ----------
+        filename : str
+            file to save the current animated frame to. |n|
+            The following formats are accepted: .PNG, .JPG, .BMP, .GIF and .TIFF are supported.
+            Other formats are not possible.
+            Note that, apart from .JPG files. the background may be semi transparent by setting
+            the alpha value to something else than 255.
+        '''
+        can_animate(try_only=False)
+        if Pythonista:
+            while g.in_draw:
+                pass
+        extension = os.path.splitext(filename)[1].lower()
+        if extension in ('.png', '.gif', '.bmp', '.tiff'):
+            mode = 'RGBA'
+        elif extension == '.jpg':
+            mode = 'RGB'
+        else:
+            raise SalabimError('extension ' + extension + '  not supported')
+        capture_image = Image.new(
+            mode, (self._width, self._height), self.colorspec_to_tuple('bg'))
+        self.an_objects.sort(
+            key=lambda obj: (-obj.layer(self.t), obj.sequence))
+        for ao in self.an_objects:
+            ao.make_pil_image(self._now)
+            if ao._image_visible:
+                capture_image.paste(ao._image,
+                    (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])),
+                    ao._image)
+        capture_image.save(filename)
+
     def modelname_width(self):
         if Environment.cached_modelname_width[0] != self._modelname:
             Environment.cached_modelname_width = \
@@ -5453,7 +5489,6 @@ class Animate(object):
                     im1 = image.resize(
                         (int(width), int(height)), Image.ANTIALIAS)
                     self.imwidth, self.imheight = im1.size
-
                     self._image = im1.rotate(angle, expand=1)
 
                 anchor_to_dis = {
@@ -6385,6 +6420,7 @@ class Component(object):
         '''
         if self._status == current:
             self._remaining_duration = 0
+        else:
             self._checkisnotdata()
             self._remove()
             self._check_fail()
@@ -6415,27 +6451,35 @@ class Component(object):
         Use resume() to resume
         '''
         if self._status == current:
-            pass
+            raise SalabimError(self.name() + ' current component cannot be interrupted')
         else:
+            if mode is not omitted:
+                self._mode = mode
+                self._mode_time = self.env._now
             if self._status == interrupted:
-                raise SalabimError(self.name() + ' already interrupted')
+                self._interrupt_level += 1
+                extra = '.' + str(self._interrupt_level)
             else:
                 self._checkisnotdata()
                 self._remove()
                 self._remaining_duration = self._scheduled_time - self.env._now
                 self._interrupted_status = self._status
+                self._interrupt_level = 1
                 self._status = interrupted
-                if mode is not omitted:
-                    self._mode = mode
-                    self._mode_time = self.env._now
-                self.env.print_trace('', '', self.name() + ' interrupt', merge_blanks(_modetxt(self._mode)))
+                extra = ''
+            self.env.print_trace('', '', self.name() + ' interrupt' + extra, merge_blanks(_modetxt(self._mode)))
 
-    def resume(self, mode=omitted, urgent=False):
+    def resume(self, all=False, mode=omitted, urgent=False):
         '''
         resumes an interrupted component
 
         Parameters
         ----------
+        all : bool
+            if True, the component returns to the original status, regardless of the number of interrupt levels |n|
+            if False (default), the interrupt level will be decremented and if the level reaches 0,
+            the component will return to the original status.
+
         mode : str preferred
             mode |n|
             will be used in trace and can be used in animations |n|
@@ -6456,29 +6500,38 @@ class Component(object):
         Can be only applied to interrupted components. |n|
         '''
         if self._status == interrupted:
-            self._status = self._interrupted_status
-            self.env.print_trace(
-                '', '', self.name() + ' resume (' + self.status()() + ')', merge_blanks(_modetxt(self._mode)))
-            if self._status == passive:
-                self.env.print_trace('', '', self.name() + ' passivate', merge_blanks(_modetxt(self._mode)))
-            elif self._status == standby:
-                self._scheduled_time = self.env._now
-                self.env._standbylist.append(self)
-                self.env.print_trace('', '', self.name() + ' standby', merge_blanks(_modetxt(self._mode)))
-            elif self._status == scheduled:
-                if self._waits:
-                    if self._trywait():
-                        return
-                    reason = 'wait'
-                elif self._requests:
-                    if self._tryrequest():
-                        return
-                    reason = 'request'
-                else:
-                    reason = 'hold'
-                self._reschedule(self.env._now + self._remaining_duration, urgent, reason)
+            if mode is not omitted:
+                self._mode = mode
+                self._mode_time = self.env._now
+            self._interrupt_level -= 1
+            if self._interrupt_level and (not all):
+                self.env.print_trace(
+                    '', '', self.name() + ' resume (interrupted.' + str(self._interrupt_level) + ')',
+                    merge_blanks(_modetxt(self._mode)))
             else:
-                raise SalabimError(self.name() + ' unexpected interrupted_status', self._status())
+                self._status = self._interrupted_status
+                self.env.print_trace(
+                    '', '', self.name() + ' resume (' + self.status()() + ')', merge_blanks(_modetxt(self._mode)))
+                if self._status == passive:
+                    self.env.print_trace('', '', self.name() + ' passivate', merge_blanks(_modetxt(self._mode)))
+                elif self._status == standby:
+                    self._scheduled_time = self.env._now
+                    self.env._standbylist.append(self)
+                    self.env.print_trace('', '', self.name() + ' standby', merge_blanks(_modetxt(self._mode)))
+                elif self._status == scheduled:
+                    if self._waits:
+                        if self._trywait():
+                            return
+                        reason = 'wait'
+                    elif self._requests:
+                        if self._tryrequest():
+                            return
+                        reason = 'request'
+                    else:
+                        reason = 'hold'
+                    self._reschedule(self.env._now + self._remaining_duration, urgent, reason)
+                else:
+                    raise SalabimError(self.name() + ' unexpected interrupted_status', self._status())
         else:
             raise SalabimError(self.name() + ' not interrupted')
 
@@ -7629,6 +7682,16 @@ class Component(object):
         if len(self._waits) > 0:
             return waiting
         return self._interrupted_status
+
+    def interrupt_level(self):
+        '''
+        returns interrupt level of an interrupted component |n|
+        non interrupted components return 0
+        '''
+        if self._status == interrupted:
+            return self._interrupt_level
+        else:
+            return 0
 
     def _member(self, q):
         return self._qmembers.get(q, None)
@@ -9594,6 +9657,7 @@ def spec_to_image(spec):
     -------
     image : PIL.Image.Image
     '''
+    can_animate(try_only=False)
     if isinstance(spec, str):
         if spec == '':
             im = Image.new('RGBA', (0, 0), (0, 0, 0, 0))
@@ -10180,4 +10244,7 @@ if __name__ == '__main__':
     except:
         print('salabim_test.py not found')
     else:
-        salabim_test.test()
+        try:
+            salabim_test.test()
+        except AttributeError:
+            print('salabim_test.test() not found')

@@ -48,6 +48,7 @@ def test62():
             yield self.hold(1)
             x1.interrupt()
             x2.interrupt()
+            x2.interrupt()
             x3.interrupt()
             x4.interrupt()
             x5.interrupt()
@@ -60,6 +61,7 @@ def test62():
             x3.resume()
             x4.resume()
             x5.resume()
+            x2.resume()   
 
     env = sim.Environment(trace=True)
     env.suppress_trace_standby(False)

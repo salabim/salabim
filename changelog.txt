@@ -3,7 +3,34 @@ salabim  changelog
 
 version 2.2.21
 ==========================
+New functionality
+-----------------
+Component.interrupt() can now be called also when a component is interrupted. In that case, the 'interrupt_level'
+will be incremented. This allows interrupts to be 'stacked'.
+When resuming with Component.resume(), the interrupt_level will be decremented als when it reaches zero,
+the component will return to the status at the moment of the first interrupt.
+If c.resume(all=True) is issued, the component c will return to its original status, regardless of the
+interrupt_level.
+The trace shows the level in interrupt and resume for interrupt_levels >= 2.
+The file 'demo interrupt resume.py' demonstrates the application of stacked interrupts for breakdowns of
+several parts of a machine.
 
+The new method Component.interrupt_level() can be used to query the current interrupt_level. It is zero
+for non interrupted components.
+
+Function Component.isinterrupted() can be used to check whether a component is interrupted. This is equivalent
+to c.status() == sim.interrupted
+
+
+The new method Environment.snapshot() can be used to write an animated frame (at time=now()) to a file.
+The method accepts .png, .jpg, .bmp, .gif and .tiff files. For all extensions but .jpg, the image can
+have a semi transparent background (i.e. an alpha < 255).
+The animation does not have to be started to use snapshot().
+
+Bug fixes
+---------
+Component.resume() did not handle mode correctly. Fixed.
+It was not possible to use sim.spec_to_image() if the animation was not started. Fixed.
 
 version 2.2.20  2018-04-28
 ==========================
