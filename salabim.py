@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.21'
+__version__ = '2.2.22'
 
 import heapq
 import random
@@ -317,12 +317,24 @@ class Monitor(object):
         if self._monitor:
             self._x.append(x)
 
-    def name(self):
+    def name(self, value=omitted):
         '''
+        Parameters
+        ----------
+        value : str
+            new name of the monitor
+            if omitted, no change
+
         Returns
         -------
         Name of the monitor : str
+
+        Note
+        ----
+        base_name and sequence_number are not affected if the name is changed
         '''
+        if value is not omitted:
+            self._name = value
         return self._name
 
     def base_name(self):
@@ -485,7 +497,7 @@ class Monitor(object):
             vcum_imin1 = vcum_i
         return interpolate(threshold, vcum_imin1, vcum_i, x_sorted[i - 1], x_sorted[min(i, len(x_sorted) - 1)])
 
-    def bin_count(self, lowerbound, upperbound, ex0=False):
+    def bin_number_of_entries(self, lowerbound, upperbound, ex0=False):
         '''
         count of the number of tallied values in range (lowerbound,upperbound]
 
@@ -506,6 +518,27 @@ class Monitor(object):
         '''
         x = self.x(ex0=ex0)
         return sum(1 for vx in x if (vx > lowerbound) and (vx <= upperbound))
+
+    def value_number_of_entries(self, value):
+        '''
+        count of the number of tallied values equal to value or in value
+
+        Parameters
+        ----------
+        value : any
+            if list, tuple or set, check whether the tallied value is in value |n|
+            otherwise, check whether the tallied value equals the given value
+
+        Returns
+        -------
+        number of tallied values in value or equal to value : int
+        '''
+        if isinstance(value, (list, tuple, set)):
+            value = [str(v) for v in value]
+        else:
+            value = [str(value)]
+
+        return sum(1 for vx in self._x if (str(vx).strip() in value))
 
     def number_of_entries(self, ex0=False):
         '''
@@ -595,7 +628,38 @@ class Monitor(object):
         print(indent + 'maximum       {}{}'.
               format(fn(self.maximum(), 13, 3), fn(self.maximum(ex0=True), 13, 3)))
 
-    def print_histogram(self, number_of_bins=30, lowerbound=0, bin_width=1, ex0=False):
+    def histogram_autoscale(self, ex0=False):
+        '''
+        used by histogram_print to autoscale |n|
+        may be overridden.
+
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+
+        Returns
+        -------
+        bin_width, lowerbound, number_of_bins : tuple
+        '''
+
+        xmax = self.maximum(ex0=ex0)
+        xmin = self.minimum(ex0=ex0)
+        done = False
+        for i in range(10):
+            exp = 10 ** i
+            for bin_width in (exp, exp * 2, exp * 5):
+                lowerbound = math.floor(xmin / bin_width) * bin_width
+                number_of_bins = math.ceil((xmax - lowerbound) / bin_width)
+                if number_of_bins <= 30:
+                    done = True
+                    break
+            if done:
+                break
+        return bin_width, lowerbound, number_of_bins
+
+    def print_histogram(self, number_of_bins=omitted,
+      lowerbound=omitted, bin_width=omitted, values=False, ex0=False):
         '''
         print monitor statistics and histogram
 
@@ -603,57 +667,115 @@ class Monitor(object):
         ----------
         number_of_bins : int
             number of bins |n|
-            if 0, also the header of the histogram will be surpressed
+            default: 30 |n|
+            if <0, also the header of the histogram will be surpressed
 
         lowerbound: float
-            first bin
+            first bin |n|
+            default: 0
 
         bin_width : float
-            width of the bins
+            width of the bins |n|
+            default: 1
+
+        values : bool
+            if False (default), bins will be used |n|
+            if True, the individual values will be shown (in the right order).
+            in that case, no cumulative values will be given |n|
 
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
+
+        Note
+        ----
+        If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
+        with a maximum of 30 classes.
         '''
+        print('Histogram of', self.name() + ('[ex0]' if ex0 else ''))
+
         if self._timestamp:
-            x, weights = self.xduration(ex0=ex0)
+            x, weights = self.xduration(ex0=ex0, force_numeric=not values)
             weight_total = sum(weights)
         else:
-            x = self.x(ex0=ex0)
+            x = self.x(ex0=ex0, force_numeric=not values)
             weight_total = len(x)
 
-        print('Histogram of', self.name())
         if weight_total == 0:
             print()
             if self._timestamp:
                 print('no data')
             else:
                 print('no entries')
+            print()
             return
 
-        self.print_statistics(show_header=False, show_legend=True, do_indent=False)
-        if number_of_bins > 0:
+        if values:
+            nentries = len(x)
+            if self._timestamp:
+                print('duration      {}'.
+                    format(fn(weight_total, 13, 3)))
+            print('entries       {}'.
+                format(fn(nentries, 13, 3)))
             print()
             if self._timestamp:
-                print('           <=      duration     %  cum%')
+                print('value                     duration        entries')
             else:
-                print('           <=       entries     %  cum%')
+                print('value               entries')
+            as_set = {str(x).strip() for x in set(x)}
 
-            cumperc = 0
-            for i in range(-1, number_of_bins + 1):
-                if i == -1:
-                    lb = -inf
+            values = sorted(list(as_set), key=self.key)
+
+            for value in values:
+                if self._timestamp:
+                    count = self.value_duration(value)
+                    count_entries = self.value_number_of_entries(value)
                 else:
-                    lb = lowerbound + i * bin_width
-                if i == number_of_bins:
-                    ub = inf
+                    count = self.value_number_of_entries(value)
+
+                perc = count / weight_total
+                scale = 80
+                n = int(perc * scale)
+                s = ('*' * n) + (' ' * (scale - n))
+
+                if self._timestamp:
+                    print(pad(str(value), 20) + fn(count, 14, 3) + '(' + fn(perc * 100, 5, 1) + '%)' +
+                       rpad(str(count_entries), 7) + '(' + fn(count_entries * 100 / nentries, 5, 1) + '%) ' + s)
                 else:
-                    ub = lowerbound + (i + 1) * bin_width
-                count = self.bin_count(lb, ub)
-                if weight_total == 0:
-                    perc = nan
-                    cumperc = nan
-                    s = '|'
+                    print(pad(str(value), 20) + rpad(str(count), 7) + '(' + fn(perc * 100, 5, 1) + '%) ' + s)
+        else:
+            if (bin_width is omitted) and (lowerbound is omitted) and (number_of_bins is omitted):
+                bin_width, lowerbound, number_of_bins = self.histogram_autoscale()
+            else:
+                if bin_width is omitted:
+                    bin_width = 1
+                if number_of_bins is omitted:
+                    number_of_bins = 30
+                if lowerbound is omitted:
+                    lowerbound = 0
+
+            self.print_statistics(show_header=False, show_legend=True, do_indent=False)
+            if number_of_bins >= 0:
+                print()
+                if self._timestamp:
+                    print('           <=      duration     %  cum%')
                 else:
+                    print('           <=       entries     %  cum%')
+
+                cumperc = 0
+                for i in range(-1, number_of_bins + 1):
+                    if i == -1:
+                        lb = -inf
+                    else:
+                        lb = lowerbound + i * bin_width
+                    if i == number_of_bins:
+                        ub = inf
+                    else:
+                        ub = lowerbound + (i + 1) * bin_width
+                    if self._timestamp:
+                        count = self.bin_duration(lb, ub)
+                    else:
+                        count = self.bin_number_of_entries(lb, ub)
+
                     perc = count / weight_total
                     cumperc += perc
                     scale = 80
@@ -662,8 +784,18 @@ class Monitor(object):
                     s = ('*' * n) + (' ' * (scale - n))
                     s = s[:ncum - 1] + '|' + s[ncum + 1:]
 
-                print('{} {}{}{} {}'.
-                      format(fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s))
+                    print('{} {}{}{} {}'.
+                          format(fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s))
+        print()
+
+    def key(self, x):
+        try:
+            x1 = float(x)
+            x2 = ''
+        except:
+            x1 = math.inf
+            x2 = x
+        return(x1, x2)
 
     def x(self, ex0=False, force_numeric=True):
         '''
@@ -896,12 +1028,24 @@ class MonitorTimestamp(Monitor):
             self._x.append(self.off)
             self._t.append(t)
 
-    def name(self):
+    def name(self, value=omitted):
         '''
+        Parameters
+        ----------
+        value : str
+            new name of the monitor
+            if omitted, no change
+
         Returns
         -------
         Name of the monitor : str
+
+        Note
+        ----
+        base_name and sequence_number are not affected if the name is changed
         '''
+        if value is not omitted:
+            self._name = value
         return self._name
 
     def base_name(self):
@@ -1040,10 +1184,9 @@ class MonitorTimestamp(Monitor):
         '''
         return Monitor.percentile(self, q, ex0=ex0)
 
-    def bin_count(self, lowerbound, upperbound, ex0=False):
+    def bin_duration(self, lowerbound, upperbound, ex0=False):
         '''
-        count of the number of tallied values,
-        weighted with the duration in range (lowerbound,upperbound]
+        duration of tallied values with the value in range (lowerbound,upperbound]
 
         Parameters
         ----------
@@ -1058,10 +1201,54 @@ class MonitorTimestamp(Monitor):
 
         Returns
         -------
-        number of values >lowerbound and <=upperbound: int
+        duration of values >lowerbound and <=upperbound: float
         '''
         x, duration = self.xduration(ex0=ex0)
         return sum((vduration for vx, vduration in zip(x, duration) if (vx > lowerbound) and (vx <= upperbound)))
+
+    def value_duration(self, value):
+        '''
+        duration of tallied values equal to value or in value
+
+        Parameters
+        ----------
+        value : any
+            if list, tuple or set, check whether the tallied value is in value |n|
+            otherwise, check whether the tallied value equals the given value
+
+        Returns
+        -------
+        duration of tallied values in value or equal to value : float
+        '''
+        if isinstance(value, (list, tuple, set)):
+            value = [str(v) for v in value]
+        else:
+            value = [str(value)]
+
+        x, duration = self.xduration(force_numeric=False, ex0=False)
+        return sum((vduration for vx, vduration in zip(x, duration) if (str(vx) in value)))
+
+    def value_number_of_entries(self, value):
+        '''
+        count of tallied values equal to value or in value
+
+        Parameters
+        ----------
+        value : any
+            if list, tuple or set, check whether the tallied value is in value |n|
+            otherwise, check whether the tallied value equals the given value
+
+        Returns
+        -------
+        count of tallied values in value or equal to value : float
+        '''
+        if isinstance(value, (list, tuple, set)):
+            value = [str(v) for v in value]
+        else:
+            value = [str(value)]
+
+        x, duration = self.xduration(force_numeric=False, ex0=False)
+        return sum((1 for vx in x if (str(vx) in value)))
 
     def duration(self, ex0=False):
         '''
@@ -1088,6 +1275,31 @@ class MonitorTimestamp(Monitor):
         total duration of zero samples : float
         '''
         return self.duration() - self.duration(ex0=True)
+
+    def number_of_entries(self, ex0=False):
+        '''
+        count of the number of entries (duration type)
+
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+
+        Returns
+        -------
+        number of entries : int
+        '''
+        return len(self.xduration(ex0=ex0))
+
+    def number_of_entries_zero(self):
+        '''
+        count of the number of zero entries (duration type)
+
+        Returns
+        -------
+        number of zero entries : int
+        '''
+        return self.number_of_entries() - self.number_of_entries(ex0=True)
 
     def xduration(self, ex0=False, force_numeric=True):
         '''
@@ -1245,7 +1457,7 @@ class MonitorTimestamp(Monitor):
 
         Monitor.print_statistics(self, show_header, show_legend, do_indent)
 
-    def print_histogram(self, number_of_bins=30, lowerbound=0, bin_width=1, ex0=False):
+    def print_histogram(self, number_of_bins=omitted, lowerbound=omitted, bin_width=omitted, values=False, ex0=False):
         '''
         print timestamped monitor statistics and histogram
 
@@ -1253,18 +1465,31 @@ class MonitorTimestamp(Monitor):
         ----------
         number_of_bins : int
             number of bins |n|
-            if 0, also the header of the histogram will be surpressed
+            default: 30 |n|
+            if <0, also the header of the histogram will be surpressed
 
         lowerbound: float
-            first bin
+            first bin |n|
+            default: 0
 
         bin_width : float
-            width of the bins
+            width of the bins |n|
+            default: 1
+
+        values : bool
+            if False (default), bins will be used |n|
+            if True, the individual values will be shown (in the right order).
+            in that case, nu cumulative values will be given |n|
 
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
+
+        Note
+        ----
+        If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
+        with a maximum of 30 classes.
         '''
-        Monitor.print_histogram(self, number_of_bins, lowerbound, bin_width, ex0)
+        Monitor.print_histogram(self, number_of_bins, lowerbound, bin_width, values, ex0)
 
 
 if Pythonista:
@@ -1673,12 +1898,38 @@ class Queue(object):
         self.length_of_stay.print_statistics(
             show_header=False, show_legend=False, do_indent=True)
 
-    def name(self):
+    def print_histograms(self, exclude=()):
         '''
+        prints the histograms of the length timestamped and length_of_stay monitor of the queue
+
+        Parameters
+        ----------
+        exclude : tuple or list
+            specifies which monitors to exclude |n|
+            default: () |n|
+        '''
+        for m in (self.length, self.length_of_stay):
+            if m not in exclude:
+                m.print_histogram()
+
+    def name(self, value=omitted):
+        '''
+        Parameters
+        ----------
+        value : str
+            new name of the queue
+            if omitted, no change
+
         Returns
         -------
         Name of the queue : str
+
+        Note
+        ----
+        base_name and sequence_number are not affected if the name is changed
         '''
+        if value is not omitted:
+            self._name = value
         return self._name
 
     def base_name(self):
@@ -4183,12 +4434,24 @@ class Environment(object):
         else:
             return fontsize / self._scale
 
-    def name(self):
+    def name(self, value=omitted):
         '''
+        Parameters
+        ----------
+        value : str
+            new name of the environment
+            if omitted, no change
+
         Returns
         -------
         Name of the environment : str
+
+        Note
+        ----
+        base_name and sequence_number are not affected if the name is changed
         '''
+        if value is not omitted:
+            self._name = value
         return self._name
 
     def base_name(self):
@@ -5052,7 +5315,6 @@ class Animate(object):
             radius or one element tuple with the radius |n|
             default behaviour: linear interpolation between self.circle0 and self.circle1
         '''
-
         return interpolate(
             (self.env._now if t is omitted else t),
             self.t0, self.t1,
@@ -6017,7 +6279,6 @@ class Component(object):
                     p = eval('self.' + process)
                 except:
                     raise SalabimError('self.' + process + ' not found')
-
         if p is None:
             if at is not omitted:
                 raise SalabimError('at is not allowed for a data component')
@@ -6062,7 +6323,6 @@ class Component(object):
                 scheduled_time = at + self.env._offset + delay
 
             self._reschedule(scheduled_time, urgent, 'activate', extra=extra)
-
         self.setup(**kwargs)
 
     def animation_objects(self, q):
@@ -7083,12 +7343,24 @@ class Component(object):
         '''
         return self._failed
 
-    def name(self):
+    def name(self, value=omitted):
         '''
+        Parameters
+        ----------
+        value : str
+            new name of the component
+            if omitted, no change
+
         Returns
         -------
         Name of the component : str
+
+        Note
+        ----
+        base_name and sequence_number are not affected if the name is changed
         '''
+        if value is not omitted:
+            self._name = value
         return self._name
 
     def base_name(self):
@@ -7249,6 +7521,18 @@ class Component(object):
         Be sure to always include the parentheses, otherwise the result will be always True
         '''
         return self._status == standby
+
+    def isinterrupted(self):
+        '''
+        Returns
+        -------
+        True if status is interrupted, False otherwise : bool
+
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True
+        '''
+        return self._status == interrupted
 
     def isdata(self):
         '''
@@ -7939,6 +8223,9 @@ class Normal(_Distribution):
         return 'Normal'
 
     def print_info(self):
+        '''
+        prints information about the distribution
+        '''
         print('Normal distribution ' + hex(id(self)))
         print('  mean=' + str(self._mean))
         print('  standard_deviation=' + str(self._standard_deviation))
@@ -8027,6 +8314,9 @@ class IntUniform(_Distribution):
         return 'IntUniform'
 
     def print_info(self):
+        '''
+        prints information about the distribution
+        '''
         print('IntUniform distribution ' + hex(id(self)))
         print('  lowerbound=' + str(self._lowerbound))
         print('  upperbound=' + str(self._upperbound))
@@ -8089,6 +8379,9 @@ class Uniform(_Distribution):
         return 'Uniform'
 
     def print_info(self):
+        '''
+        prints information about the distribution
+        '''
         print('Uniform distribution ' + hex(id(self)))
         print('  lowerbound=' + str(self._lowerbound))
         print('  upperbound=' + str(self._upperbound))
@@ -8164,6 +8457,9 @@ class Triangular(_Distribution):
         return 'Triangular'
 
     def print_info(self):
+        '''
+        prints information about the distribution
+        '''
         print('Triangular distribution ' + hex(id(self)))
         print('  low=' + str(self._low))
         print('  high=' + str(self._high))
@@ -8218,6 +8514,9 @@ class Constant(_Distribution):
         return 'Constant'
 
     def print_info(self):
+        '''
+        prints information about the distribution
+        '''
         print('Constant distribution ' + hex(id(self)))
         print('  value=' + str(self._value))
         print('  randomstream=' + hex(id(self.randomstream)))
@@ -8276,6 +8575,9 @@ class Poisson(_Distribution):
         return 'Poisson'
 
     def print_info(self):
+        '''
+        prints information about the distribution
+        '''
         print('Poissonl distribution ' + hex(id(self)))
         print('  mean (lambda)' + str(self._lambda_))
 
@@ -8347,6 +8649,9 @@ class Weibull(_Distribution):
         return 'Weibull'
 
     def print_info(self):
+        '''
+        prints information about the distribution
+        '''
         print('Weibull distribution ' + hex(id(self)))
         print('  scale (alpha or k)=' + str(self._scale))
         print('  shape (beta or lambda)=' + str(self._shape))
@@ -8429,6 +8734,9 @@ class Gamma(_Distribution):
         return 'Gamma'
 
     def print_info(self):
+        '''
+        prints information about the distribution
+        '''
         print('Gamma distribution ' + hex(id(self)))
         print('  shape (k)=' + str(self._shape))
         print('  scale (teta)=' + str(self._scale))
@@ -8493,6 +8801,9 @@ class Beta(_Distribution):
         return 'Beta'
 
     def print_info(self):
+        '''
+        prints information about the distribution
+        '''
         print('Beta distribution ' + hex(id(self)))
         print('  alpha=' + str(self._alpha))
         print('  beta=' + str(self._beta))
@@ -8579,6 +8890,9 @@ class Erlang(_Distribution):
         return 'Erlang'
 
     def print_info(self):
+        '''
+        prints information about the distribution
+        '''
         print('Erlang distribution ' + hex(id(self)))
         print('  shape (k)=' + str(self._shape))
         print('  rate (lambda)=' + str(self._rate))
@@ -8671,6 +8985,9 @@ class Cdf(_Distribution):
         return 'Cdf'
 
     def print_info(self):
+        '''
+        prints information about the distribution
+        '''
         print('Cdf distribution ' + hex(id(self)))
         print('  randomstream=' + hex(id(self.randomstream)))
 
@@ -8800,6 +9117,9 @@ class Pdf(_Distribution):
         return 'Pdf'
 
     def print_info(self):
+        '''
+        prints information about the distribution
+        '''
         print('Pdf distribution ' + hex(id(self)))
         print('  randomstream=' + hex(id(self.randomstream)))
 
@@ -9082,7 +9402,25 @@ class State(object):
     def __repr__(self):
         return objectclass_to_str(self) + ' (' + self.name() + ')'
 
+    def print_histograms(self, exclude=()):
+        '''
+        print histograms of the waiters queue and the value timestamped monitor
+
+        Parameters
+        ----------
+        exclude : tuple or list
+            specifies which queues or monitors to exclude |n|
+            default: ()
+        '''
+        if self.waiters() not in exclude:
+            self.waiters().print_histograms(exclude=exclude)
+        if self.value not in exclude:
+            self.value.print_histogram()
+
     def print_info(self):
+        '''
+        prints info about the state
+        '''
         print(objectclass_to_str(self) + ' ' + hex(id(self)))
         print('  name=' + self.name())
         print('  value=' + str(self._value))
@@ -9256,12 +9594,24 @@ class State(object):
     def _get_value(self):
         return self._value
 
-    def name(self):
+    def name(self, value=omitted):
         '''
+        Parameters
+        ----------
+        value : str
+            new name of the state
+            if omitted, no change
+
         Returns
         -------
         Name of the state : str
+
+        Note
+        ----
+        base_name and sequence_number are not affected if the name is changed
         '''
+        if value is not omitted:
+            self._name = value
         return self._name
 
     def base_name(self):
@@ -9428,6 +9778,24 @@ class Resource(object):
             m.print_statistics(show_header=False, show_legend=show_legend, do_indent=True)
             print()
 
+    def print_histograms(self, exclude=()):
+        '''
+        prints histograms of the requesters and claimers queue as well as
+        the capacity, available_qauantity and claimed_quantity timstamped monitors of the resource
+
+        Parameters
+        ----------
+        exclude : tuple or list
+            specifies which queues or monitors to exclude |n|
+            default: ()
+        '''
+        for q in (self.requesters(), self.claimers()):
+            if q not in exclude:
+                q.print_histograms(exclude=exclude)
+        for m in (self.capacity, self.available_quantity, self.claimed_quantity):
+            if m not in exclude:
+                m.print_histogram()
+
     def monitor(self, value):
         '''
         enables/disables the resource monitors  and timestamped monitors
@@ -9453,6 +9821,9 @@ class Resource(object):
         return objectclass_to_str(self) + ' (' + self.name() + ')'
 
     def print_info(self):
+        '''
+        prints info about the resource
+        '''
         print(objectclass_to_str(self) + ' ' + hex(id(self)))
         print('  name=' + self.name())
         print('  capacity=' + str(self._capacity))
@@ -9564,12 +9935,24 @@ class Resource(object):
         self.occupancy.tally(0 if self._capacity <= 0 else self._claimed_quantity / self._capacity)
         self._tryrequest()
 
-    def name(self):
+    def name(self, value=omitted):
         '''
+        Parameters
+        ----------
+        value : str
+            new name of the resource
+            if omitted, no change
+
         Returns
         -------
         Name of the resource : str
+
+        Note
+        ----
+        base_name and sequence_number are not affected if the name is changed
         '''
+        if value is not omitted:
+            self._name = value
         return self._name
 
     def base_name(self):
@@ -9657,8 +10040,8 @@ def spec_to_image(spec):
     -------
     image : PIL.Image.Image
     '''
-    can_animate(try_only=False)
     if isinstance(spec, str):
+        can_animate(try_only=False)
         if spec == '':
             im = Image.new('RGBA', (0, 0), (0, 0, 0, 0))
         else:
@@ -10126,6 +10509,43 @@ def centered_rectangle(width, height):
         height of the rectangle
     '''
     return -width / 2, -height / 2, width / 2, height / 2
+
+
+def regular_polygon(radius=1, number_of_sides=3, initial_angle=0):
+    '''
+    creates a polygon tuple with a regular polygon (within a circle) for use with sim.Animate
+
+    Parameters
+    ----------
+    radius : float
+        radius of the corner points of the polygon |n|
+        default : 1
+
+    number_of_sides : int
+        number of sides (corners) |n|
+        must be >= 3 |n|
+        default : 3
+
+    initial_angle : float
+        angle of the first corner point, relative to the origin |n|
+        default : 0
+    '''
+    number_of_sides = int(number_of_sides)
+    if number_of_sides < 3:
+        raise SalabimError('number of sides < 3')
+    tangle = 2 * math.pi / number_of_sides
+    sint = math.sin(tangle)
+    cost = math.cos(tangle)
+    p = []
+    x = radius * math.cos(initial_angle * math.pi / 180)
+    y = radius * math.sin(initial_angle * math.pi / 180)
+
+    for i in range(number_of_sides):
+        x, y = (x * cost - y * sint, x * sint + y * cost)
+        p.append(x + radius)
+        p.append(y + radius)
+
+    return p
 
 
 def can_animate(try_only=True):

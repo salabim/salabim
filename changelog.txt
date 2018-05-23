@@ -1,13 +1,125 @@
 salabim  changelog
 
+version 2.2.22  2018-05-21
+==========================
+New functionality
+-----------------
+Monitor.print_histogram() and MonitorTimestamp.print_histogram() now support auto scaling of
+the bin_width, lowerbound and number_of_bins, when none of these parameters are specified.
+The autoscaling algorithm method can be overridden if required (see Histogram.histogram_autoscale).
+For example, the following code
+    m = sim.Monitor('normal distribution')
+    for i in range(100000):
+        m.tally(sim.Normal(10,2)())
+    m.print_histogram()
 
-version 2.2.21
+will print:
+
+    Histogram of normal distribution
+                            all    excl.zero         zero
+    -------------- ------------ ------------ ------------
+    entries           10000        10000            0    
+    mean                  9.989        9.989
+    std.deviation         1.989        1.989
+    
+    minimum               1.881        1.881
+    median                9.978        9.978
+    90% percentile       12.550       12.550
+    95% percentile       13.245       13.245
+    maximum              17.597       17.597
+    
+               <=       entries     %  cum%
+            1             0       0     0   |                                                                              
+            2             1       0.0   0.0 |                                                                              
+            3             3       0.0   0.0 |                                                                              
+            4            14       0.1   0.2 |                                                                              
+            5            43       0.4   0.6 |                                                                              
+            6           153       1.5   2.1 *|                                                                             
+            7           439       4.4   6.5 ***  |                                                                         
+            8           925       9.2  15.8 *******     |                                                                  
+            9          1532      15.3  31.1 ************            |                                                      
+           10          1938      19.4  50.5 ***************                         |                                      
+           11          1895      18.9  69.4 ***************                                        |                       
+           12          1475      14.8  84.2 ***********                                                        |           
+           13           940       9.4  93.6 *******                                                                   |    
+           14           424       4.2  97.8 ***                                                                           |
+           15           165       1.7  99.5 *                                                                              |
+           16            34       0.3  99.8                                                                                |
+           17            15       0.1 100.0                                                                                |
+           18             4       0.0 100.0                                                                                |
+              inf         0       0   100.0                                                                                |
+
+Monitor.print_histogram() and MonitorTimestamp.print_histogram() now supports the presentation of
+individual values, by specifying values=True.
+This is especially useful when collecting the status of a component over time, like:
+
+    Histogram of Status
+    duration            300    
+    entries              57    
+    
+    value                     duration        entries
+    idle                        88.558( 29.5%)      9( 15.8%) ***********************                                                         
+    produce A                   37.459( 12.5%)      9( 15.8%) *********                                                                       
+    produce B                    8.425(  2.8%)      2(  3.5%) **                                                                              
+    produce C                   44.352( 14.8%)     10( 17.5%) ***********                                                                     
+    produce D                   54.775( 18.3%)     12( 21.1%) **************                                                                  
+    store                       38.591( 12.9%)      8( 14.0%) **********                                                                      
+    transport                   27.841(  9.3%)      7( 12.3%) *******                                                                         
+    
+Monitor.value_number_of_entries() introduced. The method can be used to check how many entries have an x
+equal to value or an x that is in value.
+
+MonitorTimestamp.value_duration() introduced. The method can be used to check the duration of an x
+equal to value or an x that is in value.
+
+MonitorTimestamp.value_number_of_entries() introduced. The method can be used to check how many entries have an x
+equal to value or an x that is in value.
+
+Introduced Queue.print_histograms(). This method prints autoscaled histograms of the
+- length timstamped monitor
+- length_of_stay monitor
+
+Introduced Resource.print_histograms(). This method prints autoscaled histograms of the
+- requesters().length timstamped monitor
+- requesters().length_of_stay monitor
+- claimers().length timstamped monitor
+- claimers().length_of_stay monitor
+- capacity timestamped monitor
+- available_quantity timestamped monitor
+- claimed_quantity timestamped monitor
+
+Introduced State.print_histograms(). This method prints autoscaled histograms of the
+- waiters().length timestamped monitor
+- waiters().length_of_stay monitor
+- value timestamped monitor
+
+MonitorTimestamp.number_of_entries() introduced, to be used to retrieve the number of entries.
+
+Component.name(), Environment.name(), Monitor.name(), MonitorTimestamp.name(), Queue.name()
+Resource.name() and State.name() now can be used to change the name of the object.
+Note that the base_name and the sequence_number will not change upon a name change.
+
+Function regular_polygon introduced.
+
+
+Renamed
+-------
+MonitorTimestamp.bin_count() is now called MonitorTimestamp.bin_duration()
+Monitor.bin_count() is now called Monitor.bin_number_entries()
+
+
+Bug fix
+-------
+Problem when PIL was not installed (correctly).
+
+
+version 2.2.21  2018-05-01
 ==========================
 New functionality
 -----------------
 Component.interrupt() can now be called also when a component is interrupted. In that case, the 'interrupt_level'
 will be incremented. This allows interrupts to be 'stacked'.
-When resuming with Component.resume(), the interrupt_level will be decremented als when it reaches zero,
+When resuming with Component.resume(), the interrupt_level will be decremented. If it reaches zero,
 the component will return to the status at the moment of the first interrupt.
 If c.resume(all=True) is issued, the component c will return to its original status, regardless of the
 interrupt_level.

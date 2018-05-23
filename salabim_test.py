@@ -11,36 +11,128 @@ Pythonista=(platform.system()=='Darwin')
 
 def test():
     test62()
-    
+
+def test67():
+    env = sim.Environment()
+    m = sim.Monitor('normal distribution')
+    m.name('test')
+    for i in range(100000):
+        m.tally(sim.Normal(10,2)())
+    m.print_histogram()
+
+def test66():
+    class Poly(sim.Animate):
+        def __init__(self, radius, number_of_sides,*args, **kwargs):
+            self.radius = radius
+            self.number_of_sides = number_of_sides
+            sim.Animate.__init__(self, polygon0=(), *args, **kwargs)
+
+        def polygon(self,t):
+            return sim.regular_polygon(radius=self.radius, number_of_sides=self.number_of_sides, initial_angle = t*1)
+
+    env = sim.Environment()
+    env.animate(True)
+    for i in range(3,10):
+#        sim.Animate(polygon0=sim.regular_polygon(radius=60, number_of_sides=i, initial_angle=90), x0=50+(i-3)*150, y0=300
+        Poly(radius=60, number_of_sides=i, x0=50+(i-3)*150, y0=300)
+
+    env.run()
+
+def test65():
+    class X(sim.Component):
+        def process(self):
+            while True:
+                mt.tally('idle')
+                yield self.hold(10)
+                for i in range(6):
+                    st = sim.Pdf(('produce A', 'produce B', 'produce C', 'produce D', 'transport', 'store'),1)()
+                    mt.tally(st)
+                    yield self.hold(sim.Uniform(6,6)())
+
+    env = sim.Environment(trace=False)
+    mt = sim.MonitorTimestamp('Status')
+
+    X()
+    env.run(300)
+    mt.print_histogram(values=True)
+
+
+def test64():
+    class X(sim.Component):
+        def process(self):
+            for i in list(range(70)):
+                mt.tally(i)
+                yield self.hold(2)
+            env.main().activate()
+
+    env = sim.Environment(trace=False)
+    m = sim.Monitor('m')
+    mt = sim.MonitorTimestamp('mt')
+
+    X()
+    env.run()
+    m.print_histogram()
+    for i in (0,1,1,2,3,1,1,1,10,20,300):
+        m.tally(i)
+    m.print_histogram()
+    mt.print_histogram(ex0=True)
+
+def test63():
+    class X(sim.Component):
+        def process(self):
+            for i in (1,2,3,1,1,1,'1','jan','a',1,2,'2'):
+                mt.tally(i)
+                try:
+                    x = int(i)
+                except:
+                    x = 1.5
+                yield self.hold(2.1 * x)
+            env.main().activate()
+
+    env = sim.Environment(trace=True)
+    m = sim.Monitor('m')
+    mt = sim.MonitorTimestamp('mt')
+
+    X()
+    env.run()
+    m.print_histogram(values=True)
+    for i in (1,2,3,1,1,1,1.1,1.2,'1.2',0,'',' ',' 1000 ',1000,600,6.8,5,'2','1','jan','piet','x','y','b','a',1,2,'2'):
+        m.tally(i)
+    m.print_histogram(values=True, ex0=False)
+    mt.print_histogram(values=True)
+    print(mt.xduration())
+
+    mt.print_histogram()
+
 def test62():
     class X1(sim.Component):
         def process(self):
             yield self.hold(100)
-            
+
     class X2(sim.Component):
         def process(self):
             yield self.request(res, fail_at=100)
             yield self.hold(50)
-            
+
     class X3(sim.Component):
         def process(self):
             yield self.passivate()
-            
+
     class X4(sim.Component):
         def process(self):
             while True:
                 yield self.standby()
-                        
+
     class X5(sim.Component):
         def process(self):
             yield self.wait(st, fail_at=100)
             yield self.hold(50)
-            
+
     class Z(sim.Component):
         def process(self):
             for i in range(20):
                 yield self.hold(1)
-            
+
     class Y(sim.Component):
         def process(self):
             yield self.hold(4)
@@ -61,23 +153,24 @@ def test62():
             x3.resume()
             x4.resume()
             x5.resume()
-            x2.resume()   
+            x2.resume()
 
     env = sim.Environment(trace=True)
     env.suppress_trace_standby(False)
     x1 = X1()
+    x1.name('abc')
     x2 = X2()
     x3 = X3()
     x4 = X4()
     x5 = X5()
-    
+
     y = Y()
     z = Z()
     res = sim.Resource('res', capacity=0)
     st = sim.State('st')
-    
+
     env.run(urgent=True)
-    
+
 def test61():
     class X(sim.Component):
         def process(self):
@@ -86,7 +179,7 @@ def test61():
 
     class Y(sim.Component):
         def process(self):
-            yield self.request(r)            
+            yield self.request(r)
             yield self.hold(1)
 #            self.cancel()
             a=1
@@ -97,13 +190,13 @@ def test61():
     Y()
     env.run()
     print(r.claimed_quantity())
-    
+
 def test60():
     class X(sim.Component):
         def process(self):
             yield self.request(r)
             yield self.hold(sim.Uniform(0,2)())
-            
+
     env = sim.Environment()
     r = sim.Resource(name='r',capacity=1)
     for i in range(5):
@@ -113,17 +206,17 @@ def test60():
     occupancy = r.claimed_quantity.mean() / r.capacity.mean()
     r.print_statistics()
     env.run(urgent=True)
-    
-    
+
+
 def test59():
     def do_next():
         global ans
         global min_n
-        
+
         for an in ans:
             an.remove()
         ans = []
-    
+
         x=10
         y=env.height() - 80
         sx= 230
@@ -131,7 +224,7 @@ def test59():
         y -= 30
         fontnames = []
         n=0
-        
+
         for fns, ifilename in sim.fonts():
             for fn in fns:
                 fontnames.append(fn)
@@ -154,21 +247,21 @@ def test59():
         min_n = n + 1
         if not any:
             env.quit()
-        
+
     global ans
     global min_n
-    
+
     env = sim.Environment()
     sim.AnimateButton(x=500,y=-21, width=50, xy_anchor='nw', text='Next', fillcolor='red', action=do_next)
     ans = []
     min_n = 0
 #    sim.Animate(text='Salabim fontnames', x0=x, y0=y, fontsize0=20, anchor='sw', textcolor0='white')
 
-    do_next()    
+    do_next()
     env.background_color('20%gray')
 
     env.animate(True)
-    env.run()    
+    env.run()
 
 def test58():
     env = sim.Environment()
@@ -194,7 +287,7 @@ def test58():
     env.background_color('20%gray')
     env.animate(True)
     env.run()
-    
+
 def test57():
     class X(sim.Component):
         def process(self):
@@ -206,7 +299,7 @@ def test57():
 #            yield self.hold(0)
             env.video('')
             env.main().activate()
-     
+
     env = sim.Environment()
     env.animation_parameters(background_color='blue', modelname='test')
     env.video('test.gif')
@@ -216,7 +309,7 @@ def test57():
 #    env.animation_parameters(video='test.avi+MP4V', speed=0.5)
     an = sim.Animate(text='', x0=100,y0=100, fontsize0=100)
     run_length = 1
-    
+
     X()
     sim.Animate(line0=(0,50,None,None), line1=(0,50,1024,None), linewidth0=4,t1=run_length)
     sim.Animate(circle0=(40,), x0=200, y0=200)
@@ -224,26 +317,26 @@ def test57():
     env.run()
     print('done')
     env.quit()
-    
+
 def test56():
     env = sim.Environment()
     mon = sim.Monitor('number per second')
     for i in range(100):
         sample = sim.Normal(0.083,0.00166)()
         mon.tally(sample)
-        
+
     mon = sim.Monitor('number per second')
     env.run(100)
     mon.print_histogram()
-    
-    
+
+
 def test55():
     class X(sim.Component):
         def process(self):
             while True:
                 yield self.hold(sim.Exponential(rate=0.83)())
                 env.count += 1
-            
+
     class Y(sim.Component):
         def process(self):
             while True:
@@ -258,29 +351,29 @@ def test55():
     Y()
     mon = sim.Monitor('number per second')
     env.run(100)
-    mon.print_histogram()    
-    
+    mon.print_histogram()
+
 def test54():
     import test_a
     import test_b
     env = sim.Environment(trace=True)
     test_a.X()
     test_b.X()
-    
-    
+
+
     env.run(10)
-    
+
 def test53():
     en =sim.Environment()
     d=sim.Normal(10, 3)
     d.print_info()
     d=sim.Normal(10, coefficient_of_variation=0.3)
-    d.print_info()    
+    d.print_info()
     d=sim.Normal(0, standard_deviation=3)
     d.print_info()
     d=sim.Normal(0, coefficient_of_variation=4)
-    d.print_info()    
-    
+    d.print_info()
+
 def test52():
     class X(sim.Component):
         def process(self):
@@ -395,7 +488,7 @@ def test49():
 
 
 def test48():
-    
+
     class A(sim.Component):
         def myhold(self, t):
             print('**')
