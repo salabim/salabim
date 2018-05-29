@@ -10,8 +10,56 @@ import platform
 Pythonista=(platform.system()=='Darwin')
 
 def test():
-    test62()
+    test69()
+    
+def test69():
+    class X(sim.Component):
+        pass
+        
+    sim.reset()
+    env = sim.Environment()
+    q=sim.Queue('q')
+#    X().enter_sorted(q, (1,1))
+#    X().enter_sorted(q, (0,2))
+#    X().enter_sorted(q, (1,0))
+#    X().enter_sorted(q, (1,3))
+#    q.print_info()
 
+    q=sim.Queue('q')
+    X().enter_sorted(q, 'one')
+    X().enter_sorted(q, 'two')
+    X().enter_sorted(q, 'three')
+    X().enter_sorted(q, 'four')
+    q.print_info()
+    
+def test68():
+    class X(sim.Component):
+
+        def process(self):
+            self.enter(q1).enter(q2)
+            self.enter(q3)
+            yield self.request(r)
+            self.leave().enter(q2)
+            self.leave(q2).leave().leave().enter(q1)
+            
+    env=sim.Environment(trace=True)
+    q1=sim.Queue('q1')
+    q2=sim.Queue('q2')
+    q3=sim.Queue('q3')
+    components = []
+    somecomponents =[]
+    x= [X().register(components).register(somecomponents) for _ in range(5)]
+
+    r = sim.Resource().register(components)
+    env.run()
+    
+    x[3].deregister(components)
+    
+    for c in components:
+        print(c.name())
+    for c in somecomponents:
+        print(c.name())
+    
 def test67():
     env = sim.Environment()
     m = sim.Monitor('normal distribution')
@@ -71,11 +119,11 @@ def test64():
 
     X()
     env.run()
-    m.print_histogram()
+    m.print_histograms()
     for i in (0,1,1,2,3,1,1,1,10,20,300):
         m.tally(i)
-    m.print_histogram()
-    mt.print_histogram(ex0=True)
+    m.print_histograms()
+    mt.print_histograms(ex0=True)
 
 def test63():
     class X(sim.Component):

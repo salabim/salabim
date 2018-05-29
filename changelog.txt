@@ -1,5 +1,136 @@
 salabim  changelog
 
+version 2.2.23  2018-05-28
+==========================
+New functionality
+-----------------
+Component.leave() can now be called without a queue, in which case, the component will leave all queues
+it is in, apart from internal queues (Resource.claimers(), Resource.requesters and State.waiters()).
+It is not necessary that the component is in any queue.
+The best use case is to leave the one and only queue it is in without having to specify the
+queue, like
+    self.enter(q1)
+    ...
+    self.leave()
+
+Also, Component.leave() now returns the component (self). This is useful for daisy chaining, like:
+def process(self):
+    while True:
+        self.leave().enter(q1)
+        yield self.hold(p1())
+        self.leave().enter(q2)
+        yield self.hold(p2())
+        self.leave().enter(q3)
+        yield self.hold(p3())
+With this code, the component 'hops' from queue to queue, with minimal effort.
+
+
+In line with this daisy chaining of leave, the methods
+    Component.enter(),
+    Component.enter_at_head()
+    Component.enter_sorted()
+    Component.enter_in_front_of()
+    Component.enter_behind()
+now return the component (self).
+
+With this new functionality, it is possible to do things like
+    self.enter(q1).enter(q2).enter(q3)
+for a component to enter three queues on just one line.
+
+
+Monitor.print_histograms() introduced as an alias for Monitor.print_histogram()
+MonitorTimestamped.print_histograms() introduced as an alias for MonitorTimestamped.print_histogram()
+Monitor.reset_monitors() introduced as an alias for Monitor.reset()
+MonitorTimestamped.reset_monitors() introduced as an alias for MonitorTimestamped.reset()
+
+These four new methods make it possible to intermix resources, states, queues, (timestamped) monitors when
+printing histograms or resetting the monitors, like:
+for obj in [my_queue, my_resource, my_monitor, my_timestamped_monitor]:
+     obj.print_histograms()
+     obj.reset_monitors()
+     
+     
+Introduced methods register and deregister for classes:
+    Component
+    Monitor
+    MonitorTimestamped
+    Queue
+    Resource
+    State
+This makes it easier to do collective actions on a number of component, queues, (timestamped)monitors, queues,
+resources and/or states.
+A registry is just a list of objects, which can for instance be used as:
+    monitors = []
+    m1 = sim.Monitor(name='m1').register(monitors)
+    m2 = sim.Monitor(name='m2').register(monitors)
+    queues = []
+    q1 = sim.Queue(name='q1').register(queues)
+    q2 = sim.Queue(name='q2').register(queues)
+    ...
+    for obj in monitors + queues:
+        obj.print_histograms()
+        obj.reset_histograms()
+    
+Another example:
+    components = []
+    while(...):
+        MyComp().register(components)
+    ...
+    print('all components in system:')
+    for component in components:
+        print(component.name())
+ 
+Make sure to deregister any objects that are not used anymore, otherwise these will not be garbage collected!
+
+Note that it is possible to mix several types of class in a registry (list).
+
+
+Documentation update
+--------------------
+In contrast to documentation so far, the priority parameter in Component.enter_sorted, Component.priority()
+and Queue.add_sorted() does not have to be float.
+It can be any type as long as it can be compared with the other priorities in the queue.
+Example 1:
+    q=sim.Queue('q')
+    X().enter_sorted(q, (1,1))
+    X().enter_sorted(q, (0,2))
+    X().enter_sorted(q, (1,0))
+    X().enter_sorted(q, (1,3))
+    q.print_info()
+will print
+    Queue 0x11a0136d8
+      name=q
+      component(s):
+        x.1                  enter_time     0.000 priority=(0, 2)
+        x.2                  enter_time     0.000 priority=(1, 0)
+        x.0                  enter_time     0.000 priority=(1, 1)
+        x.3                  enter_time     0.000 priority=(1, 3)
+        
+Example 2:
+    q=sim.Queue('q')
+    X().enter_sorted(q, 'one')
+    X().enter_sorted(q, 'two')
+    X().enter_sorted(q, 'three')
+    X().enter_sorted(q, 'four')
+    q.print_info()
+will print
+    Queue 0x1279a82b0
+      name=q
+      component(s):
+        x.3                  enter_time     0.000 priority=four
+        x.0                  enter_time     0.000 priority=one
+        x.2                  enter_time     0.000 priority=three
+        x.1                  enter_time     0.000 priority=two
+        
+Note: Avoid mixing enter_sorted or add_sorted with enter, enter_at_head, add, append or add_at_head when using
+non float priorities.
+
+
+Bug fixes
+---------
+Bug in State introduced in version 2.2.22 fixed.
+
+
 version 2.2.22  2018-05-21
 ==========================
 New functionality

@@ -6,7 +6,7 @@ see www.salabim.org for more information, the manual, updates and license inform
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.22'
+__version__ = '2.2.23'
 
 import heapq
 import random
@@ -267,6 +267,70 @@ class Monitor(object):
         only keyword arguments are passed
         '''
         pass
+
+    def register(self, registry):
+        '''
+        registers the monitor in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of (to be) registered objects
+
+        Returns
+        -------
+        monitor (self) : Monitor
+
+        Note
+        ----
+        Use Monitor.deregister if monitor does not longer need to be registered.
+        '''
+        if not isinstance(registry, list):
+            raise SalabimError('registry not list')
+        if self in registry:
+            raise SalabimError(self.name() + ' already in registry')
+        registry.append(self)
+        return self
+
+    def deregister(self, registry):
+        '''
+        deregisters the monitor in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of registered objects
+
+        Returns
+        -------
+        monitor (self) : Monitor
+        '''
+        if not isinstance(registry, list):
+            raise SalabimError('registry not list')
+        if self not in registry:
+            raise SalabimError(self.name() + ' not in registry')
+        registry.remove(self)
+        return self
+
+    def __repr__(self):
+        return objectclass_to_str(self) + ' (' + self.name() + ')'
+
+    def reset_monitors(self, monitor=omitted):
+        '''
+        resets monitor
+
+        Parameters
+        ----------
+        monitor : bool
+            if True (default), monitoring will be on. |n|
+            if False, monitoring is disabled |n|
+            if omitted, the monitor state remains unchanged
+
+        Note
+        ----
+        Exactly same functionality as Monitor.reset()
+        '''
+        self.reset(monitor)
 
     def reset(self, monitor=omitted):
         '''
@@ -658,6 +722,42 @@ class Monitor(object):
                 break
         return bin_width, lowerbound, number_of_bins
 
+    def print_histograms(self, number_of_bins=omitted,
+      lowerbound=omitted, bin_width=omitted, values=False, ex0=False):
+        '''
+        print monitor statistics and histogram
+
+        Parameters
+        ----------
+        number_of_bins : int
+            number of bins |n|
+            default: 30 |n|
+            if <0, also the header of the histogram will be surpressed
+
+        lowerbound: float
+            first bin |n|
+            default: 0
+
+        bin_width : float
+            width of the bins |n|
+            default: 1
+
+        values : bool
+            if False (default), bins will be used |n|
+            if True, the individual values will be shown (in the right order).
+            in that case, no cumulative values will be given |n|
+
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+
+        Note
+        ----
+        If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
+        with a maximum of 30 classes. |n|
+        Exactly same functionality as Monitor.print_histogram()
+        '''
+        self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0)
+
     def print_histogram(self, number_of_bins=omitted,
       lowerbound=omitted, bin_width=omitted, values=False, ex0=False):
         '''
@@ -936,6 +1036,53 @@ class MonitorTimestamp(Monitor):
         '''
         pass
 
+    def register(self, registry):
+        '''
+        registers the timestamped monitor in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of (to be) registered objects
+
+        Returns
+        -------
+        timestamped monitor (self) : MonitorTimestamped
+
+        Note
+        ----
+        Use MonitorTimestamped.deregister if timestamped monitor does not longer need to be registered.
+        '''
+        if not isinstance(registry, list):
+            raise SalabimError('registry not list')
+        if self in registry:
+            raise SalabimError(self.name() + ' already in registry')
+        registry.append(self)
+        return self
+
+    def deregister(self, registry):
+        '''
+        deregisters the timestamped monitor in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of registered objects
+
+        Returns
+        -------
+        timestamped monitor (self): MonitorTimestamped
+        '''
+        if not isinstance(registry, list):
+            raise SalabimError('registry not list')
+        if self not in registry:
+            raise SalabimError(self.name() + ' not in registry')
+        registry.remove(self)
+        return self
+
+    def __repr__(self):
+        return objectclass_to_str(self) + ' (' + self.name() + ')'
+
     def __call__(self):  # direct moneypatching __call__ doesn't work
         return self._tally
 
@@ -953,6 +1100,23 @@ class MonitorTimestamp(Monitor):
             print(level.get())  # identical |n|
         '''
         return self._tally
+
+    def reset_monitors(self, monitor=omitted):
+        '''
+        resets timestamped monitor
+
+        Parameters
+        ----------
+        monitor : bool
+            if True (default), monitoring will be on. |n|
+            if False, monitoring is disabled |n|
+            if omitted, the monitor state remains unchanged
+
+        Note
+        ----
+        Exactly same functionality as MonitorTimestamped.reset()
+        '''
+        self.reset(monitor)
 
     def reset(self, monitor=omitted):
         '''
@@ -1457,6 +1621,42 @@ class MonitorTimestamp(Monitor):
 
         Monitor.print_statistics(self, show_header, show_legend, do_indent)
 
+    def print_histograms(self, number_of_bins=omitted,
+      lowerbound=omitted, bin_width=omitted, values=False, ex0=False):
+        '''
+        print timedstamped monitor statistics and histogram
+
+        Parameters
+        ----------
+        number_of_bins : int
+            number of bins |n|
+            default: 30 |n|
+            if <0, also the header of the histogram will be surpressed
+
+        lowerbound: float
+            first bin |n|
+            default: 0
+
+        bin_width : float
+            width of the bins |n|
+            default: 1
+
+        values : bool
+            if False (default), bins will be used |n|
+            if True, the individual values will be shown (in the right order).
+            in that case, no cumulative values will be given |n|
+
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+
+        Note
+        ----
+        If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
+        with a maximum of 30 classes. |n|
+        Exactly same functionality as MonitorTimestamped.print_histogram()
+        '''
+        self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0)
+
     def print_histogram(self, number_of_bins=omitted, lowerbound=omitted, bin_width=omitted, values=False, ex0=False):
         '''
         print timestamped monitor statistics and histogram
@@ -1675,7 +1875,8 @@ class Qmember():
             q._iter_touched[iter] = True
         c._qmembers[q] = self
         if q.env._trace:
-            q.env.print_trace('', '', c.name(), 'enter ' + q.name())
+            if not q._isinternal:
+                q.env.print_trace('', '', c.name(), 'enter ' + q.name())
         q.length.tally(q._length)
         if q._animate_on:
             q._animate_update()
@@ -1707,12 +1908,9 @@ class Queue(object):
     env : Environment
         environment where the queue is defined |n|
         if omitted, default_env will be used
-
-    _isinternal : bool
-        for internal use only
     '''
 
-    def __init__(self, name=omitted, monitor=True, fill=omitted, env=omitted, _isinternal=False, *args, **kwargs):
+    def __init__(self, name=omitted, monitor=True, fill=omitted, env=omitted, *args, **kwargs):
         if env is omitted:
             self.env = g.default_env
         else:
@@ -1731,17 +1929,20 @@ class Queue(object):
         self._length = 0
         self._iter_sequence = 0
         self._iter_touched = {}
+        self._isinternal = False
         self._animate_on = False
         self.length = MonitorTimestamp(
             'Length of ' + self.name(), initial_tally=0, monitor=monitor, type='uint32', env=self.env)
         self.length_of_stay = Monitor(
             'Length of stay in ' + self.name(), monitor=monitor, type='float')
         if fill is not omitted:
+            savetrace = self.env._trace
+            self.env._trace = False
             for c in fill:
-                c._enter(self)
-        if not _isinternal:
-            if self.env._trace:
-                self.env.print_trace('', '', self.name() + ' create')
+                c.enter(self)
+            self.env._trace = savetrace
+        if self.env._trace:
+            self.env.print_trace('', '', self.name() + ' create')
         self.setup(*args, **kwargs)
 
     def setup(self):
@@ -1866,12 +2067,56 @@ class Queue(object):
         self.length.monitor(value=value)
         self.length_of_stay.monitor(value=value)
 
+    def register(self, registry):
+        '''
+        registers the queue in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of (to be) registered objects
+
+        Returns
+        -------
+        queue (self) : Queue
+
+        Note
+        ----
+        Use Queue.deregister if queue does not longer need to be registered.
+        '''
+        if not isinstance(registry, list):
+            raise SalabimError('registry not list')
+        if self in registry:
+            raise SalabimError(self.name() + ' already in registry')
+        registry.append(self)
+        return self
+
+    def deregister(self, registry):
+        '''
+        deregisters the queue in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of registered queues
+
+        Returns
+        -------
+        queue (self) : Queue
+        '''
+        if not isinstance(registry, list):
+            raise SalabimError('registry not list')
+        if self not in registry:
+            raise SalabimError(self.name() + ' not in registry')
+        registry.remove(self)
+        return self
+
     def __repr__(self):
         return objectclass_to_str(self) + '(' + self.name() + ')'
 
     def print_info(self):
         '''
-        prints information about the component
+        prints information about the queue
         '''
         print(objectclass_to_str(self) + ' ' + hex(id(self)))
         print('  name=' + self.name())
@@ -2027,7 +2272,7 @@ class Queue(object):
         ----
         the priority of component will be set to the priority of poscomponent
         '''
-        component.enter_in_front_off(self, poscomponent)
+        component.enter_in_front_of(self, poscomponent)
 
     def insert(self, index, component):
         '''
@@ -2411,9 +2656,12 @@ class Queue(object):
         ----
         The components added to the queue will get the priority of the tail of self.
         '''
+        savetrace = self.env._trace
+        self.env._trace = False
         for c in q:
             if c not in self:
-                c._enter(q)
+                c.enter(q)
+        self.env._trace = savetrace
 
     def as_set(self):
         return {c for c in self}
@@ -2673,11 +2921,14 @@ class Queue(object):
 
         removes all components from a queue
         '''
+        savetrace = self.env._trace
+        self.env._trace = False
         mx = self._head.successor
         while mx != self._tail:
             c = mx.component
             mx = mx.successor
-            c._leave(self)
+            c.leave(self)
+        self._trace = savetrace
         if self.env._trace:
             self.env.print_trace('', '', self.name() + ' clear')
 
@@ -6384,6 +6635,50 @@ class Component(object):
     def __repr__(self):
         return objectclass_to_str(self) + ' (' + self.name() + ')'
 
+    def register(self, registry):
+        '''
+        registers the component in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of (to be) registered objects
+
+        Returns
+        -------
+        component (self) : Component
+
+        Note
+        ----
+        Use Component.deregister if component does not longer need to be registered.
+        '''
+        if not isinstance(registry, list):
+            raise SalabimError('registry not list')
+        if self in registry:
+            raise SalabimError(self.name() + ' already in registry')
+        registry.append(self)
+        return self
+
+    def deregister(self, registry):
+        '''
+        deregisters the component in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of registered components
+
+        Returns
+        -------
+        component (self) : Component
+        '''
+        if not isinstance(registry, list):
+            raise SalabimError('registry not list')
+        if self not in registry:
+            raise SalabimError(self.name() + ' not in registry')
+        registry.remove(self)
+        return self
+
     def print_info(self):
         '''
         prints information about the queue
@@ -6465,7 +6760,7 @@ class Component(object):
             if self.env._trace:
                 self.env.print_trace('', '', self.name(), 'request failed')
             for r in list(self._requests):
-                self._leave(r._requesters)
+                self.leave(r._requesters)
                 if r._requesters._length == 0:
                     r._minq = inf
             self._requests = collections.defaultdict(int)
@@ -6476,7 +6771,7 @@ class Component(object):
                 self.env.print_trace('', '', self.name(), 'wait failed')
             for state, _, _ in self._waits:
                 if self in state._waiters:  # there might be more values for this state
-                    self._leave(state._waiters)
+                    self.leave(state._waiters)
             self._waits = []
             self._failed = True
 
@@ -6973,10 +7268,10 @@ class Component(object):
             self._requests[r] += q  # is same resource is specified several times, just add them up
             addstring = ''
             if priority is None:
-                self._enter(r._requesters)
+                self.enter(r._requesters)
             else:
                 addstring = addstring + ' priority=' + str(priority)
-                self._enter_sorted(r._requesters, priority)
+                self.enter_sorted(r._requesters, priority)
             if self.env._trace:
                 self.env.print_trace(
                     '', '', self.name(),
@@ -7004,12 +7299,12 @@ class Component(object):
             for r in list(self._requests):
                 r._claimed_quantity += self._requests[r]
 
-                self._leave(r._requesters)
+                self.leave(r._requesters)
                 if not r._anonymous:
                     self._claims[r] += self._requests[r]
                     mx = self._member(r._claimers)
                     if mx is None:
-                        self._enter(r._claimers)
+                        self.enter(r._claimers)
                 if r._requesters._length == 0:
                     r._minq = inf
                 r.claimed_quantity.tally(r._claimed_quantity)
@@ -7031,7 +7326,7 @@ class Component(object):
         r._claimed_quantity -= q
         self._claims[r] -= q
         if self._claims[r] < 1e-8:
-            self._leave(r._claimers)
+            self.leave(r._claimers)
             if r._claimers._length == 0:
                 r._claimed_quantity = 0  # to avoid rounding problems
             del self._claims[r]
@@ -7228,9 +7523,9 @@ class Component(object):
                     break
             else:
                 if priority is None:
-                    self._enter(state._waiters)
+                    self.enter(state._waiters)
                 else:
-                    self._enter_sorted(state._waiters, priority)
+                    self.enter_sorted(state._waiters, priority)
             if inspect.isfunction(value):
                 self._waits.append((state, value, 2))
             elif '$' in str(value):
@@ -7283,7 +7578,7 @@ class Component(object):
         if honored:
             for s, _, _ in self._waits:
                 if self in s._waiters:  # there might be more values for this state
-                    self._leave(s._waiters)
+                    self.leave(s._waiters)
             self._waits = []
             self._remove()
             self._reschedule(self.env._now, False, 'wait honor')
@@ -7599,12 +7894,6 @@ class Component(object):
                 index += 1
             return index
 
-    def _enter(self, q):
-        savetrace = self.env._trace
-        self.env._trace = False
-        self.enter(q)
-        self.env._trace = savetrace
-
     def enter(self, q):
         '''
         enters a queue at the tail
@@ -7623,6 +7912,7 @@ class Component(object):
         self._checknotinqueue(q)
         priority = q._tail.predecessor.priority
         Qmember().insert_in_front_of(q._tail, self, q, priority)
+        return self
 
     def enter_at_head(self, q):
         '''
@@ -7643,6 +7933,7 @@ class Component(object):
         self._checknotinqueue(q)
         priority = q._head.successor.priority
         Qmember().insert_in_front_of(q._head.successor, self, q, priority)
+        return self
 
     def enter_in_front_of(self, q, poscomponent):
         '''
@@ -7665,6 +7956,7 @@ class Component(object):
         m2 = poscomponent._checkinqueue(q)
         priority = m2.priority
         Qmember().insert_in_front_of(m2, self, q, priority)
+        return self
 
     def enter_behind(self, q, poscomponent):
         '''
@@ -7687,6 +7979,7 @@ class Component(object):
         m1 = poscomponent._checkinqueue(q)
         priority = m1.priority
         Qmember().insert_in_front_of(m1.successor, self, q, priority)
+        return self
 
     def enter_sorted(self, q, priority):
         '''
@@ -7697,7 +7990,7 @@ class Component(object):
         q : Queue
             queue to enter
 
-        priority: float
+        priority: type that can be compared with other priorities in the queue
             priority in the queue
 
         Note
@@ -7710,20 +8003,9 @@ class Component(object):
         while (m2 != q._tail) and (m2.priority <= priority):
             m2 = m2.successor
         Qmember().insert_in_front_of(m2, self, q, priority)
+        return self
 
-    def _enter_sorted(self, q, priority):
-        savetrace = self.env._trace
-        self.env._trace = False
-        self.enter_sorted(q, priority)
-        self.env._trace = savetrace
-
-    def _leave(self, q):
-        savetrace = self.env._trace
-        self.env._trace = False
-        self.leave(q)
-        self.env._trace = savetrace
-
-    def leave(self, q):
+    def leave(self, q=omitted):
         '''
         leave queue
 
@@ -7736,6 +8018,11 @@ class Component(object):
         ----
         statistics are updated accordingly
         '''
+        if q is omitted:
+            for q in list(self._qmembers):
+                if not q._isinternal:
+                    self.leave(q)
+            return self
 
         mx = self._checkinqueue(q)
         m1 = mx.predecessor
@@ -7747,13 +8034,15 @@ class Component(object):
         q._length -= 1
         del self._qmembers[q]
         if self.env._trace:
-            self.env.print_trace('', '', self.name(), 'leave ' + q.name())
+            if not q._isinternal:
+                self.env.print_trace('', '', self.name(), 'leave ' + q.name())
         length_of_stay = self.env._now - mx.enter_time
         q.length_of_stay.tally(length_of_stay)
         q.length.tally(q._length)
         if q._animate_on:
             self._remove_from_aos(q)
             q._animate_update()
+        return self
 
     def priority(self, q, priority=omitted):
         '''
@@ -7764,7 +8053,7 @@ class Component(object):
         q : Queue
             queue where the component belongs to
 
-        priority : float
+        priority : type that can be compared with other priorities in the queue
             priority in queue |n|
             if omitted, no change
 
@@ -9328,9 +9617,13 @@ class State(object):
         self._value = value
         self._animate_on = False
         self._aos = []
+        savetrace = self.env._trace
+        self.env._trace = False
         self._waiters = Queue(
             name='waiters of ' + self.name(),
-            monitor=monitor, env=self.env, _isinternal=True)
+            monitor=monitor, env=self.env)
+        self._waiters._isinternal = True
+        self.env._trace = savetrace
         self.value = MonitorTimestamp(
             name='Value of ' + self.name(),
             initial_tally=value, monitor=monitor, type=type, env=self.env)
@@ -9398,6 +9691,50 @@ class State(object):
             ao.x0 = self._animate_x
             ao.y0 = self._animate_y
             self._aos.append(ao)
+
+    def register(self, registry):
+        '''
+        registers the state in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of (to be) registered objetcs
+
+        Returns
+        -------
+        state (self) : State
+
+        Note
+        ----
+        Use State.deregister if state does not longer need to be registered.
+        '''
+        if not isinstance(registry, list):
+            raise SalabimError('registry not list')
+        if self in registry:
+            raise SalabimError(self.name() + ' already in registry')
+        registry.append(self)
+        return self
+
+    def deregister(self, registry):
+        '''
+        deregisters the state in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of registered states
+
+        Returns
+        -------
+        state (self) : State
+        '''
+        if not isinstance(registry, list):
+            raise SalabimError('registry not list')
+        if self not in registry:
+            raise SalabimError(self.name() + ' not in registry')
+        registry.remove(self)
+        return self
 
     def __repr__(self):
         return objectclass_to_str(self) + ' (' + self.name() + ')'
@@ -9697,12 +10034,17 @@ class Resource(object):
             self.env = env
         self._capacity = capacity
         _set_name(name, self.env._nameserializeResource, self)
+        savetrace = self.env._trace
+        self.env._trace = False
         self._requesters = Queue(
             name='requesters of ' + self.name(),
-            monitor=monitor, env=self.env, _isinternal=True)
+            monitor=monitor, env=self.env)
+        self._requesters._isinternal = True
         self._claimers = Queue(
             name='claimers of ' + self.name(),
-            monitor=monitor, env=self.env, _isinternal=True)
+            monitor=monitor, env=self.env)
+        self._claimers._isinternal = True
+        self.env._trace = savetrace
         self._claimed_quantity = 0
         self._anonymous = anonymous
         self._minq = inf
@@ -9816,6 +10158,50 @@ class Resource(object):
         self.claimers().monitor(value)
         for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
             m.monitor(value)
+
+    def register(self, registry):
+        '''
+        registers the resource in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of (to be) registered objects
+
+        Returns
+        -------
+        resource (self) : Resource
+
+        Note
+        ----
+        Use Resource.deregister if resource does not longer need to be registered.
+        '''
+        if not isinstance(registry, list):
+            raise SalabimError('registry not list')
+        if self in registry:
+            raise SalabimError(self.name() + ' already in registry')
+        registry.append(self)
+        return self
+
+    def deregister(self, registry):
+        '''
+        deregisters the resource in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of registered components
+
+        Returns
+        -------
+        resource (self) : Resource
+        '''
+        if not isinstance(registry, list):
+            raise SalabimError('registry not list')
+        if self not in registry:
+            raise SalabimError(self.name() + ' not in registry')
+        registry.remove(self)
+        return self
 
     def __repr__(self):
         return objectclass_to_str(self) + ' (' + self.name() + ')'
@@ -10663,8 +11049,12 @@ if __name__ == '__main__':
         import salabim_test
     except:
         print('salabim_test.py not found')
-    else:
-        try:
-            salabim_test.test()
-        except AttributeError:
-            print('salabim_test.test() not found')
+        quit()
+
+    try:
+        salabim_test.__dict__['test']
+    except KeyError:
+        print('salabim_test.test() not found')
+        quit()
+
+    salabim_test.test()
