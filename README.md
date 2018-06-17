@@ -13,3 +13,5 @@ to use for modellers. Also, salabim provides animation, queues, 'states', monito
 collection and presentation, tracing and statistical distributions, none of which are present in SimPy3.
 
 See www.salabim.org for details. 
+
+See www.salabim.og/manual for the documentation.
