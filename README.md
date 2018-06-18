@@ -14,4 +14,4 @@ collection and presentation, tracing and statistical distributions, none of whic
 
 See www.salabim.org for details. 
 
-See www.salabim.og/manual for the documentation.
+See www.salabim.org/manual for the documentation.
