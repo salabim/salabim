@@ -28,7 +28,8 @@ class Clerk(sim.Component):
 
 
 env = sim.Environment(trace=True)
-CustomerGenerator(name='customergenerator')
+
+CustomerGenerator(name='')  # using name='' prevents the name customergenerator to be serialized
 clerk = Clerk()
 waitingline = sim.Queue('waitingline')
 

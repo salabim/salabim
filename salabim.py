@@ -1,12 +1,12 @@
 '''
 salabim  discrete event simulation
 
-see www.salabim.org for more information, the manual, updates and license information.
+see www.salabim.org for more information, the documentation, updates and license information.
 '''
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.2.23'
+__version__ = '2.3.0'
 
 import heapq
 import random
@@ -44,7 +44,6 @@ if Pythonista:
 
 inf = float('inf')
 nan = float('nan')
-omitted = ['omitted']
 
 
 class ItemFile(object):
@@ -237,6 +236,11 @@ class Monitor(object):
             - 'uint64' integer >= 0 <= 18446744073709551615 8 bytes
             - 'float' float 8 bytes
 
+    merge: list, tuple or set
+        the monitor will be created by merging the monitors mentioned in the list |n|
+        note that the types of all to be merged monitors should be the same. |n|
+        default: no merge
+
     env : Environment
         environment where the monitor is defined |n|
         if omitted, default_env will be used
@@ -244,18 +248,42 @@ class Monitor(object):
 
     cached_x = [(0, 0), (0, 0)]  # index=ex0, value=[hash,x]
 
-    def __init__(self, name=omitted, monitor=True, type='any', env=omitted, *args, **kwargs):
-        if env is omitted:
+    def __init__(self, name=None, monitor=True, type=None, merge=None,
+        env=None, *args, **kwargs):
+        if env is None:
             self.env = g.default_env
         else:
             self.env = env
         _set_name(name, self.env._nameserializeMonitor, self)
-        try:
-            self.xtypecode, _ = type_to_typecode_off(type)
-        except KeyError:
-            raise SalabimError('type (' + type + ') not recognized')
         self._timestamp = False
-        self.reset(monitor)
+        if merge is None:
+            if type is None:
+                type = 'any'
+            try:
+                self.xtypecode, _ = type_to_typecode_off(type)
+            except KeyError:
+                raise SalabimError('type (' + type + ') not recognized')
+            self.reset(monitor)
+        else:
+            if not merge:
+                raise SalabimError('merge list empty')
+            for m in merge:
+                if not isinstance(m, Monitor):
+                    raise SalabimError('non Monitor item found in merge list')
+
+            self.xtypecode = merge[0].xtypecode
+            for m in merge:
+                if m.xtypecode != self.xtypecode:
+                    raise SalabimError('not all types in merge list are equal')
+            if type is not None:
+                if type_to_typecode_off(type)[0] != self.xtypecode:
+                    raise SalabimError('type does not match the type of the monitors in the merge list')
+            if self.xtypecode:
+                self._x = array.array(self.xtypecode, itertools.chain(*[m._x for m in merge]))
+            else:
+                self._x = list(itertools.chain(*[m._x for m in merge]))
+
+            self._monitor = monitor
         self.setup(*args, **kwargs)
 
     def setup(self):
@@ -315,7 +343,7 @@ class Monitor(object):
     def __repr__(self):
         return objectclass_to_str(self) + ' (' + self.name() + ')'
 
-    def reset_monitors(self, monitor=omitted):
+    def reset_monitors(self, monitor=None):
         '''
         resets monitor
 
@@ -332,7 +360,7 @@ class Monitor(object):
         '''
         self.reset(monitor)
 
-    def reset(self, monitor=omitted):
+    def reset(self, monitor=None):
         '''
         resets monitor
 
@@ -344,15 +372,16 @@ class Monitor(object):
             if omitted, no change of monitoring state
         '''
 
-        if monitor is omitted:
+        if monitor is None:
             monitor = self._monitor
         if self.xtypecode:
             self._x = array.array(self.xtypecode)
         else:
             self._x = []
         self.monitor(monitor)
+        Monitor.cached_x = [(0, 0), (0, 0)]  # invalidate the cache
 
-    def monitor(self, value=omitted):
+    def monitor(self, value=None):
         '''
         enables/disabled monitor
 
@@ -367,7 +396,7 @@ class Monitor(object):
         -------
         True, if monitoring enabled. False, if not : bool
         '''
-        if value is not omitted:
+        if value is not None:
             self._monitor = value
         return self.monitor
 
@@ -381,7 +410,7 @@ class Monitor(object):
         if self._monitor:
             self._x.append(x)
 
-    def name(self, value=omitted):
+    def name(self, value=None):
         '''
         Parameters
         ----------
@@ -397,7 +426,7 @@ class Monitor(object):
         ----
         base_name and sequence_number are not affected if the name is changed
         '''
-        if value is not omitted:
+        if value is not None:
             self._name = value
         return self._name
 
@@ -629,7 +658,7 @@ class Monitor(object):
         '''
         return self.number_of_entries() - self.number_of_entries(ex0=True)
 
-    def print_statistics(self, show_header=True, show_legend=True, do_indent=False):
+    def print_statistics(self, show_header=True, show_legend=True, do_indent=False, as_str=False):
         '''
         print monitor statistics
 
@@ -643,7 +672,16 @@ class Monitor(object):
 
         do_indent: bool
             primarily for internal use
+
+        as_str: bool
+            if False (default), print the statistics
+            if True, return a string containing the statistics
+
+        Returns
+        -------
+        statistics (if as_str is True) : str
         '''
+        result = []
         if do_indent:
             l = 45
         else:
@@ -651,46 +689,48 @@ class Monitor(object):
         indent = pad('', l)
 
         if show_header:
-            print(indent + 'Statistics of {} at {}'.format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
+            result.append(
+                indent + 'Statistics of {} at {}'.format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
 
         if show_legend:
-            print(
+            result.append(
                 indent + '                        all    excl.zero         zero')
-            print(
+            result.append(
                 pad('-' * (l - 1) + ' ', l) + '-------------- ------------ ------------ ------------')
 
         if self._timestamp:
             if self.duration() == 0:
-                print(pad(self.name(), l) + 'no data')
-                return
+                result.append(pad(self.name(), l) + 'no data')
+                return return_or_print(result, as_str)
             else:
-                print(pad(self.name(), l) + 'duration      {}{}{}'.
+                result.append(pad(self.name(), l) + 'duration      {}{}{}'.
                     format(fn(self.duration(), 13, 3),
                     fn(self.duration(ex0=True), 13, 3), fn(self.duration_zero(), 13, 3)))
         else:
             if self.number_of_entries() == 0:
-                print(pad(self.name(), l) + 'no entries')
-                return
+                result.append(pad(self.name(), l) + 'no entries')
+                return return_or_print(result, as_str)
             else:
-                print(pad(self.name(), l) + 'entries       {}{}{}'.
+                result.append(pad(self.name(), l) + 'entries       {}{}{}'.
                     format(fn(self.number_of_entries(), 13, 3),
                     fn(self.number_of_entries(ex0=True), 13, 3), fn(self.number_of_entries_zero(), 13, 3)))
 
-        print(indent + 'mean          {}{}'.
+        result.append(indent + 'mean          {}{}'.
               format(fn(self.mean(), 13, 3), fn(self.mean(ex0=True), 13, 3)))
-        print(indent + 'std.deviation {}{}'.
+        result.append(indent + 'std.deviation {}{}'.
               format(fn(self.std(), 13, 3), fn(self.std(ex0=True), 13, 3)))
-        print()
-        print(indent + 'minimum       {}{}'.
+        result.append('')
+        result.append(indent + 'minimum       {}{}'.
               format(fn(self.minimum(), 13, 3), fn(self.minimum(ex0=True), 13, 3)))
-        print(indent + 'median        {}{}'.
+        result.append(indent + 'median        {}{}'.
               format(fn(self.percentile(50), 13, 3), fn(self.percentile(50, ex0=True), 13, 3)))
-        print(indent + '90% percentile{}{}'.
+        result.append(indent + '90% percentile{}{}'.
               format(fn(self.percentile(90), 13, 3), fn(self.percentile(90, ex0=True), 13, 3)))
-        print(indent + '95% percentile{}{}'.
+        result.append(indent + '95% percentile{}{}'.
               format(fn(self.percentile(95), 13, 3), fn(self.percentile(95, ex0=True), 13, 3)))
-        print(indent + 'maximum       {}{}'.
+        result.append(indent + 'maximum       {}{}'.
               format(fn(self.maximum(), 13, 3), fn(self.maximum(ex0=True), 13, 3)))
+        return return_or_print(result, as_str)
 
     def histogram_autoscale(self, ex0=False):
         '''
@@ -706,9 +746,9 @@ class Monitor(object):
         -------
         bin_width, lowerbound, number_of_bins : tuple
         '''
-
         xmax = self.maximum(ex0=ex0)
         xmin = self.minimum(ex0=ex0)
+
         done = False
         for i in range(10):
             exp = 10 ** i
@@ -722,8 +762,8 @@ class Monitor(object):
                 break
         return bin_width, lowerbound, number_of_bins
 
-    def print_histograms(self, number_of_bins=omitted,
-      lowerbound=omitted, bin_width=omitted, values=False, ex0=False):
+    def print_histograms(self, number_of_bins=None,
+        lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False):
         '''
         print monitor statistics and histogram
 
@@ -749,6 +789,14 @@ class Monitor(object):
 
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
+
+        as_str: bool
+            if False (default), print the histogram
+            if True, return a string containing the histogram
+
+        Returns
+        -------
+        histogram (if as_str is True) : str
 
         Note
         ----
@@ -756,10 +804,10 @@ class Monitor(object):
         with a maximum of 30 classes. |n|
         Exactly same functionality as Monitor.print_histogram()
         '''
-        self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0)
+        return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0)
 
-    def print_histogram(self, number_of_bins=omitted,
-      lowerbound=omitted, bin_width=omitted, values=False, ex0=False):
+    def print_histogram(self, number_of_bins=None,
+      lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False):
         '''
         print monitor statistics and histogram
 
@@ -786,12 +834,22 @@ class Monitor(object):
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
 
+
+        as_str: bool
+            if False (default), print the histogram
+            if True, return a string containing the histogram
+
+        Returns
+        -------
+        histogram (if as_str is True) : str
+
         Note
         ----
         If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
         with a maximum of 30 classes.
         '''
-        print('Histogram of', self.name() + ('[ex0]' if ex0 else ''))
+        result = []
+        result.append('Histogram of ' + self.name() + ('[ex0]' if ex0 else ''))
 
         if self._timestamp:
             x, weights = self.xduration(ex0=ex0, force_numeric=not values)
@@ -801,92 +859,84 @@ class Monitor(object):
             weight_total = len(x)
 
         if weight_total == 0:
-            print()
+            result.append('')
             if self._timestamp:
-                print('no data')
+                result.append('no data')
             else:
-                print('no entries')
-            print()
-            return
-
-        if values:
-            nentries = len(x)
-            if self._timestamp:
-                print('duration      {}'.
-                    format(fn(weight_total, 13, 3)))
-            print('entries       {}'.
-                format(fn(nentries, 13, 3)))
-            print()
-            if self._timestamp:
-                print('value                     duration        entries')
-            else:
-                print('value               entries')
-            as_set = {str(x).strip() for x in set(x)}
-
-            values = sorted(list(as_set), key=self.key)
-
-            for value in values:
-                if self._timestamp:
-                    count = self.value_duration(value)
-                    count_entries = self.value_number_of_entries(value)
-                else:
-                    count = self.value_number_of_entries(value)
-
-                perc = count / weight_total
-                scale = 80
-                n = int(perc * scale)
-                s = ('*' * n) + (' ' * (scale - n))
-
-                if self._timestamp:
-                    print(pad(str(value), 20) + fn(count, 14, 3) + '(' + fn(perc * 100, 5, 1) + '%)' +
-                       rpad(str(count_entries), 7) + '(' + fn(count_entries * 100 / nentries, 5, 1) + '%) ' + s)
-                else:
-                    print(pad(str(value), 20) + rpad(str(count), 7) + '(' + fn(perc * 100, 5, 1) + '%) ' + s)
+                result.append('no entries')
         else:
-            if (bin_width is omitted) and (lowerbound is omitted) and (number_of_bins is omitted):
-                bin_width, lowerbound, number_of_bins = self.histogram_autoscale()
-            else:
-                if bin_width is omitted:
-                    bin_width = 1
-                if number_of_bins is omitted:
-                    number_of_bins = 30
-                if lowerbound is omitted:
-                    lowerbound = 0
 
-            self.print_statistics(show_header=False, show_legend=True, do_indent=False)
-            if number_of_bins >= 0:
-                print()
+            if values:
+                nentries = len(x)
                 if self._timestamp:
-                    print('           <=      duration     %  cum%')
+                    result.append('duration      {}'.
+                        format(fn(weight_total, 13, 3)))
+                result.append('entries       {}'.
+                    format(fn(nentries, 13, 3)))
+                result.append('')
+                if self._timestamp:
+                    result.append('value                     duration        entries')
                 else:
-                    print('           <=       entries     %  cum%')
+                    result.append('value               entries')
+                as_set = {str(x).strip() for x in set(x)}
 
-                cumperc = 0
-                for i in range(-1, number_of_bins + 1):
-                    if i == -1:
-                        lb = -inf
-                    else:
-                        lb = lowerbound + i * bin_width
-                    if i == number_of_bins:
-                        ub = inf
-                    else:
-                        ub = lowerbound + (i + 1) * bin_width
+                values = sorted(list(as_set), key=self.key)
+
+                for value in values:
                     if self._timestamp:
-                        count = self.bin_duration(lb, ub)
+                        count = self.value_duration(value)
+                        count_entries = self.value_number_of_entries(value)
                     else:
-                        count = self.bin_number_of_entries(lb, ub)
+                        count = self.value_number_of_entries(value)
 
                     perc = count / weight_total
-                    cumperc += perc
                     scale = 80
                     n = int(perc * scale)
-                    ncum = int(cumperc * scale) + 1
                     s = ('*' * n) + (' ' * (scale - n))
-                    s = s[:ncum - 1] + '|' + s[ncum + 1:]
 
-                    print('{} {}{}{} {}'.
-                          format(fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s))
-        print()
+                    if self._timestamp:
+                        result.append(pad(str(value), 20) + fn(count, 14, 3) + '(' + fn(perc * 100, 5, 1) + '%)' +
+                           rpad(str(count_entries), 7) + '(' + fn(count_entries * 100 / nentries, 5, 1) + '%) ' + s)
+                    else:
+                        result.append(
+                            pad(str(value), 20) + rpad(str(count), 7) + '(' + fn(perc * 100, 5, 1) + '%) ' + s)
+            else:
+                bin_width, lowerbound, number_of_bins = self.histogram_autoscale()
+                result.append(self.print_statistics(show_header=False, show_legend=True, do_indent=False, as_str=True))
+                if number_of_bins >= 0:
+                    result.append('')
+                    if self._timestamp:
+                        result.append('           <=      duration     %  cum%')
+                    else:
+                        result.append('           <=       entries     %  cum%')
+
+                    cumperc = 0
+                    for i in range(-1, number_of_bins + 1):
+                        if i == -1:
+                            lb = -inf
+                        else:
+                            lb = lowerbound + i * bin_width
+                        if i == number_of_bins:
+                            ub = inf
+                        else:
+                            ub = lowerbound + (i + 1) * bin_width
+                        if self._timestamp:
+                            count = self.bin_duration(lb, ub)
+                        else:
+                            count = self.bin_number_of_entries(lb, ub)
+
+                        perc = count / weight_total
+                        cumperc += perc
+                        scale = 80
+                        n = int(perc * scale)
+                        ncum = int(cumperc * scale) + 1
+                        s = ('*' * n) + (' ' * (scale - n))
+                        s = s[:ncum - 1] + '|' + s[ncum + 1:]
+
+                        result.append('{} {}{}{} {}'.
+                              format(fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s))
+        result.append('')
+        return return_or_print(result, as_str)
 
     def key(self, x):
         try:
@@ -896,6 +946,100 @@ class Monitor(object):
             x1 = math.inf
             x2 = x
         return(x1, x2)
+
+    def animate(self, *args, **kwargs):
+        '''
+        animates the monitor in a panel
+
+        Parameters
+        ----------
+        linecolor : colorspec
+            color of the line or points (default foreground color)
+
+        linewidth : int
+            width of the line or points (default 1 for line, 3 for points)
+
+        fillcolor : colorspec
+            color of the panel (default transparent)
+
+        bordercolor : colorspec
+            color of the border (default foreground color)
+
+        borderlinewidth : int
+            width of the line around the panel (default 1)
+
+        nowcolor : colorspec
+            color of the line indicating now (default red)
+
+        titlecolor : colorspec
+            color of the title (default foreground color)
+
+        titlefont : font
+            font of the title (default '')
+
+        titlefontsize : int
+            size of the font of the title (default 15)
+
+        as_points : bool
+            if False, lines will be drawn between the points |n|
+            if True (default),  only the points will be shown
+
+        as_level : bool
+            if True (default for lines), the timestamped monitor is considered to be a level
+            if False (default for points), just the tallied values will be shown, and connected (for lines)
+
+        title : str
+            title to be shown above panel |n|
+            default: name of the monitor
+
+        x : int
+            x-coordinate of panel, relative to xy_anchor, default 0
+
+        y : int
+            y-coordinate of panel, relative to xy_anchor. default 0
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        vertical_offset : float
+            the vertical position of x within the panel is
+             vertical_offset + x * vertical_scale (default 0)
+
+        vertical_scale : float
+            the vertical position of x within the panel is
+            vertical_offset + x * vertical_scale (default 5)
+
+        horizontal_scale : float
+            for timescaled monitors the relative horizontal position of time t within the panel is on
+            t * horizontal_scale, possibly shifted (default 1)|n|
+            for non timescaled monitors, the relative horizontal position of index i within the panel is on
+            i * horizontal_scale, possibly shifted (default 5)|n|
+
+        width : int
+            width of the panel (default 200)
+
+        height : int
+            height of the panel (default 75)
+
+        layer : int
+            layer (default 0)
+
+        Returns
+        -------
+        reference to AnimateMonitor object : AnimateMonitor
+
+        Note
+        ----
+        It is recommended to use sim.AnimateMonitor instead |n|
+
+        All measures are in screen coordinates |n|
+        '''
+
+        return AnimateMonitor(monitor=self, *args, **kwargs)
 
     def x(self, ex0=False, force_numeric=True):
         '''
@@ -914,7 +1058,7 @@ class Monitor(object):
         -------
         all tallied values : array/list
         '''
-        thishash = hash((tuple(self._x), force_numeric))
+        thishash = hash((self, len(self._x), force_numeric))
 
         if Monitor.cached_x[ex0][0] == thishash:
             return Monitor.cached_x[ex0][1]
@@ -982,6 +1126,13 @@ class MonitorTimestamp(Monitor):
             - 'uint64' integer >= 0 <= 18446744073709551614 8 bytes do not use 18446744073709551615
             - 'float' float 8 bytes do not use -inf
 
+    merge: list, tuple or set
+        the monitor will be created by merging the monitors mentioned in the list |n|
+        merging means summing the available x-values|n|
+        note that the types of all to be merged monitors should be the same. |n|
+        initial_tally may not be specified when merge is specified. |n|
+        default: no merge
+
     env : Environment
         environment where the monitor is defined |n|
         if omitted, default_env will be used
@@ -1008,22 +1159,80 @@ class MonitorTimestamp(Monitor):
         And thus a mean of (10*50+11*20+12*10+10*20)/(50+20+10+20)
     '''
 
-    cached_xduration = [(0, ()), (0, ())]  # index=ex0, value=[hash,(x,duration)]
+    cached_xduration = [(0, 0), (0, 0)]  # index=ex0, value=[hash,(x,duration)]
 
-    def __init__(self, name=omitted, initial_tally=0, monitor=True, type='any', env=omitted, *args, **kwargs):
-        if env is omitted:
+    def __init__(self, name=None, initial_tally=None, monitor=True, type=None,
+        merge=None, env=None, *args, **kwargs):
+        if env is None:
             self.env = g.default_env
         else:
             self.env = env
-        try:
-            self.xtypecode, self.off = type_to_typecode_off(type)
-        except KeyError:
-            raise SalabimError('type (' + type + ') not recognized')
-
-        _set_name(name, self.env._nameserializeComponent, self)
         self._timestamp = True
-        self._tally = initial_tally
-        self.reset(monitor=monitor)
+        _set_name(name, self.env._nameserializeComponent, self)
+        if merge is None:
+            if type is None:
+                type = 'any'
+            try:
+                self.xtypecode, self.off = type_to_typecode_off(type)
+            except KeyError:
+                raise SalabimError('type (' + type + ') not recognized')
+
+            if initial_tally is None:
+                self._tally = 0
+            else:
+                self._tally = initial_tally
+            self.reset(monitor=monitor)
+        else:
+            if initial_tally is not None:
+                raise SalabimError('initial_tally cannot be combined with merge')
+            if not merge:
+                raise SalabimError('merge list empty')
+
+            for m in merge:
+                if not isinstance(m, MonitorTimestamp):
+                    raise SalabimError('non MonitorTimestamp item found in merge list')
+
+            self.xtypecode = merge[0].xtypecode
+            for m in merge:
+                if m.xtypecode != self.xtypecode:
+                    raise SalabimError('not all types in merge list are equal')
+            if type is not None:
+                if type != self.xtypecode:
+                    raise SalabimError('type does not match the type of the monitors in the merge list')
+            self.off = merge[0].off
+            if self.xtypecode:
+                self._x = array.array(self.xtypecode)
+            else:
+                self._x = []
+
+            curx = [self.off] * len(merge)
+            self._t = array.array('d')
+            for t, index, x in heapq.merge(
+                *[zip(merge[index]._t, itertools.repeat(index), merge[index]._x) for index in range(len(merge))]):
+                if self.xtypecode:
+                    curx[index] = x
+                else:
+                    try:
+                        curx[index] = float(x)
+                    except:
+                        curx[index] = 0
+
+                sum = 0
+                for xi in curx:
+                    if xi is self.off:
+                        sum = self.off
+                        break
+                    sum += xi
+
+                if self._t and (t == self._t[-1]):
+                    self._x[-1] = sum
+                else:
+                    self._t.append(t)
+                    self._x.append(sum)
+            if not monitor:
+                self._t.append(self.env._now)
+                self._x.append(self.off)
+
         self.setup(*args, **kwargs)
 
     def setup(self):
@@ -1101,7 +1310,7 @@ class MonitorTimestamp(Monitor):
         '''
         return self._tally
 
-    def reset_monitors(self, monitor=omitted):
+    def reset_monitors(self, monitor=None):
         '''
         resets timestamped monitor
 
@@ -1118,7 +1327,7 @@ class MonitorTimestamp(Monitor):
         '''
         self.reset(monitor)
 
-    def reset(self, monitor=omitted):
+    def reset(self, monitor=None):
         '''
         resets timestamped monitor
 
@@ -1129,7 +1338,7 @@ class MonitorTimestamp(Monitor):
             if False, monitoring is disabled |n|
             if omitted, the monitor state remains unchanged
         '''
-        if monitor is not omitted:
+        if monitor is not None:
             self._monitor = monitor
         if self.xtypecode:
             self._x = array.array(self.xtypecode)
@@ -1142,8 +1351,9 @@ class MonitorTimestamp(Monitor):
             self._x.append(self.off)
         self._t = array.array('d')
         self._t.append(self.env._now)
+        MonitorTimestamp.cached_xduration = [(0, 0), (0, 0)]  # invalidate cache
 
-    def monitor(self, value=omitted):
+    def monitor(self, value=None):
         '''
         enables/disabled timestamped monitor
 
@@ -1159,7 +1369,7 @@ class MonitorTimestamp(Monitor):
         True, if monitoring enabled. False, if not : bool
         '''
 
-        if value is not omitted:
+        if value is not None:
             self._monitor = value
             if self._monitor:
                 self.tally(self._tally)
@@ -1192,7 +1402,7 @@ class MonitorTimestamp(Monitor):
             self._x.append(self.off)
             self._t.append(t)
 
-    def name(self, value=omitted):
+    def name(self, value=None):
         '''
         Parameters
         ----------
@@ -1208,7 +1418,7 @@ class MonitorTimestamp(Monitor):
         ----
         base_name and sequence_number are not affected if the name is changed
         '''
-        if value is not omitted:
+        if value is not None:
             self._name = value
         return self._name
 
@@ -1465,6 +1675,96 @@ class MonitorTimestamp(Monitor):
         '''
         return self.number_of_entries() - self.number_of_entries(ex0=True)
 
+    def animate(self, *args, **kwargs):
+        '''
+        animates the timestamed monitor in a panel
+
+        Parameters
+        ----------
+        linecolor : colorspec
+            color of the line or points (default foreground color)
+
+        linewidth : int
+            width of the line or points (default 1 for line, 3 for points)
+
+        fillcolor : colorspec
+            color of the panel (default transparent)
+
+        bordercolor : colorspec
+            color of the border (default foreground color)
+
+        borderlinewidth : int
+            width of the line around the panel (default 1)
+
+        nowcolor : colorspec
+            color of the line indicating now (default red)
+
+        titlecolor : colorspec
+            color of the title (default foreground color)
+
+        titlefont : font
+            font of the title (default '')
+
+        titlefontsize : int
+            size of the font of the title (default 15)
+
+        as_points : bool
+            if False (default), lines will be drawn between the points |n|
+            if True,  only the points will be shown
+
+        title : str
+            title to be shown above panel |n|
+            default: name of the monitor
+
+        x : int
+            x-coordinate of panel, relative to xy_anchor, default 0
+
+        y : int
+            y-coordinate of panel, relative to xy_anchor. default 0
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        vertical_offset : float
+            the vertical position of x within the panel is
+             vertical_offset + x * vertical_scale (default 0)
+
+        vertical_scale : float
+            the vertical position of x within the panel is
+            vertical_offset + x * vertical_scale (default 5)
+
+        horizontal_scale : float
+            for timescaled monitors the relative horizontal position of time t within the panel is on
+            t * horizontal_scale, possibly shifted (default 1)|n|
+            for non timescaled monitors, the relative horizontal position of index i within the panel is on
+            i * horizontal_scale, possibly shifted (default 5)|n|
+
+        width : int
+            width of the panel (default 200)
+
+        height : int
+            height of the panel (default 75)
+
+        layer : int
+            layer (default 0)
+
+        Returns
+        -------
+        reference to AnimateMonitor object : AnimateMonitor
+
+        Note
+        ----
+        It is recommended to use sim.AnimateMonitor instead |n|
+
+        All measures are in screen coordinates |n|
+        '''
+
+        return AnimateMonitor(monitor=self, *args, **kwargs)
+
     def xduration(self, ex0=False, force_numeric=True):
         '''
         tuple of array with x-values and array with durations
@@ -1482,8 +1782,7 @@ class MonitorTimestamp(Monitor):
         -------
         array/list with x-values and array with durations : tuple
         '''
-
-        thishash = hash((tuple(self._x), tuple(self._t), force_numeric))
+        thishash = hash((self, len(self._x), force_numeric))
 
         if MonitorTimestamp.cached_xduration[ex0][0] == thishash:
             return MonitorTimestamp.cached_xduration[ex0][1]
@@ -1603,7 +1902,7 @@ class MonitorTimestamp(Monitor):
         '''
         return tuple(reversed(self.xt(ex0=ex0, exoff=exoff, force_numeric=force_numeric, add_now=add_now)))
 
-    def print_statistics(self, show_header=True, show_legend=True, do_indent=False):
+    def print_statistics(self, show_header=True, show_legend=True, do_indent=False, as_str=False):
         '''
         print timestamped monitor statistics
 
@@ -1617,12 +1916,20 @@ class MonitorTimestamp(Monitor):
 
         do_indent: bool
             primarily for internal use
+
+        as_str: bool
+            if False (default), print the statistics
+            if True, return a string containing the statistics
+
+        Returns
+        -------
+        statistics (if as_str is True) : str
         '''
 
-        Monitor.print_statistics(self, show_header, show_legend, do_indent)
+        return Monitor.print_statistics(self, show_header, show_legend, do_indent, as_str=as_str)
 
-    def print_histograms(self, number_of_bins=omitted,
-      lowerbound=omitted, bin_width=omitted, values=False, ex0=False):
+    def print_histograms(self, number_of_bins=None,
+      lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False):
         '''
         print timedstamped monitor statistics and histogram
 
@@ -1649,15 +1956,25 @@ class MonitorTimestamp(Monitor):
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
 
+
+        as_str: bool
+            if False (default), print the histogram
+            if True, return a string containing the histogram
+
+        Returns
+        -------
+        histogram (if as_str is True) : str
+
         Note
         ----
         If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
         with a maximum of 30 classes. |n|
         Exactly same functionality as MonitorTimestamped.print_histogram()
         '''
-        self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0)
+        return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str)
 
-    def print_histogram(self, number_of_bins=omitted, lowerbound=omitted, bin_width=omitted, values=False, ex0=False):
+    def print_histogram(
+        self, number_of_bins=None, lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False):
         '''
         print timestamped monitor statistics and histogram
 
@@ -1684,12 +2001,166 @@ class MonitorTimestamp(Monitor):
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
 
+        as_str: bool
+            if False (default), print the histogram
+            if True, return a string containing the histogram
+
+        Returns
+        -------
+        histogram (if as_str is True) : str
+
         Note
         ----
         If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
         with a maximum of 30 classes.
         '''
-        Monitor.print_histogram(self, number_of_bins, lowerbound, bin_width, values, ex0)
+        return Monitor.print_histogram(self, number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str)
+
+
+class AnimateMonitor(object):
+    '''
+    animates a (timestamped) monitor in a panel
+
+    Parameters
+    ----------
+    linecolor : colorspec
+        color of the line or points (default foreground color)
+
+    linewidth : int
+        width of the line or points (default 1 for line, 3 for points)
+
+    fillcolor : colorspec
+        color of the panel (default transparent)
+
+    bordercolor : colorspec
+        color of the border (default foreground color)
+
+    borderlinewidth : int
+        width of the line around the panel (default 1)
+
+    nowcolor : colorspec
+        color of the line indicating now (default red)
+
+    titlecolor : colorspec
+        color of the title (default foreground color)
+
+    titlefont : font
+        font of the title (default '')
+
+    titlefontsize : int
+        size of the font of the title (default 15)
+
+    as_points : bool
+        if False (default for timestamped monitors), lines will be drawn between the points |n|
+        if True (default for non timestamped monitors),  only the points will be shown
+
+    as_level : bool
+        if True (default for lines), the timestamped monitor is considered to be a level
+        if False (default for points), just the tallied values will be shown, and connected (for lines)
+
+    title : str
+        title to be shown above panel |n|
+        default: name of the monitor
+
+    x : int
+        x-coordinate of panel, relative to xy_anchor, default 0
+
+    y : int
+        y-coordinate of panel, relative to xy_anchor. default 0
+
+    xy_anchor : str
+        specifies where x and y are relative to |n|
+        possible values are (default: sw): |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
+
+    vertical_offset : float
+        the vertical position of x within the panel is
+         vertical_offset + x * vertical_scale (default 0)
+
+    vertical_scale : float
+        the vertical position of x within the panel is
+        vertical_offset + x * vertical_scale (default 5)
+
+    horizontal_scale : float
+        for timescaled monitors the relative horizontal position of time t within the panel is on
+        t * horizontal_scale, possibly shifted (default 1)|n|
+        for non timescaled monitors, the relative horizontal position of index i within the panel is on
+        i * horizontal_scale, possibly shifted (default 5)|n|
+
+    width : int
+        width of the panel (default 200)
+
+    height : int
+        height of the panel (default 75)
+
+    layer : int
+        layer (default 0)
+
+    Note
+    ----
+    All measures are in screen coordinates |n|
+    '''
+
+    def __init__(self, monitor, linecolor='fg', linewidth=None, fillcolor='', bordercolor='fg', borderlinewidth=1,
+        titlecolor='fg', nowcolor='red',
+        titlefont='', titlefontsize=15,
+        as_points=None, as_level=None, title=None, x=0, y=0, vertical_offset=2,
+        vertical_scale=5, horizontal_scale=None, width=200, height=75, xy_anchor='sw', layer=0):
+
+        _checkismonitor(monitor)
+
+        if title is None:
+            title = monitor.name()
+
+        if as_points is None:
+            as_points = not monitor._timestamp
+
+        if as_level is None:
+            as_level = not as_points
+
+        if linewidth is None:
+            linewidth = 3 if as_points else 1
+
+        if horizontal_scale is None:
+            horizontal_scale = 1 if monitor._timestamp else 5
+
+        xll = x + monitor.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True)
+        yll = y + monitor.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True)
+
+        self.aos = []
+        self.aos.append(AnimateRectangle(spec=(0, 0, width, height), offsetx=xll, offsety=yll,
+            fillcolor=fillcolor, linewidth=borderlinewidth, linecolor=bordercolor,
+            screen_coordinates=True, layer=layer))
+        self.aos.append(AnimateText(text=title, textcolor=titlecolor,
+            offsetx=xll, offsety=yll + height + titlefontsize * 0.15, text_anchor='sw',
+            screen_coordinates=True, fontsize=titlefontsize, font=titlefont, layer=layer))
+        if monitor._timestamp:
+            self.aos.append(_Animate_t_Line(line0=(), linecolor0=nowcolor,
+                monitor=self, width=width, height=height, t_scale=horizontal_scale,
+                layer=layer, offsetx0=xll, offsety0=yll,
+                screen_coordinates=True))
+            self.aos.append(_Animate_t_x_Line(monitor=monitor, linecolor0=linecolor, line0=(),
+                linewidth0=linewidth,
+                screen_coordinates=True, offsetx0=xll, offsety0=yll,
+                width=width, height=height, value_offsety=vertical_offset, value_scale=vertical_scale,
+                as_points=as_points, as_level=as_level,
+                linewidth=linewidth, t_scale=horizontal_scale, layer=layer))
+        else:
+            self.aos.append(_Animate_index_x_Line(monitor=monitor, line0=(), linecolor0=linecolor,
+                linewidth0=linewidth,
+                screen_coordinates=True, xll=xll, yll=yll,
+                as_points=as_points,
+                width=width, height=height, value_offsety=vertical_offset, value_scale=vertical_scale,
+                index_scale=horizontal_scale, layer=layer, linewidth=linewidth))
+
+    def remove(self):
+        '''
+        removes the animate object and thus closes this animation
+        '''
+        for ao in self.aos:
+            ao.remove()
 
 
 if Pythonista:
@@ -1760,6 +2231,7 @@ if Pythonista:
                     (env._width, env._height), env.colorspec_to_tuple('bg'))
 
                 env.animation_pre_tick(env.t)
+                env.animation_pre_tick_sys(env.t)
                 for ao in env.an_objects:
                     ao.make_pil_image(env.t)
                     if ao._image_visible:
@@ -1878,8 +2350,6 @@ class Qmember():
             if not q._isinternal:
                 q.env.print_trace('', '', c.name(), 'enter ' + q.name())
         q.length.tally(q._length)
-        if q._animate_on:
-            q._animate_update()
 
 
 class Queue(object):
@@ -1910,8 +2380,8 @@ class Queue(object):
         if omitted, default_env will be used
     '''
 
-    def __init__(self, name=omitted, monitor=True, fill=omitted, env=omitted, *args, **kwargs):
-        if env is omitted:
+    def __init__(self, name=None, monitor=True, fill=None, env=None, *args, **kwargs):
+        if env is None:
             self.env = g.default_env
         else:
             self.env = env
@@ -1930,12 +2400,11 @@ class Queue(object):
         self._iter_sequence = 0
         self._iter_touched = {}
         self._isinternal = False
-        self._animate_on = False
         self.length = MonitorTimestamp(
             'Length of ' + self.name(), initial_tally=0, monitor=monitor, type='uint32', env=self.env)
         self.length_of_stay = Monitor(
             'Length of stay in ' + self.name(), monitor=monitor, type='float')
-        if fill is not omitted:
+        if fill is not None:
             savetrace = self.env._trace
             self.env._trace = False
             for c in fill:
@@ -1955,83 +2424,69 @@ class Queue(object):
         '''
         pass
 
-    def _animate_update(self):
-        if self._animate_reverse:
-            q = reversed(self)
-        else:
-            q = self
-        x = self._animate_x
-        y = self._animate_y
-        for c in q:
-            if self not in c._aos:
-                c._aos[self] = c.animation_objects(self)
-                if isinstance(c._aos[self], (tuple, list)):
-                    if len(c._aos[self]) <= 1:
-                        raise SalabimError('at least 2 elements (sizex, sizey) required')
-                    for i, el in enumerate(c._aos[self]):
-                        if i == 0:
-                            try:
-                                float(el)
-                            except ValueError:
-                                raise SalabimError('element #0 (sizex) of tuple/list not numeric')
-                        elif i == 1:
-                            try:
-                                float(el)
-                            except ValueError:
-                                raise SalabimError('element #1 (sizey) of tuple/list not numeric')
-                        else:
-                            if not isinstance(el, Animate):
-                                raise SalabimError('element #{} of tuple/list is not Animate type'.format(i))
-                else:
-                    raise SalabimError('animation_objects should return list or tuple')
-
-            for ao in c._aos[self][2:]:
-                ao.x0 = x
-                ao.y0 = y
-            x += self._displacement_x * c._aos[self][0]
-            y += self._displacement_y * c._aos[self][1]
-
-    def animate(self, x=500, y=100, direction='w', on=True, reverse=False):
+    def animate(self, *args, **kwargs):
         '''
-        turns on/off animation for the queue
+        Animates the components in the queue.
 
         Parameters
         ----------
         x : float
             x-position of the first component in the queue |n|
-            default: 500
+            default: 50
 
         y : float
             y-position of the first component in the queue |n|
-            default: 100
+            default: 50
 
         direction : str
-            if 'w', waiting line runs westwards (i.e. from right to left) (default) |n|
+            if 'w', waiting line runs westwards (i.e. from right to left) |n|
             if 'n', waiting line runs northeards (i.e. from bottom to top) |n|
-            if 'e', waiting line runs eastwards (i.e. from left to right) |n|
+            if 'e', waiting line runs eastwards (i.e. from left to right) (default) |n|
             if 's', waiting line runs southwards (i.e. from top to bottom)
-
-        on : bool
-            if True (default) do animate the queue. If False, do not animate.
 
         reverse : bool
             if False (default), display in normal order. If True, reversed.
+
+        max_length : int
+            maximum number of components to be displayed
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        id : any
+            the animation works by calling the animation_objects method of each component, optionally
+            with id. By default, this is self, but can be overriden, particularly with the queue
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        Returns
+        -------
+        reference to AnimationQueue object : AnimationQueue
+
+        Note
+        ----
+        It is recommended to use sim.AnimateQueue instead |n|
+
+        All measures are in screen coordinates |n|
+
+        All parameters, apart from queue and arg can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: title |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+
         '''
+        return AnimateQueue(self, *args, **kwargs)
 
-        self._animate_on = on
-        if on:
-            self._animate_x = x
-            self._animate_y = y
-            self._displacement_x, self._displacement_y = \
-                {'w': (-1, 0), 'n': (0, 1), 'e': (1, 0), 's': (0, -1)}[direction.lower()]
-
-            self._animate_reverse = reverse
-            self._animate_update()
-        else:
-            for c in self:
-                c._remove_from_aos(self)
-
-    def reset_monitors(self, monitor=omitted):
+    def reset_monitors(self, monitor=None):
         '''
         resets queue monitor length_of_stay and timestamped monitor length
 
@@ -2114,36 +2569,60 @@ class Queue(object):
     def __repr__(self):
         return objectclass_to_str(self) + '(' + self.name() + ')'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the queue
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print(objectclass_to_str(self) + ' ' + hex(id(self)))
-        print('  name=' + self.name())
+        result = []
+        result.append(objectclass_to_str(self) + ' ' + hex(id(self)))
+        result.append('  name=' + self.name())
         if self._length:
-            print('  component(s):')
+            result.append('  component(s):')
             mx = self._head.successor
             while mx != self._tail:
-                print('    ' + pad(mx.component.name(), 20) +
+                result.append('    ' + pad(mx.component.name(), 20) +
                     ' enter_time' + time_to_string(mx.enter_time - self.env._offset) +
                     ' priority=' + str(mx.priority))
                 mx = mx.successor
         else:
-            print('  no components')
+            result.append('  no components')
+        return return_or_print(result, as_str)
 
-    def print_statistics(self):
+    def print_statistics(self, as_str=False):
         '''
         prints a summary of statistics of a queue
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the statistics
+            if True, return a string containing the statistics
+
+        Returns
+        -------
+        statistics (if as_str is True) : str
         '''
-        print('Statistics of {} at {}'.format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
-        self.length.print_statistics(
-            show_header=False, show_legend=True, do_indent=True)
+        result = []
+        result.append('Statistics of {} at {}'.format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
+        result.append(self.length.print_statistics(
+            show_header=False, show_legend=True, do_indent=True, as_str=True))
 
-        print()
-        self.length_of_stay.print_statistics(
-            show_header=False, show_legend=False, do_indent=True)
+        result.append('')
+        result.append(self.length_of_stay.print_statistics(
+            show_header=False, show_legend=False, do_indent=True, as_str=True))
+        return return_or_print(result, as_str)
 
-    def print_histograms(self, exclude=()):
+    def print_histograms(self, exclude=(), as_str=False):
         '''
         prints the histograms of the length timestamped and length_of_stay monitor of the queue
 
@@ -2152,12 +2631,22 @@ class Queue(object):
         exclude : tuple or list
             specifies which monitors to exclude |n|
             default: () |n|
+
+        as_str: bool
+            if False (default), print the histograms
+            if True, return a string containing the histograms
+
+        Returns
+        -------
+        histograms (if as_str is True) : str
         '''
+        result = []
         for m in (self.length, self.length_of_stay):
             if m not in exclude:
-                m.print_histogram()
+                result.append(m.print_histogram(as_str=True))
+        return return_or_print(result, as_str)
 
-    def name(self, value=omitted):
+    def name(self, value=None):
         '''
         Parameters
         ----------
@@ -2171,10 +2660,13 @@ class Queue(object):
 
         Note
         ----
-        base_name and sequence_number are not affected if the name is changed
+        base_name and sequence_number are not affected if the name is changed |n|
+        All derived named are updated as well.
         '''
-        if value is not omitted:
+        if value is not None:
             self._name = value
+            self.length.name('Length of ' + self.name())
+            self.length_of_stay.name('Length of stay of ' + self.name())
         return self._name
 
     def base_name(self):
@@ -2338,17 +2830,16 @@ class Queue(object):
             component to be added to the queue |n|
             may not be member of the queue yet
 
-        priority : float
-            priority of the component |n|
+        priority: type that can be compared with other priorities in the queue
+            priority in the queue
 
         Note
         ----
-        component will be placed just after the last component with
-        a priority <= priority
+        The component is placed just before the first component with a priority > given priority
         '''
         component.enter_sorted(self, priority)
 
-    def remove(self, component=omitted):
+    def remove(self, component=None):
         '''
         removes component from the queue
 
@@ -2362,7 +2853,7 @@ class Queue(object):
         ----
         component must be member of the queue
         '''
-        if component is omitted:
+        if component is None:
             self.clear()
         else:
             component.leave(self)
@@ -2391,7 +2882,7 @@ class Queue(object):
         '''
         return self._tail.predecessor.component
 
-    def pop(self, index=omitted):
+    def pop(self, index=None):
         '''
         removes a component by its position (or head)
 
@@ -2406,7 +2897,7 @@ class Queue(object):
         The i-th component or head : Component
             None if not existing
         '''
-        if index is omitted:
+        if index is None:
             c = self._head.successor.component
         else:
             c = self[index]
@@ -2669,7 +3160,7 @@ class Queue(object):
     def as_list(self):
         return [c for c in self]
 
-    def union(self, q, name=omitted, monitor=False):
+    def union(self, q, name=None, monitor=False):
         '''
         Parameters
         ----------
@@ -2700,7 +3191,7 @@ class Queue(object):
         '''
         save_trace = self.env._trace
         self.env._trace = False
-        if name is omitted:
+        if name is None:
             name = self.name() + ' | ' + q.name()
         q1 = type(self)(name=name, monitor=monitor, env=self.env)
         self_set = self.as_set()
@@ -2719,7 +3210,7 @@ class Queue(object):
         self.env._trace = save_trace
         return q1
 
-    def intersection(self, q, name=omitted, monitor=False):
+    def intersection(self, q, name=None, monitor=False):
         '''
         returns the intersect of two queues
 
@@ -2750,7 +3241,7 @@ class Queue(object):
         '''
         save_trace = self.env._trace
         self.env._trace = False
-        if name is omitted:
+        if name is None:
             name = self.name() + ' & ' + q.name()
         q1 = type(self)(name=name, monitor=monitor, env=self.env)
         q_set = q.as_set()
@@ -2762,7 +3253,7 @@ class Queue(object):
         self.env._trace = save_trace
         return q1
 
-    def difference(self, q, name=omitted, monitor=monitor):
+    def difference(self, q, name=None, monitor=monitor):
         '''
         returns the difference of two queues
 
@@ -2789,7 +3280,7 @@ class Queue(object):
         Also, the order will be maintained. |n|
         Alternatively, the more pythonic - operator is also supported, e.g. q1 - q2
         '''
-        if name is omitted:
+        if name is None:
             name = self.name() + ' - ' + q.name()
         save_trace = self.env._trace
         self.env._trace = False
@@ -2804,7 +3295,7 @@ class Queue(object):
         self.env._trace = save_trace
         return q1
 
-    def symmetric_difference(self, q, name=omitted, monitor=monitor):
+    def symmetric_difference(self, q, name=None, monitor=monitor):
         '''
         returns the symmetric difference of two queues
 
@@ -2831,7 +3322,7 @@ class Queue(object):
         Order: First, elelements in self (in that order), then elements in q (in that order)
         Alternatively, the more pythonic ^ operator is also supported, e.g. q1 ^ q2
         '''
-        if name is omitted:
+        if name is None:
             name = self.name() + ' ^ ' + q.name()
         save_trace = self.env._trace
         self.env._trace = False
@@ -2854,7 +3345,7 @@ class Queue(object):
         self.env._trace = save_trace
         return q1
 
-    def copy(self, name=omitted, monitor=monitor):
+    def copy(self, name=None, monitor=monitor):
         '''
         returns a copy of two queues
 
@@ -2879,7 +3370,7 @@ class Queue(object):
         '''
         save_trace = self.env._trace
         self.env._trace = False
-        if name is omitted:
+        if name is None:
             name = 'copy of ' + self.name()
         q1 = type(self)(name=name, env=self.env)
         mx = self._head.successor
@@ -2889,7 +3380,7 @@ class Queue(object):
         self.env._trace = save_trace
         return q1
 
-    def move(self, name=omitted, monitor=monitor):
+    def move(self, name=None, monitor=monitor):
         '''
         makes a copy of a queue and empties the original
 
@@ -2945,10 +3436,10 @@ class Environment(object):
 
     random_seed : hashable object, usually int
         the seed for random, equivalent to random.seed() |n|
-        if None, a purely random value (based on the current time) will be used
+        if '*', a purely random value (based on the current time) will be used
         (not reproducable) |n|
         if the null string (''), no action on random is taken |n|
-        if omitted, 1234567 will be used.
+        if None (the default), 1234567 will be used.
 
     name : str
         name of the environment |n|
@@ -2975,23 +3466,25 @@ class Environment(object):
     The seed may be later set with random_seed() |n|
     Initially, the random stream will be seeded with the value 1234567.
     If required to be purely, not not reproducable, values, use
-    random_seed=None.
+    random_seed='*'.
     '''
     _nameserialize = {}
     cached_modelname_width = [None, None]
 
-    def __init__(self, trace=False, random_seed=omitted, name=omitted,
+    def __init__(self, trace=False, random_seed=None, name=None,
       print_trace_header=True, isdefault_env=True, *args, **kwargs):
         if isdefault_env:
             g.default_env = self
-        if name is omitted:
+        if name is None:
             if isdefault_env:
                 name = 'default environment'
         self._trace = trace
         self._source_files = {inspect.getframeinfo(_get_caller_frame()).filename: 0}
         if random_seed != '':
-            if random_seed is omitted:
+            if random_seed is None:
                 random_seed = 1234567
+            elif random_seed == '*':
+                random_seed = None
             random.seed(random_seed)
         _set_name(name, Environment._nameserialize, self)
         self._buffered_trace = False
@@ -3024,6 +3517,7 @@ class Environment(object):
 
         self.an_objects = []
         self.ui_objects = []
+        self.sys_objects = []
         self.serial = 0
         self._speed = 1
         self._animate = False
@@ -3101,15 +3595,31 @@ class Environment(object):
         '''
         return
 
-    def print_info(self):
+    def animation_pre_tick_sys(self, t):
+        for ao in self.sys_objects:
+            ao.update(t)
+
+    def print_info(self, as_str=False):
         '''
         prints information about the environment
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print(objectclass_to_str(self) + ' ' + hex(id(self)))
-        print('  name=' + self.name())
-        print('  now=' + time_to_string(self._now - self._offset))
-        print('  current_component=' + self._current_component.name())
-        print('  trace=' + str(self._trace))
+        result = []
+        result.append(objectclass_to_str(self) + ' ' + hex(id(self)))
+        result.append('  name=' + self.name())
+        result.append('  now=' + time_to_string(self._now - self._offset))
+        result.append('  current_component=' + self._current_component.name())
+        result.append('  trace=' + str(self._trace))
+        return return_or_print(result, as_str)
 
     def step(self):
         '''
@@ -3198,11 +3708,11 @@ class Environment(object):
             print('{:10.3f} {}'.format(t, comp.name()))
 
     def animation_parameters(self,
-      animate=True, synced=omitted, speed=omitted, width=omitted, height=omitted,
-      x0=omitted, y0=omitted, x1=omitted, background_color=omitted, foreground_color=omitted,
-      fps=omitted, modelname=omitted, use_toplevel=omitted,
-      show_fps=omitted, show_time=omitted,
-      video=omitted, video_repeat=omitted, video_pingpong=omitted):
+      animate=True, synced=None, speed=None, width=None, height=None,
+      x0=None, y0=None, x1=None, background_color=None, foreground_color=None,
+      fps=None, modelname=None, use_toplevel=None,
+      show_fps=None, show_time=None,
+      video=None, video_repeat=None, video_pingpong=None):
         '''
         set animation parameters
 
@@ -3307,71 +3817,71 @@ class Environment(object):
         width_changed = False
         height_changed = False
         fps_changed = False
-        if speed is not omitted:
+        if speed is not None:
             self._speed = speed
             self.set_start_animation()
 
-        if show_fps is not omitted:
+        if show_fps is not None:
             if show_fps != show_fps:
                 self._show_fps = show_fps
 
-        if show_time is not omitted:
+        if show_time is not None:
             self._show_time = show_time
 
-        if synced is not omitted:
+        if synced is not None:
             self._synced = synced
             self.set_start_animation()
 
-        if width is not omitted:
+        if width is not None:
             if self._width != width:
                 self._width = width
                 frame_changed = True
                 width_changed = True
 
-        if height is not omitted:
+        if height is not None:
             if self._height != height:
                 self._height = height
                 frame_changed = True
                 height_changed = True
 
-        if fps is not omitted:
+        if fps is not None:
             if self._fps != fps:
                 self._fps = fps
                 fps_changed = True
 
-        if x0 is not omitted:
+        if x0 is not None:
             if self._x0 != x0:
                 self._x0 = x0
                 self.uninstall_uios()
 
-        if x1 is not omitted:
+        if x1 is not None:
             if self._x1 != x1:
                 self._x1 = x1
                 self.uninstall_uios()
 
-        if y0 is not omitted:
+        if y0 is not None:
             if self._y0 != y0:
                 self._y0 = y0
                 self.uninstall_uios()
 
-        if background_color is not omitted:
+        if background_color is not None:
             if background_color in ('fg', 'bg'):
                 raise SalabimError(background_color + 'not allowed for background_color')
             if self._background_color != background_color:
                 self._background_color = background_color
                 frame_changed = True
-            if foreground_color is omitted:
+            if foreground_color is None:
                 self._foreground_color = 'white' if self.is_dark('bg') else 'black'
 
-        if foreground_color is not omitted:
+        if foreground_color is not None:
             if foreground_color in ('fg', 'bg'):
                 raise SalabimError(foreground_color + 'not allowed for foreground_color')
             self._foreground_color = foreground_color
 
-        if modelname is not omitted:
+        if modelname is not None:
             self._modelname = modelname
 
-        if use_toplevel is not omitted:
+        if use_toplevel is not None:
             self.use_toplevel = use_toplevel
 
         if animate is None:
@@ -3391,14 +3901,14 @@ class Environment(object):
             else:
                 frame_changed = False  # no animation required, so leave running animation_env untouched
 
-        if video_repeat is not omitted:
+        if video_repeat is not None:
             self._video_repeat = video_repeat
 
-        if video_pingpong is not omitted:
+        if video_pingpong is not None:
             self._video_pingpong = video_pingpong
 
         video_opened = False
-        if video is not omitted:
+        if video is not None:
             if video != self._video:
                 if self._video:
                     self.video_close()
@@ -3498,7 +4008,7 @@ class Environment(object):
         for uio in self.ui_objects:
             uio.installed = False
 
-    def x0(self, value=omitted):
+    def x0(self, value=None):
         '''
         x coordinate of lower left corner of animation
 
@@ -3511,11 +4021,11 @@ class Environment(object):
         -------
         x coordinate of lower left corner of animation : float
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(x0=value, animate=None)
         return self._x0
 
-    def x1(self, value=omitted):
+    def x1(self, value=None):
         '''
         x coordinate of upper right corner of animation : float
 
@@ -3529,11 +4039,11 @@ class Environment(object):
         -------
         x coordinate of upper right corner of animation : float
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(x1=value, animate=None)
         return self._x1
 
-    def y0(self, value=omitted):
+    def y0(self, value=None):
         '''
         y coordinate of lower left corner of animation
 
@@ -3547,7 +4057,7 @@ class Environment(object):
         -------
         y coordinate of lower left corner of animation : float
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(y0=value, animate=None)
         return self._y0
 
@@ -3579,7 +4089,7 @@ class Environment(object):
         '''
         return self._scale
 
-    def width(self, value=omitted):
+    def width(self, value=None):
         '''
         width of the animation in screen coordinates
 
@@ -3594,11 +4104,11 @@ class Environment(object):
         -------
         width of animation : int
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(width=value, animate=None)
         return self._width
 
-    def height(self, value=omitted):
+    def height(self, value=None):
         '''
         height of the animation in screen coordinates
 
@@ -3612,11 +4122,11 @@ class Environment(object):
         -------
         height of animation : int
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(height=value, animate=None)
         return self._height
 
-    def background_color(self, value=omitted):
+    def background_color(self, value=None):
         '''
         background_color of the animation
 
@@ -3630,11 +4140,11 @@ class Environment(object):
         -------
         background_color of animation : colorspec
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(background_color=value, animate=None)
         return self._background_color
 
-    def foreground_color(self, value=omitted):
+    def foreground_color(self, value=None):
         '''
         foreground_color of the animation
 
@@ -3648,11 +4158,11 @@ class Environment(object):
         -------
         foreground_color of animation : colorspec
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(foreground_color=value, animate=None)
         return self._foreground_color
 
-    def animate(self, value=omitted):
+    def animate(self, value=None):
         '''
         animate indicator
 
@@ -3670,11 +4180,11 @@ class Environment(object):
         ----
         When the run is not issued, no acction will be taken.
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(animate=value)
         return self._animate
 
-    def modelname(self, value=omitted):
+    def modelname(self, value=None):
         '''
         modelname
 
@@ -3692,11 +4202,11 @@ class Environment(object):
         ----
         If modelname is the null string, nothing will be displayed.
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(modelname=value, animate=None)
         return self._modelname
 
-    def video(self, value=omitted):
+    def video(self, value=None):
         '''
         video name
 
@@ -3715,11 +4225,11 @@ class Environment(object):
         ----
         If video is the null string, the video (if any) will be closed.
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(video=value, animate=None)
         return self._video
 
-    def video_repeat(self, value=omitted):
+    def video_repeat(self, value=None):
         '''
         video repeat
 
@@ -3737,11 +4247,11 @@ class Environment(object):
         ----
         Applies only to gif animation.
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(video_repeat=value, animate=None)
         return self._video_repeat
 
-    def video_pingpong(self, value=omitted):
+    def video_pingpong(self, value=None):
         '''
         video pingponf
 
@@ -3759,11 +4269,11 @@ class Environment(object):
         ----
         Applies only to gif animation.
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(video_pingpong=value, animate=None)
         return self._video_pingpong
 
-    def fps(self, value=omitted):
+    def fps(self, value=None):
         '''
         fps
 
@@ -3777,11 +4287,11 @@ class Environment(object):
         -------
         fps : bool
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(fps=value, animate=None)
         return self._fps
 
-    def show_time(self, value=omitted):
+    def show_time(self, value=None):
         '''
         show_time
 
@@ -3795,11 +4305,11 @@ class Environment(object):
         -------
         show_time : bool
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(show_time=value, animate=None)
         return self._show_time
 
-    def show_fps(self, value=omitted):
+    def show_fps(self, value=None):
         '''
         show_fps
 
@@ -3813,11 +4323,11 @@ class Environment(object):
         -------
         show_fps : bool
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(show_fps=value, animate=None)
         return self._show_fps
 
-    def synced(self, value=omitted):
+    def synced(self, value=None):
         '''
         synced
 
@@ -3831,11 +4341,11 @@ class Environment(object):
         -------
         synced : bool
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(synced=value, animate=None)
         return self._synced
 
-    def speed(self, value=omitted):
+    def speed(self, value=None):
         '''
         speed
 
@@ -3849,7 +4359,7 @@ class Environment(object):
         -------
         speed : float
         '''
-        if value is not omitted:
+        if value is not None:
             self.animation_parameters(speed=value, animate=None)
         return self._speed
 
@@ -3890,7 +4400,7 @@ class Environment(object):
         Parameters
         ----------
         new_now : float
-            now will be set not new_now |n|
+            now will be set to new_now |n|
             default: 0
 
         Note
@@ -3910,7 +4420,7 @@ class Environment(object):
                 '', '', 'now reset to {:0.3f}'.format(new_now),
                 '(all times are reduced by {:0.3f})'.format(self._offset - offset_before))
 
-    def trace(self, value=omitted):
+    def trace(self, value=None):
         '''
         trace status
 
@@ -3931,12 +4441,12 @@ class Environment(object):
 
             ``if env.trace():``
         '''
-        if value is not omitted:
+        if value is not None:
             self._trace = value
             self._buffered_trace = False
         return self._trace
 
-    def suppress_trace_standby(self, value=omitted):
+    def suppress_trace_standby(self, value=None):
         '''
         suppress_trace_standby status
 
@@ -3956,7 +4466,7 @@ class Environment(object):
         (apart from when they become non standby) suppressed from the trace. |n|
         If you set suppress_trace_standby to False, standby components are fully traced.
         '''
-        if value is not omitted:
+        if value is not None:
             self._suppress_trace_standby = value
             self._buffered_trace = False
         return self._suppress_trace_standby
@@ -3969,7 +4479,7 @@ class Environment(object):
         '''
         return self._current_component
 
-    def run(self, duration=omitted, till=omitted, urgent=False):
+    def run(self, duration=None, till=None, urgent=False):
         '''
         start execution of the simulation
 
@@ -3996,8 +4506,8 @@ class Environment(object):
         ----
         only issue run() from the main level
         '''
-        if till is omitted:
-            if duration is omitted:
+        if till is None:
+            if duration is None:
                 scheduled_time = inf
             else:
                 if duration == inf:
@@ -4005,7 +4515,7 @@ class Environment(object):
                 else:
                     scheduled_time = self.env._now + duration
         else:
-            if duration is omitted:
+            if duration is None:
                 scheduled_time = till + self.env._offset
             else:
                 raise SalabimError('both duration and till specified')
@@ -4080,6 +4590,7 @@ class Environment(object):
             canvas_objects_iter = iter(g.canvas_objects[:])
             co = next(canvas_objects_iter, None)
             self.animation_pre_tick(self.t)
+            self.animation_pre_tick_sys(self.t)
             for ao in self.an_objects:
                 ao.make_pil_image(self.t)
 
@@ -4154,7 +4665,7 @@ class Environment(object):
                         time.sleep(((1 / self._fps) - tick_duration) * 0.8)
                         # 0.8 compensation because of clock inaccuracy
 
-    def snaphot(self, filename):
+    def snapshot(self, filename):
         '''
         Takes a snapshot of the current animated frame (at time = now()) and saves it to a file
 
@@ -4182,6 +4693,8 @@ class Environment(object):
             mode, (self._width, self._height), self.colorspec_to_tuple('bg'))
         self.an_objects.sort(
             key=lambda obj: (-obj.layer(self.t), obj.sequence))
+        self.animation_pre_tick(self._now)
+        self.animation_pre_tick_sys(self._now)
         for ao in self.an_objects:
             ao.make_pil_image(self._now)
             if ao._image_visible:
@@ -4193,7 +4706,7 @@ class Environment(object):
     def modelname_width(self):
         if Environment.cached_modelname_width[0] != self._modelname:
             Environment.cached_modelname_width = \
-                [self._modelname, self.env.getwidth(self._modelname + ' : a ', fontsize=18)]
+                [self._modelname, self.env.getwidth(self._modelname + ' : a ', font='', fontsize=18)]
         return Environment.cached_modelname_width[1]
 
     def modelname_text(self, t):
@@ -4225,8 +4738,8 @@ class Environment(object):
              screen_coordinates=True, xy_anchor='nw', env=self)
         an.visible = self.modelname_visible
         an.text = self.modelname_text
-        an = Animate(image=None,
-             y0=y, offsety0=5,
+        an = Animate(image='',
+             y0=y + 1, offsety0=5,
              anchor='w', width0=61,
              screen_coordinates=True, xy_anchor='nw', env=self)
         an.visible = self.modelname_visible
@@ -4541,6 +5054,8 @@ class Environment(object):
         -------
         (r, g, b, a)
         '''
+        if colorspec is None:
+            colorspec = ''
         if colorspec == 'fg':
             colorspec = self.colorspec_to_tuple(self._foreground_color)
         elif colorspec == 'bg':
@@ -4654,7 +5169,7 @@ class Environment(object):
         else:
             return True
 
-    def getwidth(self, text, font='', fontsize=20, screen_coordinates=False):
+    def getwidth(self, text, font, fontsize, screen_coordinates=False):
         if not screen_coordinates:
             fontsize = fontsize * self._scale
         f, heightA = getfont(font, fontsize)
@@ -4667,13 +5182,23 @@ class Environment(object):
         else:
             return thiswidth / self._scale
 
-    def getfontsize_to_fit(self, text, width, font='', screen_coordinates=False):
+    def getheight(self, font, fontsize, screen_coordinates=False):
+        if not screen_coordinates:
+            fontsize = fontsize * self._scale
+        f, heightA = getfont(font, fontsize)
+        thiswidth, thisheight = f.getsize('Ap')
+        if screen_coordinates:
+            return thisheight
+        else:
+            return thisheight / self._scale
+
+    def getfontsize_to_fit(self, text, width, font, screen_coordinates=False):
         if not screen_coordinates:
             width = width * self._scale
 
         lastwidth = 0
         for fontsize in range(1, 300):
-            f = self.getfont(font, fontsize)
+            f = getfont(font, fontsize)
             thiswidth, thisheight = f.getsize(text)
             if thiswidth > width:
                 break
@@ -4685,7 +5210,7 @@ class Environment(object):
         else:
             return fontsize / self._scale
 
-    def name(self, value=omitted):
+    def name(self, value=None):
         '''
         Parameters
         ----------
@@ -4701,7 +5226,7 @@ class Environment(object):
         ----
         base_name and sequence_number are not affected if the name is changed
         '''
-        if value is not omitted:
+        if value is not None:
             self._name = value
         return self._name
 
@@ -4766,7 +5291,7 @@ class Environment(object):
             self._print_legend(ref)
         return rpad(pre + str(lineno), 5)
 
-    def print_trace(self, s1='', s2='', s3='', s4='', s0=omitted, _optional=False):
+    def print_trace(self, s1='', s2='', s3='', s4='', s0=None, _optional=False):
         '''
         prints a trace line
 
@@ -4785,7 +5310,7 @@ class Environment(object):
             part 4
 
         s0 : str
-            part 0. If omitted, the line number from where the call was given will be used at
+            part 0. if omitted, the line number from where the call was given will be used at
             the start of the line. Otherwise s0, left padded to 7 characters will be used at
             the start of the line.
 
@@ -4800,7 +5325,7 @@ class Environment(object):
         '''
         if self._trace:
             if not (hasattr(self, '_current_component') and self._current_component._suppress_trace):
-                if s0 is omitted:
+                if s0 is None:
                     stack = inspect.stack()
                     filename0 = inspect.getframeinfo(stack[0][0]).filename
                     for i in range(len(inspect.stack())):
@@ -4915,8 +5440,15 @@ class Animate(object):
         the image to be displayed |n|
         This may be either a filename or a PIL image
 
-    text : str
-        the text to be displayed
+    text : str, tuple or list
+        the text to be displayed |n|
+        if text is str, the text may contain linefeeds, which are shown as individual lines
+
+    max_lines : int
+        the maximum of lines of text to be displayed |n|
+        if positive, it refers to the first max_lines lines |n|
+        if negative, it refers to the first -max_lines lines |n|
+        if zero (default), all lines will be displayed
 
     font : str or list/tuple
         font to be used for texts |n|
@@ -4932,11 +5464,17 @@ class Animate(object):
         ``w     c     e`` |n|
         ``sw    s    se``
 
+    as_points : bool
+         if False (default), lines in line, rectangle and polygon are drawn |n|
+         if True, only the end points are shown in line, rectangle and polygon
+
     linewidth0 : float
-        linewidth of the contour at time t0 (default 0 for polygon, rectangle and circle, 1 for line)
+        linewidth of the contour at time t0 (default 0 for polygon, rectangle and circle, 1 for line) |n|
+        if as_point is True, the default size is 3
 
     fillcolor0 : colorspec
-        color of interior at time t0 (default foreground_color)
+        color of interior at time t0 (default foreground_color) |n|
+        if as_points is True, fillcolor0 defaults to transparent
 
     linecolor0 : colorspec
         color of the contour at time t0 (default foreground_color)
@@ -5051,33 +5589,33 @@ class Animate(object):
     polygon0,polygon1                                     -
     rectangle0,rectangle1                                           -
     text                                                                      -
-    font
     anchor                            -                                       -
     linewidth0,linewidth1    -                  -         -         -
     fillcolor0,fillcolor1    -                            -         -
     linecolor0,linecolor1    -                  -         -         -
-    textcolor0,textcolor1.                                                    -
+    textcolor0,textcolor1                                                     -
     angle0,angle1                     -         -         -         -         -
+    as_points                                   -         -         -
     font                                                                      -
     fontsize0,fontsize1                                                       -
     width0,width1                     -
     ======================  ========= ========= ========= ========= ========= =========
     '''
 
-    def __init__(self, parent=omitted, layer=0, keep=True, visible=True,
+    def __init__(self, parent=None, layer=0, keep=True, visible=True,
                  screen_coordinates=False,
-                 t0=omitted, x0=0, y0=0, offsetx0=0, offsety0=0,
-                 circle0=omitted, line0=omitted, polygon0=omitted, rectangle0=omitted,
-                 image=omitted, text=omitted,
-                 font='', anchor='c',
-                 linewidth0=omitted, fillcolor0='fg', linecolor0='fg', textcolor0='fg',
-                 angle0=0, fontsize0=20, width0=omitted,
-                 t1=omitted, x1=omitted, y1=omitted, offsetx1=omitted, offsety1=omitted,
-                 circle1=omitted, line1=omitted, polygon1=omitted, rectangle1=omitted,
-                 linewidth1=omitted, fillcolor1=omitted, linecolor1=omitted, textcolor1=omitted,
-                 angle1=omitted, fontsize1=omitted, width1=omitted, xy_anchor='', env=omitted):
+                 t0=None, x0=0, y0=0, offsetx0=0, offsety0=0,
+                 circle0=None, line0=None, polygon0=None, rectangle0=None, points0=None,
+                 image=None, text=None,
+                 font='', anchor='c', as_points=False, max_lines=0, text_anchor=None,
+                 linewidth0=None, fillcolor0=None, linecolor0='fg', textcolor0='fg',
+                 angle0=0, fontsize0=20, width0=None,
+                 t1=None, x1=None, y1=None, offsetx1=None, offsety1=None,
+                 circle1=None, line1=None, polygon1=None, rectangle1=None, points1=None,
+                 linewidth1=None, fillcolor1=None, linecolor1=None, textcolor1=None,
+                 angle1=None, fontsize1=None, width1=None, xy_anchor='', env=None):
 
-        self.env = g.default_env if env is omitted else env
+        self.env = g.default_env if env is None else env
         self._image_ident = None  # denotes no image yet
         self._image = None
         self._image_x = 0
@@ -5085,16 +5623,16 @@ class Animate(object):
         self.canvas_object = None
 
         self.type = self.settype(
-            circle0, line0, polygon0, rectangle0, image, text)
+            circle0, line0, polygon0, rectangle0, points0, image, text)
         if self.type == '':
             raise SalabimError('no object specified')
-        type1 = self.settype(circle1, line1, polygon1, rectangle1, omitted, omitted)
+        type1 = self.settype(circle1, line1, polygon1, rectangle1, points1, None, None)
         if (type1 != '') and (type1 != self.type):
             raise SalabimError('incompatible types: ' +
                 self.type + ' and ' + type1)
 
         self.layer0 = layer
-        self.parent = (None if parent is omitted else parent)
+        self.parent = (None if parent is None else parent)
         self.keep = keep
         self.visible0 = visible
         self.screen_coordinates = screen_coordinates
@@ -5104,15 +5642,24 @@ class Animate(object):
         self.line0 = de_none(line0)
         self.polygon0 = de_none(polygon0)
         self.rectangle0 = de_none(rectangle0)
+        self.points0 = de_none(points0)
         self.text0 = text
 
-        if image is omitted:
+        if image is None:
             self.width0 = 0  # just to be able to interpolate
         else:
             self.image0 = spec_to_image(image)
-            self.width0 = None if width0 is omitted else width0  # None means original size
+            self.width0 = None if width0 is None else width0  # None means original size
 
+        self.as_points0 = as_points
         self.font0 = font
+        self.max_lines0 = max_lines
+        self.anchor0 = anchor
+        if self.type == 'text':
+            if text_anchor is None:
+                self.text_anchor0 = self.anchor0
+            else:
+                self.text_anchor0 = text_anchor
         self.anchor0 = anchor
         self.xy_anchor0 = xy_anchor
 
@@ -5121,57 +5668,67 @@ class Animate(object):
         self.offsetx0 = offsetx0
         self.offsety0 = offsety0
 
-        self.fillcolor0 = fillcolor0
+        if fillcolor0 is None:
+            if self.as_points0:
+                self.fillcolor0 = ''
+            else:
+                self.fillcolor0 = 'fg'
+        else:
+            self.fillcolor0 = fillcolor0
         self.linecolor0 = linecolor0
         self.textcolor0 = textcolor0
-        if linewidth0 is omitted:
-            if self.type == 'line':
-                self.linewidth0 = 1
+        if linewidth0 is None:
+            if self.as_points0:
+                self.linewidth0 = 3
             else:
-                self.linewidth0 = 0
+                if self.type == 'line':
+                    self.linewidth0 = 1
+                else:
+                    self.linewidth0 = 0
         else:
             self.linewidth0 = linewidth0
         self.angle0 = angle0
         self.fontsize0 = fontsize0
 
-        self.t0 = self.env._now if t0 is omitted else t0
+        self.t0 = self.env._now if t0 is None else t0
 
-        self.circle1 = self.circle0 if circle1 is omitted else circle1
-        self.line1 = self.line0 if line1 is omitted else de_none(line1)
-        self.polygon1 = self.polygon0 if polygon1 is omitted else de_none(polygon1)
-        self.rectangle1 = self.rectangle0 if rectangle1 is omitted else de_none(rectangle1)
+        self.circle1 = self.circle0 if circle1 is None else circle1
+        self.line1 = self.line0 if line1 is None else de_none(line1)
+        self.polygon1 = self.polygon0 if polygon1 is None else de_none(polygon1)
+        self.rectangle1 = self.rectangle0 if rectangle1 is None else de_none(rectangle1)
+        self.points1 = self.points0 if points1 is None else de_none(points1)
 
-        self.x1 = self.x0 if x1 is omitted else x1
-        self.y1 = self.y0 if y1 is omitted else y1
-        self.offsetx1 = self.offsetx0 if offsetx1 is omitted else offsetx1
-        self.offsety1 = self.offsety0 if offsety1 is omitted else offsety1
+        self.x1 = self.x0 if x1 is None else x1
+        self.y1 = self.y0 if y1 is None else y1
+        self.offsetx1 = self.offsetx0 if offsetx1 is None else offsetx1
+        self.offsety1 = self.offsety0 if offsety1 is None else offsety1
         self.fillcolor1 =\
-            self.fillcolor0 if fillcolor1 is omitted else fillcolor1
+            self.fillcolor0 if fillcolor1 is None else fillcolor1
         self.linecolor1 =\
-            self.linecolor0 if linecolor1 is omitted else linecolor1
+            self.linecolor0 if linecolor1 is None else linecolor1
         self.textcolor1 =\
-            self.textcolor0 if textcolor1 is omitted else textcolor1
+            self.textcolor0 if textcolor1 is None else textcolor1
         self.linewidth1 =\
-            self.linewidth0 if linewidth1 is omitted else linewidth1
-        self.angle1 = self.angle0 if angle1 is omitted else angle1
+            self.linewidth0 if linewidth1 is None else linewidth1
+        self.angle1 = self.angle0 if angle1 is None else angle1
         self.fontsize1 =\
-            self.fontsize0 if fontsize1 is omitted else fontsize1
-        self.width1 = self.width0 if width1 is omitted else width1
+            self.fontsize0 if fontsize1 is None else fontsize1
+        self.width1 = self.width0 if width1 is None else width1
 
-        self.t1 = inf if t1 is omitted else t1
+        self.t1 = inf if t1 is None else t1
 
         self.env.an_objects.append(self)
 
-    def update(self, layer=omitted, keep=omitted, visible=omitted,
-               t0=omitted, x0=omitted, y0=omitted, offsetx0=omitted, offsety0=omitted,
-               circle0=omitted, line0=omitted, polygon0=omitted, rectangle0=omitted,
-               image=omitted, text=omitted, font=omitted, anchor=omitted,
-               linewidth0=omitted, fillcolor0=omitted, linecolor0=omitted, textcolor0=omitted,
-               angle0=omitted, fontsize0=omitted, width0=omitted,
-               t1=omitted, x1=omitted, y1=omitted, offsetx1=omitted, offsety1=omitted,
-               circle1=omitted, line1=omitted, polygon1=omitted, rectangle1=omitted,
-               linewidth1=omitted, fillcolor1=omitted, linecolor1=omitted, textcolor1=omitted,
-               angle1=omitted, fontsize1=omitted, width1=omitted, xy_anchor=omitted):
+    def update(self, layer=None, keep=None, visible=None,
+               t0=None, x0=None, y0=None, offsetx0=None, offsety0=None,
+               circle0=None, line0=None, polygon0=None, rectangle0=None, points0=None,
+               image=None, text=None, font=None, anchor=None, max_lines=None, text_anchor=None,
+               linewidth0=None, fillcolor0=None, linecolor0=None, textcolor0=None,
+               angle0=None, fontsize0=None, width0=None, as_points=None,
+               t1=None, x1=None, y1=None, offsetx1=None, offsety1=None,
+               circle1=None, line1=None, polygon1=None, rectangle1=None, points1=None,
+               linewidth1=None, fillcolor1=None, linecolor1=None, textcolor1=None,
+               angle1=None, fontsize1=None, width1=None, xy_anchor=None):
         '''
         updates an animation object
 
@@ -5229,6 +5786,9 @@ class Animate(object):
             the rectangle at time t0 |n|
             (xlowerleft,ylowerlef,xupperright,yupperright) (default see below)
 
+        points0 : tuple
+            the points(s) at time t0 (xa,ya,xb,yb,xc,yc, ...) (default see below)
+
         image : str or PIL image
             the image to be displayed |n|
             This may be either a filename or a PIL image (default see below)
@@ -5240,6 +5800,12 @@ class Animate(object):
             font to be used for texts |n|
             Either a string or a list/tuple of fontnames. (default see below)
             If not found, uses calibri or arial
+
+        max_lines : int
+            the maximum of lines of text to be displayed |n|
+            if positive, it refers to the first max_lines lines |n|
+            if negative, it refers to the first -max_lines lines |n|
+            if zero (default), all lines will be displayed
 
         anchor : str
             anchor position |n|
@@ -5300,6 +5866,10 @@ class Animate(object):
             the rectangle at time t (xlowerleft,ylowerleft,xupperright,yupperright)
             (default: rectangle0) |n|
 
+        points1 : tuple
+            the points(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: points0) |n|
+            should have the same number of elements as points1
+
         linewidth1 : float
             linewidth of the contour at time t1 (default linewidth0)
 
@@ -5325,79 +5895,90 @@ class Animate(object):
         '''
 
         t = self.env._now
-        type0 = self.settype(circle0, line0, polygon0, rectangle0, image, text)
+        type0 = self.settype(circle0, line0, polygon0, rectangle0, points0, image, text)
         if (type0 != '') and (type0 != self.type):
             raise SalabimError('incorrect type ' +
                 type0 + ' (should be ' + self.type)
-        type1 = self.settype(circle1, line1, polygon1, rectangle1, omitted, omitted)
+        type1 = self.settype(circle1, line1, polygon1, rectangle1, points1, None, None)
         if (type1 != '') and (type1 != self.type):
             raise SalabimError('incompatible types: ' +
                 self.type + ' and ' + type1)
 
-        if layer is not omitted:
+        if layer is not None:
             self.layer0 = layer
-        if keep is not omitted:
+        if keep is not None:
             self.keep = keep
-        if visible is not omitted:
+        if visible is not None:
             self.visible0 = visible
-        self.circle0 = self.circle() if circle0 is omitted else circle0
-        self.line0 = self.line() if line0 is omitted else de_none(line0)
-        self.polygon0 = self.polygon() if polygon0 is omitted else de_none(polygon0)
+        self.circle0 = self.circle() if circle0 is None else circle0
+        self.line0 = self.line() if line0 is None else de_none(line0)
+        self.polygon0 = self.polygon() if polygon0 is None else de_none(polygon0)
         self.rectangle0 =\
-            self.rectangle() if rectangle0 is omitted else de_none(rectangle0)
-        if text is not omitted:
+            self.rectangle() if rectangle0 is None else de_none(rectangle0)
+        self.points0 = self.points() if points0 is None else de_none(points0)
+        if as_points is not None:
+            self.as_points0 = as_points
+        if text is not None:
             self.text0 = text
-        self.width0 = self.width() if width0 is omitted else width0
-        if image is not omitted:
+        if max_lines is not None:
+            self.max_lines0 = max_lines
+        self.width0 = self.width() if width0 is None else width0
+        if image is not None:
             self.image0 = spec_to_image(image)
-            self.width0 = self.image0.size[0] if width0 is omitted else width0
+            self.width0 = self.image0.size[0] if width0 is None else width0
 
-        if font is not omitted:
+        if font is not None:
             self.font0 = font
-        if anchor is not omitted:
+        if anchor is not None:
             self.anchor0 = anchor
+            if self.type == 'text':
+                if text_anchor is not None:
+                    self.text_anchor0 = text_anchor
+        if text_anchor is not None:
+            self.text_anchor0 = text_anchor
 
-        self.x0 = self.x(t) if x0 is omitted else x0
-        self.y0 = self.y(t) if y0 is omitted else y0
-        self.offsetx0 = self.offsetx(t) if offsetx0 is omitted else offsetx0
-        self.offsety0 = self.offsety(t) if offsety0 is omitted else offsety0
+        self.x0 = self.x(t) if x0 is None else x0
+        self.y0 = self.y(t) if y0 is None else y0
+        self.offsetx0 = self.offsetx(t) if offsetx0 is None else offsetx0
+        self.offsety0 = self.offsety(t) if offsety0 is None else offsety0
 
         self.fillcolor0 =\
-            self.fillcolor(t) if fillcolor0 is omitted else fillcolor0
+            self.fillcolor(t) if fillcolor0 is None else fillcolor0
         self.linecolor0 =\
-            self.linecolor(t) if linecolor0 is omitted else linecolor0
+            self.linecolor(t) if linecolor0 is None else linecolor0
         self.textcolor0 =\
-            self.textcolor(t) if textcolor0 is omitted else textcolor0
+            self.textcolor(t) if textcolor0 is None else textcolor0
         self.linewidth0 =\
-            self.linewidth(t) if linewidth0 is omitted else linewidth0
-        self.angle0 = self.angle(t) if angle0 is omitted else angle0
-        self.fontsize0 = self.fontsize(t) if fontsize0 is omitted else fontsize0
-        self.t0 = self.env._now if t0 is omitted else t0
+            self.linewidth(t) if linewidth0 is None else linewidth0
+        self.angle0 = self.angle(t) if angle0 is None else angle0
+        self.fontsize0 = self.fontsize(t) if fontsize0 is None else fontsize0
+        self.t0 = self.env._now if t0 is None else t0
 
-        self.circle1 = self.circle0 if circle1 is omitted else circle1
-        self.line1 = self.line0 if line1 is omitted else de_none(line1)
-        self.polygon1 = self.polygon0 if polygon1 is omitted else de_none(polygon1)
+        self.circle1 = self.circle0 if circle1 is None else circle1
+        self.line1 = self.line0 if line1 is None else de_none(line1)
+        self.polygon1 = self.polygon0 if polygon1 is None else de_none(polygon1)
         self.rectangle1 =\
-            self.rectangle0 if rectangle1 is omitted else de_none(rectangle1)
+            self.rectangle0 if rectangle1 is None else de_none(rectangle1)
+        self.points1 = self.points0 if points1 is None else de_none(points1)
 
-        self.x1 = self.x0 if x1 is omitted else x1
-        self.y1 = self.y0 if y1 is omitted else y1
-        self.offsetx1 = self.offsetx0 if offsetx1 is omitted else offsetx1
-        self.offsety1 = self.offsety0 if offsety1 is omitted else offsety1
+        self.x1 = self.x0 if x1 is None else x1
+        self.y1 = self.y0 if y1 is None else y1
+        self.offsetx1 = self.offsetx0 if offsetx1 is None else offsetx1
+        self.offsety1 = self.offsety0 if offsety1 is None else offsety1
         self.fillcolor1 =\
-            self.fillcolor0 if fillcolor1 is omitted else fillcolor1
+            self.fillcolor0 if fillcolor1 is None else fillcolor1
         self.linecolor1 =\
-            self.linecolor0 if linecolor1 is omitted else linecolor1
+            self.linecolor0 if linecolor1 is None else linecolor1
         self.textcolor1 =\
-            self.textcolor0 if textcolor1 is omitted else textcolor1
+            self.textcolor0 if textcolor1 is None else textcolor1
         self.linewidth1 =\
-            self.linewidth0 if linewidth1 is omitted else linewidth1
-        self.angle1 = self.angle0 if angle1 is omitted else angle1
+            self.linewidth0 if linewidth1 is None else linewidth1
+        self.angle1 = self.angle0 if angle1 is None else angle1
         self.fontsize1 =\
-            self.fontsize0 if fontsize1 is omitted else fontsize1
-        self.width1 = self.width0 if width1 is omitted else width1
+            self.fontsize0 if fontsize1 is None else fontsize1
+        self.width1 = self.width0 if width1 is None else width1
 
-        self.t1 = inf if t1 is omitted else t1
+        self.t1 = inf if t1 is None else t1
         if self not in self.env.an_objects:
             self.env.an_objects.append(self)
 
@@ -5415,7 +5996,7 @@ class Animate(object):
         if self in self.env.an_objects:
             self.env.an_objects.remove(self)
 
-    def x(self, t=omitted):
+    def x(self, t=None):
         '''
         x-position of an animate object. May be overridden.
 
@@ -5429,10 +6010,10 @@ class Animate(object):
         x : float
             default behaviour: linear interpolation between self.x0 and self.x1
         '''
-        return interpolate((self.env._now if t is omitted else t),
+        return interpolate((self.env._now if t is None else t),
                            self.t0, self.t1, self.x0, self.x1)
 
-    def y(self, t=omitted):
+    def y(self, t=None):
         '''
         y-position of an animate object. May be overridden.
 
@@ -5446,10 +6027,10 @@ class Animate(object):
         y : float
             default behaviour: linear interpolation between self.y0 and self.y1
         '''
-        return interpolate((self.env._now if t is omitted else t),
+        return interpolate((self.env._now if t is None else t),
                            self.t0, self.t1, self.y0, self.y1)
 
-    def offsetx(self, t=omitted):
+    def offsetx(self, t=None):
         '''
         offsetx of an animate object. May be overridden.
 
@@ -5463,10 +6044,10 @@ class Animate(object):
         offsetx : float
             default behaviour: linear interpolation between self.offsetx0 and self.offsetx1
         '''
-        return interpolate((self.env._now if t is omitted else t),
+        return interpolate((self.env._now if t is None else t),
                            self.t0, self.t1, self.offsetx0, self.offsetx1)
 
-    def offsety(self, t=omitted):
+    def offsety(self, t=None):
         '''
         offsety of an animate object. May be overridden.
 
@@ -5480,10 +6061,10 @@ class Animate(object):
         offsety : float
             default behaviour: linear interpolation between self.offsety0 and self.offsety1
         '''
-        return interpolate((self.env._now if t is omitted else t),
+        return interpolate((self.env._now if t is None else t),
                            self.t0, self.t1, self.offsety0, self.offsety1)
 
-    def angle(self, t=omitted):
+    def angle(self, t=None):
         '''
         angle of an animate object. May be overridden.
 
@@ -5497,10 +6078,10 @@ class Animate(object):
         angle : float
             default behaviour: linear interpolation between self.angle0 and self.angle1
         '''
-        return interpolate((self.env._now if t is omitted else t),
+        return interpolate((self.env._now if t is None else t),
                            self.t0, self.t1, self.angle0, self.angle1)
 
-    def linewidth(self, t=omitted):
+    def linewidth(self, t=None):
         '''
         linewidth of an animate object. May be overridden.
 
@@ -5514,10 +6095,10 @@ class Animate(object):
         linewidth : float
             default behaviour: linear interpolation between self.linewidth0 and self.linewidth1
         '''
-        return interpolate((self.env._now if t is omitted else t),
+        return interpolate((self.env._now if t is None else t),
                            self.t0, self.t1, self.linewidth0, self.linewidth1)
 
-    def linecolor(self, t=omitted):
+    def linecolor(self, t=None):
         '''
         linecolor of an animate object. May be overridden.
 
@@ -5531,10 +6112,10 @@ class Animate(object):
         linecolor : colorspec
             default behaviour: linear interpolation between self.linecolor0 and self.linecolor1
         '''
-        return self.env.colorinterpolate((self.env._now if t is omitted else t),
+        return self.env.colorinterpolate((self.env._now if t is None else t),
                                 self.t0, self.t1, self.linecolor0, self.linecolor1)
 
-    def fillcolor(self, t=omitted):
+    def fillcolor(self, t=None):
         '''
         fillcolor of an animate object. May be overridden.
 
@@ -5548,10 +6129,10 @@ class Animate(object):
         fillcolor : colorspec
             default behaviour: linear interpolation between self.fillcolor0 and self.fillcolor1
         '''
-        return self.env.colorinterpolate((self.env._now if t is omitted else t),
+        return self.env.colorinterpolate((self.env._now if t is None else t),
                                 self.t0, self.t1, self.fillcolor0, self.fillcolor1)
 
-    def circle(self, t=omitted):
+    def circle(self, t=None):
         '''
         circle of an animate object. May be overridden.
 
@@ -5567,12 +6148,12 @@ class Animate(object):
             default behaviour: linear interpolation between self.circle0 and self.circle1
         '''
         return interpolate(
-            (self.env._now if t is omitted else t),
+            (self.env._now if t is None else t),
             self.t0, self.t1,
             self.circle0[0] if isinstance(self.circle0, (list, tuple)) else self.circle0,
             self.circle1[0] if isinstance(self.circle1, (list, tuple)) else self.circle1)
 
-    def textcolor(self, t=omitted):
+    def textcolor(self, t=None):
         '''
         textcolor of an animate object. May be overridden.
 
@@ -5586,10 +6167,10 @@ class Animate(object):
         textcolor : colorspec
             default behaviour: linear interpolation between self.textcolor0 and self.textcolor1
         '''
-        return self.env.colorinterpolate((self.env._now if t is omitted else t),
+        return self.env.colorinterpolate((self.env._now if t is None else t),
                                 self.t0, self.t1, self.textcolor0, self.textcolor1)
 
-    def line(self, t=omitted):
+    def line(self, t=None):
         '''
         line of an animate object. May be overridden.
 
@@ -5604,10 +6185,10 @@ class Animate(object):
             series of x- and y-coordinates (xa,ya,xb,yb,xc,yc, ...) |n|
             default behaviour: linear interpolation between self.line0 and self.line1
         '''
-        return interpolate((self.env._now if t is omitted else t),
+        return interpolate((self.env._now if t is None else t),
                            self.t0, self.t1, self.line0, self.line1)
 
-    def polygon(self, t=omitted):
+    def polygon(self, t=None):
         '''
         polygon of an animate object. May be overridden.
 
@@ -5622,10 +6203,10 @@ class Animate(object):
             series of x- and y-coordinates describing the polygon (xa,ya,xb,yb,xc,yc, ...) |n|
             default behaviour: linear interpolation between self.polygon0 and self.polygon1
         '''
-        return interpolate((self.env._now if t is omitted else t),
+        return interpolate((self.env._now if t is None else t),
                            self.t0, self.t1, self.polygon0, self.polygon1)
 
-    def rectangle(self, t=omitted):
+    def rectangle(self, t=None):
         '''
         rectangle of an animate object. May be overridden.
 
@@ -5640,10 +6221,28 @@ class Animate(object):
             (xlowerleft,ylowerlef,xupperright,yupperright) |n|
             default behaviour: linear interpolation between self.rectangle0 and self.rectangle1
         '''
-        return interpolate((self.env._now if t is omitted else t),
+        return interpolate((self.env._now if t is None else t),
                            self.t0, self.t1, self.rectangle0, self.rectangle1)
 
-    def width(self, t=omitted):
+    def points(self, t=None):
+        '''
+        points of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        points : tuple
+            series of x- and y-coordinates (xa,ya,xb,yb,xc,yc, ...) |n|
+            default behaviour: linear interpolation between self.points0 and self.points1
+        '''
+        return interpolate((self.env._now if t is None else t),
+                           self.t0, self.t1, self.points0, self.points1)
+
+    def width(self, t=None):
         '''
         width position of an animated image object. May be overridden.
 
@@ -5658,10 +6257,10 @@ class Animate(object):
             default behaviour: linear interpolation between self.width0 and self.width1 |n|
             if None, the original width of the image will be used
         '''
-        return interpolate((self.env._now if t is omitted else t),
+        return interpolate((self.env._now if t is None else t),
                            self.t0, self.t1, self.width0, self.width1)
 
-    def fontsize(self, t=omitted):
+    def fontsize(self, t=None):
         '''
         fontsize of an animate object. May be overridden.
 
@@ -5675,10 +6274,26 @@ class Animate(object):
         fontsize : float
             default behaviour: linear interpolation between self.fontsize0 and self.fontsize1
         '''
-        return interpolate((self.env._now if t is omitted else t),
+        return interpolate((self.env._now if t is None else t),
                            self.t0, self.t1, self.fontsize0, self.fontsize1)
 
-    def text(self, t=omitted):
+    def as_points(self, t=None):
+        '''
+        as_points of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        as_points : bool
+            default behaviour: self.as_points (text given at creation or update)
+        '''
+        return self.as_points0
+
+    def text(self, t=None):
         '''
         text of an animate object. May be overridden.
 
@@ -5694,7 +6309,23 @@ class Animate(object):
         '''
         return self.text0
 
-    def anchor(self, t=omitted):
+    def max_lines(self, t=None):
+        '''
+        maximum number of lines to be displayed of text. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        max_lines : int
+            default behaviour: self.max_lines0 (max_lines given at creation or update)
+        '''
+        return self.max_lines0
+
+    def anchor(self, t=None):
         '''
         anchor of an animate object. May be overridden.
 
@@ -5711,7 +6342,24 @@ class Animate(object):
 
         return self.anchor0
 
-    def layer(self, t=omitted):
+    def text_anchor(self, t=None):
+        '''
+        text_anchor of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        text_anchor : str
+            default behaviour: self.text_anchor0 (text_anchor given at creation or update)
+        '''
+
+        return self.text_anchor0
+
+    def layer(self, t=None):
         '''
         layer of an animate object. May be overridden.
 
@@ -5727,7 +6375,7 @@ class Animate(object):
         '''
         return self.layer0
 
-    def font(self, t=omitted):
+    def font(self, t=None):
         '''
         font of an animate object. May be overridden.
 
@@ -5743,7 +6391,7 @@ class Animate(object):
         '''
         return self.font0
 
-    def xy_anchor(self, t=omitted):
+    def xy_anchor(self, t=None):
         '''
         xy_anchor attribute of an animate object. May be overridden.
 
@@ -5759,7 +6407,7 @@ class Animate(object):
         '''
         return self.xy_anchor0
 
-    def visible(self, t=omitted):
+    def visible(self, t=None):
         '''
         visible attribute of an animate object. May be overridden.
 
@@ -5775,7 +6423,7 @@ class Animate(object):
         '''
         return self.visible0
 
-    def image(self, t=omitted):
+    def image(self, t=None):
         '''
         image of an animate object. May be overridden.
 
@@ -5792,25 +6440,28 @@ class Animate(object):
         '''
         return self.image0
 
-    def settype(self, circle, line, polygon, rectangle, image, text):
+    def settype(self, circle, line, polygon, rectangle, points, image, text):
         n = 0
         t = ''
-        if circle is not omitted:
+        if circle is not None:
             t = 'circle'
             n += 1
-        if line is not omitted:
+        if line is not None:
             t = 'line'
             n += 1
-        if polygon is not omitted:
+        if polygon is not None:
             t = 'polygon'
             n += 1
-        if rectangle is not omitted:
+        if rectangle is not None:
             t = 'rectangle'
             n += 1
-        if image is not omitted:
+        if points is not None:
+            t = 'points'
+            n += 1
+        if image is not None:
             t = 'image'
             n += 1
-        if text is not omitted:
+        if text is not None:
             t = 'text'
             n += 1
         if n >= 2:
@@ -5874,6 +6525,10 @@ class Animate(object):
                     qy = (y - self.env._y0) * self.env._scale
 
                 r = []
+                minpx = inf
+                minpy = inf
+                maxpx = -inf
+                maxpy = -inf
                 minrx = inf
                 minry = inf
                 maxrx = -inf
@@ -5881,17 +6536,30 @@ class Animate(object):
                 for i in range(0, len(p), 2):
                     px = p[i]
                     py = p[i + 1]
+                    if not self.screen_coordinates:
+                        px *= self.env._scale
+                        py *= self.env._scale
                     rx = px * cosa - py * sina
                     ry = px * sina + py * cosa
-                    if not self.screen_coordinates:
-                        rx = rx * self.env._scale
-                        ry = ry * self.env._scale
+                    minpx = min(minpx, px)
+                    maxpx = max(maxpx, px)
+                    minpy = min(minpy, py)
+                    maxpy = max(maxpy, py)
                     minrx = min(minrx, rx)
                     maxrx = max(maxrx, rx)
                     minry = min(minry, ry)
                     maxry = max(maxry, ry)
                     r.append(rx)
                     r.append(ry)
+                if maxrx == -inf:
+                    maxpx = 0
+                    minpx = 0
+                    maxpy = 0
+                    minpy = 0
+                    maxrx = 0
+                    minrx = 0
+                    maxry = 0
+                    minry = 0
                 if self.type == 'polygon':
                     if r[0:1] != r[-2:-1]:
                         r.append(r[0])
@@ -5903,18 +6571,37 @@ class Animate(object):
                     rscaled.append(maxry - r[i + 1] + linewidth)
                 rscaled = tuple(rscaled)  # to make it hashable
 
+                as_points = self.as_points(t)
                 self._image_ident = (rscaled, minrx, maxrx, minry, maxry,
-                                     fillcolor, linecolor, linewidth)
+                                     fillcolor, linecolor, linewidth, as_points)
                 if self._image_ident != self._image_ident_prev:
-                    self._image = Image.new('RGBA', (int(maxrx - minrx + 2 * linewidth),
-                                                     int(maxry - minry + 2 * linewidth)), (0, 0, 0, 0))
-                    draw = ImageDraw.Draw(self._image)
-                    if fillcolor[3] != 0:
-                        draw.polygon(rscaled, fill=fillcolor)
-                    if (linewidth > 0) and (linecolor[3] != 0):
-                        draw.line(rscaled, fill=linecolor,
-                                  width=int(linewidth))
-                    del draw
+
+                    if as_points:
+                        self._image = Image.new('RGBA', (int(maxrx - minrx + 2 * linewidth),
+                          int(maxry - minry + 2 * linewidth)), (0, 0, 0, 0))
+                        point_image = Image.new('RGBA', (int(linewidth), int(linewidth)), linecolor)
+
+                        for i in range(0, len(r), 2):
+                            rx = rscaled[i]
+                            ry = rscaled[i + 1]
+                            self._image.paste(point_image,
+                              (int(rx - 0.5 * linewidth), int(ry - 0.5 * linewidth)), point_image)
+
+                    else:
+                        self._image = Image.new('RGBA', (int(maxrx - minrx + 2 * linewidth),
+                            int(maxry - minry + 2 * linewidth)), (0, 0, 0, 0))
+                        draw = ImageDraw.Draw(self._image)
+                        if fillcolor[3] != 0:
+                            draw.polygon(rscaled, fill=fillcolor)
+                        if (linewidth > 0) and (linecolor[3] != 0):
+                            draw.line(rscaled, fill=linecolor,
+                                      width=int(linewidth))
+                        del draw
+
+                self.env._centerx = qx + (minrx + maxrx) / 2
+                self.env._centery = qy + (minry + maxry) / 2
+                self.env._dimx = maxpx - minpx
+                self.env._dimy = maxpy - minpy
 
                 self._image_x = qx + minrx - linewidth + \
                     (offsetx * cosa - offsety * sina)
@@ -5969,6 +6656,10 @@ class Animate(object):
                 sina = math.sin(angle * math.pi / 180)
                 ex = dx * cosa - dy * sina
                 ey = dx * sina + dy * cosa
+                self.env._centerx = qx
+                self.env._centery = qy
+                self.env._dimx = 2 * radius
+                self.env._dimy = 2 * radius
                 self._image_x = qx + ex - radius - linewidth - 1
                 self._image_y = qy + ey - radius - linewidth - 1
 
@@ -6024,6 +6715,11 @@ class Animate(object):
                 ey = dx * sina + dy * cosa
                 imrwidth, imrheight = self._image.size
 
+                self.env._centerx = qx + ex
+                self.env._centery = qy + ey
+                self.env._dimx = width
+                self.env._dimy = height
+
                 self._image_x = qx + ex - imrwidth / 2
                 self._image_y = qy + ey - imrheight / 2
 
@@ -6031,34 +6727,79 @@ class Animate(object):
                 textcolor = self.env.colorspec_to_tuple(self.textcolor(t))
                 fontsize = self.fontsize(t)
                 angle = self.angle(t)
-                anchor = self.anchor(t)
                 fontname = self.font(t)
-
-                text = self.text(t)
-                if self.screen_coordinates:
-                    qx = x
-                    qy = y
-                else:
-                    qx = (x - self.env._x0) * self.env._scale
-                    qy = (y - self.env._y0) * self.env._scale
+                if not self.screen_coordinates:
                     fontsize = fontsize * self.env._scale
                     offsetx = offsetx * self.env._scale
                     offsety = offsety * self.env._scale
+                text = self.text(t)
+                text_anchor = self.text_anchor(t)
 
+                if hasattr(self, 'dependent'):
+                    text_offsetx = self.text_offsetx(t)
+                    text_offsety = self.text_offsety(t)
+                    if not self.screen_coordinates:
+                        text_offsetx = text_offsetx * self.env._scale
+                        text_offsety = text_offsety * self.env._scale
+                    qx = self.env._centerx
+                    qy = self.env._centery
+                    anchor_to_dis = {
+                        'ne': (0.5, 0.5),
+                        'n': (0, 0.5),
+                        'nw': (-0.5, 0.5),
+                        'e': (0.5, 0),
+                        'center': (0, 0),
+                        'c': (0, 0),
+                        'w': (-0.5, 0),
+                        'se': (0.5, -0.5),
+                        's': (0, -0.5),
+                        'sw': (-0.5, -0.5)}
+                    dis = anchor_to_dis[text_anchor.lower()]
+                    offsetx += text_offsetx + dis[0] * self.env._dimx - dis[0] * 4  # 2 extra at east or west
+                    offsety += text_offsety + dis[1] * self.env._dimy - (2 if dis[1] > 0 else 0)  # 2 extra at north
+                else:
+                    if self.screen_coordinates:
+                        qx = x
+                        qy = y
+                    else:
+                        qx = (x - self.env._x0) * self.env._scale
+                        qy = (y - self.env._y0) * self.env._scale
+                max_lines = self.max_lines(t)
                 self._image_ident = (
-                    text, fontname, fontsize, angle, textcolor)
+                    text, fontname, fontsize, angle, textcolor, max_lines)
                 if self._image_ident != self._image_ident_prev:
                     font, heightA = getfont(fontname, fontsize)
-                    if text == '':  # this code is a workaround for a bug in PIL >= 4.2.1
+                    if text == '' or text is None:  # this code is a workaround for a bug in PIL >= 4.2.1
                         im = Image.new(
                             'RGBA', (0, 0), (0, 0, 0, 0))
                     else:
-                        width, height = font.getsize(text)
+                        lines = []
+                        for item in deep_flatten(text):
+                            for line in item.splitlines():
+                                lines.append(line.rstrip())
+
+                        if max_lines <= 0:  # 0 is all
+                            lines = lines[max_lines:]
+                        else:
+                            lines = lines[:max_lines]
+
+                        widths = [(font.getsize(line)[0] if line else 0) for line in lines]
+                        if widths:
+                            totwidth = max(widths)
+                        else:
+                            totwidth = 0
+                        number_of_lines = len(lines)
+                        lineheight = font.getsize('Ap')[1]
+                        totheight = number_of_lines * lineheight
                         im = Image.new(
-                            'RGBA', (int(width + 0.1 * fontsize), int(height)), (0, 0, 0, 0))
+                            'RGBA', (int(totwidth + 0.1 * fontsize), int(totheight)), (0, 0, 0, 0))
                         imwidth, imheight = im.size
                         draw = ImageDraw.Draw(im)
-                        draw.text(xy=(0.1 * fontsize, 0), text=text, font=font, fill=textcolor)
+                        pos = 0
+                        for line, width in zip(lines, widths):
+                            if line:
+                                draw.text(xy=(0.1 * fontsize, pos), text=line, font=font, fill=textcolor)
+                            pos += lineheight
                         # this code is to correct a bug in the rendering of text,
                         # leaving a kind of shadow around the text
                         del draw
@@ -6077,20 +6818,20 @@ class Animate(object):
                     self._image = im.rotate(angle, expand=1)
 
                 anchor_to_dis = {
-                    'ne': (-0.5, 0),
-                    'n': (0, 0),
-                    'nw': (0.5, 0),
-                    'e': (-0.5, 0.5),
-                    'center': (0, 0.5),
-                    'c': (0, 0.5),
-                    'w': (0.5, 0.5),
-                    'se': (-0.5, 1),
-                    's': (0, 1),
-                    'sw': (0.5, 1)}
-
-                dx, dy = anchor_to_dis[anchor.lower()]
+                    'ne': (-0.5, -0.5),
+                    'n': (0, -0.5),
+                    'nw': (0.5, -0.5),
+                    'e': (-0.5, 0),
+                    'center': (0, 0),
+                    'c': (0, 0),
+                    'w': (0.5, 0),
+                    'se': (-0.5, 0.5),
+                    's': (0, 0.5),
+                    'sw': (0.5, 0.5)}
+                dx, dy = anchor_to_dis[text_anchor.lower()]
                 dx = dx * self.imwidth + offsetx - 0.1 * fontsize
-                dy = -0.5 * self.imheight + dy * self.heightA + offsety
+
+                dy = dy * self.imheight + offsety
                 cosa = math.cos(angle * math.pi / 180)
                 sina = math.sin(angle * math.pi / 180)
                 ex = dx * cosa - dy * sina
@@ -6182,9 +6923,9 @@ class AnimateButton(object):
     def __init__(self, x=0, y=0, width=80, height=30,
                  linewidth=0, fillcolor='fg',
                  linecolor='fg', color='bg', text='', font='',
-                 fontsize=15, action=None, env=omitted, xy_anchor='sw'):
+                 fontsize=15, action=None, env=None, xy_anchor='sw'):
 
-        self.env = g.default_env if env is omitted else env
+        self.env = g.default_env if env is None else env
         self.type = 'button'
         self.t0 = -inf
         self.t1 = inf
@@ -6320,15 +7061,15 @@ class AnimateSlider(object):
     '''
 
     def __init__(self, layer=0, x=0, y=0, width=100, height=20,
-                 vmin=0, vmax=10, v=omitted, resolution=1,
+                 vmin=0, vmax=10, v=None, resolution=1,
                  linecolor='fg', labelcolor='fg', label='',
-                 font='', fontsize=12, action=None, xy_anchor='sw', env=omitted):
+                 font='', fontsize=12, action=None, xy_anchor='sw', env=None):
 
-        self.env = g.default_env if env is omitted else env
+        self.env = g.default_env if env is None else env
         n = round((vmax - vmin) / resolution) + 1
         self.vmin = vmin
         self.vmax = vmin + (n - 1) * resolution
-        self._v = vmin if v is omitted else v
+        self._v = vmin if v is None else v
         self.xdelta = width / n
         self.resolution = resolution
 
@@ -6358,7 +7099,7 @@ class AnimateSlider(object):
 
         self.env.ui_objects.append(self)
 
-    def v(self, value=omitted):
+    def v(self, value=None):
         '''
         value |n|
 
@@ -6372,7 +7113,7 @@ class AnimateSlider(object):
         -------
         Current value of the slider : float
         '''
-        if value is not omitted:
+        if value is not None:
             if Pythonista:
                 self._v = value
             else:
@@ -6424,6 +7165,1406 @@ class AnimateSlider(object):
             self.installed = False
 
 
+class AnimateQueue(object):
+    '''
+    Animates the component in a queue.
+
+    Parameters
+    ----------
+    queue : Queue
+
+    x : float
+        x-position of the first component in the queue |n|
+        default: 50
+
+    y : float
+        y-position of the first component in the queue |n|
+        default: 50
+
+    direction : str
+        if 'w', waiting line runs westwards (i.e. from right to left) |n|
+        if 'n', waiting line runs northeards (i.e. from bottom to top) |n|
+        if 'e', waiting line runs eastwards (i.e. from left to right) (default) |n|
+        if 's', waiting line runs southwards (i.e. from top to bottom)
+
+    reverse : bool
+        if False (default), display in normal order. If True, reversed.
+
+    max_length : int
+        maximum number of components to be displayed
+
+    xy_anchor : str
+        specifies where x and y are relative to |n|
+        possible values are (default: sw): |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
+
+    id : any
+        the animation works by calling the animation_objects method of each component, optionally
+        with id. By default, this is self, but can be overriden, particularly with the queue
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    Note
+    ----
+    All measures are in screen coordinates |n|
+
+    All parameters, apart from queue and arg can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: title |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+    '''
+
+    def __init__(self, queue, x=50, y=50, direction='w', max_length=None,
+        xy_anchor='sw', reverse=False, id=None, arg=None):
+        _checkisqueue(queue)
+        self._queue = queue
+        self.xy_anchor = xy_anchor
+        self.x = x
+        self.y = y
+        self.id = self if id is None else id
+        self.arg = self if arg is None else arg
+        self.max_length = max_length
+        self.direction = direction
+        self.reverse = reverse
+        self.current_aos = {}
+        self._queue.env.sys_objects.append(self)
+
+    def update(self, t):
+        prev_aos = self.current_aos
+        self.current_aos = {}
+        xy_anchor = _call(self.xy_anchor, t, self.arg)
+        max_length = _call(self.max_length, t, self.arg)
+        x = _call(self.x, t, self.arg)
+        y = _call(self.y, t, self.arg)
+        direction = _call(self.direction, t, self.arg)
+        reverse = _call(self.reverse, t, self.arg)
+        x += self._queue.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True)
+        y += self._queue.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True)
+
+        factor_x, factor_y = \
+            {'w': (-1, 0), 'n': (0, 1), 'e': (1, 0), 's': (0, -1)}[direction.lower()]
+        n = 0
+        for c in reversed(self._queue) if reverse else self._queue:
+            if (max_length is not None) and n >= max_length:
+                break
+            if c not in prev_aos:
+                nargs = c.animation_objects.__code__.co_argcount
+                if nargs == 1:
+                    animation_objects = self.current_aos[c] = c.animation_objects()
+                else:
+                    animation_objects = self.current_aos[c] = c.animation_objects(self.id)
+            else:
+                animation_objects = self.current_aos[c] = prev_aos[c]
+                del prev_aos[c]
+            dimx = _call(animation_objects[0], t, c)
+            dimy = _call(animation_objects[1], t, c)
+            for ao in animation_objects[2:]:
+                if isinstance(ao, _Vis):
+                    ao.x = x
+                    ao.y = y
+                else:
+                    ao.x0 = x
+                    ao.y0 = y
+            x += factor_x * dimx
+            y += factor_y * dimy
+            n += 1
+
+        for animation_objects in prev_aos.values():
+            for ao in animation_objects[2:]:
+                ao.remove()
+
+    def remove(self):
+        for animation_objects in self.current_aos.values():
+            for ao in animation_objects[2:]:
+                ao.remove()
+        self._queue.env.sys_objects.remove(self)
+
+
+class _Vis(object):
+    pass
+
+
+class AnimateText(_Vis):
+    '''
+    Displays a text
+
+    Parameters
+    ----------
+    text : str, tuple or list
+        the text to be displayed |n|
+        if text is str, the text may contain linefeeds, which are shown as individual lines
+        if text is tple or list, each item is displayed on a separate line
+
+    x : float
+        position of anchor point (default 0)
+
+    y : float
+        position of anchor point (default 0)
+
+    xy_anchor : str
+        specifies where x and y are relative to |n|
+        possible values are (default: sw) : |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se`` |n|
+        If '', the given coordimates are used untranslated
+
+    offsetx : float
+        offsets the x-coordinate of the rectangle (default 0)
+
+    offsety : float
+        offsets the y-coordinate of the rectangle (default 0)
+
+    angle : float
+        angle of the text (in degrees) |n|
+        default: 0
+
+    max_lines : int
+        the maximum of lines of text to be displayed |n|
+        if positive, it refers to the first max_lines lines |n|
+        if negative, it refers to the last -max_lines lines |n|
+        if zero (default), all lines will be displayed
+
+    font : str or list/tuple
+        font to be used for texts |n|
+        Either a string or a list/tuple of fontnames.
+        If not found, uses calibri or arial
+
+    text_anchor : str
+        anchor position of text|n|
+        specifies where to texts relative to the rectangle
+        point |n|
+        possible values are (default: c): |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
+
+    textcolor : colorspec
+        color of the text (default foreground_color)
+
+    fontsize : float
+        fontsize of text (default 15)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    Note
+    ----
+    All measures are in screen coordinates |n|
+
+    All parameters, apart from queue and arg can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: title |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+
+    '''
+    def __init__(self, text='', x=0, y=0, fontsize=15, textcolor='fg', font='', text_anchor='sw', angle=0,
+        visible=True, xy_anchor='', layer=0, env=None, screen_coordinates=False, arg=None,
+        offsetx=0, offsety=0, max_lines=0):
+        self.env = g.default_env if env is None else env
+
+        # the checks hasattr are req'd to not override methods of inherited classes
+        if not hasattr(self, 'x'):
+            self.x = x
+        if not hasattr(self, 'y'):
+            self.y = y
+        if not hasattr(self, 'offsetx'):
+            self.offsetx = offsetx
+        if not hasattr(self, 'offsety'):
+            self.offsety = offsety
+        if not hasattr(self, 'text'):
+            self.text = text
+        if not hasattr(self, 'max_lines'):
+            self.max_lines = max_lines
+        if not hasattr(self, 'textcolor'):
+            self.textcolor = textcolor
+        if not hasattr(self, 'angle'):
+            self.angle = angle
+        if not hasattr(self, 'text_anchor'):
+            self.text_anchor = text_anchor
+        if not hasattr(self, 'font'):
+            self.font = font
+        if not hasattr(self, 'fontsize'):
+            self.fontsize = fontsize
+        if not hasattr(self, 'visible'):
+            self.visible = visible
+        if not hasattr(self, 'xy_anchor'):
+            self.xy_anchor = xy_anchor
+        if not hasattr(self, 'layer'):
+            self.layer = layer
+        self.arg = self if arg is None else arg
+        ao0 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        self.aos = (ao0,)
+
+    def remove(self):
+        for ao in self.aos:
+            ao.remove()
+
+
+class AnimateRectangle(_Vis):
+    '''
+    Displays a rectangle, optionally with a text
+
+    Parameters
+    ----------
+    spec : four item tuple or list
+        should specify xlowerleft, ylowerleft, xupperright yupperrighg
+
+    x : float
+        position of anchor point (default 0)
+
+    y : float
+        position of anchor point (default 0)
+
+    xy_anchor : str
+        specifies where x and y are relative to |n|
+        possible values are (default: sw) : |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se`` |n|
+        If '', the given coordimates are used untranslated
+
+    offsetx : float
+        offsets the x-coordinate of the rectangle (default 0)
+
+    offsety : float
+        offsets the y-coordinate of the rectangle (default 0)
+
+    linewidth : float
+        linewidth of the contour |n|
+        default 1
+
+    fillcolor : colorspec
+        color of interior (default foreground_color) |n|
+        default transparent
+
+    linecolor : colorspec
+        color of the contour (default transparent)
+
+    angle : float
+        angle of the rectangle (in degrees) |n|
+        default: 0
+
+    as_points : bool
+         if False (default), the contour lines are drawn |n|
+         if True, only the corner points are shown
+
+    text : str, tuple or list
+        the text to be displayed |n|
+        if text is str, the text may contain linefeeds, which are shown as individual lines
+
+    max_lines : int
+        the maximum of lines of text to be displayed |n|
+        if positive, it refers to the first max_lines lines |n|
+        if negative, it refers to the last -max_lines lines |n|
+        if zero (default), all lines will be displayed
+
+    font : str or list/tuple
+        font to be used for texts |n|
+        Either a string or a list/tuple of fontnames.
+        If not found, uses calibri or arial
+
+    text_anchor : str
+        anchor position of text|n|
+        specifies where to texts relative to the rectangle
+        point |n|
+        possible values are (default: c): |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
+
+    textcolor : colorspec
+        color of the text (default foreground_color)
+
+    textoffsetx : float
+        extra x offset to the text_anchor point
+
+    textoffsety : float
+        extra y offset to the text_anchor point
+
+    fontsize : float
+        fontsize of text (default 15)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    Note
+    ----
+    All measures are in screen coordinates |n|
+
+    All parameters, apart from queue and arg can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: title |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+    '''
+    def __init__(self, spec=(), x=0, y=0, fillcolor='fg', linecolor='', linewidth=1,
+        text='', fontsize=15, textcolor='bg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
+        offsetx=0, offsety=0, as_points=False, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+        visible=True, env=None, screen_coordinates=False):
+
+        self.env = g.default_env if env is None else env
+
+        # the checks hasattr are req'd to not override methods of inherited classes
+        if not hasattr(self, 'spec'):
+            self.spec = spec
+        if not hasattr(self, 'fillcolor'):
+            self.fillcolor = fillcolor
+        if not hasattr(self, 'linecolor'):
+            self.linecolor = linecolor
+        if not hasattr(self, 'linewidth'):
+            self.linewidth = linewidth
+        if not hasattr(self, 'as_points'):
+            self.aspoint = as_points
+        if not hasattr(self, 'x'):
+            self.x = x
+        if not hasattr(self, 'y'):
+            self.y = y
+        if not hasattr(self, 'offsetx'):
+            self.offsetx = offsetx
+        if not hasattr(self, 'offsety'):
+            self.offsety = offsety
+        if not hasattr(self, 'text_offsetx'):
+            self.text_offsetx = text_offsetx
+        if not hasattr(self, 'text_offsety'):
+            self.text_offsety = text_offsety
+        if not hasattr(self, 'text'):
+            self.text = text
+        if not hasattr(self, 'max_lines'):
+            self.max_lines = max_lines
+        if not hasattr(self, 'textcolor'):
+            self.textcolor = textcolor
+        if not hasattr(self, 'text_anchor'):
+            self.text_anchor = text_anchor
+        if not hasattr(self, 'angle'):
+            self.angle = angle
+        if not hasattr(self, 'font'):
+            self.font = font
+        if not hasattr(self, 'fontsize'):
+            self.fontsize = fontsize
+        if not hasattr(self, 'visible'):
+            self.visible = visible
+        if not hasattr(self, 'xy_anchor'):
+            self.xy_anchor = xy_anchor
+        if not hasattr(self, 'layer'):
+            self.layer = layer
+        self.arg = self if arg is None else arg
+        ao0 = _AnimateVis(rectangle0=(), vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao1.dependent = True
+        self.aos = (ao0, ao1)
+
+    def remove(self):
+        for ao in self.aos:
+            ao.remove()
+
+
+class AnimatePolygon(_Vis):
+    '''
+    Displays a polygon, optionally with a text
+
+    Parameters
+    ----------
+    spec : tuple or list
+        should specify x0, y0, x1, y1, ...
+
+    x : float
+        position of anchor point (default 0)
+
+    y : float
+        position of anchor point (default 0)
+
+    xy_anchor : str
+        specifies where x and y are relative to |n|
+        possible values are (default: sw) : |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se`` |n|
+        If '', the given coordimates are used untranslated
+
+    offsetx : float
+        offsets the x-coordinate of the polygon (default 0)
+
+    offsety : float
+        offsets the y-coordinate of the polygon (default 0)
+
+    linewidth : float
+        linewidth of the contour |n|
+        default 1
+
+    fillcolor : colorspec
+        color of interior (default foreground_color) |n|
+        default transparent
+
+    linecolor : colorspec
+        color of the contour (default transparent)
+
+    angle : float
+        angle of the polygon (in degrees) |n|
+        default: 0
+
+    as_points : bool
+         if False (default), the contour lines are drawn |n|
+         if True, only the corner points are shown
+
+    text : str, tuple or list
+        the text to be displayed |n|
+        if text is str, the text may contain linefeeds, which are shown as individual lines
+
+    max_lines : int
+        the maximum of lines of text to be displayed |n|
+        if positive, it refers to the first max_lines lines |n|
+        if negative, it refers to the last -max_lines lines |n|
+        if zero (default), all lines will be displayed
+
+    font : str or list/tuple
+        font to be used for texts |n|
+        Either a string or a list/tuple of fontnames.
+        If not found, uses calibri or arial
+
+    text_anchor : str
+        anchor position of text|n|
+        specifies where to texts relative to the polygon
+        point |n|
+        possible values are (default: c): |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
+
+    textcolor : colorspec
+        color of the text (default foreground_color)
+
+    textoffsetx : float
+        extra x offset to the text_anchor point
+
+    textoffsety : float
+        extra y offset to the text_anchor point
+
+    fontsize : float
+        fontsize of text (default 15)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    Note
+    ----
+    All measures are in screen coordinates |n|
+
+    All parameters, apart from queue and arg can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: title |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+    '''
+    def __init__(self, spec=(), x=0, y=0, fillcolor='fg', linecolor='', linewidth=1,
+        text='', fontsize=15, textcolor='bg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
+        offsetx=0, offsety=0, as_points=False, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+        visible=True, env=None, screen_coordinates=False):
+        self.env = g.default_env if env is None else env
+
+        # the checks hasattr are req'd to not override methods of inherited classes
+        if not hasattr(self, 'spec'):
+            self.spec = spec
+        if not hasattr(self, 'fillcolor'):
+            self.fillcolor = fillcolor
+        if not hasattr(self, 'linecolor'):
+            self.linecolor = linecolor
+        if not hasattr(self, 'linewidth'):
+            self.linewidth = linewidth
+        if not hasattr(self, 'as_points'):
+            self.aspoint = as_points
+        if not hasattr(self, 'x'):
+            self.x = x
+        if not hasattr(self, 'y'):
+            self.y = y
+        if not hasattr(self, 'offsetx'):
+            self.offsetx = offsetx
+        if not hasattr(self, 'offsety'):
+            self.offsety = offsety
+        if not hasattr(self, 'text_offsetx'):
+            self.text_offsetx = text_offsetx
+        if not hasattr(self, 'text_offsety'):
+            self.text_offsety = text_offsety
+        if not hasattr(self, 'text'):
+            self.text = text
+        if not hasattr(self, 'max_lines'):
+            self.max_lines = max_lines
+        if not hasattr(self, 'textcolor'):
+            self.textcolor = textcolor
+        if not hasattr(self, 'text_anchor'):
+            self.text_anchor = text_anchor
+        if not hasattr(self, 'angle'):
+            self.angle = angle
+        if not hasattr(self, 'font'):
+            self.font = font
+        if not hasattr(self, 'fontsize'):
+            self.fontsize = fontsize
+        if not hasattr(self, 'visible'):
+            self.visible = visible
+        if not hasattr(self, 'xy_anchor'):
+            self.xy_anchor = xy_anchor
+        if not hasattr(self, 'layer'):
+            self.layer = layer
+        self.arg = self if arg is None else arg
+        ao0 = _AnimateVis(polygon0=(), vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao1.dependent = True
+        self.aos = (ao0, ao1)
+
+    def remove(self):
+        for ao in self.aos:
+            ao.remove()
+
+
+class AnimateLine(_Vis):
+    '''
+    Displays a line, optionally with a text
+
+    Parameters
+    ----------
+    spec : tuple or list
+        should specify x0, y0, x1, y1, ...
+
+    x : float
+        position of anchor point (default 0)
+
+    y : float
+        position of anchor point (default 0)
+
+    xy_anchor : str
+        specifies where x and y are relative to |n|
+        possible values are (default: sw) : |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se`` |n|
+        If '', the given coordimates are used untranslated
+
+    offsetx : float
+        offsets the x-coordinate of the line (default 0)
+
+    offsety : float
+        offsets the y-coordinate of the line (default 0)
+
+    linewidth : float
+        linewidth of the contour |n|
+        default 1
+
+    linecolor : colorspec
+        color of the contour (default foreground_color)
+
+    angle : float
+        angle of the line (in degrees) |n|
+        default: 0
+
+    as_points : bool
+         if False (default), the contour lines are drawn |n|
+         if True, only the corner points are shown
+
+    text : str, tuple or list
+        the text to be displayed |n|
+        if text is str, the text may contain linefeeds, which are shown as individual lines
+
+    max_lines : int
+        the maximum of lines of text to be displayed |n|
+        if positive, it refers to the first max_lines lines |n|
+        if negative, it refers to the last -max_lines lines |n|
+        if zero (default), all lines will be displayed
+
+    font : str or list/tuple
+        font to be used for texts |n|
+        Either a string or a list/tuple of fontnames.
+        If not found, uses calibri or arial
+
+    text_anchor : str
+        anchor position of text|n|
+        specifies where to texts relative to the polygon
+        point |n|
+        possible values are (default: c): |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
+
+    textcolor : colorspec
+        color of the text (default foreground_color)
+
+    textoffsetx : float
+        extra x offset to the text_anchor point
+
+    textoffsety : float
+        extra y offset to the text_anchor point
+
+    fontsize : float
+        fontsize of text (default 15)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    Note
+    ----
+    All measures are in screen coordinates |n|
+
+    All parameters, apart from queue and arg can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: title |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+    '''
+    def __init__(self, spec=(), x=0, y=0, linecolor='fg', linewidth=1,
+        text='', fontsize=15, textcolor='fg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
+        offsetx=0, offsety=0, as_points=False, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+        visible=True, env=None, screen_coordinates=False):
+        self.env = g.default_env if env is None else env
+
+        # the checks hasattr are req'd to not override methods of inherited classes
+        if not hasattr(self, 'spec'):
+            self.spec = spec
+        if not hasattr(self, 'linecolor'):
+            self.linecolor = linecolor
+        if not hasattr(self, 'linewidth'):
+            self.linewidth = linewidth
+        if not hasattr(self, 'as_points'):
+            self.aspoint = as_points
+        if not hasattr(self, 'x'):
+            self.x = x
+        if not hasattr(self, 'y'):
+            self.y = y
+        if not hasattr(self, 'offsetx'):
+            self.offsetx = offsetx
+        if not hasattr(self, 'offsety'):
+            self.offsety = offsety
+        if not hasattr(self, 'text_offsetx'):
+            self.text_offsetx = text_offsetx
+        if not hasattr(self, 'text_offsety'):
+            self.text_offsety = text_offsety
+        if not hasattr(self, 'text'):
+            self.text = text
+        if not hasattr(self, 'max_lines'):
+            self.max_lines = max_lines
+        if not hasattr(self, 'textcolor'):
+            self.textcolor = textcolor
+        if not hasattr(self, 'text_anchor'):
+            self.text_anchor = text_anchor
+        if not hasattr(self, 'angle'):
+            self.angle = angle
+        if not hasattr(self, 'font'):
+            self.font = font
+        if not hasattr(self, 'fontsize'):
+            self.fontsize = fontsize
+        if not hasattr(self, 'visible'):
+            self.visible = visible
+        if not hasattr(self, 'xy_anchor'):
+            self.xy_anchor = xy_anchor
+        if not hasattr(self, 'layer'):
+            self.layer = layer
+        self.fillcolor = ''
+        self.arg = self if arg is None else arg
+        ao0 = _AnimateVis(line0=(), vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao1.dependent = True
+        self.aos = (ao0, ao1)
+
+    def remove(self):
+        for ao in self.aos:
+            ao.remove()
+
+
+class AnimatePoints(_Vis):
+    '''
+    Displays a series of points, optionally with a text
+
+    Parameters
+    ----------
+    spec : tuple or list
+        should specify x0, y0, x1, y1, ...
+
+    x : float
+        position of anchor point (default 0)
+
+    y : float
+        position of anchor point (default 0)
+
+    xy_anchor : str
+        specifies where x and y are relative to |n|
+        possible values are (default: sw) : |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se`` |n|
+        If '', the given coordimates are used untranslated
+
+    offsetx : float
+        offsets the x-coordinate of the points (default 0)
+
+    offsety : float
+        offsets the y-coordinate of the points (default 0)
+
+    linewidth : float
+        width of the points |n|
+        default 1
+
+    linecolor : colorspec
+        color of the points (default foreground_color)
+
+    angle : float
+        angle of the points (in degrees) |n|
+        default: 0
+
+    as_points : bool
+         if False (default), the contour lines are drawn |n|
+         if True, only the corner points are shown
+
+    text : str, tuple or list
+        the text to be displayed |n|
+        if text is str, the text may contain linefeeds, which are shown as individual lines
+
+    max_lines : int
+        the maximum of lines of text to be displayed |n|
+        if positive, it refers to the first max_lines lines |n|
+        if negative, it refers to the last -max_lines lines |n|
+        if zero (default), all lines will be displayed
+
+    font : str or list/tuple
+        font to be used for texts |n|
+        Either a string or a list/tuple of fontnames.
+        If not found, uses calibri or arial
+
+    text_anchor : str
+        anchor position of text|n|
+        specifies where to texts relative to the polygon
+        point |n|
+        possible values are (default: c): |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
+
+    textcolor : colorspec
+        color of the text (default foreground_color)
+
+    textoffsetx : float
+        extra x offset to the text_anchor point
+
+    textoffsety : float
+        extra y offset to the text_anchor point
+
+    fontsize : float
+        fontsize of text (default 15)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    Note
+    ----
+    All measures are in screen coordinates |n|
+
+    All parameters, apart from queue and arg can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: title |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+    '''
+    def __init__(self, spec=(), x=0, y=0, linecolor='fg', linewidth=4,
+        text='', fontsize=15, textcolor='fg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
+        offsetx=0, offsety=0, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+        visible=True, env=None, screen_coordinates=False):
+        self.env = g.default_env if env is None else env
+
+        # the checks hasattr are req'd to not override methods of inherited classes
+        if not hasattr(self, 'spec'):
+            self.spec = spec
+        if not hasattr(self, 'linecolor'):
+            self.linecolor = linecolor
+        if not hasattr(self, 'linewidth'):
+            self.linewidth = linewidth
+        if not hasattr(self, 'x'):
+            self.x = x
+        if not hasattr(self, 'y'):
+            self.y = y
+        if not hasattr(self, 'offsetx'):
+            self.offsetx = offsetx
+        if not hasattr(self, 'offsety'):
+            self.offsety = offsety
+        if not hasattr(self, 'text_offsetx'):
+            self.text_offsetx = text_offsetx
+        if not hasattr(self, 'text_offsety'):
+            self.text_offsety = text_offsety
+        if not hasattr(self, 'text'):
+            self.text = text
+        if not hasattr(self, 'max_lines'):
+            self.max_lines = max_lines
+        if not hasattr(self, 'textcolor'):
+            self.textcolor = textcolor
+        if not hasattr(self, 'text_anchor'):
+            self.text_anchor = text_anchor
+        if not hasattr(self, 'angle'):
+            self.angle = angle
+        if not hasattr(self, 'font'):
+            self.font = font
+        if not hasattr(self, 'fontsize'):
+            self.fontsize = fontsize
+        if not hasattr(self, 'visible'):
+            self.visible = visible
+        if not hasattr(self, 'xy_anchor'):
+            self.xy_anchor = xy_anchor
+        if not hasattr(self, 'layer'):
+            self.layer = layer
+        self.fillcolor = ''
+        self.arg = self if arg is None else arg
+        ao0 = _AnimateVis(line0=(), as_points=True, vis=self,
+            screen_coordinates=screen_coordinates, env=env)
+        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao1.dependent = True
+        self.aos = (ao0, ao1)
+
+    def remove(self):
+        for ao in self.aos:
+            ao.remove()
+
+
+class AnimateCircle(_Vis):
+    '''
+    Displays a circle, optionally with a text
+
+    Parameters
+    ----------
+    radius : float
+        radius of the circle
+
+    x : float
+        position of anchor point (default 0)
+
+    y : float
+        position of anchor point (default 0)
+
+    xy_anchor : str
+        specifies where x and y are relative to |n|
+        possible values are (default: sw) : |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se`` |n|
+        If '', the given coordimates are used untranslated
+
+    offsetx : float
+        offsets the x-coordinate of the circle (default 0)
+
+    offsety : float
+        offsets the y-coordinate of the circle (default 0)
+
+    linewidth : float
+        linewidth of the contour |n|
+        default 1
+
+    fillcolor : colorspec
+        color of interior (default foreground_color) |n|
+        default transparent
+
+    linecolor : colorspec
+        color of the contour (default transparent)
+
+    angle : float
+        angle of the text (in degrees) |n|
+        default: 0
+
+    as_points : bool
+         if False (default), the contour lines are drawn |n|
+         if True, only the corner points are shown
+
+    text : str, tuple or list
+        the text to be displayed |n|
+        if text is str, the text may contain linefeeds, which are shown as individual lines
+
+    max_lines : int
+        the maximum of lines of text to be displayed |n|
+        if positive, it refers to the first max_lines lines |n|
+        if negative, it refers to the last -max_lines lines |n|
+        if zero (default), all lines will be displayed
+
+    font : str or list/tuple
+        font to be used for texts |n|
+        Either a string or a list/tuple of fontnames.
+        If not found, uses calibri or arial
+
+    text_anchor : str
+        anchor position of text|n|
+        specifies where to texts relative to the polygon
+        point |n|
+        possible values are (default: c): |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
+
+    textcolor : colorspec
+        color of the text (default foreground_color)
+
+    textoffsetx : float
+        extra x offset to the text_anchor point
+
+    textoffsety : float
+        extra y offset to the text_anchor point
+
+    fontsize : float
+        fontsize of text (default 15)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    Note
+    ----
+    All measures are in screen coordinates |n|
+
+    All parameters, apart from queue and arg can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: title |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+    '''
+    def __init__(self, radius=100, x=0, y=0, fillcolor='fg', linecolor='', linewidth=1,
+        text='', fontsize=15, textcolor='bg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
+        offsetx=0, offsety=0, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+        visible=True, env=None, screen_coordinates=False):
+        self.env = g.default_env if env is None else env
+
+        # the checks hasattr are req'd to not override methods of inherited classes
+        if not hasattr(self, 'radius'):
+            self.radius = radius
+        if not hasattr(self, 'fillcolor'):
+            self.fillcolor = fillcolor
+        if not hasattr(self, 'linecolor'):
+            self.linecolor = linecolor
+        if not hasattr(self, 'linewidth'):
+            self.linewidth = linewidth
+        if not hasattr(self, 'angle'):
+            self.angle = angle
+        if not hasattr(self, 'x'):
+            self.x = x
+        if not hasattr(self, 'y'):
+            self.y = y
+        if not hasattr(self, 'offsetx'):
+            self.offsetx = offsetx
+        if not hasattr(self, 'offsety'):
+            self.offsety = offsety
+        if not hasattr(self, 'text_offsetx'):
+            self.text_offsetx = text_offsetx
+        if not hasattr(self, 'text_offsety'):
+            self.text_offsety = text_offsety
+        if not hasattr(self, 'text'):
+            self.text = text
+        if not hasattr(self, 'max_lines'):
+            self.max_lines = max_lines
+        if not hasattr(self, 'textcolor'):
+            self.textcolor = textcolor
+        if not hasattr(self, 'text_anchor'):
+            self.text_anchor = text_anchor
+        if not hasattr(self, 'angle'):
+            self.angle = angle
+        if not hasattr(self, 'font'):
+            self.font = font
+        if not hasattr(self, 'fontsize'):
+            self.fontsize = fontsize
+        if not hasattr(self, 'visible'):
+            self.visible = visible
+        if not hasattr(self, 'xy_anchor'):
+            self.xy_anchor = xy_anchor
+        if not hasattr(self, 'layer'):
+            self.layer = layer
+        self.arg = self if arg is None else arg
+        ao0 = _AnimateVis(circle0=(), vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao1.dependent = True
+        self. aos = (ao0, ao1)
+
+    def remove(self):
+        for ao in self.aos:
+            ao.remove()
+
+
+class AnimateImage(_Vis):
+    '''
+    Displays an image, optionally with a text
+
+    Parameters
+    ----------
+    image : str
+        image to be displayed |n|
+        if used as function or method or in direct assigmnent,
+        the image should be a PIL image (most likely via spec_to_image)
+
+    x : float
+        position of anchor point (default 0)
+
+    y : float
+        position of anchor point (default 0)
+
+    xy_anchor : str
+        specifies where x and y are relative to |n|
+        possible values are (default: sw) : |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se`` |n|
+        If '', the given coordimates are used untranslated
+        
+    anchor : str
+        specifies where the x and refer to |n|
+        possible values are (default: sw) : |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se`` |n|
+
+    offsetx : float
+        offsets the x-coordinate of the circle (default 0)
+
+    offsety : float
+        offsets the y-coordinate of the circle (default 0)
+
+    angle : float
+        angle of the text (in degrees) |n|
+        default: 0
+
+    text : str, tuple or list
+        the text to be displayed |n|
+        if text is str, the text may contain linefeeds, which are shown as individual lines
+
+    max_lines : int
+        the maximum of lines of text to be displayed |n|
+        if positive, it refers to the first max_lines lines |n|
+        if negative, it refers to the last -max_lines lines |n|
+        if zero (default), all lines will be displayed
+
+    font : str or list/tuple
+        font to be used for texts |n|
+        Either a string or a list/tuple of fontnames.
+        If not found, uses calibri or arial
+
+    text_anchor : str
+        anchor position of text|n|
+        specifies where to texts relative to the polygon
+        point |n|
+        possible values are (default: c): |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
+
+    textcolor : colorspec
+        color of the text (default foreground_color)
+
+    textoffsetx : float
+        extra x offset to the text_anchor point
+
+    textoffsety : float
+        extra y offset to the text_anchor point
+
+    fontsize : float
+        fontsize of text (default 15)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    Note
+    ----
+    All measures are in screen coordinates |n|
+
+    All parameters, apart from queue and arg can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: title |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+    '''
+
+    def __init__(self, spec='', x=0, y=0, width=None,
+        text='', fontsize=15, textcolor='bg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
+        offsetx=0, offsety=0, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+        anchor='sw', visible=True, env=None, screen_coordinates=False):
+        self.env = g.default_env if env is None else env
+
+        # the checks hasattr are req'd to not override methods of inherited classes
+        if not hasattr(self, 'spec'):
+            self.spec = spec_to_image(spec)
+        if not hasattr(self, 'width'):
+            self.width = width
+        if not hasattr(self, 'x'):
+            self.x = x
+        if not hasattr(self, 'y'):
+            self.y = y
+        if not hasattr(self, 'offsetx'):
+            self.offsetx = offsetx
+        if not hasattr(self, 'offsety'):
+            self.offsety = offsety
+        if not hasattr(self, 'text_offsetx'):
+            self.text_offsetx = text_offsetx
+        if not hasattr(self, 'text_offsety'):
+            self.text_offsety = text_offsety
+        if not hasattr(self, 'text'):
+            self.text = text
+        if not hasattr(self, 'max_lines'):
+            self.max_lines = max_lines
+        if not hasattr(self, 'textcolor'):
+            self.textcolor = textcolor
+        if not hasattr(self, 'text_anchor'):
+            self.text_anchor = text_anchor
+        if not hasattr(self, 'angle'):
+            self.angle = angle
+        if not hasattr(self, 'anchor'):
+            self.anchor = anchor
+        if not hasattr(self, 'font'):
+            self.font = font
+        if not hasattr(self, 'fontsize'):
+            self.fontsize = fontsize
+        if not hasattr(self, 'visible'):
+            self.visible = visible
+        if not hasattr(self, 'xy_anchor'):
+            self.xy_anchor = xy_anchor
+        if not hasattr(self, 'layer'):
+            self.layer = layer
+
+        self.arg = self if arg is None else arg
+        ao0 = _AnimateVis(image='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao1.dependent = True
+        self. aos = (ao0, ao1)
+
+    def remove(self):
+        for ao in self.aos:
+            ao.remove()
+
+
+class _AnimateVis(Animate):
+    def __init__(self, vis, *args, **kwargs):
+        Animate.__init__(self, *args, **kwargs)
+        self.vis = vis
+
+    def x(self, t):
+        return _call(self.vis.x, t, self.vis.arg)
+
+    def y(self, t):
+        return _call(self.vis.y, t, self.vis.arg)
+
+    def offsetx(self, t):
+        return _call(self.vis.offsetx, t, self.vis.arg)
+
+    def offsety(self, t):
+        return _call(self.vis.offsety, t, self.vis.arg)
+
+    def text_offsetx(self, t):
+        return _call(self.vis.text_offsetx, t, self.vis.arg)
+
+    def text_offsety(self, t):
+        return _call(self.vis.text_offsety, t, self.vis.arg)
+
+    def rectangle(self, t):
+        return _call(self.vis.spec, t, self.vis.arg)
+
+    def line(self, t):
+        return _call(self.vis.spec, t, self.vis.arg)
+
+    def polygon(self, t):
+        return _call(self.vis.spec, t, self.vis.arg)
+
+    def circle(self, t):
+        return _call(self.vis.radius, t, self.vis.arg)
+
+    def image(self, t):
+        return _call(self.vis.spec, t, self.vis.arg)
+
+    def fillcolor(self, t):
+        return _call(self.vis.fillcolor, t, self.vis.arg)
+
+    def linecolor(self, t):
+        return _call(self.vis.linecolor, t, self.vis.arg)
+
+    def linewidth(self, t):
+        return _call(self.vis.linewidth, t, self.vis.arg)
+
+    def text(self, t):
+        return _call(self.vis.text, t, self.vis.arg)
+
+    def max_lines(self, t):
+        return _call(self.vis.max_lines, t, self.vis.arg)
+
+    def textcolor(self, t):
+        return _call(self.vis.textcolor, t, self.vis.arg)
+
+    def text_anchor(self, t):
+        return _call(self.vis.text_anchor, t, self.vis.arg)
+
+    def angle(self, t):
+        return _call(self.vis.angle, t, self.vis.arg)
+
+    def width(self, t):
+        return _call(self.vis.width, t, self.vis.arg)
+
+    def anchor(self, t):
+        return _call(self.vis.anchor, t, self.vis.arg)
+
+    def font(self, t):
+        return _call(self.vis.font, t, self.vis.arg)
+
+    def fontsize(self, t):
+        return _call(self.vis.fontsize, t, self.vis.arg)
+
+    def visible(self, t):
+        return _call(self.vis.visible, t, self.vis.arg)
+
+    def xy_anchor(self, t):
+        return _call(self.vis.xy_anchor, t, self.vis.arg)
+
+    def layer(self, t):
+        return _call(self.vis.layer, t, self.vis.arg)
+
+
+class _AosObject(object):  # for Monitor.animate and MonitorTimestamp.animate
+    def __init__(self):
+        self.aos = []
+
+    def remove(self):
+        for ao in self.aos:
+            ao.remove()
+        self.aos = []
+
+
+class _Animate_index_x_Line(Animate):
+    def __init__(self, monitor, xll, yll, width, height, value_offsety, value_scale, index_scale,
+        linewidth, *args, **kwargs):
+        self.monitor = monitor
+        self.xll = xll
+        self.yll = yll
+        self.width = width
+        self.height = height
+        self.value_offsety = value_offsety
+        self.value_scale = value_scale
+        self.index_scale = index_scale
+        self._linewidth = linewidth
+        self.index_width = int(self.width / self.index_scale)
+        Animate.__init__(self, *args, **kwargs)
+
+    def index_to_x(self, index):
+        if len(self.monitor._x) > self.index_width:
+            index = index + self.index_width - len(self.monitor._x)
+            if index < 0:
+                self.done = True
+        x = (index + 0.5) * self.index_scale
+        return self.xll + max(self._linewidth / 2, min(self.width - self._linewidth / 2, x))
+
+    def value_to_y(self, value):
+        try:
+            value = float(value)
+        except ValueError:
+            value = 0
+        return self.yll + max(
+            self._linewidth / 2, min(self.height - self._linewidth / 2, value * self.value_scale + self.value_offsety))
+
+    def line(self, t):
+        p = []
+        self.done = False
+
+        for index, value in zip(reversed(range(len(self.monitor._x))), reversed(self.monitor._x)):
+            x = self.index_to_x(index)
+            if self.done:
+                break
+            y = self.value_to_y(value)
+
+            p.append(x)
+            p.append(y)
+        return p
+
+
+class _Animate_t_x_Line(Animate):
+    def __init__(self, monitor, width, height, value_offsety, value_scale, t_scale, linewidth,
+        as_level, *args, **kwargs):
+        self.monitor = monitor
+        self.width = width
+        self.height = height
+        self.value_offsety = value_offsety
+        self.value_scale = value_scale
+        self.t_scale = t_scale
+        self._linewidth = linewidth
+        self.as_level = as_level
+        self.t_width = self.width / self.t_scale
+        Animate.__init__(self, *args, **kwargs)
+
+    def t_to_x(self, t):
+        if self.tnow > self.t_width:
+            t = t + self.t_width - self.tnow
+            if t < 0:
+                t = 0
+                self.done = True
+        x = t * self.t_scale
+        return max(self._linewidth / 2, min(self.width - self._linewidth / 2, x))
+
+    def value_to_y(self, value):
+        if value == self.monitor.off:
+            value = 0
+        else:
+            try:
+                value = float(value)
+            except ValueError:
+                value = 0
+        return max(
+          self._linewidth / 2, min(self.height - self._linewidth / 2, value * self.value_scale + self.value_offsety))
+
+    def line(self, t):
+        self.tnow = t
+        l = []
+        value = self.monitor._x[-1]
+        lastt = t
+        if self.as_level:
+            l.append(self.t_to_x(lastt))
+            l.append(self.value_to_y(value))
+        self.done = False
+        for value, t in zip(reversed(self.monitor._x), reversed(self.monitor._t)):
+            if self.as_level:
+                l.append(self.t_to_x(lastt))
+                l.append(self.value_to_y(value))
+            l.append(self.t_to_x(t))
+            l.append(self.value_to_y(value))
+            if self.done:
+                break
+            lastt = t
+        return l
+
+
+class _Animate_t_Line(Animate):
+    def __init__(self, monitor, width, height, t_scale, *args, **kwargs):
+        self.monitor = monitor
+        self.t_scale = t_scale
+        self.width = width
+        self.height = height
+        self.t_width = self.width / self.t_scale
+        Animate.__init__(self, *args, **kwargs)
+
+    def line(self, t):
+        if t > self.t_width:
+            t = self.t_width
+        x = t * self.t_scale
+        return x, 0, x, self.height
+
+
 class Component(object):
     '''Component object
 
@@ -6461,8 +8602,8 @@ class Component(object):
 
     process : str
         name of process to be started. |n|
-        if omitted, it will try to start self.process() |n|
-        if None, no process will be started even if self.process() exists,
+        if None (default), it will try to start self.process() |n|
+        if '', no process will be started even if self.process() exists,
         i.e. become a data component. |n|
         note that the function *must* be a generator,
         i.e. contains at least one yield.
@@ -6490,9 +8631,10 @@ class Component(object):
         if omitted, default_env will be used
     '''
 
-    def __init__(self, name=omitted, at=omitted, delay=omitted, urgent=omitted,
-      process=omitted, suppress_trace=False, suppress_pause_at_step=False, mode=None, env=omitted, **kwargs):
-        if env is omitted:
+    def __init__(self, name=None, at=None, delay=None, urgent=None,
+      process=None, suppress_trace=False, suppress_pause_at_step=False, mode=None,
+      env=None, **kwargs):
+        if env is None:
             self.env = g.default_env
         else:
             self.env = env
@@ -6513,17 +8655,17 @@ class Component(object):
         self._mode_time = self.env._now
         self._aos = {}
 
-        if mode is not omitted:
+        if mode is not None:
             self._mode = mode
             self._mode_time = self.env._now
 
-        if process is omitted:
+        if process is None:
             if self.hasprocess():
                 p = self.process
             else:
                 p = None
         else:
-            if process is None:
+            if process is '':
                 p = None
             else:
                 try:
@@ -6531,11 +8673,11 @@ class Component(object):
                 except:
                     raise SalabimError('self.' + process + ' not found')
         if p is None:
-            if at is not omitted:
+            if at is not None:
                 raise SalabimError('at is not allowed for a data component')
-            if delay is not omitted:
+            if delay is not None:
                 raise SalabimError('delay is not allowed for a data component')
-            if urgent is not omitted:
+            if urgent is not None:
                 raise SalabimError('urgent is not allowed for a data component')
             if self.env._trace:
                 if self._name == 'main':
@@ -6564,11 +8706,11 @@ class Component(object):
             else:
                 self._process = p()
             extra = 'process=' + self._process.__name__
-            if urgent is omitted:
+            if urgent is None:
                 urgent = False
-            if delay is omitted:
+            if delay is None:
                 delay = 0
-            if at is omitted:
+            if at is None:
                 scheduled_time = self.env._now + delay
             else:
                 scheduled_time = at + self.env._offset + delay
@@ -6576,14 +8718,14 @@ class Component(object):
             self._reschedule(scheduled_time, urgent, 'activate', extra=extra)
         self.setup(**kwargs)
 
-    def animation_objects(self, q):
+    def animation_objects(self, id):
         '''
-        defines how to display a component when animate a queue
+        defines how to display a component in AnimateQueue
 
         Parameters
         ----------
-        q : Queue
-            queue to be visualized. This may be ignored.
+        id : any
+            id as given by AnimateQueue. Note that by default this the reference to the AnimateQueue object.
 
         Returns
         -------
@@ -6592,17 +8734,17 @@ class Component(object):
             size_y : how much to displace the next component in y-direction, if applicable |n|
             animation objects : instances of Animate class |n|
             default behaviour: |n|
-            green square of size 40 (displacements 50), with the sequence number centered in white.
+            square of size 40 (displacements 50), with the sequence number centered.
 
         Note
         ----
-        If you override this method, be sure to use the same header. |n|
+        If you override this method, be sure to use the same header, either with or without the id parameter. |n|
         '''
         size_x = 50
         size_y = 50
-        ao1 = Animate(rectangle0=(-20, -20, 20, 20), linewidth0=0, fillcolor0=self.env._foreground_color)
-        ao2 = Animate(text=str(self.sequence_number()), textcolor0=self.env._background_color, anchor='c')
-        return (size_x, size_y, ao1, ao2)
+        ao0 = AnimateRectangle(text=str(self.sequence_number()), textcolor='bg', spec=(-20, -20, 20, 20),
+            linewidth=0, fillcolor='fg')
+        return (size_x, size_y, ao0)
 
     def _remove_from_aos(self, q):
         if q in self._aos:
@@ -6679,48 +8821,60 @@ class Component(object):
         registry.remove(self)
         return self
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
-        prints information about the queue
+        prints information about the component
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print(objectclass_to_str(self) + ' ' + hex(id(self)))
-        print('  name=' + self.name())
-        print('  class=' + str(type(self)).split('.')[-1].split("'")[0])
-        print('  suppress_trace=' + str(self._suppress_trace))
-        print('  suppress_pause_at_step=' + str(self._suppress_pause_at_step))
-        print('  status=' + self._status())
-        print('  mode=' + _modetxt(self._mode).strip())
-        print('  mode_time=' + time_to_string(self._mode_time))
-        print('  creation_time=' + time_to_string(self._creation_time))
-        print('  scheduled_time=' +
+        result = []
+        result.append(objectclass_to_str(self) + ' ' + hex(id(self)))
+        result.append('  name=' + self.name())
+        result.append('  class=' + str(type(self)).split('.')[-1].split("'")[0])
+        result.append('  suppress_trace=' + str(self._suppress_trace))
+        result.append('  suppress_pause_at_step=' + str(self._suppress_pause_at_step))
+        result.append('  status=' + self._status())
+        result.append('  mode=' + _modetxt(self._mode).strip())
+        result.append('  mode_time=' + time_to_string(self._mode_time))
+        result.append('  creation_time=' + time_to_string(self._creation_time))
+        result.append('  scheduled_time=' +
             time_to_string(self._scheduled_time))
         if len(self._qmembers) > 0:
-            print('  member of queue(s):')
+            result.append('  member of queue(s):')
             for q in sorted(self._qmembers, key=lambda obj: obj.name().lower()):
-                print('    ' + pad(q.name(), 20) + ' enter_time=' +
+                result.append('    ' + pad(q.name(), 20) + ' enter_time=' +
                     time_to_string(self._qmembers[q].enter_time - self.env._offset) +
                     ' priority=' + str(self._qmembers[q].priority))
         if len(self._requests) > 0:
-            print('  requesting resource(s):')
+            result.append('  requesting resource(s):')
 
             for r in sorted(list(self._requests),
               key=lambda obj: obj.name().lower()):
-                print('    ' + pad(r.name(), 20) + ' quantity=' +
+                result.append('    ' + pad(r.name(), 20) + ' quantity=' +
                     str(self._requests[r]))
         if len(self._claims) > 0:
-            print('  claiming resource(s):')
+            result.append('  claiming resource(s):')
 
             for r in sorted(list(self._claims), key=lambda obj: obj.name().lower()):
-                print('    ' + pad(r.name(), 20) +
+                result.append('    ' + pad(r.name(), 20) +
                     ' quantity=' + str(self._claims[r]))
         if len(self._waits) > 0:
             if self._wait_all:
-                print('  waiting for all of state(s):')
+                result.append('  waiting for all of state(s):')
             else:
-                print('  waiting for any of state(s):')
+                result.append('  waiting for any of state(s):')
             for s, value, _ in self._waits:
-                print('    ' + pad(s.name(), 20) +
+                result.append('    ' + pad(s.name(), 20) +
                     ' value=' + str(value))
+        return return_or_print(result, as_str)
 
     def hasprocess(self):
         if hasattr(self, 'process'):
@@ -6793,8 +8947,8 @@ class Component(object):
                     _modetxt(self._mode),
                     extra))
 
-    def activate(self, at=omitted, delay=0, urgent=False, process=omitted,
-      keep_request=False, keep_wait=False, mode=omitted, **kwargs):
+    def activate(self, at=None, delay=0, urgent=False, process=None,
+      keep_request=False, keep_wait=False, mode=None, **kwargs):
         '''
         activate component
 
@@ -6820,7 +8974,7 @@ class Component(object):
 
         process : str
             name of process to be started. |n|
-            if omitted, process will not be changed |n|
+            if None (default), process will not be changed |n|
             if the component is a data component, the
             generator function process will be used as the default process. |n|
             note that the function *must* be a generator,
@@ -6849,7 +9003,7 @@ class Component(object):
         of the two values.
         '''
         p = None
-        if process is omitted:
+        if process is None:
             if self._status == data:
                 if self.hasprocess():
                     p = self.process
@@ -6887,18 +9041,18 @@ class Component(object):
             else:
                 self._check_fail()
 
-        if mode is not omitted:
+        if mode is not None:
             self._mode = mode
             self._mode_time = self.env._now
 
-        if at is omitted:
+        if at is None:
             scheduled_time = self.env._now + delay
         else:
             scheduled_time = at + self.env._offset + delay
 
         self._reschedule(scheduled_time, urgent, 'activate', extra=extra)
 
-    def hold(self, duration=omitted, till=omitted, urgent=False, mode=omitted):
+    def hold(self, duration=None, till=None, urgent=False, mode=None):
         '''
         hold the component
 
@@ -6941,23 +9095,23 @@ class Component(object):
                 self._checkisnotdata()
                 self._remove()
                 self._check_fail()
-        if mode is not omitted:
+        if mode is not None:
             self._mode = mode
             self._mode_time = self.env._now
 
-        if till is omitted:
-            if duration is omitted:
+        if till is None:
+            if duration is None:
                 scheduled_time = self.env._now
             else:
                 scheduled_time = self.env._now + duration
         else:
-            if duration is omitted:
+            if duration is None:
                 scheduled_time = till + self.env._offset
             else:
                 raise SalabimError('both duration and till specified')
         self._reschedule(scheduled_time, urgent, 'hold')
 
-    def passivate(self, mode=omitted):
+    def passivate(self, mode=None):
         '''
         passivate the component
 
@@ -6981,14 +9135,14 @@ class Component(object):
             self._check_fail()
             self._remaining_duration = self._scheduled_time - self.env._now
         self._scheduled_time = inf
-        if mode is not omitted:
+        if mode is not None:
             self._mode = mode
             self._mode_time = self.env._now
         if self.env._trace:
             self.env.print_trace('', '', self.name() + ' passivate', merge_blanks(_modetxt(self._mode)))
         self._status = passive
 
-    def interrupt(self, mode=omitted):
+    def interrupt(self, mode=None):
         '''
         interrupt the component
 
@@ -7008,7 +9162,7 @@ class Component(object):
         if self._status == current:
             raise SalabimError(self.name() + ' current component cannot be interrupted')
         else:
-            if mode is not omitted:
+            if mode is not None:
                 self._mode = mode
                 self._mode_time = self.env._now
             if self._status == interrupted:
@@ -7024,7 +9178,7 @@ class Component(object):
                 extra = ''
             self.env.print_trace('', '', self.name() + ' interrupt' + extra, merge_blanks(_modetxt(self._mode)))
 
-    def resume(self, all=False, mode=omitted, urgent=False):
+    def resume(self, all=False, mode=None, urgent=False):
         '''
         resumes an interrupted component
 
@@ -7055,7 +9209,7 @@ class Component(object):
         Can be only applied to interrupted components. |n|
         '''
         if self._status == interrupted:
-            if mode is not omitted:
+            if mode is not None:
                 self._mode = mode
                 self._mode_time = self.env._now
             self._interrupt_level -= 1
@@ -7090,7 +9244,7 @@ class Component(object):
         else:
             raise SalabimError(self.name() + ' not interrupted')
 
-    def cancel(self, mode=omitted):
+    def cancel(self, mode=None):
         '''
         cancel component (makes the component data)
 
@@ -7112,7 +9266,7 @@ class Component(object):
             self._check_fail()
         self._process = None
         self._scheduled_time = inf
-        if mode is not omitted:
+        if mode is not None:
             self._mode = mode
             self._mode_time = self.env._now
         if self.env._trace:
@@ -7123,7 +9277,7 @@ class Component(object):
             if ao.parent == self:
                 self.env.an_objects.remove(ao)
 
-    def standby(self, mode=omitted):
+    def standby(self, mode=None):
         '''
         puts the component in standby mode
 
@@ -7150,7 +9304,7 @@ class Component(object):
             self._check_fail()
         self._scheduled_time = self.env._now
         self.env._standbylist.append(self)
-        if mode is not omitted:
+        if mode is not None:
             self._mode = mode
             self._mode_time = self.env._now
         if self.env._trace:
@@ -7218,9 +9372,9 @@ class Component(object):
         ``yield self.request((r1,1),(r2,2))`` |n|
         --> requests 1 from r1, 2 from r2 |n|
         '''
-        fail_at = kwargs.pop('fail_at', omitted)
-        fail_delay = kwargs.pop('fail_delay', omitted)
-        mode = kwargs.pop('mode', omitted)
+        fail_at = kwargs.pop('fail_at', None)
+        fail_delay = kwargs.pop('fail_delay', None)
+        mode = kwargs.pop('mode', None)
         if kwargs:
             raise TypeError("request() got an expected keyword argument '" + tuple(kwargs)[0] + "'")
 
@@ -7229,8 +9383,8 @@ class Component(object):
             self._checkisnotmain()
             self._remove()
             self._check_fail()
-        if fail_at is omitted:
-            if fail_delay is omitted:
+        if fail_at is None:
+            if fail_delay is None:
                 scheduled_time = inf
             else:
                 if fail_delay == inf:
@@ -7238,12 +9392,12 @@ class Component(object):
                 else:
                     scheduled_time = self.env._now + fail_delay
         else:
-            if fail_delay is omitted:
+            if fail_delay is None:
                 scheduled_time = fail_at + self.env._offset
             else:
                 raise SalabimError('both fail_at and fail_delay specified')
 
-        if mode is not omitted:
+        if mode is not None:
             self._mode = mode
             self._mode_time = self.env._now
 
@@ -7315,7 +9469,7 @@ class Component(object):
             self._reschedule(self.env._now, False, 'request honor')
         return honored
 
-    def _release(self, r, q=None, s0=omitted):
+    def _release(self, r, q=None, s0=None):
         if r not in self._claims:
             raise SalabimError(self.name() +
                 ' not claiming from resource ' + r.name())
@@ -7470,10 +9624,10 @@ class Component(object):
         ``yield self.wait(s1,s2,all=True)`` |n|
         --> waits for s1.value()==True and s2.value==True |n|
         '''
-        fail_at = kwargs.pop('fail_at', omitted)
-        fail_delay = kwargs.pop('fail_delay', omitted)
+        fail_at = kwargs.pop('fail_at', None)
+        fail_delay = kwargs.pop('fail_delay', None)
         all = kwargs.pop('all', False)
-        mode = kwargs.pop('mode', omitted)
+        mode = kwargs.pop('mode', None)
         if kwargs:
             raise TypeError("wait() got an expected keyword argument '" + tuple(kwargs)[0] + "'")
 
@@ -7486,8 +9640,8 @@ class Component(object):
         self._wait_all = all
         self._fail = False
 
-        if fail_at is omitted:
-            if fail_delay is omitted:
+        if fail_at is None:
+            if fail_delay is None:
                 scheduled_time = inf
             else:
                 if fail_delay == inf:
@@ -7495,12 +9649,12 @@ class Component(object):
                 else:
                     scheduled_time = self.env._now + fail_delay
         else:
-            if fail_delay is omitted:
+            if fail_delay is None:
                 scheduled_time = fail_at + self.env._offset
             else:
                 raise SalabimError('both fail_at and fail_delay specified')
 
-        if mode is not omitted:
+        if mode is not None:
             self._mode = mode
             self._mode_time = self.env._now
 
@@ -7638,7 +9792,7 @@ class Component(object):
         '''
         return self._failed
 
-    def name(self, value=omitted):
+    def name(self, value=None):
         '''
         Parameters
         ----------
@@ -7654,7 +9808,7 @@ class Component(object):
         ----
         base_name and sequence_number are not affected if the name is changed
         '''
-        if value is not omitted:
+        if value is not None:
             self._name = value
         return self._name
 
@@ -7690,7 +9844,7 @@ class Component(object):
         else:
             return self._process.__name__
 
-    def suppress_trace(self, value=omitted):
+    def suppress_trace(self, value=None):
         '''
         Parameters
         ----------
@@ -7703,11 +9857,11 @@ class Component(object):
         suppress_trace : bool
             components with the suppress_status of True, will be ignored in the trace
         '''
-        if value is not omitted:
+        if value is not None:
             self._suppress_trace = value
         return self._suppress_trace
 
-    def suppress_pause_at_step(self, value=omitted):
+    def suppress_pause_at_step(self, value=None):
         '''
         Parameters
         ----------
@@ -7720,11 +9874,11 @@ class Component(object):
         suppress_pause_at_step : bool
             components with the suppress_pause_at_step of True, will be ignored in a step
         '''
-        if value is not omitted:
+        if value is not None:
             self._suppress_pause_at_step = value
         return self._suppress_pause_at_step
 
-    def mode(self, value=omitted):
+    def mode(self, value=None):
         '''
         Parameters
         ----------
@@ -7739,7 +9893,7 @@ class Component(object):
             the mode is useful for tracing and animations. |n|
             Usually the mode will be set in a call to passivate, hold, activate, request or standby.
         '''
-        if value is not omitted:
+        if value is not None:
             self._mode_time = self.env._now
             self._mode = value
 
@@ -7849,7 +10003,7 @@ class Component(object):
         '''
         return set(self._qmembers)
 
-    def count(self, q=omitted):
+    def count(self, q=None):
         '''
         queue count
 
@@ -7865,7 +10019,7 @@ class Component(object):
             |n|
             if q is omitted, the number of queues where the component is in
         '''
-        if q is omitted:
+        if q is None:
             return len(self._qmembers)
         else:
             return 1 if self in q else 0
@@ -8005,7 +10159,7 @@ class Component(object):
         Qmember().insert_in_front_of(m2, self, q, priority)
         return self
 
-    def leave(self, q=omitted):
+    def leave(self, q=None):
         '''
         leave queue
 
@@ -8018,7 +10172,7 @@ class Component(object):
         ----
         statistics are updated accordingly
         '''
-        if q is omitted:
+        if q is None:
             for q in list(self._qmembers):
                 if not q._isinternal:
                     self.leave(q)
@@ -8039,12 +10193,9 @@ class Component(object):
         length_of_stay = self.env._now - mx.enter_time
         q.length_of_stay.tally(length_of_stay)
         q.length.tally(q._length)
-        if q._animate_on:
-            self._remove_from_aos(q)
-            q._animate_update()
         return self
 
-    def priority(self, q, priority=omitted):
+    def priority(self, q, priority=None):
         '''
         gets/sets the priority of a component in a queue
 
@@ -8067,7 +10218,7 @@ class Component(object):
         '''
 
         mx = self._checkinqueue(q)
-        if priority is not omitted:
+        if priority is not None:
             if priority != mx.priority:
                 # leave.sort is not possible, because statistics will be affected
                 mx.predecessor.successor = mx.successor
@@ -8151,7 +10302,7 @@ class Component(object):
         '''
         return self._scheduled_time - self.env._offset
 
-    def remaining_duration(self, value=omitted, urgent=False):
+    def remaining_duration(self, value=None, urgent=False):
         '''
         Parameters
         ----------
@@ -8186,7 +10337,7 @@ class Component(object):
         This method is usefu for interrupting a process and then resuming it,
         after some (breakdown) time
         '''
-        if value is not omitted:
+        if value is not None:
             if self._status in (passive, interrupted):
                 self._remaining_duration = value
             elif self._status == current:
@@ -8304,9 +10455,22 @@ class Component(object):
         return self.env._frame_to_lineno(frame) + plus
 
 
+class Random(random.Random):
+    '''
+    defines a randomstream, equivalent to random.Random()
+
+    Parameters
+    ----------
+    seed : any hashable
+        default: None
+    '''
+    def __init__(self, seed=None):
+        random.Random.__init__(self, seed)
+
+
 class _Distribution():
 
-    def bounded_sample(self, lowerbound=-inf, upperbound=inf, fail_value=omitted, number_of_retries=100):
+    def bounded_sample(self, lowerbound=-inf, upperbound=inf, fail_value=None, number_of_retries=100):
         '''
         Parameters
         ----------
@@ -8339,9 +10503,9 @@ class _Distribution():
         if (lowerbound == -inf) and (upperbound == inf):
             return self.sample()
 
-        if lowerbound is omitted:
+        if lowerbound is None:
             lowerbound = -inf
-        if upperbound is omitted:
+        if upperbound is None:
             upperbound = inf
 
         if lowerbound > upperbound:
@@ -8350,7 +10514,7 @@ class _Distribution():
         if number_of_retries <= 0:
             raise SalabimError('number_of_tries <= 0')
 
-        if fail_value is omitted:
+        if fail_value is None:
             if lowerbound == -inf:
                 fail_value = upperbound
             else:
@@ -8399,39 +10563,51 @@ class Exponential(_Distribution):
     Either mean or rate has to be specified, not both
     '''
 
-    def __init__(self, mean=omitted, rate=omitted, randomstream=omitted):
-        if mean is omitted:
-            if rate is omitted:
+    def __init__(self, mean=None, rate=None, randomstream=None):
+        if mean is None:
+            if rate is None:
                 raise SalabimError('neither mean nor rate are specified')
             else:
                 if rate <= 0:
                     raise SalabimError('rate<=0')
                 self._mean = 1 / rate
         else:
-            if rate is omitted:
+            if rate is None:
                 if mean <= 0:
                     raise SalabimError('mean<=0')
                 self._mean = mean
             else:
                 raise SalabimError('both mean and rate are specified')
 
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
 
     def __repr__(self):
         return('Exponential')
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print('Exponential distribution ' + hex(id(self)))
-        print('  mean=' + str(self._mean))
-        print('  rate (lambda)=' + str(1 / self._mean))
-        print('  randomstream=' + hex(id(self.randomstream)))
+        result = []
+        result.append('Exponential distribution ' + hex(id(self)))
+        result.append('  mean=' + str(self._mean))
+        result.append('  rate (lambda)=' + str(1 / self._mean))
+        result.append('  randomstream=' + hex(id(self.randomstream)))
+        return return_or_print(result, as_str)
 
     def sample(self):
         '''
@@ -8484,47 +10660,59 @@ class Normal(_Distribution):
         it assigns a new stream with the specified seed
     '''
 
-    def __init__(self, mean, standard_deviation=omitted, coefficient_of_variation=omitted,
-      use_gauss=False, randomstream=omitted):
+    def __init__(self, mean, standard_deviation=None, coefficient_of_variation=None,
+      use_gauss=False, randomstream=None):
         self._use_gauss = use_gauss
         self._mean = mean
-        if standard_deviation is omitted:
-            if coefficient_of_variation is omitted:
+        if standard_deviation is None:
+            if coefficient_of_variation is None:
                 self._standard_deviation = 0
             else:
                 if mean == 0:
                     raise SalabimError('coefficient_of_variation not allowed with mean = 0')
                 self._standard_deviation = coefficient_of_variation * mean
         else:
-            if coefficient_of_variation is omitted:
+            if coefficient_of_variation is None:
                 self._standard_deviation = standard_deviation
             else:
                 raise SalabimError('both standard_deviation and coefficient_of_variation specified')
         if self._standard_deviation < 0:
             raise SalabimError('standard_deviation < 0')
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
 
     def __repr__(self):
         return 'Normal'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print('Normal distribution ' + hex(id(self)))
-        print('  mean=' + str(self._mean))
-        print('  standard_deviation=' + str(self._standard_deviation))
+        result = []
+        result.append('Normal distribution ' + hex(id(self)))
+        result.append('  mean=' + str(self._mean))
+        result.append('  standard_deviation=' + str(self._standard_deviation))
         if self._mean == 0:
-            print('  coefficient of variation= N/A')
+            result.append('  coefficient of variation= N/A')
         else:
-            print('  coefficient_of_variation=' + str(self._standard_deviation / self._mean))
+            result.append('  coefficient_of_variation=' + str(self._standard_deviation / self._mean))
         if self._use_gauss:
-            print('  use_gauss=True')
-        print('  randomstream=' + hex(id(self.randomstream)))
+            result.append('  use_gauss=True')
+        result.append('  randomstream=' + hex(id(self.randomstream)))
+        return return_or_print(result, as_str)
 
     def sample(self):
         '''
@@ -8579,37 +10767,49 @@ class IntUniform(_Distribution):
     This will print 10 throws of a die.
     '''
 
-    def __init__(self, lowerbound, upperbound=omitted, randomstream=omitted):
+    def __init__(self, lowerbound, upperbound=None, randomstream=None):
         self._lowerbound = lowerbound
-        if upperbound is omitted:
+        if upperbound is None:
             self._upperbound = lowerbound
         else:
             self._upperbound = upperbound
         if self._lowerbound > self._upperbound:
             raise SalabimError('lowerbound>upperbound')
-        if lowerbound != int(lowerbound):
+        if self._lowerbound != int(self._lowerbound):
             raise SalabimError('lowerbound not integer')
-        if upperbound != int(upperbound):
+        if self._upperbound != int(self._upperbound):
             raise SalabimError('upperbound not integer')
 
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
         self._mean = (self._lowerbound + self._upperbound) / 2
 
     def __repr__(self):
         return 'IntUniform'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print('IntUniform distribution ' + hex(id(self)))
-        print('  lowerbound=' + str(self._lowerbound))
-        print('  upperbound=' + str(self._upperbound))
-        print('  randomstream=' + hex(id(self.randomstream)))
+        result = []
+        result.append('IntUniform distribution ' + hex(id(self)))
+        result.append('  lowerbound=' + str(self._lowerbound))
+        result.append('  upperbound=' + str(self._upperbound))
+        result.append('  randomstream=' + hex(id(self.randomstream)))
+        return return_or_print(result, as_str)
 
     def sample(self):
         '''
@@ -8649,32 +10849,44 @@ class Uniform(_Distribution):
         it assigns a new stream with the specified seed
     '''
 
-    def __init__(self, lowerbound, upperbound=omitted, randomstream=omitted):
+    def __init__(self, lowerbound, upperbound=None, randomstream=None):
         self._lowerbound = lowerbound
-        if upperbound is omitted:
+        if upperbound is None:
             self._upperbound = lowerbound
         else:
             self._upperbound = upperbound
         if self._lowerbound > self._upperbound:
             raise SalabimError('lowerbound>upperbound')
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
         self._mean = (self._lowerbound + self._upperbound) / 2
 
     def __repr__(self):
         return 'Uniform'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print('Uniform distribution ' + hex(id(self)))
-        print('  lowerbound=' + str(self._lowerbound))
-        print('  upperbound=' + str(self._upperbound))
-        print('  randomstream=' + hex(id(self.randomstream)))
+        result = []
+        result.append('Uniform distribution ' + hex(id(self)))
+        result.append('  lowerbound=' + str(self._lowerbound))
+        result.append('  upperbound=' + str(self._upperbound))
+        result.append('  randomstream=' + hex(id(self.randomstream)))
+        return return_or_print(result, as_str)
 
     def sample(self):
         '''
@@ -8719,13 +10931,13 @@ class Triangular(_Distribution):
         it assigns a new stream with the specified seed
     '''
 
-    def __init__(self, low, high=omitted, mode=omitted, randomstream=omitted):
+    def __init__(self, low, high=None, mode=None, randomstream=None):
         self._low = low
-        if high is omitted:
+        if high is None:
             self._high = low
         else:
             self._high = high
-        if mode is omitted:
+        if mode is None:
             self._mode = (self._high + self._low) / 2
         else:
             self._mode = mode
@@ -8735,25 +10947,37 @@ class Triangular(_Distribution):
             raise SalabimError('low>mode')
         if self._high < self._mode:
             raise SalabimError('high<mode')
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
         self._mean = (self._low + self._mode + self._high) / 3
 
     def __repr__(self):
         return 'Triangular'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print('Triangular distribution ' + hex(id(self)))
-        print('  low=' + str(self._low))
-        print('  high=' + str(self._high))
-        print('  mode=' + str(self._mode))
-        print('  randomstream=' + hex(id(self.randomstream)))
+        result = []
+        result.append('Triangular distribution ' + hex(id(self)))
+        result.append('  low=' + str(self._low))
+        result.append('  high=' + str(self._high))
+        result.append('  mode=' + str(self._mode))
+        result.append('  randomstream=' + hex(id(self.randomstream)))
+        return return_or_print(result, as_str)
 
     def sample(self):
         '''
@@ -8790,25 +11014,37 @@ class Constant(_Distribution):
 
     '''
 
-    def __init__(self, value, randomstream=omitted):
+    def __init__(self, value, randomstream=None):
         self._value = value
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
         self._mean = value
 
     def __repr__(self):
         return 'Constant'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print('Constant distribution ' + hex(id(self)))
-        print('  value=' + str(self._value))
-        print('  randomstream=' + hex(id(self.randomstream)))
+        result = []
+        result.append('Constant distribution ' + hex(id(self)))
+        result.append('  value=' + str(self._value))
+        result.append('  randomstream=' + hex(id(self.randomstream)))
+        return return_or_print(result, as_str)
 
     def sample(self):
         '''
@@ -8848,27 +11084,39 @@ class Poisson(_Distribution):
     It is not recommended to use mean (lambda) > 100
     '''
 
-    def __init__(self, mean, randomstream=omitted):
+    def __init__(self, mean, randomstream=None):
         if mean <= 0:
             raise SalabimError('mean (lambda) <=0')
 
         self._mean = mean
 
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
 
     def __repr__(self):
         return 'Poisson'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print('Poissonl distribution ' + hex(id(self)))
-        print('  mean (lambda)' + str(self._lambda_))
+        result = []
+        result.append('Poissonl distribution ' + hex(id(self)))
+        result.append('  mean (lambda)' + str(self._lambda_))
+        return return_or_print(result, as_str)
 
     def sample(self):
         '''
@@ -8920,16 +11168,16 @@ class Weibull(_Distribution):
         it assigns a new stream with the specified seed
     '''
 
-    def __init__(self, scale, shape, randomstream=omitted):
+    def __init__(self, scale, shape, randomstream=None):
         self._scale = scale
         if shape <= 0:
             raise SalabimError('shape<=0')
 
         self._shape = shape
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
 
         self._mean = self._scale * math.gamma((1 / self._shape) + 1)
@@ -8937,14 +11185,26 @@ class Weibull(_Distribution):
     def __repr__(self):
         return 'Weibull'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print('Weibull distribution ' + hex(id(self)))
-        print('  scale (alpha or k)=' + str(self._scale))
-        print('  shape (beta or lambda)=' + str(self._shape))
-        print('  randomstream=' + hex(id(self.randomstream)))
+        result = []
+        result.append('Weibull distribution ' + hex(id(self)))
+        result.append('  scale (alpha or k)=' + str(self._scale))
+        result.append('  shape (beta or lambda)=' + str(self._shape))
+        result.append('  randomstream=' + hex(id(self.randomstream)))
+        return return_or_print(result, as_str)
 
     def sample(self):
         '''
@@ -8992,29 +11252,29 @@ class Gamma(_Distribution):
     Either scale or rate has to be specified, not both.
     '''
 
-    def __init__(self, shape, scale=omitted, rate=omitted, randomstream=omitted):
+    def __init__(self, shape, scale=None, rate=None, randomstream=None):
         if shape <= 0:
             raise SalabimError('shape<=0')
         self._shape = shape
-        if rate is omitted:
-            if scale is omitted:
+        if rate is None:
+            if scale is None:
                 raise SalabimError('neither scale nor rate specified')
             else:
                 if scale <= 0:
                     raise SalabimError('scale<=0')
                 self._scale = scale
         else:
-            if scale is omitted:
+            if scale is None:
                 if rate <= 0:
                     raise SalabimError('rate<=0')
                 self._scale = 1 / rate
             else:
                 raise SalabimError('both scale and rate specified')
 
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
 
         self._mean = self._shape * self._scale
@@ -9022,15 +11282,27 @@ class Gamma(_Distribution):
     def __repr__(self):
         return 'Gamma'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print('Gamma distribution ' + hex(id(self)))
-        print('  shape (k)=' + str(self._shape))
-        print('  scale (teta)=' + str(self._scale))
-        print('  rate (beta)=' + str(1 / self._scale))
-        print('  randomstream=' + hex(id(self.randomstream)))
+        result = []
+        result.append('Gamma distribution ' + hex(id(self)))
+        result.append('  shape (k)=' + str(self._shape))
+        result.append('  scale (teta)=' + str(self._scale))
+        result.append('  rate (beta)=' + str(1 / self._scale))
+        result.append('  randomstream=' + hex(id(self.randomstream)))
+        return return_or_print(result, as_str)
 
     def sample(self):
         '''
@@ -9070,7 +11342,7 @@ class Beta(_Distribution):
         it assigns a new stream with the specified seed
     '''
 
-    def __init__(self, alpha, beta, randomstream=omitted):
+    def __init__(self, alpha, beta, randomstream=None):
         if alpha <= 0:
             raise SalabimError('alpha<=0')
         self._alpha = alpha
@@ -9078,10 +11350,10 @@ class Beta(_Distribution):
             raise SalabimError('beta<>=0')
         self._beta = beta
 
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
 
         self._mean = self._alpha / (self._alpha + self._beta)
@@ -9089,14 +11361,26 @@ class Beta(_Distribution):
     def __repr__(self):
         return 'Beta'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print('Beta distribution ' + hex(id(self)))
-        print('  alpha=' + str(self._alpha))
-        print('  beta=' + str(self._beta))
-        print('  randomstream=' + hex(id(self.randomstream)))
+        result = []
+        result.append('Beta distribution ' + hex(id(self)))
+        result.append('  alpha=' + str(self._alpha))
+        result.append('  beta=' + str(self._beta))
+        result.append('  randomstream=' + hex(id(self.randomstream)))
+        return return_or_print(result, as_str)
 
     def sample(self):
         '''
@@ -9146,31 +11430,31 @@ class Erlang(_Distribution):
     Either rate or scale has to be specified, not both.
     '''
 
-    def __init__(self, shape, rate=omitted, scale=omitted, randomstream=omitted):
+    def __init__(self, shape, rate=None, scale=None, randomstream=None):
         if int(shape) != shape:
             raise SalabimError('shape not integer')
         if shape <= 0:
             raise SalabimError('shape <=0')
         self._shape = shape
-        if rate is omitted:
-            if scale is omitted:
+        if rate is None:
+            if scale is None:
                 raise SalabimError('neither rate nor scale specified')
             else:
                 if scale <= 0:
                     raise SalabimError('scale<=0')
                 self._rate = 1 / scale
         else:
-            if scale is omitted:
+            if scale is None:
                 if rate <= 0:
                     raise SalabimError('rate<=0')
                 self._rate = rate
             else:
                 raise SalabimError('both rate and scale specified')
 
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
 
         self._mean = self._shape / self._rate
@@ -9178,15 +11462,27 @@ class Erlang(_Distribution):
     def __repr__(self):
         return 'Erlang'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print('Erlang distribution ' + hex(id(self)))
-        print('  shape (k)=' + str(self._shape))
-        print('  rate (lambda)=' + str(self._rate))
-        print('  scale (mu)=' + str(1 / self._rate))
-        print('  randomstream=' + hex(id(self.randomstream)))
+        result = []
+        result.append('Erlang distribution ' + hex(id(self)))
+        result.append('  shape (k)=' + str(self._shape))
+        result.append('  rate (lambda)=' + str(self._rate))
+        result.append('  scale (mu)=' + str(1 / self._rate))
+        result.append('  randomstream=' + hex(id(self.randomstream)))
+        return return_or_print(result, as_str)
 
     def sample(self):
         '''
@@ -9230,13 +11526,13 @@ class Cdf(_Distribution):
 
     '''
 
-    def __init__(self, spec, randomstream=omitted):
+    def __init__(self, spec, randomstream=None):
         self._x = []
         self._cum = []
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
 
         lastcum = 0
@@ -9273,12 +11569,24 @@ class Cdf(_Distribution):
     def __repr__(self):
         return 'Cdf'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print('Cdf distribution ' + hex(id(self)))
-        print('  randomstream=' + hex(id(self.randomstream)))
+        result = []
+        result.append('Cdf distribution ' + hex(id(self)))
+        result.append('  randomstream=' + hex(id(self.randomstream)))
+        return return_or_print(result, as_str)
 
     def sample(self):
         '''
@@ -9338,19 +11646,19 @@ class Pdf(_Distribution):
     but a sample will be returned when calling sample.
     '''
 
-    def __init__(self, spec, probabilities=omitted, randomstream=omitted):
+    def __init__(self, spec, probabilities=None, randomstream=None):
         self._x = [0]  # just a place holder
         self._cum = [0]
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
 
         sump = 0
         sumxp = 0
         hasmean = True
-        if probabilities is omitted:
+        if probabilities is None:
             spec = list(spec)
 
             if not spec:
@@ -9405,12 +11713,175 @@ class Pdf(_Distribution):
     def __repr__(self):
         return 'Pdf'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print('Pdf distribution ' + hex(id(self)))
-        print('  randomstream=' + hex(id(self.randomstream)))
+        result = []
+        result.append('Pdf distribution ' + hex(id(self)))
+        result.append('  randomstream=' + hex(id(self.randomstream)))
+        return return_or_print(result, as_str)
+
+    def sample(self):
+        '''
+        Returns
+        -------
+        Sample of the distribution : any (usually float)
+        '''
+        r = self.randomstream.random()
+        for cum, x in zip(self._cum, self._x):
+            if r <= cum:
+                if isinstance(x, _Distribution):
+                    return x.sample()
+                return x
+
+    def mean(self):
+        '''
+        Returns
+        -------
+        mean of the distribution : float
+            if the mean can't be calculated (if not all x-values are scalars or distributions),
+            nan will be returned.
+        '''
+        return self._mean
+
+
+class CumPdf(_Distribution):
+    '''
+    Cumulative Probability distribution function
+
+    Parameters
+    ----------
+    spec : list or tuple
+        either
+
+        -   if no cumprobabilities specified: |n|
+            list with x-values and corresponding cumulative probability
+            (x0, p0, x1, p1, ...xn,pn) |n|
+        -   if cumprobabilities is specified: |n|
+            list with x-values
+
+    cumprobabilities : list, tuple or float
+        if omitted, spec contains the probabilities |n|
+        the list (p0, p1, ...pn) contains the cumulative probabilities of the corresponding
+        x-values from spec. |n|
+
+    randomstream : randomstream
+        if omitted, random will be used |n|
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
+
+    Note
+    ----
+    p0<=p1<=..pn>0 |n|
+    all densities are auto scaled according to pn,
+    so no need to have pn be 1 or 100. |n|
+    The x-values can be any type. |n|
+    If it is a salabim distribution, not the distribution,
+    but a sample will be returned when calling sample.
+    '''
+
+    def __init__(self, spec, cumprobabilities=None, cum=False, randomstream=None):
+        self._x = [0]  # just a place holder
+        self._cum = [0]
+        if randomstream is None:
+            self.randomstream = random
+        else:
+            _checkrandomstream(randomstream)
+            self.randomstream = randomstream
+
+        sump = 0
+        sumxp = 0
+        hasmean = True
+        if cumprobabilities is None:
+            spec = list(spec)
+
+            if not spec:
+                raise SalabimError('no arguments specified')
+            while len(spec) > 0:
+                x = spec.pop(0)
+                if not spec:
+                    raise SalabimError(
+                        'uneven number of parameters specified')
+                self._x.append(x)
+                p = spec.pop(0)
+                p = p - sump
+                if p < 0:
+                    raise SalabimError('non increasing cumulative probabilities')
+                sump += p
+                self._cum.append(sump)
+                if isinstance(x, _Distribution):
+                    x = x._mean
+                try:
+                    sumxp += float(x) * p
+                except:
+                    hasmean = False
+        else:
+            spec = list(spec)
+            if isinstance(cumprobabilities, (list, tuple)):
+                cumprobabilities = list(cumprobabilities)
+            else:
+                raise SalabimError('wrong type for cumulative probabilities')
+            if len(spec) != len(cumprobabilities):
+                raise SalabimError(
+                    'length of x-values does not match length of cumulative probabilities')
+
+            while len(spec) > 0:
+                x = spec.pop(0)
+                self._x.append(x)
+                p = cumprobabilities.pop(0)
+                p = p - sump
+                if p < 0:
+                    raise SalabimError('non increasing cumulative probabilities')
+                sump += p
+                self._cum.append(sump)
+                if isinstance(x, _Distribution):
+                    x = x._mean
+                try:
+                    sumxp += float(x) * p
+                except:
+                    hasmean = False
+
+        if sump == 0:
+            raise SalabimError('last cumulative probability should be >0')
+
+        self._cum = [x / sump for x in self._cum]
+        if hasmean:
+            self._mean = sumxp / sump
+        else:
+            self._mean = nan
+
+    def __repr__(self):
+        return 'CumPdf'
+
+    def print_info(self, as_str=False):
+        '''
+        prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
+        '''
+        result = []
+        result.append('CumPdf distribution ' + hex(id(self)))
+        result.append('  randomstream=' + hex(id(self.randomstream)))
+        return return_or_print(result, as_str)
 
     def sample(self):
         '''
@@ -9445,8 +11916,8 @@ class Distribution(_Distribution):
     spec : str
         - string containing a valid salabim distribution, where only the first
           letters are relevant and casing is not important. Note that Erlang,
-          Cdf and Poisson require at least two letters
-          (Er, Cd and Po)
+          Cdf, CumPdf and Poisson require at least two letters
+          (Er, Cd, Cu and Po)
         - string containing one float (c1), resulting in Constant(c1)
         - string containing two floats seperated by a comma (c1,c2),
           resulting in a Uniform(c1,c2)
@@ -9480,7 +11951,7 @@ class Distribution(_Distribution):
     Er(2,3)      ==> Erlang(2,3)
     '''
 
-    def __init__(self, spec, randomstream=omitted):
+    def __init__(self, spec, randomstream=None):
 
         spec_orig = spec
 
@@ -9509,7 +11980,7 @@ class Distribution(_Distribution):
 
         else:
             for distype in ('Uniform', 'Constant', 'Triangular', 'Exponential', 'Normal',
-              'Cdf', 'Pdf', 'Weibull', 'Gamma', 'Erlang', 'Beta', 'IntUniform', 'Poisson'):
+              'Cdf', 'Pdf', 'CumPdf', 'Weibull', 'Gamma', 'Erlang', 'Beta', 'IntUniform', 'Poisson'):
                 if pre == distype.upper()[:len(pre)]:
                     sp[0] = distype
                     spec = '('.join(sp)
@@ -9517,10 +11988,10 @@ class Distribution(_Distribution):
 
         d = eval(spec)
 
-        if randomstream is omitted:
+        if randomstream is None:
             self.randomstream = random
         else:
-            randomstream_check(randomstream)
+            _checkrandomstream(randomstream)
             self.randomstream = randomstream
         self._distribution = d
         self._mean = d._mean
@@ -9528,8 +11999,21 @@ class Distribution(_Distribution):
     def __repr__(self):
         return self._distribution.__repr__()
 
-    def print_info(self):
-        self._distribution.print_info()
+    def print_info(self, as_str=False):
+        '''
+        prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
+        '''
+        return self._distribution.print_info(as_str=as_str)
 
     def sample(self):
         '''
@@ -9593,7 +12077,7 @@ class State(object):
         -  'float' float 8 bytes do not use -inf
 
     animation_objects : list or tuple
-        overrides the deafult animation_object method |n|
+        overrides the default animation_object method |n|
         the method should have a header like |n|
         ``def animation_objects(self, value):`` |n|
         and should return a list or tuple of animation objects, which
@@ -9607,15 +12091,14 @@ class State(object):
         environment to be used |n|
         if omitted, default_env is used
     '''
-    def __init__(self, name=omitted, value=False, type='any',
-      monitor=True, animation_objects=omitted, env=omitted, *args, **kwargs):
-        if env is omitted:
+    def __init__(self, name=None, value=False, type='any',
+      monitor=True, animation_objects=None, env=None, *args, **kwargs):
+        if env is None:
             self.env = g.default_env
         else:
             self.env = env
         _set_name(name, self.env._nameserializeState, self)
         self._value = value
-        self._animate_on = False
         self._aos = []
         savetrace = self.env._trace
         self.env._trace = False
@@ -9627,7 +12110,7 @@ class State(object):
         self.value = MonitorTimestamp(
             name='Value of ' + self.name(),
             initial_tally=value, monitor=monitor, type=type, env=self.env)
-        if animation_objects is not omitted:
+        if animation_objects is not None:
             self.animation_objects = animation_objects.__get__(self, State)
         if self.env._trace:
             self.env.print_trace(
@@ -9644,53 +12127,6 @@ class State(object):
         only keyword arguments will be passed
         '''
         pass
-
-    def animate(self, x=500, y=100, on=True):
-        '''
-        turns on/off animation for the state
-
-        Parameters
-        ----------
-        x : float
-            x-position of the animation|n|
-            default: 500
-
-        y : float
-            y-position of the animation |n|
-            default: 100
-
-        on : bool
-            if True (default) do animate the state. If False, do not animate.
-        '''
-
-        self._animate_on = on
-        if on:
-            self._animate_x = x
-            self._animate_y = y
-            self._animate_update()
-        else:
-            self._remove_from_aos()
-
-    def _remove_from_aos(self):
-        for ao in self._aos:
-            ao.remove()
-        self._aos = []
-
-    def animation_objects(self, value):
-        if str(value).lower() in colornames():
-            ao1 = Animate(rectangle0=(-20, -20, 20, 20), fillcolor0=value, linewidth0=0)
-            return (ao1,)
-        else:
-            ao1 = Animate(rectangle0=(-20, -20, 20, 20), fillcolor0=self.env._foreground_color, linewidth0=0)
-            ao2 = Animate(text=str(value), textcolor0=self.env._background_color, anchor='c')
-            return ao1, ao2
-
-    def _animate_update(self):
-        self._remove_from_aos()
-        for ao in self.animation_objects(self._value):
-            ao.x0 = self._animate_x
-            ao.y0 = self._animate_y
-            self._aos.append(ao)
 
     def register(self, registry):
         '''
@@ -9739,7 +12175,7 @@ class State(object):
     def __repr__(self):
         return objectclass_to_str(self) + ' (' + self.name() + ')'
 
-    def print_histograms(self, exclude=()):
+    def print_histograms(self, exclude=(), as_str=False):
         '''
         print histograms of the waiters queue and the value timestamped monitor
 
@@ -9748,21 +12184,42 @@ class State(object):
         exclude : tuple or list
             specifies which queues or monitors to exclude |n|
             default: ()
-        '''
-        if self.waiters() not in exclude:
-            self.waiters().print_histograms(exclude=exclude)
-        if self.value not in exclude:
-            self.value.print_histogram()
 
-    def print_info(self):
+        as_str: bool
+            if False (default), print the histograms
+            if True, return a string containing the histograms
+
+        Returns
+        -------
+        histograms (if as_str is True) : str
+        '''
+        result = []
+        if self.waiters() not in exclude:
+            result.append(self.waiters().print_histograms(exclude=exclude, as_str=True))
+        if self.value not in exclude:
+            result.append(self.value.print_histogram(as_str=True))
+        return return_or_print(result, as_str)
+
+    def print_info(self, as_str=False):
         '''
         prints info about the state
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print(objectclass_to_str(self) + ' ' + hex(id(self)))
-        print('  name=' + self.name())
-        print('  value=' + str(self._value))
+        result = []
+        result.append(objectclass_to_str(self) + ' ' + hex(id(self)))
+        result.append('  name=' + self.name())
+        result.append('  value=' + str(self._value))
         if self._waiters:
-            print('  waiting component(s):')
+            result.append('  waiting component(s):')
             mx = self._waiters._head.successor
             while mx != self._waiters._tail:
                 c = mx.component
@@ -9774,9 +12231,10 @@ class State(object):
                             values = values + ', '
                         values = values + str(value)
 
-                print('    ' + pad(c.name(), 20), ' value(s): ' + values)
+                result.append('    ' + pad(c.name(), 20), ' value(s): ' + values)
         else:
-            print('  no waiting components')
+            result.append('  no waiting components')
+        return return_or_print(result, as_str)
 
     def __call__(self):
         return self._value
@@ -9817,8 +12275,6 @@ class State(object):
         if self._value != value:
             self._value = value
             self.value.tally(value)
-            if self._animate_on:
-                self._animate_update()
             self._trywait()
 
     def reset(self, value=False):
@@ -9841,11 +12297,9 @@ class State(object):
         if self._value != value:
             self._value = value
             self.value.tally(value)
-            if self._animate_on:
-                self._animate_update()
             self._trywait()
 
-    def trigger(self, value=True, value_after=omitted, max=inf):
+    def trigger(self, value=True, value_after=None, max=inf):
         '''
         triggers the value of the state
 
@@ -9869,7 +12323,7 @@ class State(object):
             the value will be set to value_after and again checked for possible
             honors.
         '''
-        if value_after is omitted:
+        if value_after is None:
             value_after = self._value
         if self.env._trace:
             self.env.print_trace('', '', self.name() + ' trigger',
@@ -9880,8 +12334,6 @@ class State(object):
         self._trywait(max)
         self._value = value_after
         self.value.tally(value_after)
-        if self._animate_on:
-            self._animate_update()
         self._trywait()
 
     def _trywait(self, max=inf):
@@ -9894,7 +12346,7 @@ class State(object):
                 if max == 0:
                     return
 
-    def monitor(self, value=omitted):
+    def monitor(self, value=None):
         '''
         enables/disables the state monitors and timestamped monitors
 
@@ -9913,7 +12365,7 @@ class State(object):
         self.requesters().monitor(value)
         self.value.monitor(value)
 
-    def reset_monitors(self, monitor=omitted):
+    def reset_monitors(self, monitor=None):
         '''
         resets the timestamped monitor for the state's value and the monitors of the waiters queue
 
@@ -9931,7 +12383,7 @@ class State(object):
     def _get_value(self):
         return self._value
 
-    def name(self, value=omitted):
+    def name(self, value=None):
         '''
         Parameters
         ----------
@@ -9945,10 +12397,14 @@ class State(object):
 
         Note
         ----
-        base_name and sequence_number are not affected if the name is changed
+        base_name and sequence_number are not affected if the name is changed |n|
+        All derived named are updated as well.
         '''
-        if value is not omitted:
+        if value is not None:
             self._name = value
+            self._waiters.name('waiters of ' + value)
+            self.value.name('Value of ' + value)
+
         return self._name
 
     def base_name(self):
@@ -9971,16 +12427,31 @@ class State(object):
         '''
         return self._sequence_number
 
-    def print_statistics(self):
+    def print_statistics(self, as_str=False):
         '''
         prints a summary of statistics of the state
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the statistics
+            if True, return a string containing the statistics
+
+        Returns
+        -------
+        statistics (if as_str is True) : str
         '''
-        print('Statistics of {} at {}'.format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
-        self.waiters().length.print_statistics(show_header=False, show_legend=True, do_indent=True)
-        print()
-        self.waiters().length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True)
-        print()
-        self.value.print_statistics(show_header=False, show_legend=False, do_indent=True)
+        result = []
+        result.append('Statistics of {} at {}'.format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
+        result.append(
+            self.waiters().length.print_statistics(show_header=False, show_legend=True, do_indent=True, as_str=True))
+        result.append('')
+        result.append(
+            self.waiters().length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True,
+            as_str=True))
+        result.append('')
+        result.append(self.value.print_statistics(show_header=False, show_legend=False, do_indent=True, as_str=True))
+        return return_or_print(result, as_str)
 
     def waiters(self):
         '''
@@ -10026,9 +12497,9 @@ class Resource(object):
         if omitted, default_env is used
     '''
 
-    def __init__(self, name=omitted, capacity=1,
-                 anonymous=False, monitor=True, env=omitted, *args, **kwargs):
-        if env is omitted:
+    def __init__(self, name=None, capacity=1,
+                 anonymous=False, monitor=True, env=None, *args, **kwargs):
+        if env is None:
             self.env = g.default_env
         else:
             self.env = env
@@ -10076,7 +12547,7 @@ class Resource(object):
         '''
         pass
 
-    def reset_monitors(self, monitor=omitted):
+    def reset_monitors(self, monitor=None):
         '''
         resets the resource monitors  and timestamped monitors
 
@@ -10103,40 +12574,65 @@ class Resource(object):
         for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
             m.reset(monitor)
 
-    def print_statistics(self):
+    def print_statistics(self, as_str=False):
         '''
         prints a summary of statistics of a resource
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the statistics
+            if True, return a string containing the statistics
+
+        Returns
+        -------
+        statistics (if as_str is True) : str
         '''
-        print('Statistics of {} at {:13.3f}'.format(self.name(), self.env._now - self.env._offset))
+        result = []
+        result.append('Statistics of {} at {:13.3f}'.format(self.name(), self.env._now - self.env._offset))
         show_legend = True
         for q in [self.requesters(), self.claimers()]:
-            q.length.print_statistics(show_header=False, show_legend=show_legend, do_indent=True)
+            result.append(
+                q.length.print_statistics(show_header=False, show_legend=show_legend, do_indent=True, as_str=True))
             show_legend = False
-            print()
-            q.length_of_stay.print_statistics(show_header=False, show_legend=show_legend, do_indent=True)
-            print()
+            result.append('')
+            result.append(
+                q.length_of_stay.print_statistics(
+                    show_header=False, show_legend=show_legend, do_indent=True, as_str=True))
+            result.append('')
 
         for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
-            m.print_statistics(show_header=False, show_legend=show_legend, do_indent=True)
-            print()
+            result.append(m.print_statistics(show_header=False, show_legend=show_legend, do_indent=True, as_str=True))
+            result.append('')
+        return return_or_print(result, as_str)
 
-    def print_histograms(self, exclude=()):
+    def print_histograms(self, exclude=(), as_str=False):
         '''
         prints histograms of the requesters and claimers queue as well as
-        the capacity, available_qauantity and claimed_quantity timstamped monitors of the resource
+        the capacity, available_quantity and claimed_quantity timstamped monitors of the resource
 
         Parameters
         ----------
         exclude : tuple or list
             specifies which queues or monitors to exclude |n|
             default: ()
+
+        as_str: bool
+            if False (default), print the histograms
+            if True, return a string containing the histograms
+
+        Returns
+        -------
+        histograms (if as_str is True) : str
         '''
+        result = []
         for q in (self.requesters(), self.claimers()):
             if q not in exclude:
-                q.print_histograms(exclude=exclude)
+                result.append(q.print_histograms(exclude=exclude, as_str=True))
         for m in (self.capacity, self.available_quantity, self.claimed_quantity):
             if m not in exclude:
-                m.print_histogram()
+                result.append(m.print_histogram(as_str=True))
+        return return_or_print(result, as_str)
 
     def monitor(self, value):
         '''
@@ -10206,37 +12702,49 @@ class Resource(object):
     def __repr__(self):
         return objectclass_to_str(self) + ' (' + self.name() + ')'
 
-    def print_info(self):
+    def print_info(self, as_str=False):
         '''
         prints info about the resource
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        Returns
+        -------
+        info (if as_str is True) : str
         '''
-        print(objectclass_to_str(self) + ' ' + hex(id(self)))
-        print('  name=' + self.name())
-        print('  capacity=' + str(self._capacity))
+        result = []
+        result.append(objectclass_to_str(self) + ' ' + hex(id(self)))
+        result.append('  name=' + self.name())
+        result.append('  capacity=' + str(self._capacity))
         if self._requesters:
-            print('  requesting component(s):')
+            result.append('  requesting component(s):')
             mx = self._requesters._head.successor
             while mx != self._requesters._tail:
                 c = mx.component
                 mx = mx.successor
-                print('    ' + pad(c.name(), 20) +
+                result.append('    ' + pad(c.name(), 20) +
                     ' quantity=' + str(c._requests[self]))
         else:
-            print('  no requesting components')
+            result.append('  no requesting components')
 
-        print('  claimed_quantity=' + str(self._claimed_quantity))
+        result.append('  claimed_quantity=' + str(self._claimed_quantity))
         if self._claimed_quantity >= 0:
             if self._anonymous:
-                print('  not claimed by any components,' +
+                result.append('  not claimed by any components,' +
                     ' because the resource is anonymous')
             else:
-                print('  claimed by:')
+                result.append('  claimed by:')
                 mx = self._claimers._head.successor
                 while mx != self._claimers._tail:
                     c = mx.component
                     mx = mx.successor
-                    print('    ' + pad(c.name(), 20) +
+                    result.append('    ' + pad(c.name(), 20) +
                         ' quantity=' + str(c._claims[self]))
+        return return_or_print(result, as_str)
 
     def _tryrequest(self):
         mx = self._requesters._head.successor
@@ -10247,7 +12755,7 @@ class Resource(object):
             mx = mx.successor
             c._tryrequest()
 
-    def release(self, quantity=omitted):
+    def release(self, quantity=None):
         '''
         releases all claims or a specified quantity
 
@@ -10265,7 +12773,7 @@ class Resource(object):
         '''
 
         if self._anonymous:
-            if quantity is omitted:
+            if quantity is None:
                 q = self._claimed_quantity
             else:
                 q = quantity
@@ -10279,7 +12787,7 @@ class Resource(object):
             self._tryrequest()
 
         else:
-            if quantity is not omitted:
+            if quantity is not None:
                 raise SalabimError(
                     'no quantity allowed for non-anonymous resource')
 
@@ -10321,7 +12829,7 @@ class Resource(object):
         self.occupancy.tally(0 if self._capacity <= 0 else self._claimed_quantity / self._capacity)
         self._tryrequest()
 
-    def name(self, value=omitted):
+    def name(self, value=None):
         '''
         Parameters
         ----------
@@ -10335,10 +12843,18 @@ class Resource(object):
 
         Note
         ----
-        base_name and sequence_number are not affected if the name is changed
+        base_name and sequence_number are not affected if the name is changed |n|
+        All derived named are updated as well.
         '''
-        if value is not omitted:
+        if value is not None:
             self._name = value
+            self._requesters.name('requesters of ' + value)
+            self._claimers.name('claimers of ' + value)
+            self.capacity.name('Capacity of ' + value)
+            self.claimed_quantity.name('Clamed quantity of ' + value)
+            self.available_quantity.name('Available quantity of ' + value)
+            self.occupancy.name('Occupancy of ' + value)
+
         return self._name
 
     def base_name(self):
@@ -10498,7 +13014,7 @@ def interpolate(t, t0, t1, v0, v1):
 
 
 def _set_name(name, _nameserialize, object):
-    if name is omitted:
+    if name is None:
         name = objectclass_to_str(object).lower() + '.'
     elif len(name) <= 1:
         if name == '':
@@ -10559,9 +13075,19 @@ def fn(x, l, d):
     return ('{:' + str(l) + '.' + str(d) + 'f}').format(x)
 
 
-def randomstream_check(randomstream):
+def _checkrandomstream(randomstream):
     if not isinstance(randomstream, random.Random):
-        raise SalabimError('randomstream is not an instance of random.Random()')
+        raise SalabimError('Type randomstream or random.Random expected, got ' + type(randomstream))
+
+
+def _checkismonitor(monitor):
+    if not isinstance(monitor, Monitor):
+        raise SalabimError('Type Monitor or MonitorTimestamp expected, got ' + type(monitor))
+
+
+def _checkisqueue(queue):
+    if not isinstance(queue, Queue):
+        raise SalabimError('Type Queue expected, got ' + type(queue))
 
 
 def type_to_typecode_off(type):
@@ -10609,6 +13135,15 @@ def list_to_array(l):
         return int_result
     else:
         return float_result
+
+
+def deep_flatten(l):
+
+    if hasattr(l, '__iter__') and not isinstance(l, str):
+        for x in l:
+            yield from deep_flatten(x)
+    else:
+        yield l
 
 
 def merge_blanks(*l):
@@ -10670,7 +13205,34 @@ def _get_caller_frame():
     return frame
 
 
+def return_or_print(result, as_str):
+    result = '\n'.join(result)
+    if as_str:
+        return result
+    else:
+        print(result)
+
+
+def _call(c, t, self):
+    '''
+    special function to suppory scalars, methods (with one parameter) and function with zero, one or two parameters
+    '''
+    if inspect.isfunction(c):
+        nargs = c.__code__.co_argcount
+        if nargs == 0:
+            return c()
+        elif nargs == 1:
+            return c(t)
+        else:
+            return c(self, t)
+    if inspect.ismethod(c):
+        return c(t)
+    return c
+
+
 def de_none(l):
+    if l is None:
+        return None
     result = []
     for index, item in enumerate(l):
         if item is None:
@@ -10712,13 +13274,13 @@ def waiting():
     return 'waiting'
 
 
-def random_seed(seed, randomstream=omitted):
+def random_seed(seed, randomstream=None):
     '''
     Parameters
     ----------
     seed : hashable object, usually int
         the seed for random, equivalent to random.seed() |n|
-        if None, a purely random value (based on the current time) will be used
+        if None or '*', a purely random value (based on the current time) will be used
         (not reproducable) |n|
 
     randomstream: randomstream
@@ -10727,8 +13289,10 @@ def random_seed(seed, randomstream=omitted):
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
     '''
-    if randomstream is omitted:
+    if randomstream is None:
         randomstream = random
+    if seed == '*':
+        seed = None
     randomstream.seed(seed)
 
 
@@ -11047,7 +13611,7 @@ reset()
 if __name__ == '__main__':
     try:
         import salabim_test
-    except:
+    except ModuleNotFoundError:
         print('salabim_test.py not found')
         quit()
 

@@ -5,38 +5,6 @@ import salabim as sim
 import random
 
 
-class AnimateLED(sim.Animate):
-    def __init__(self, x, y, floor, direction):
-        self.floor = floor
-        self.direction = direction
-
-        b = xvisitor_dim / 2
-        if direction == up:
-            polygon = (-0.5 * b, 0, 0.5 * b, 0, 0, 1 * b)
-        else:
-            polygon = (-0.5 * b, b, 0.5 * b, b, 0, 0)
-
-        sim.Animate.__init__(self, x0=x, y0=y, polygon0=polygon)
-
-    def fillcolor(self, t):
-        if (self.floor, self.direction) in requests:
-            return direction_color(self.direction)
-        else:
-            return ''
-
-
-def animation_pre_tick(self, t):
-    for car in cars:
-        if car.mode() == 'Move':
-            y = sim.interpolate(
-                t, car.mode_time(), car.scheduled_time(),
-                car.floor.y, car.nextfloor.y)
-        else:
-            y = car.floor.y
-        car.visitors.animate(x=xcar[car], y=y, direction='e')
-        car.pic.update(y0=y)
-
-
 def do_animation():
 
     global xvisitor_dim
@@ -44,13 +12,11 @@ def do_animation():
     global xcar
     global capacity_last, ncars_last, topfloor_last
 
+    env.modelname('Elevator')
+    env.speed(32)
+    env.background_color('20%gray')
     if make_video:
-        env.animation_parameters(modelname='Elevator', speed=32, video='Elevator.mp4',
-            show_fps=False, background_color='20%gray')
-    else:
-        env.animation_parameters(modelname='Elevator', speed=32, background_color='20%gray')
-
-    sim.Environment.animation_pre_tick = animation_pre_tick
+        env.video('Elevator.mp4')
 
     xvisitor_dim = 30
     yvisitor_dim = xvisitor_dim
@@ -77,18 +43,27 @@ def do_animation():
         floor.y = y
         for direction in (up, down):
             if (direction == up and floor.n < topfloor) or (direction == down and floor.n > 0):
-                AnimateLED(x=xled[direction], y=y + 6, floor=floor, direction=direction)
-        sim.Animate(x0=0, y0=y, line0=(0, 0, xwait, 0))
-        sim.Animate(x0=xsign, y0=y + yvisitor_dim / 2,
-            text=str(floor.n), fontsize0=xvisitor_dim / 2, anchor='center')
+                b = xvisitor_dim / 4
+                animate_led = sim.AnimatePolygon(
+                    spec=(-b, -b, b, -b, 0, b),
+                    x=xled[direction],
+                    y=y + 2 * b,
+                    angle=0 if direction == up else 180,
+                    fillcolor=direction_color(direction),
+                    visible=lambda arg, t: (arg.floor_direction) in requests)
+                animate_led.floor_direction = (floor, direction)
 
-        floor.visitors.animate(x=xwait - xvisitor_dim, y=floor.y, direction='w')
+        sim.AnimateLine(x=0, y=y, spec=(0, 0, xwait, 0))
+        sim.AnimateText(x=xsign, y=y + yvisitor_dim / 2,
+            text=str(floor.n), fontsize=xvisitor_dim / 2)
+
+        sim.AnimateQueue(queue=floor.visitors, x=xwait - xvisitor_dim, y=floor.y, direction='w')
 
     for car in cars:
         x = xcar[car]
-        car.pic = sim.Animate(x0=x,
-           rectangle0=(0, 0, capacity * xvisitor_dim, yvisitor_dim), fillcolor0='lightblue', linewidth0=0)
-        car.visitors.animate(x=xcar[car], y=600, direction='e')
+        car.pic = sim.AnimateRectangle(x=x, y=car.y,
+           spec=(0, 0, capacity * xvisitor_dim, yvisitor_dim), fillcolor='lightblue', linewidth=0)
+        sim.AnimateQueue(queue=car.visitors, x=xcar[car], y=car.y, direction='e', arg=car)
 
     ncars_last = ncars
     sim.AnimateSlider(x=510, y=0, width=90, height=20,
@@ -117,7 +92,7 @@ def do_animation():
         vmin=0, vmax=400, resolution=25, v=load_n_0, label='Load n->0', action=set_load_n_0,
         xy_anchor='nw')
 
-    env.animating = True
+    env.animate(True)
 
 
 def set_load_0_n(val):
@@ -216,12 +191,11 @@ class Visitor(sim.Component):
         size_x = xvisitor_dim
         size_y = yvisitor_dim
         b = 0.1 * xvisitor_dim
-        an1 = sim.Animate(rectangle0=(b, 2, xvisitor_dim - b, yvisitor_dim - b),
-            linewidth0=0, fillcolor0=direction_color(self.direction))
-        an2 = sim.Animate(text=str(self.tofloor.n), fontsize0=xvisitor_dim * 0.7,
-            anchor='center', offsetx0=5 * b, offsety0=2 + 4 * b,
-            textcolor0='white')
-        return size_x, size_y, an1, an2
+        an0 = sim.AnimateRectangle(spec=(b, 2, xvisitor_dim - b, yvisitor_dim - b),
+            linewidth=0, fillcolor=direction_color(self.direction),
+            text=str(self.tofloor.n), fontsize=xvisitor_dim * 0.7,
+            textcolor='white')
+        return size_x, size_y, an0
 
     def process(self):
         self.enter(self.fromfloor.visitors)
@@ -244,6 +218,15 @@ class Car(sim.Component):
         self.direction = still
         self.floor = floors[0]
         self.visitors = VisitorsInCar()
+
+    def y(self, t):
+        if self.mode() == 'Move':
+            y = sim.interpolate(
+                t, self.mode_time(), self.scheduled_time(),
+                self.floor.y, self.nextfloor.y)
+        else:
+            y = self.floor.y
+        return y
 
     def process(self):
         dooropen = False
