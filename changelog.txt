@@ -7,8 +7,9 @@ New functionality
 As from this version, animation is more powerful and easier to use. Although the old style
 Animate class is still available, it is recommended to use the new style classes.
 
-The documentation is not yet completely up-to-date. 
-All the docstrings (and therefor he reference section of the manual) are however up-to-date.
+The documentation is not yet completely up-to-date. Please read these release notes carefully to get more information.
+
+All the docstrings (and therefore the reference section of the manual) are however up-to-date.
 It is planned to publish a number of tutorial videos or guides, both for basic and advanced animation.
 
 To visualize rectangles, lines, points, polygon, texts, circles and images salabim offers the new classes
@@ -21,10 +22,10 @@ To visualize rectangles, lines, points, polygon, texts, circles and images salab
 - AnimateText
 
 The main difference with the Animate class is that no automatic linear interpolation over time is supported.
-But, each of the characteristic may be still changed over time easily!
+But, each of the characteristics may be still changed over time easily!
 All visualizations (apart from AnimateText) have an attached text field that will be displayed relative to
 the shape.
-Thus, for instance it possible to say:
+Thus, for instance, it possible to say:
     vis = sim.AnimateRectangle(spec=(100, 100, 300, 50), text='some text')
 and then a rectangle with the text 'some text' in the middle will be displayed.
 In contrast to Animate, updating any of the specifying fields does not require the update method, but can be
@@ -47,9 +48,9 @@ One queue can now be animated in several ways, whereas previously one queue coul
 Demo queue animation.py for an example.
 It possible to restrict the number of components shown (max_length).
 Is possible to change all the parameters of the queue animation and the shown components dynamically.
-See for instance Elevator animated.py where the queue position moves up and and down.
-Or see Machine shop animated.py where the shape of the components change dynamically.
-Internally, the animation of queues uses a new, more effecient, algorithm.
+See for instance Elevator animated.py where the queue position moves up and down.
+Or see Machine shop animated.py where the shape of the components changes dynamically.
+Internally, the animation of queues uses a new, more efficient, algorithm.
 
 Most examples have been updated to use this new visualization functionality.
 
@@ -73,7 +74,7 @@ particularly useful for visualizing the length of a queue, the various monitors 
 the value of a state.
 It is possible to connect the lines (very useful for 'duration' monitors, like queue length) or just show
 the individual points.
-This class can also visualize the relation between the index and the value of a non time stamped monitor.
+This class can also visualize the relationship between the index and the value of a non time stamped monitor.
 The points can be just shown or connected with a line.
 It is possible to use
     Monitor.animate() and
@@ -92,7 +93,7 @@ Periods where one or more monitors were off, are excluded.
 Note that the merge only takes place at creation of the (timestamped) monitor and not dynamically later.
 
 Sample usage:
-Suppose we have three types products, that each have a queue for processing, so
+Suppose we have three types of products, that each have a queue for processing, so
 a.processing, b.processing, c.processing.
 If we want to print the histogram of the combined (=summed) length of these queues:
     MonitorTimestamp(name='combined processing length',
@@ -131,7 +132,7 @@ The API of Component has changed slightly. The parameter process now defaults to
 it tries to run the process generator method, if any.
 If you don't want to start the process generator method, even if it exists, now set process='' (this was None).
 
-The API of Enviromment had changed slightly. The parameter random_seed now defaults to None, which means that
+The API of Environment had changed slightly. The parameter random_seed now defaults to None, which means that
 1234567 will be used as the random seed value. If random_seed is '*', a system generated, non reproducable,
 random seed will be used.
 
