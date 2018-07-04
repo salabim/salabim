@@ -9,13 +9,381 @@ import inspect
 import platform
 Pythonista=(platform.system()=='Darwin')
 
+
 def test():
-    test69()
+    test80()
+
+def test80():
+    env=sim.Environment(trace=False)
+    class X(sim.Component):
+        def process(self):
+            yield self.hold(1)
+            env.snapshot('manual/source/Pic1.png')
+    env.animate(True)
+    env.background_color('20%gray')
     
+    sim.AnimatePolygon(spec=(100, 100, 300, 100, 200,190), text='This is\na polygon')
+    sim.AnimateLine(spec=(100, 200, 300, 300), text='This is a line')
+    sim.AnimateRectangle(spec=(100, 10, 300, 30), text='This is a rectangle')
+    sim.AnimateCircle(radius=60, x=200, y=400,text='This is a rectangle')
+    sim.AnimatePoints(spec=(100,500, 150, 550, 180, 570, 250, 500, 300, 500), text='These are points')
+    sim.AnimateText(text='This is a one-line text', x=100, y=600)
+    sim.AnimateText(text='''\
+Multi line text
+-----------------
+Lorem ipsum dolor sit amet, consectetur
+adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua.
+Ut enim ad minim veniam, quis nostrud
+exercitation ullamco laboris nisi ut
+aliquip ex ea commodo consequat. Duis aute
+irure dolor in reprehenderit in voluptate
+velit esse cillum dolore eu fugiat nulla
+pariatur.
+
+Excepteur sint occaecat cupidatat non
+proident, sunt in culpa qui officia
+deserunt mollit anim id est laborum.
+''', x=500, y=100)
+    
+    sim.AnimateImage('Pas un pipe.jpg', x=500, y=400)
+    X()
+    env.run(100)
+    
+def test79():
+    env = sim.Environment(trace=True)
+    class X(sim.Component):
+        def process(self):
+            yield self.hold(3)
+            yield self.hold(5)
+
+
+    env.reset_now(-1000)
+    X(at=-500)
+    env.run()
+
+def test78():
+
+    class X(sim.Component):
+
+        def process(self):
+            while True:
+                yield self.hold(sim.Uniform(0,2)())
+                self.enter(q)
+                yield self.hold(sim.Uniform(0,2)())
+                self.leave(q)
+
+    env = sim.Environment(trace=False)
+    for _ in range(15):
+        x=X()
+    q = sim.Queue('q')
+    r=sim.Resource()
+    s=sim.State()
+    env.run(500)
+    as_str=False
+    d=sim.Normal(4)
+    d1=sim.Distribution('Normal(4)')
+    q.print_histograms(as_str=as_str)
+    q.print_statistics(as_str=as_str)
+    q.print_info(as_str=as_str)
+    env.print_info(as_str=as_str)
+    x.print_info(as_str=as_str)
+    s.print_info(as_str=as_str)
+    r.print_info(as_str=as_str)
+    d.print_info(as_str=as_str)
+    d1.print_info(as_str=as_str)
+
+def test77():
+
+    def y(self,t):
+        if self == qa0:
+            return 50
+        if self == qa1:
+            return 100
+        if self == qa2:
+            return 150
+        return 600
+
+    class X(sim.Component):
+        def setup(self, i):
+            self.i = i
+
+        def animation_objects(self,id ):
+            if id =='text':
+                ao0 = sim.AnimateText(text=self.name(), textcolor='black')
+                return 0, 20, ao0
+            ao0 = sim.AnimateRectangle(spec=lambda c,t: (0,0,40 + 10 * t if c.index(q) <= 2 else 40,20), text=self.name(), fillcolor=id, textcolor='white', arg=self)
+            return lambda c, t: 45 + 10 * t if c.index(q) <= 2 else 45, 0, ao0
+
+        def process(self):
+            while True:
+                yield self.hold(sim.Uniform(0,2)())
+                self.enter(q)
+                yield self.hold(sim.Uniform(0,2)())
+                self.leave(q)
+
+    env = sim.Environment(trace=False)
+    q = sim.Queue('q')
+    qa0 = sim.AnimateQueue(q, x=lambda t: 100+t*10, y=y, direction='e', reverse=False, id='blue')
+    qa1 = sim.AnimateQueue(q, x=100, y=y, direction='e', reverse=False, max_length=6, id='red')
+    qa2 = sim.AnimateQueue(q, x=100, y=y, direction='e', reverse=True, max_length=6, id='green')
+    qa3 = sim.AnimateQueue(q, x=100, y=200, direction='n', id='text')
+    [X(i=i) for i in range(15)]
+    env.animate(True)
+    env.run(5)
+    qa1.remove()
+    env.run(5)
+
+def test76():
+    class X(sim.Component):
+        def process(self):
+            for i in range(100):
+                yield self.hold(0.3)
+                testline = ['Line'+ str(i) for i in range(i)]
+                testanim.line = testline
+
+    env = sim.Environment()
+    env.modelname('test many')
+    env.background_color('10%gray')
+#    an = sim.Rectangle(spec=(0,0,400,200),x=100, y=100, text='ABCabcopqxyz\nABCabcopqxyz              \nABCabcopqxyz\n', text_anchor='sw', font='narrow', fontsize=40, textcolor='blue')
+#    an = sim.Rectangle(spec=(0,0,400,200),x=100, y=400, text='ABCabcopqxyz\nABCabcopqxyz           \nABCabcopqxyz\n', text_anchor='nw', font='narrow', fontsize=40, textcolor='blue')
+
+#    an = sim.Text(x=600, y=100, text='ABCabcopqxyz', anchor='sw', font='', fontsize=40, textcolor='blue')
+#    an = sim.Text(x=600, y=100, text='ABCabcopqxyz', anchor='nw', font='', fontsize=40, textcolor='blue')
+#    an = sim.Text(x=600, y=100, text='ABCabcopqxyz', anchor='e', font='', fontsize=40, textcolor='blue')
+
+    for dir in ('nw', 'w','sw','s','se','e','ne','n','c'):
+        an = sim.AnimateRectangle(spec=(-250,-250,250,250), x=300,y =300,fillcolor='', linewidth=1, linecolor='white',text='A1y'+dir, text_anchor=dir, textcolor='white', angle=lambda t:t*5)
+
+    x= 600
+    for c in 'ABCabcopqxyz':
+        sim.AnimateText(text=c, y=100, x=x, textcolor='white',text_anchor='s')
+        x += 10
+
+    an = sim.AnimateLine(spec=(0,0,1000,0), x=500, y=100, linecolor='red')
+    an = sim.AnimateCircle(radius=100, fillcolor=('red',100), text='Hallo', textcolor='yellow', angle =45, x=500, y=500)
+
+    an=sim.AnimateText(text=('cc\n\nx','abc','def','','ghi'), x=300, y=300, textcolor='white', text_anchor='c')
+
+    testanim=sim.AnimateText(text=('Line1', 'Line2', 'Line3', 'Line4'), x=600, y=10, text_anchor='sw', max_lines=0)
+
+    X()
+
+    env.animate(True)
+    env.run()
+
+
+def test75():
+    class MyText(sim.Text):
+        def __init__(self, my='Abc', *args, **kwargs):
+            sim.Text.__init__(self, text=None, *args, **kwargs)
+            self.my=my
+
+        def text(self,t):
+            return self.my + str(env.now())
+
+        def anchor(self, t):
+            if t > 50:
+                return 'w'
+            else:
+                return 'e'
+
+    def xx(self,t):
+        return self.sequence_number() * 75 + 600 + t
+
+    class Comp(sim.Component):
+        def setup(self):
+            i = self.sequence_number()
+            sim.Rectangle(spec=sim.centered_rectangle(50, 50), y=100 + i * 75,
+                fillcolor='orange', x=xx, arg=self)
+
+        def x(self, t):
+            return self.sequence_number() * 75 + 600 + t
+
+        def process(self):
+            yield self.cancel()
+
+    class CompGenerator(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(sim.Uniform(20,20)())
+                c=Comp()
+
+    env = sim.Environment()
+    env.modelname('test')
+    env.background_color('10%gray')
+    env.speed(16)
+    CompGenerator()
+    for s in ('a', 'b', 'p', 'A','A1yp'):
+        print(s, env.getwidth(s, font='', fontsize=20), env.getheight(font='', fontsize=20))
+
+    for text_anchor in ('s','sw','w','nw','n','ne','e','se','c'):
+        sim.Text(x=200,y=200,text=text_anchor, text_anchor=text_anchor)
+
+    anpanel = sim.Rectangle(spec=(0,0,400,200),x=lambda:50, y=500, text='This is a test with\ntwo lines\nline three ', text_anchor='sw', font='narrow', fontsize=40, textcolor='blue')
+    anpanel1 = MyText(x=50, y=20, my='MY')
+    anpanel2 = sim.Rectangle(x=0, y=200, text='abcde',
+        spec=(0,0,500,100), angle=20, xy_anchor='n')
+    sim.Circle(x=400,y=100,radius=100, text='Circle', fontsize=30, angle=45, xy_anchor='w')
+    sim.Line(spec=(200,750,210,700,220,730,240,730,250,700,1000,0))
+    sim.Points(spec=(200,750,210,700,220,730,240,730,250,700,1000,0))
+    sim.Image(spec='Cogwheel.png', x=500, y=500, anchor='c', width=lambda t:t, text='cogwheel', angle=lambda t:t)
+    angle = 0
+    an = sim.Rectangle(spec=(-150, -25, 150, 25), x=300, y= 125, fillcolor='red', angle=lambda t: t * 360/200,
+        text='test', textcolor='white', text_anchor='e')
+    sim.Line(spec=(0,0,900,0), x=100, y=700, offsetx=0, offsety=0, text='hallo', text_anchor='nw', textcolor='white', text_offsetx=0, text_offsety=0, angle=lambda t: sim.interpolate(t, 0, 200, 0, 360))
+
+
+    env.animate(True)
+    env.run(100)
+
+    env.run()
+
+def test74():
+    class Comp(sim.Component):
+        def process(self):
+            a.tally(env.now())
+            self.enter(stage1)
+            yield self.hold(sim.Uniform(10,20)())
+
+            self.leave()
+            b.tally(env.now())
+            self.enter(stage2)
+            yield self.hold(sim.Uniform(20,30)())
+            self.leave()
+
+    class CompGenerator(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(sim.Uniform(2,6)())
+                c=Comp()
+
+    env = sim.Environment()
+    env.modelname('test')
+    env.background_color('10%gray')
+    stage1=sim.Queue('stage1')
+    stage2=sim.Queue('stage2')
+    sim.aMonitor(monitor=stage2.length, x=100, y=100,as_points=True,as_level=True,linewidth=1, vertical_scale=5, fillcolor=('blue',100))
+    s2 = sim.aMonitor(monitor=stage2.length, x=300, y=100, linewidth=2, horizontal_scale=2)
+    s1 = sim.aMonitor(monitor=stage1.length_of_stay, x=100, y=400, as_points=False, height=200)
+    sim.aMonitor(stage2.length_of_stay, x=300, y=400, height=200)
+    a = sim.Monitor(name='a')
+    b = sim.Monitor(name='')
+    a1=sim.aMonitor(a, x=500, y=100, vertical_scale=1, horizontal_scale=10, height=200, as_points=True)
+    sim.aMonitor(b, x=500, y=100, vertical_scale=1, linecolor='blue', height=200, as_points=True)
+
+    CompGenerator()
+    env.animate(True)
+    env.speed(16)
+
+    env.run(100)
+#    s2.remove()
+#    s1.remove()
+    env.run()
+
+def test73():
+    class X(sim.Component):
+
+        def process(self):
+            while True:
+                yield self.hold(1)
+                mon.tally(sim.Uniform(-5,50)())
+
+
+    env=sim.Environment(trace=False)
+    X()
+    mon=sim.Monitor('monitor')
+    a=mon.animate(x=500, y=300, key_scale=10, point_size=4)
+    env.animate(True)
+    env.run(5)
+    a.remove()
+    env.run()
+
+def test72():
+    env=sim.Environment()
+    p = sim.CumPdf((0, 0.5, 1,0.5))
+    p.print_info()
+    print(p.mean())
+    r = sim.Resource(name='resource')
+    s = sim.State(name='state')
+    q=sim.Queue('rij')
+    r.name('bron')
+    s.name('staat')
+    as_str=False
+    print('---')
+    r.print_histograms(as_str=as_str)
+    s.print_histograms(as_str=as_str)
+    q.print_histograms(as_str=as_str)
+    r.print_statistics(as_str=as_str)
+    s.print_statistics(as_str=as_str)
+    q.print_statistics(as_str=as_str)
+    print('---')
+
+
+def test71():
+    env = sim.Environment()
+    env.animate(True)
+    p = (100,100, 300, 100, 300, 500)
+    r=(400,400, 600,600)
+    po =(800, 400, 1000, 400,1000,650)
+    sim.Animate(line0=p, linecolor0='red', linewidth0=1)
+    sim.Animate(line0=p, linecolor0='red', linewidth0=1, linewidth1=10, as_points=True, t1=10)
+    sim.Animate(rectangle0=r, linecolor0='green', linewidth0=1, as_points=False, fillcolor0='', t1=10)
+    sim.Animate(rectangle0=r, linecolor0='blue', linewidth0=10, linewidth1=10, as_points=True, t1=10)
+    sim.Animate(polygon0=po, linecolor0='orange', as_points=False, t1=10)
+    sim.Animate(polygon0=po, linecolor0='pink', linewidth1=10, as_points=True, t1=10)
+    sim.Animate(rectangle0=(500,500,600,600))
+    sim.Animate(circle0=100, x0=800,y0=300)
+    env.run()
+
+def test70():
+    class X(sim.Component):
+        def setup(self,start,durations,xs):
+            self.start=start
+            self.xs=xs
+            self.durations = durations
+            self.monitor = sim.MonitorTimestamp(name=self.name()+'.monitor',type='any', monitor=False)
+
+        def process(self):
+            yield self.hold(self.start)
+            self.monitor.monitor(True)
+            for x, duration in zip(self.xs, self.durations):
+                self.monitor.tally(x)
+                yield self.hold(duration)
+            self.monitor.monitor(False)
+
+    env=sim.Environment()
+    x0= X(start=0, xs=(1,3,'a','7'), durations=(1,1,1,1))
+    x1= X(start=0, xs=('a',2,5), durations=(3,3,8))
+    env.run(20)
+    x0.monitor.print_histograms()
+    x1.monitor.print_histograms()
+    m = sim.MonitorTimestamp(name='combined', merge=(x0.monitor,x1.monitor))
+    m.print_histogram()
+
+    a1=sim.Monitor(name='a1', type='int8')
+    a1.tally(1)
+    a1.tally(2)
+    a1.tally(2)
+    a1.tally(0)
+    a2=sim.Monitor(name='a2', type='int8')
+    a2.tally(1)
+    a2.tally(20)
+    a2.tally(18)
+    a2.tally(0)
+    a2.tally(2)
+    a1.print_histogram()
+    a2.print_histogram()
+    a = sim.Monitor(name='combined', merge=(a1,a2), type='int8')
+    a.print_histogram()
+
+
+
+
 def test69():
     class X(sim.Component):
         pass
-        
+
     sim.reset()
     env = sim.Environment()
     q=sim.Queue('q')
@@ -31,7 +399,7 @@ def test69():
     X().enter_sorted(q, 'three')
     X().enter_sorted(q, 'four')
     q.print_info()
-    
+
 def test68():
     class X(sim.Component):
 
@@ -41,7 +409,7 @@ def test68():
             yield self.request(r)
             self.leave().enter(q2)
             self.leave(q2).leave().leave().enter(q1)
-            
+
     env=sim.Environment(trace=True)
     q1=sim.Queue('q1')
     q2=sim.Queue('q2')
@@ -52,14 +420,14 @@ def test68():
 
     r = sim.Resource().register(components)
     env.run()
-    
+
     x[3].deregister(components)
-    
+
     for c in components:
         print(c.name())
     for c in somecomponents:
         print(c.name())
-    
+
 def test67():
     env = sim.Environment()
     m = sim.Monitor('normal distribution')

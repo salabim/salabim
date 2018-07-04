@@ -22,31 +22,32 @@ def fork_angle(self, t):
 
 
 def do_animation():
+    global nphilosophers, eatingtime_mean, thinkingtime_mean
+    global nphilosophers_last
     env.animation_parameters(x0=-50 * env.width() / env.height(), y0=-50,
       x1=+50 * env.width() / env.height(),
       modelname='Dining philosophers', speed=8)
-      
+
     alpha = 360 / nphilosophers
     r1 = 25
     r2 = r1 * sin(radians(alpha) / 4)
     for philosopher in philosophers:
         angle = philosopher.sequence_number() * alpha
-        an = sim.Animate(x0=r1 * cos(radians(angle)), y0=r1 * sin(radians(angle)),
-            circle0=r2, linewidth0=0)
+        an = sim.AnimateCircle(x=r1 * cos(radians(angle)), y=r1 * sin(radians(angle)),
+            radius=r2, linewidth=0, fillcolor=philosopher_fillcolor, screen_coordinates=False)
         an.philosopher = philosopher
-        an.fillcolor = types.MethodType(philosopher_fillcolor, an)
 
     for fork in forks:
         angle = (fork.sequence_number() + 0.5) * alpha
-        an = sim.Animate(x0=0, y0=0,
-            line0=(r1 - r2, 0, r1 + r2, 0), linewidth0=r2 / 4, linecolor0='green')
+        an = sim.AnimateLine(x=0, y=0,
+            spec=(r1 - r2, 0, r1 + r2, 0), linewidth=r2 / 4, linecolor='green', angle=fork_angle)
         an.fork = fork
         an.left_philosopher = philosophers[fork.sequence_number()]
         an.angle_mid = angle
         an.angle_left = angle - 0.2 * alpha
         an.angle_right = angle + 0.2 * alpha
-        an.angle = types.MethodType(fork_angle, an)
-        
+#        an.angle = forkangle
+
     sim.AnimateSlider(x=520, y=0, width=100, height=20,
         vmin=10, vmax=40, resolution=5, v=eatingtime_mean, label='eating time', action=set_eatingtime_mean,
         xy_anchor='nw')

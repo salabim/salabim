@@ -8,19 +8,8 @@ def sidename(side):
     return 'l' if side == left else 'r'
 
 
-def shortname(ship):
-    s = ''
-    for c in ship.name():
-        if c != '.':
-            s = s + c
-    return s
-
-
 def shipcolor(side):
-    if side == left:
-        return 'blue'
-    else:
-        return 'red'
+    return 'blue' if side == left else 'red'
 
 
 def ship_polygon(ship):
@@ -30,8 +19,7 @@ def ship_polygon(ship):
 
 def lock_water_rectangle(t):
     if lock.mode() == 'Switch':
-        y = sim.interpolate(t, lock.mode_time(), lock.scheduled_time(
-        ), ylevel[lock.side], ylevel[-lock.side])
+        y = sim.interpolate(t, lock.mode_time(), lock.scheduled_time(), ylevel[lock.side], ylevel[-lock.side])
     else:
         y = ylevel[lock.side]
     return (xdoor[left], -waterdepth, xdoor[right], y)
@@ -53,15 +41,6 @@ def lock_door_right_rectangle(t):
     return (xdoor[right] - 1, -waterdepth, xdoor[right] + 1, y)
 
 
-def animation_pre_tick(self, t):
-    if lock.mode() == 'Switch':
-        y = sim.interpolate(t, lock.mode_time(), lock.scheduled_time(),
-            ylevel[lock.side], ylevel[-lock.side])
-    else:
-        y = ylevel[lock.side]
-    lockqueue.animate(x=xdoor[-lock.side], y=y, direction='w' if lock.side == left else 'e')
-
-
 def do_animation():
     global ylevel, xdoor, waterdepth
 
@@ -71,45 +50,40 @@ def do_animation():
     xdoor = {left: -0.5 * locklength, right: 0.5 * locklength}
     xbound = {left: -1.2 * locklength, right: 1.2 * locklength}
 
-    sim.Environment.animation_pre_tick = animation_pre_tick
     env.animation_parameters(
         x0=xbound[left], y0=-waterdepth, x1=xbound[right], modelname='Lock', speed=8, background_color='20%gray')
 
     for side in [left, right]:
-        wait[side].animate(x=xdoor[side], y=10 + ylevel[side], direction='n')
+        sim.AnimateQueue(queue=wait[side], x=xdoor[side], y=10 + ylevel[side], direction='n')
 
-    sim.Animate(rectangle0=(xbound[left], ylevel[left] - waterdepth,
-                            xdoor[left], ylevel[left]), fillcolor0='aqua')
-    sim.Animate(rectangle0=(xdoor[right], ylevel[right] - waterdepth,
-                            xbound[right], ylevel[right]), fillcolor0='aqua')
-    a = sim.Animate(rectangle0=(0, 0, 0, 0), fillcolor0='aqua')
-    a.rectangle = lock_water_rectangle
-    a = sim.Animate(rectangle0=(0, 0, 0, 0))
-    a.rectangle = lock_door_left_rectangle
-    a = sim.Animate(rectangle0=(0, 0, 0, 0))
-    a.rectangle = lock_door_right_rectangle
-
-    a = sim.Animate(text='', x0=10, y0=650, screen_coordinates=True,
-                    fontsize0=15, font='narrow', anchor='w')
-    a.text = lambda t: 'mean waiting left : {:5.1f} (n={})'.\
-        format(wait[left].length_of_stay.mean(),
-        wait[left].length_of_stay.number_of_entries())
-    a = sim.Animate(text='', x0=10, y0=630, screen_coordinates=True,
-        fontsize0=15, font='narrow', anchor='w')
-    a.text = lambda t: 'mean waiting right: {:5.1f} (n={})'.\
-        format(wait[right].length_of_stay.mean(),
-        wait[right].length_of_stay.number_of_entries())
-    a = sim.Animate(text='xx=12.34', x0=10, y0=610, screen_coordinates=True,
-        fontsize0=15, font='narrow', anchor='w')
-    a.text = lambda t: '  nr waiting left : {:3d}'.format(wait[left].length())
-    a = sim.Animate(text='xx=12.34', x0=10, y0=590, screen_coordinates=True,
-        fontsize0=15, font='narrow', anchor='w')
-    a.text = lambda t: '  nr waiting right: {:3d}'.format(wait[right].length())
+    sim.AnimateRectangle(spec=(xbound[left], ylevel[left] - waterdepth,
+                            xdoor[left], ylevel[left]), fillcolor='aqua')
+    sim.AnimateRectangle(spec=(xdoor[right], ylevel[right] - waterdepth,
+                            xbound[right], ylevel[right]), fillcolor='aqua')
+    sim.AnimateRectangle(spec=lock_water_rectangle, fillcolor='aqua')
+    sim.AnimateRectangle(spec=lock_door_left_rectangle)
+    sim.AnimateRectangle(spec=lock_door_right_rectangle)
 
     sim.AnimateSlider(x=520, y=0, width=100, height=20,
           vmin=16, vmax=60, resolution=4, v=iat, label='iat', action=set_iat, xy_anchor='nw')
     sim.AnimateSlider(x=660, y=0, width=100, height=20,
           vmin=10, vmax=60, resolution=5, v=meanlength, label='mean length', action=set_meanlength, xy_anchor='nw')
+    sim.AnimateMonitor(wait[left].length, linecolor='orange', fillcolor='bg', x=-225, y=-200, xy_anchor='n',
+        horizontal_scale=1, width=450, linewidth=2,
+        title=lambda: 'Number of waiting ships left. Mean={:10.2f}'.format(wait[left].length.mean()))
+    sim.AnimateMonitor(wait[right].length, linecolor='orange', fillcolor='bg', x=-225, y=-300, xy_anchor='n',
+        horizontal_scale=1, width=450, linewidth=2,
+        title=lambda: 'Number of waiting ships right. Mean={:10.2f}'.format(wait[right].length.mean()))
+    sim.AnimateMonitor(wait[left].length_of_stay, linecolor='white', fillcolor='bg', x=-225, y=-400, xy_anchor='n',
+        vertical_scale=0.5, horizontal_scale=5, as_points=True, width=450, height=75, linewidth=4,
+        title=lambda: 'Waiting time of ships left. Mean={:10.2f}'.format(wait[left].length_of_stay.mean()))
+    sim.AnimateMonitor(wait[right].length_of_stay, linecolor='white', fillcolor='bg', x=-225, y=-500, xy_anchor='n',
+        vertical_scale=0.5, horizontal_scale=5, as_points=True, width=450, height=75, linewidth=4,
+        title=lambda: 'Waiting time of ships left. Mean={:10.2f}'.format(wait[right].length_of_stay.mean()))
+
+    sim.AnimateQueue(
+        queue=lockqueue, x=lambda: xdoor[-lock.sideq], y=lock_y,
+        direction=lambda: 'w' if lock.sideq == left else 'e')
 
 
 def set_iat(val):
@@ -138,15 +112,11 @@ class Ship(sim.Component):
     def animation_objects(self, q):
         size_x = self.length
         size_y = 5
-        if self.side == left:
-            anchor = 'se'
-        else:
-            anchor = 'sw'
-        an1 = sim.Animate(polygon0=ship_polygon(self),
-            fillcolor0=shipcolor(self.side), anchor=anchor, linewidth0=0)
-        an2 = sim.Animate(text=shortname(self), textcolor0='white',
-            anchor=anchor, fontsize0=2.4, offsetx0=self.side * 5, offsety0=0.7)
-        return (size_x, size_y, an1, an2)
+        an0 = sim.AnimatePolygon(spec=ship_polygon(self),
+            fillcolor=shipcolor(self.side), linewidth=0,
+            text=' ' + self.name(), textcolor='white', layer=1,
+            fontsize=2.6, text_anchor=('e' if self.side == left else 'w'))
+        return (size_x, size_y, an0)
 
     def process(self):
         self.enter(wait[self.side])
@@ -159,6 +129,15 @@ class Ship(sim.Component):
         self.leave(lockqueue)
         yield self.hold(outtime, mode='Sail out')
         lock.activate()
+
+
+def lock_y(t):
+    if lock.mode() == 'Switch':
+        y = sim.interpolate(t, lock.mode_time(), lock.scheduled_time(),
+            ylevel[lock.side], ylevel[-lock.side])
+    else:
+        y = ylevel[lock.side]
+    return y
 
 
 class Lock(sim.Component):
@@ -181,6 +160,7 @@ class Lock(sim.Component):
             for ship in lockqueue:
                 ship.activate()
                 yield self.passivate('Wait for sail out')
+            self.sideq = -self.sideq
 
 
 env = sim.Environment()
@@ -190,7 +170,7 @@ switchtime = 10
 intime = 2
 outtime = 2
 meanlength = 30
-iat = 200
+iat = 20
 
 lockqueue = sim.Queue('lockqueue')
 
@@ -203,6 +183,7 @@ for side in (left, right):
 
 lock = Lock(name='lock')
 lock.side = left
+lock.sideq = left
 
 do_animation()
 env.run()

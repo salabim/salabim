@@ -33,142 +33,25 @@ SIM_TIME = WEEKS * 7 * 24 * 60  # Simulation time in minutes
 SCALE = 10
 
 
-class MachineBarAnimate(sim.Animate):
-    def __init__(self, machine):
-        self.machine = machine
-        sim.Animate.__init__(self, rectangle0=(0, 0, 0, 0), linewidth0=0)
-
-    def rectangle(self, t):
-        if self.machine.scheduled_time() == sim.inf:
-            d = self.machine.remaining_time
-        else:
-            d = self.machine.scheduled_time() - t
-        return(
-            100, 100 + self.machine.n * 30,
-            100 + d * SCALE, 100 + self.machine.n * 30 + 20)
-
-    def fillcolor(self, t):
-        if self.machine.mode() == 'work':
-            return 'green'
-        if self.machine.mode() == 'wait':
-            return 'red'
-        if self.machine.mode() == 'repair':
-            return 'orange'
-
-
-class MachineTextAnimate(sim.Animate):
-    def __init__(self, machine):
-        self.machine = machine
-        sim.Animate.__init__(self,
-            x0=10, y0=100 + self.machine.n * 30, text='', anchor='sw', font='narrow', fontsize0=15)
-
-    def text(self, t):
-        return '{} {:4d}'.format(self.machine.ident, self.machine.parts_made)
-
-
-class MachineBarJobAnimate(sim.Animate):
-    def __init__(self, machine):
-        self.machine = machine
-        sim.Animate.__init__(self, rectangle0=(0, 0, 0, 0), linewidth0=0)
-
-    def rectangle(self, t):
-        d = self.machine.job_time
-        return(
-            100, 100 + self.machine.n * 30,
-            100 + d * SCALE, 100 + self.machine.n * 30 + 20)
-
-    def fillcolor(self, t):
-        if self.machine.mode() == 'work':
-            return ('green', 25)
-        if self.machine.mode() == 'wait':
-            return ('red', 25)
-        if self.machine.mode() == 'repair':
-            return ('orange', 25)
-
-
-class RepairBlockAnimate(sim.Animate):
-    def __init__(self, i):
-        self.i = i
-        sim.Animate.__init__(self, y0=10, rectangle0=(0, 0, 20, 20), linecolor0='white')
-
-    def x(self, t):
-        return xrepairman(self.i, t)
-
-    def rectangle(self, t):
-        if self.i == -1:
-            if repairman.claimers()[0] is None:
-                d = 0
-            else:
-                d = repairman.claimers()[0].scheduled_time() - t
-        else:
-            if repairman.requesters()[self.i] is None:
-                d = 0
-            else:
-                if repairman.requesters()[self.i] == other:
-                    d = repairman.requesters()[self.i].remaining_time
-                else:
-                    d = repairman.requesters()[self.i].repair_time
-        return (0, 0, d * SCALE, 20)
-
-    def fillcolor(self, t):
-        if self.i == -1:
-            if repairman.claimers()[0] is None:
-                return ''
-            else:
-                return 'orange'
-        else:
-            if repairman.requesters()[self.i] is None:
-                return ''
-            else:
-                return 'red'
-
-
-class RepairTextAnimate(sim.Animate):
-    def __init__(self, i):
-        self.i = i
-        sim.Animate.__init__(self, y0=10 + 3, text='',
-            textcolor0='white', font='narrow', fontsize0=15, anchor='sw')
-
-    def x(self, t):
-        return xrepairman(self.i, t) + 2
-
-    def text(self, t):
-        if self.i == -1:
-            if repairman.claimers()[0] is None:
-                return ''
-            else:
-                return repairman.claimers()[0].ident
-        else:
-            if repairman.requesters()[self.i] is None:
-                return ''
-            else:
-                return repairman.requesters()[self.i].ident
-
-
-def xrepairman(i, t):
-    start = 0
-    if i != -1:
-        start += (repairman.claimers()[0].scheduled_time() - t)
-        for j in range(i):
-            if repairman.requesters()[j] is not None:
-                if repairman.requesters()[j] != other:
-                    start += repairman.requesters()[j].repair_time
-    return 10 + start * SCALE
-
-
 def do_animation():
 
     env.animation_parameters(modelname='Machine shop', speed=4, background_color='20%gray')
-    for machine in machines:
-        MachineBarAnimate(machine)
-        MachineTextAnimate(machine)
-        MachineBarJobAnimate(machine)
-    MachineBarAnimate(other)
-    MachineTextAnimate(other)
-    MachineBarJobAnimate(other)
-    for i in range(-1, NUM_MACHINES):
-        RepairBlockAnimate(i)
-        RepairTextAnimate(i)
+    for machine in machines + [other]:
+        sim.AnimateRectangle(spec=lambda arg, t: arg.rectangle(t, remain=False),
+        fillcolor=lambda arg, t: arg.fillcolor(t, remain=False),
+            linewidth=0,
+            text=lambda self, t: '{} {:4d}'.format(self.ident, self.parts_made),
+            text_anchor='sw', font='narrow', fontsize=15, text_offsetx=-90, textcolor='white',
+            arg=machine)
+        sim.AnimateRectangle(spec=lambda arg, t: arg.rectangle(t, remain=True),
+            fillcolor=lambda arg, t: arg.fillcolor(t, remain=True), linewidth=0,
+            text=lambda self, t: '{} {:4d}'.format(self.ident, self.parts_made),
+            text_anchor='sw', font='narrow', fontsize=15, text_offsetx=-90, textcolor='white',
+            arg=machine)
+    sim.AnimateQueue(queue=repairman.requesters(),
+        x=lambda t: 10 + repairman.claimers()[0].l(t) + 2 if repairman.claimers() else 10,
+        y=10, direction='e')
+    sim.AnimateQueue(queue=repairman.claimers(), x=10, y=10, direction='e')
 
 
 def time_per_part():
@@ -190,30 +73,80 @@ class Machine(sim.Component):
     A machine has a *name* and a numberof *parts_made* thus far.
 
     """
-
-    def setup(self, n):
+    def setup(self, n, ident, disturb):
         self.n = n
-        self.ident = str(n)
+        self.ident = ident
         self.parts_made = 0
-        self.broken = False
-        self.disturber = Disturber(machine=self)
+        if disturb:
+            self.broken = False
+            self.disturber = Disturber(machine=self)
 
-    def process(self):
+    def l(self, t):
+        if self in repairman.claimers():
+            d = self.scheduled_time() - t
+        else:
+            if self == other:
+                d = self.remaining_time
+            else:
+                d = self.repair_time
+        return d * SCALE
+
+    def animation_objects(self):
+        ao0 = sim.AnimateRectangle(
+            spec=lambda arg, t: (0, 0, arg.l(t), 20),
+            fillcolor=lambda arg, t: 'orange' if self in repairman.claimers() else 'red',
+            textcolor='white',
+            text=self.ident, arg=self)
+        return lambda arg, t: arg.l(t) + 2, 0, ao0
+
+    def rectangle(self, t, remain):
+        if remain:
+            d = self.job_time
+        else:
+            if self.scheduled_time() == sim.inf:
+                d = self.remaining_time
+            else:
+                d = self.scheduled_time() - t
+        return(
+            100, 100 + self.n * 30,
+            100 + d * SCALE, 100 + self.n * 30 + 20)
+
+    def fillcolor(self, t, remain):
+        alpha = 100 if remain else 255
+        if self.mode() == 'work':
+            return ('green', alpha)
+        if self.mode() == 'wait':
+            return ('red', alpha)
+        if self.mode() == 'repair':
+            return ('orange', alpha)
+
+    def process_normal(self):
+            while True:
+                self.job_time = time_per_part()
+                self.remaining_time = self.job_time
+                while self.remaining_time > 1e-8:
+                    yield self.hold(self.remaining_time, mode='work')
+                    self.remaining_time -= (self.env.now() - self.mode_time())
+                    if self.broken:
+                        if repairman.claimers()[0] == other:
+                            other.release()
+                            other.activate()
+                        self.repair_time = REPAIR_TIME
+                        yield self.request((repairman, 1, 0), mode='wait')
+                        yield self.hold(self.repair_time, mode='repair')
+                        self.release()
+                        self.broken = False
+                self.parts_made += 1
+
+    def process_other(self):
         while True:
-            self.job_time = time_per_part()
+            self.job_time = JOB_DURATION
             self.remaining_time = self.job_time
             while self.remaining_time > 1e-8:
+                yield self.request((repairman, 1, 1), mode='wait')
                 yield self.hold(self.remaining_time, mode='work')
                 self.remaining_time -= (self.env.now() - self.mode_time())
-                if self.broken:
-                    if repairman.claimers()[0] == other:
-                        other.release()
-                        other.activate()
-                    self.repair_time = REPAIR_TIME
-                    yield self.request((repairman, 1, 0), mode='wait')
-                    yield self.hold(self.repair_time, mode='repair')
-                    self.release()
-                    self.broken = False
+            other.release()
             self.parts_made += 1
 
 
@@ -235,7 +168,7 @@ class Other(sim.Component):
         self.ident = 'X'
         self.parts_made = 0
 
-    def process(self):
+    def process_other(self):
         while True:
             self.job_time = JOB_DURATION
             self.remaining_time = self.job_time
@@ -248,14 +181,13 @@ class Other(sim.Component):
 
 
 # Setup and start the simulation
-print('Machine shop')
 env = sim.Environment()
 random.seed(RANDOM_SEED)  # This helps reproducing the results
 
 repairman = sim.Resource('repairman')
 
-machines = [Machine(n=i) for i in range(NUM_MACHINES)]
-other = Other(name='other')
+machines = [Machine(n=i, ident=str(i), disturb=True, process='process_normal') for i in range(NUM_MACHINES)]
+other = Machine(n=-1, ident='X', disturb=False, name='other', process='process_other')
 
 # Execute!
 do_animation()

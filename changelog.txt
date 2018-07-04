@@ -1,5 +1,165 @@
 salabim  changelog
 
+version 2.3.0  2018-06-28
+=========================
+New functionality
+-----------------
+As from this version, animation is more powerful and easier to use. Although the old style
+Animate class is still available, it is recommended to use the new style classes.
+
+The documentation is not yet completely up-to-date. Please read these release notes carefully to get more information.
+
+All the docstrings (and therefore the reference section of the manual) are however up-to-date.
+It is planned to publish a number of tutorial videos or guides, both for basic and advanced animation.
+
+To visualize rectangles, lines, points, polygon, texts, circles and images salabim offers the new classes
+- AnimateCircle
+- AnimateImage
+- AnimateLine
+- AnimatePoints
+- AnimatePolygon
+- AnimateRectangle
+- AnimateText
+
+The main difference with the Animate class is that no automatic linear interpolation over time is supported.
+But, each of the characteristics may be still changed over time easily!
+All visualizations (apart from AnimateText) have an attached text field that will be displayed relative to
+the shape.
+Thus, for instance, it possible to say:
+    vis = sim.AnimateRectangle(spec=(100, 100, 300, 50), text='some text')
+and then a rectangle with the text 'some text' in the middle will be displayed.
+In contrast to Animate, updating any of the specifying fields does not require the update method, but can be
+done directly.
+In the above example you can just say
+    vis.text='yet another text' or vis.x=100
+
+One of the key features of this new visualization is that all the specifying fields can now be functions or methods.
+This make is possible to automatically update fields, e.g.
+   vis = sim.AnimateText(lambda:'mean of histogram = ' + str(hist1.mean()), x=100, y=100)
+   which will show and update the current mean of the histogram
+or
+   vis = sim.AnimateRectangle(spec=(0, 0, 60, 20), x=100, y=lambda t:t+10)
+   which results in a rectangle, moving from bottom to top.
+The animation_objects method of Component now accepts any of the new visualization class instances as well as
+Animate instances.
+
+Animation of queues is now specified with the class AnimateQueue, although Queue.animate() is still supported.
+One queue can now be animated in several ways, whereas previously one queue could be animated only once. See
+Demo queue animation.py for an example.
+It possible to restrict the number of components shown (max_length).
+Is possible to change all the parameters of the queue animation and the shown components dynamically.
+See for instance Elevator animated.py where the queue position moves up and down.
+Or see Machine shop animated.py where the shape of the components changes dynamically.
+Internally, the animation of queues uses a new, more efficient, algorithm.
+
+Most examples have been updated to use this new visualization functionality.
+
+Texts can now spawn multiple lines (lines separated by linefeeds). Also, a list or tuple of strings may
+be used instead, in which case each element of the list/tuple will be treated as another line.
+This is particularly useful to present (dynamic) monitor values.
+With AnimateText, it is possible to restrict the number of lines (parameter max_lines) shown.
+
+
+Class Animate has a new animation parameter, as_points that applies to lines, rectangles and polygons.
+If as_points is False (the default), all lines will be drawn.
+If as_points is True, only the end point will be drawn as a square with a width equal to the linewidth.
+Technical remark: the advantage of using as_points this instead of a series of individual squares
+is that there is only one bitmap to be placed on the canvas, which may lead to better performance in many cases.
+Also this is used internally for AnimateMonitor() (see below).
+Points are also available in the new AnimatePoints class.
+
+
+Class AnimateMonitor() can be used to visualize the value of a timestamped monitor over time. It is
+particularly useful for visualizing the length of a queue, the various monitors of a resource or
+the value of a state.
+It is possible to connect the lines (very useful for 'duration' monitors, like queue length) or just show
+the individual points.
+This class can also visualize the relationship between the index and the value of a non time stamped monitor.
+The points can be just shown or connected with a line.
+It is possible to use
+    Monitor.animate() and
+    MonitorTimestamp.animate()
+as an alternative, although not recommended.
+
+The MMc animated.py model demonstrates the use of the (timestamped) monitor animation.
+
+
+Monitor and MonitorTimestamp can now be used to create a merged (timestamped) monitor.
+This is done by providing a list of (timestamped) monitors (all have to have the same type), like
+    mc = MonitorTimestamp(name='m1 and m2', merge=(m1, m2))
+For monitors, just all of the tallied x-values are copied from the to be merged monitors.
+For timestamped monitors, the x-values are summed, for all the periods where all the monitors were on.
+Periods where one or more monitors were off, are excluded.
+Note that the merge only takes place at creation of the (timestamped) monitor and not dynamically later.
+
+Sample usage:
+Suppose we have three types of products, that each have a queue for processing, so
+a.processing, b.processing, c.processing.
+If we want to print the histogram of the combined (=summed) length of these queues:
+    MonitorTimestamp(name='combined processing length',
+        merge=(a.processing.length, b.processing.length, c.processing.length)).print_histogram()
+and to print the histogram of the length_of_stay for all entries:
+    Monitor(name='combined processing length of stay', 
+        merge=(a.processing.length_of_stay, b.processing.length_of_stay, c.processing.length_of_stay)).print_histogram()
+        
+ 
+CumPdf is a new distribution type that is similar to Pdf, but where cumulative probability values are used.
+This is particularly useful for dichotomies, like failing probabilities:
+    failrate = 0.1
+    if CumPdf(True, failrate, False,1)
+        print('failed!')
+
+
+All methods 
+  print_histogram()
+  print_histograms()
+  print_statistics()
+  print_info()
+now have an additional parameter as_str, that allows the output to be returned
+as a string, rather than print the information (the default is False, so just print):
+This is particularly useful for animation of that information (see demo queue animation.py) or to
+write directly to a file.        
+                        
+
+sim.Random() is a new class that makes a randomstream. It is essentially the same as sim.random.Random().
+
+        
+Queue.name(value), Resource.name(value) and State.name(value) now also update the derived names.        
+
+API changes
+-----------
+The API of Component has changed slightly. The parameter process now defaults to None, which means that
+it tries to run the process generator method, if any.
+If you don't want to start the process generator method, even if it exists, now set process='' (this was None).
+
+The API of Environment had changed slightly. The parameter random_seed now defaults to None, which means that
+1234567 will be used as the random seed value. If random_seed is '*', a system generated, non reproducable,
+random seed will be used.
+
+The API of Environment.random_seed has changed slightly. If the argument seed is '*', a system generated, non
+reproducable random seed will be used.
+
+State.animate() is phased out. Use the standard visualization classes, like AnimateRectangle,
+    AnimateCircle and AnimateTex instead.
+
+
+Future changes
+--------------
+Python 2.7 will not be supported in a future version. Please upgrade to Python 3.x as soon as possible .
+
+
+Internal changes
+----------------
+Most default parameters are now None, instead of omitted, which is completely phased out.
+This makes it easier to specify default arguments, like:
+    myname = None
+    sim.Component(name=myname)
+This internal change required a couple of changes to the API (see above).
+Apart from that, the user shouldn't notice this rather dramatic internal change (>500 replacements in the code!).
+
+Animating lines and polygons without any points is now supported.
+
+
 version 2.2.23  2018-05-28
 ==========================
 New functionality
