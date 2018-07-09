@@ -15,3 +15,5 @@ collection and presentation, tracing and statistical distributions, none of whic
 See www.salabim.org for details. 
 
 See www.salabim.org/manual for the documentation.
+
+[![DOI](http://joss.theoj.org/papers/10.21105/joss.00767/status.svg)](https://doi.org/10.21105/joss.00767)
