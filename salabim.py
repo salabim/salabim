@@ -6,7 +6,7 @@ see www.salabim.org for more information, the documentation, updates and license
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.0'
+__version__ = '2.3.1'
 
 import heapq
 import random
@@ -236,6 +236,14 @@ class Monitor(object):
             - 'uint64' integer >= 0 <= 18446744073709551615 8 bytes
             - 'float' float 8 bytes
 
+    weighted : bool
+        if True, tallied values may be given weight.
+        if False (default), weights are not allowed
+
+    weight_legend : str
+        used in print_statistics and print_histogram to indicate the dimension of weight,
+        e.g. duration or minutes. Default: weight.
+
     merge: list, tuple or set
         the monitor will be created by merging the monitors mentioned in the list |n|
         note that the types of all to be merged monitors should be the same. |n|
@@ -246,9 +254,9 @@ class Monitor(object):
         if omitted, default_env will be used
     '''
 
-    cached_x = [(0, 0), (0, 0)]  # index=ex0, value=[hash,x]
+    cached_xweight = {(ex0, force_numeric): (0, 0) for ex0 in (False, True) for force_numeric in (False, True)}
 
-    def __init__(self, name=None, monitor=True, type=None, merge=None,
+    def __init__(self, name=None, monitor=True, type=None, merge=None, weighted=False, weight_legend='weight',
         env=None, *args, **kwargs):
         if env is None:
             self.env = g.default_env
@@ -256,6 +264,8 @@ class Monitor(object):
             self.env = env
         _set_name(name, self.env._nameserializeMonitor, self)
         self._timestamp = False
+        self.weighted = weighted
+        self.weight_legend = weight_legend
         if merge is None:
             if type is None:
                 type = 'any'
@@ -272,9 +282,12 @@ class Monitor(object):
                     raise SalabimError('non Monitor item found in merge list')
 
             self.xtypecode = merge[0].xtypecode
+            self.weighted = merge[0].weighted
             for m in merge:
                 if m.xtypecode != self.xtypecode:
                     raise SalabimError('not all types in merge list are equal')
+                if m.weighted != self.weighted:
+                    raise SalabimError('not all weighted flags in merge list are equal')
             if type is not None:
                 if type_to_typecode_off(type)[0] != self.xtypecode:
                     raise SalabimError('type does not match the type of the monitors in the merge list')
@@ -282,7 +295,7 @@ class Monitor(object):
                 self._x = array.array(self.xtypecode, itertools.chain(*[m._x for m in merge]))
             else:
                 self._x = list(itertools.chain(*[m._x for m in merge]))
-
+            self._weight = array.array('float', itertools.chain(*[m._weight for m in merge]))
             self._monitor = monitor
         self.setup(*args, **kwargs)
 
@@ -378,12 +391,15 @@ class Monitor(object):
             self._x = array.array(self.xtypecode)
         else:
             self._x = []
+        if self.weighted:
+            self._weight = array.array('d')
         self.monitor(monitor)
-        Monitor.cached_x = [(0, 0), (0, 0)]  # invalidate the cache
+        Monitor.cached_xweight = {(ex0, force_numeric): (0, 0)
+            for ex0 in (False, True) for force_numeric in (False, True)}  # invalidate the cache
 
     def monitor(self, value=None):
         '''
-        enables/disabled monitor
+        enables/disables monitor
 
         Parameters
         ----------
@@ -400,7 +416,7 @@ class Monitor(object):
             self._monitor = value
         return self.monitor
 
-    def tally(self, x):
+    def tally(self, x, weight=1):
         '''
         Parameters
         ----------
@@ -409,6 +425,11 @@ class Monitor(object):
         '''
         if self._monitor:
             self._x.append(x)
+            if self.weighted:
+                self._weight.append(1 if weight is None else weight)
+            else:
+                if weight != 1:
+                    raise SalabimError('incorrect weight, for non weighted monitors')
 
     def name(self, value=None):
         '''
@@ -462,13 +483,24 @@ class Monitor(object):
         Returns
         -------
         mean : float
-        '''
 
-        x = self.x(ex0=ex0)
-        if x:
-            return sum(x) / len(x)
+        Note
+        ----
+        For weighted monitors, the weighted mean is returned
+        '''
+        if self.weighted:
+            x, weight = self.xweight(ex0=ex0)
+            sumweight = sum(weight)
+            if sumweight:
+                return sum(vx * vweight for vx, vweight in zip(x, weight)) / sumweight
+            else:
+                return nan
         else:
-            return nan
+            x = self.x(ex0=ex0)
+            if x:
+                return sum(x) / len(x)
+            else:
+                return nan
 
     def std(self, ex0=False):
         '''
@@ -482,14 +514,28 @@ class Monitor(object):
         Returns
         -------
         standard deviation : float
+
+        Note
+        ----
+        For weighted monitors, the weighted standard deviation is returned
         '''
-        x = self.x(ex0=ex0)
-        if x:
-            wmean = self.mean(ex0)
-            wvar = sum(((vx - wmean)**2) for vx in x) / len(x)
-            return math.sqrt(wvar)
+        if self.weighted:
+            x, weight = self.xweight(ex0=ex0)
+            sumweight = sum(weight)
+            if sumweight:
+                wmean = self.mean(ex0=ex0)
+                wvar = sum((vweight * (vx - wmean)**2) for vx, vweight in zip(x, weight)) / sumweight
+                return math.sqrt(wvar)
+            else:
+                return nan
         else:
-            return nan
+            x = self.x(ex0=ex0)
+            if x:
+                wmean = self.mean(ex0=ex0)
+                wvar = sum(((vx - wmean)**2) for vx in x) / len(x)
+                return math.sqrt(wvar)
+            else:
+                return nan
 
     def minimum(self, ex0=False):
         '''
@@ -532,7 +578,7 @@ class Monitor(object):
 
     def median(self, ex0=False):
         '''
-        median of tallied values weighted wioth their durations
+        median of tallied values
 
         Parameters
         ----------
@@ -542,6 +588,10 @@ class Monitor(object):
         Returns
         -------
         median : float
+
+        Note
+        ----
+        For weighted monitors, the weighted median is returned
         '''
         return self.percentile(50, ex0=ex0)
 
@@ -564,26 +614,25 @@ class Monitor(object):
         : float
             q-th percentile |n|
             0 returns the minimum, 50 the median and 100 the maximum
+
+        Note
+        ----
+        For weighted monitors, the weighted percentile is returned
         '''
 
         q = max(0, min(q, 100))
-        if self._timestamp:
-            x, weights = self.xduration(ex0=ex0)
-        else:
-            x = self.x(ex0=ex0)
-            weights = [1] * len(x)
+        x, weight = self.xweight(ex0=ex0)
         if len(x) == 1:
             return x[0]
-        sumweights = sum(weights)
-        if not sumweights:
+        sumweight = sum(weight)
+        if not sumweight:
             return nan
-
-        xweights = sorted(zip(x, weights), key=lambda v: v[0])
-        x_sorted, weights_sorted = zip(*xweights)
-        weights_sorted = [0] + list(weights_sorted)
-        threshold = sumweights * q / 100
+        xweight = sorted(zip(x, weight), key=lambda v: v[0])
+        x_sorted, weight_sorted = zip(*xweight)
+        weight_sorted = [0] + list(weight_sorted)
+        threshold = sumweight * q / 100
         vcum_imin1 = 0
-        for i, v in enumerate(weights_sorted):
+        for i, v in enumerate(weight_sorted):
             vcum_i = vcum_imin1 + v
             if vcum_i > threshold:
                 break
@@ -612,6 +661,28 @@ class Monitor(object):
         x = self.x(ex0=ex0)
         return sum(1 for vx in x if (vx > lowerbound) and (vx <= upperbound))
 
+    def bin_weight(self, lowerbound, upperbound):
+        '''
+        total weight of tallied values in range (lowerbound,upperbound]
+
+        Parameters
+        ----------
+        lowerbound : float
+            non inclusive lowerbound
+
+        upperbound : float
+            inclusive upperbound
+
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+
+        Returns
+        -------
+        total weight of values >lowerbound and <=upperbound : int
+        '''
+        x, weight = self.xweight()
+        return sum((vweight for vx, vweight in zip(x, weight) if (vx > lowerbound) and (vx <= upperbound)))
+
     def value_number_of_entries(self, value):
         '''
         count of the number of tallied values equal to value or in value
@@ -631,7 +702,30 @@ class Monitor(object):
         else:
             value = [str(value)]
 
-        return sum(1 for vx in self._x if (str(vx).strip() in value))
+        x = self.x()
+        return sum(1 for vx in x if (str(vx).strip() in value))
+
+    def value_weight(self, value):
+        '''
+        total weight of tallied values equal to value or in value
+
+        Parameters
+        ----------
+        value : any
+            if list, tuple or set, check whether the tallied value is in value |n|
+            otherwise, check whether the tallied value equals the given value
+
+        Returns
+        -------
+        total of weights of tallied values in value or equal to value : int
+        '''
+        x, weight = self.xweight(force_numeric=False)  # can't use self._weight, because of MonitorTimestamp
+        if isinstance(value, (list, tuple, set)):
+            value = [str(v) for v in value]
+        else:
+            value = [str(value)]
+
+        return sum(vweight for (vx, vweight) in zip(x, weight) if (str(vx).strip() in value))
 
     def number_of_entries(self, ex0=False):
         '''
@@ -657,6 +751,32 @@ class Monitor(object):
         number of zero entries : int
         '''
         return self.number_of_entries() - self.number_of_entries(ex0=True)
+
+    def weight(self, ex0=False):
+        '''
+        sum of weights
+
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+
+        Returns
+        -------
+        sum of weights : float
+        '''
+        x, weight = self.xweight(ex0=ex0)
+        return sum(weight)
+
+    def weight_zero(self):
+        '''
+        sum of weights of zero entries
+
+        Returns
+        -------
+        sum of weights of zero entries : float
+        '''
+        return self.weight() - self.weight(ex0=True)
 
     def print_statistics(self, show_header=True, show_legend=True, do_indent=False, as_str=False):
         '''
@@ -698,22 +818,17 @@ class Monitor(object):
             result.append(
                 pad('-' * (l - 1) + ' ', l) + '-------------- ------------ ------------ ------------')
 
-        if self._timestamp:
-            if self.duration() == 0:
-                result.append(pad(self.name(), l) + 'no data')
-                return return_or_print(result, as_str)
-            else:
-                result.append(pad(self.name(), l) + 'duration      {}{}{}'.
-                    format(fn(self.duration(), 13, 3),
-                    fn(self.duration(ex0=True), 13, 3), fn(self.duration_zero(), 13, 3)))
+        if self.weight() == 0:
+            result.append(pad(self.name(), l) + 'no data')
+            return return_or_print(result, as_str)
+        if self.weighted:
+            result.append(pad(self.name(), l) + pad(self.weight_legend, 14) +
+              '{}{}{}'.format(fn(self.weight(), 13, 3),
+              fn(self.weight(ex0=True), 13, 3), fn(self.weight_zero(), 13, 3)))
         else:
-            if self.number_of_entries() == 0:
-                result.append(pad(self.name(), l) + 'no entries')
-                return return_or_print(result, as_str)
-            else:
-                result.append(pad(self.name(), l) + 'entries       {}{}{}'.
-                    format(fn(self.number_of_entries(), 13, 3),
-                    fn(self.number_of_entries(ex0=True), 13, 3), fn(self.number_of_entries_zero(), 13, 3)))
+            result.append(pad(self.name(), l) + pad('entries', 14) +
+              '{}{}{}'.format(fn(self.number_of_entries(), 13, 3),
+                fn(self.number_of_entries(ex0=True), 13, 3), fn(self.number_of_entries_zero(), 13, 3)))
 
         result.append(indent + 'mean          {}{}'.
               format(fn(self.mean(), 13, 3), fn(self.mean(ex0=True), 13, 3)))
@@ -804,7 +919,7 @@ class Monitor(object):
         with a maximum of 30 classes. |n|
         Exactly same functionality as Monitor.print_histogram()
         '''
-        return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0)
+        return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str)
 
     def print_histogram(self, number_of_bins=None,
       lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False):
@@ -851,31 +966,24 @@ class Monitor(object):
         result = []
         result.append('Histogram of ' + self.name() + ('[ex0]' if ex0 else ''))
 
-        if self._timestamp:
-            x, weights = self.xduration(ex0=ex0, force_numeric=not values)
-            weight_total = sum(weights)
-        else:
-            x = self.x(ex0=ex0, force_numeric=not values)
-            weight_total = len(x)
+        x, weight = self.xweight(ex0=ex0, force_numeric=not values)
+        weight_total = sum(weight)
 
         if weight_total == 0:
             result.append('')
-            if self._timestamp:
-                result.append('no data')
-            else:
-                result.append('no entries')
+            result.append('no data')
         else:
 
             if values:
                 nentries = len(x)
-                if self._timestamp:
-                    result.append('duration      {}'.
-                        format(fn(weight_total, 13, 3)))
-                result.append('entries       {}'.
+                if self.weighted:
+                    result.append(pad(self.weight_legend, 13) +
+                        '{}'.format(fn(weight_total, 13, 3)))
+                result.append(pad('entries', 13) + '{}'.
                     format(fn(nentries, 13, 3)))
                 result.append('')
-                if self._timestamp:
-                    result.append('value                     duration        entries')
+                if self.weighted:
+                    result.append('value                ' + rpad(self.weight_legend, 13) + '        entries')
                 else:
                     result.append('value               entries')
                 as_set = {str(x).strip() for x in set(x)}
@@ -883,8 +991,8 @@ class Monitor(object):
                 values = sorted(list(as_set), key=self.key)
 
                 for value in values:
-                    if self._timestamp:
-                        count = self.value_duration(value)
+                    if self.weighted:
+                        count = self.value_weight(value)
                         count_entries = self.value_number_of_entries(value)
                     else:
                         count = self.value_number_of_entries(value)
@@ -894,7 +1002,7 @@ class Monitor(object):
                     n = int(perc * scale)
                     s = ('*' * n) + (' ' * (scale - n))
 
-                    if self._timestamp:
+                    if self.weighted:
                         result.append(pad(str(value), 20) + fn(count, 14, 3) + '(' + fn(perc * 100, 5, 1) + '%)' +
                            rpad(str(count_entries), 7) + '(' + fn(count_entries * 100 / nentries, 5, 1) + '%) ' + s)
                     else:
@@ -905,8 +1013,8 @@ class Monitor(object):
                 result.append(self.print_statistics(show_header=False, show_legend=True, do_indent=False, as_str=True))
                 if number_of_bins >= 0:
                     result.append('')
-                    if self._timestamp:
-                        result.append('           <=      duration     %  cum%')
+                    if self.weighted:
+                        result.append('           <= ' + rpad(self.weight_legend, 13) + '     %  cum%')
                     else:
                         result.append('           <=       entries     %  cum%')
 
@@ -920,8 +1028,8 @@ class Monitor(object):
                             ub = inf
                         else:
                             ub = lowerbound + (i + 1) * bin_width
-                        if self._timestamp:
-                            count = self.bin_duration(lb, ub)
+                        if self.weighted:
+                            count = self.bin_weight(lb, ub)
                         else:
                             count = self.bin_number_of_entries(lb, ub)
 
@@ -936,7 +1044,7 @@ class Monitor(object):
                         result.append('{} {}{}{} {}'.
                               format(fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s))
         result.append('')
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str=as_str)
 
     def key(self, x):
         try:
@@ -1052,16 +1160,35 @@ class Monitor(object):
 
         force_numeric : bool
             if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
+            if False, do not interpret x-values, return as list if type is any (list)
+
+        Returns
+        -------
+        all tallied values : array/list
+        '''
+        return self.xweight(ex0=ex0, force_numeric=force_numeric)[0]
+
+    def xweight(self, ex0=False, force_numeric=True):
+        '''
+        array/list of tallied values
+
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+
+        force_numeric : bool
+            if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
             if False, do not interpret x-values, return as list if type is list
 
         Returns
         -------
         all tallied values : array/list
         '''
-        thishash = hash((self, len(self._x), force_numeric))
+        thishash = hash((self, len(self._x)))
 
-        if Monitor.cached_x[ex0][0] == thishash:
-            return Monitor.cached_x[ex0][1]
+        if Monitor.cached_xweight[(ex0, force_numeric)][0] == thishash:
+            return Monitor.cached_xweight[(ex0, force_numeric)][1]
 
         if self.xtypecode or (not force_numeric):
             xall = self._x
@@ -1077,8 +1204,16 @@ class Monitor(object):
         else:
             x = xall
 
-        Monitor.cached_x[ex0] = (thishash, x)
-        return x
+        if self.weighted:
+            if ex0:
+                xweight = (x, array.array('d', [vweight for vx, vweight in zip(x, self._weight) if vx != 0]))
+            else:
+                xweight = (x, self._weight)
+        else:
+            xweight = (x, array.array('d', (1,) * len(x)))
+
+        Monitor.cached_xweight[(ex0, force_numeric)] = (thishash, xweight)
+        return xweight
 
 
 class MonitorTimestamp(Monitor):
@@ -1159,8 +1294,6 @@ class MonitorTimestamp(Monitor):
         And thus a mean of (10*50+11*20+12*10+10*20)/(50+20+10+20)
     '''
 
-    cached_xduration = [(0, 0), (0, 0)]  # index=ex0, value=[hash,(x,duration)]
-
     def __init__(self, name=None, initial_tally=None, monitor=True, type=None,
         merge=None, env=None, *args, **kwargs):
         if env is None:
@@ -1168,6 +1301,8 @@ class MonitorTimestamp(Monitor):
         else:
             self.env = env
         self._timestamp = True
+        self.weighted = True
+        self.weight_legend = 'duration'
         _set_name(name, self.env._nameserializeComponent, self)
         if merge is None:
             if type is None:
@@ -1201,14 +1336,14 @@ class MonitorTimestamp(Monitor):
                     raise SalabimError('type does not match the type of the monitors in the merge list')
             self.off = merge[0].off
             if self.xtypecode:
-                self._x = array.array(self.xtypecode)
+                self._xw = array.array(self.xtypecode)
             else:
-                self._x = []
+                self._xw = []
 
             curx = [self.off] * len(merge)
             self._t = array.array('d')
             for t, index, x in heapq.merge(
-                *[zip(merge[index]._t, itertools.repeat(index), merge[index]._x) for index in range(len(merge))]):
+                *[zip(merge[index]._t, itertools.repeat(index), merge[index]._xw) for index in range(len(merge))]):
                 if self.xtypecode:
                     curx[index] = x
                 else:
@@ -1225,13 +1360,13 @@ class MonitorTimestamp(Monitor):
                     sum += xi
 
                 if self._t and (t == self._t[-1]):
-                    self._x[-1] = sum
+                    self._xw[-1] = sum
                 else:
                     self._t.append(t)
-                    self._x.append(sum)
+                    self._xw.append(sum)
             if not monitor:
                 self._t.append(self.env._now)
-                self._x.append(self.off)
+                self._xw.append(self.off)
 
         self.setup(*args, **kwargs)
 
@@ -1245,7 +1380,7 @@ class MonitorTimestamp(Monitor):
         '''
         pass
 
-    def register(self, registry):
+    def register(self, *args, **kwargs):
         '''
         registers the timestamped monitor in the registry
 
@@ -1262,14 +1397,9 @@ class MonitorTimestamp(Monitor):
         ----
         Use MonitorTimestamped.deregister if timestamped monitor does not longer need to be registered.
         '''
-        if not isinstance(registry, list):
-            raise SalabimError('registry not list')
-        if self in registry:
-            raise SalabimError(self.name() + ' already in registry')
-        registry.append(self)
-        return self
+        return Monitor.register(self, *args, **kwargs)
 
-    def deregister(self, registry):
+    def deregister(self, *args, **kwargs):
         '''
         deregisters the timestamped monitor in the registry
 
@@ -1282,12 +1412,7 @@ class MonitorTimestamp(Monitor):
         -------
         timestamped monitor (self): MonitorTimestamped
         '''
-        if not isinstance(registry, list):
-            raise SalabimError('registry not list')
-        if self not in registry:
-            raise SalabimError(self.name() + ' not in registry')
-        registry.remove(self)
-        return self
+        return Monitor.deregister(self, *args, **kwargs)
 
     def __repr__(self):
         return objectclass_to_str(self) + ' (' + self.name() + ')'
@@ -1341,17 +1466,19 @@ class MonitorTimestamp(Monitor):
         if monitor is not None:
             self._monitor = monitor
         if self.xtypecode:
-            self._x = array.array(self.xtypecode)
+            self._xw = array.array(self.xtypecode)
         else:
-            self._x = []
+            self._xw = []
 
         if self._monitor:
-            self._x.append(self._tally)
+            self._xw.append(self._tally)
         else:
-            self._x.append(self.off)
+            self._xw.append(self.off)
         self._t = array.array('d')
         self._t.append(self.env._now)
-        MonitorTimestamp.cached_xduration = [(0, 0), (0, 0)]  # invalidate cache
+        Monitor.cached_xweight = {(ex0, force_numeric): (0, 0)
+            for ex0 in (False, True) for force_numeric in (False, True)}  # invalidate the cache
+        self.x_weight_len = -1  # invalidate _x and _weight
 
     def monitor(self, value=None):
         '''
@@ -1375,6 +1502,7 @@ class MonitorTimestamp(Monitor):
                 self.tally(self._tally)
             else:
                 self._tally_off()  # can't use tally() here because self._tally should be untouched
+            self.x_weight_len = -1  # invalidate _x and _weight
         return self.monitor
 
     def tally(self, value):
@@ -1389,17 +1517,17 @@ class MonitorTimestamp(Monitor):
         if self._monitor:
             t = self.env._now
             if self._t[-1] == t:
-                self._x[-1] = value
+                self._xw[-1] = value
             else:
-                self._x.append(value)
+                self._xw.append(value)
                 self._t.append(t)
 
     def _tally_off(self):
         t = self.env._now
         if self._t[-1] == t:
-            self._x[-1] = self.off
+            self._xw[-1] = self.off
         else:
-            self._x.append(self.off)
+            self._xw.append(self.off)
             self._t.append(t)
 
     def name(self, value=None):
@@ -1442,7 +1570,7 @@ class MonitorTimestamp(Monitor):
         '''
         return self._sequence_number
 
-    def mean(self, ex0=False):
+    def mean(self, *args, **kwargs):
         '''
         mean of tallied values, weighted with their durations
 
@@ -1455,14 +1583,10 @@ class MonitorTimestamp(Monitor):
         -------
         mean : float
         '''
-        x, duration = self.xduration(ex0=ex0)
-        sumduration = sum(duration)
-        if sumduration:
-            return sum(vx * vduration for vx, vduration in zip(x, duration)) / sumduration
-        else:
-            return nan
+        self.set_x_weight()
+        return Monitor.mean(self, *args, **kwargs)
 
-    def std(self, ex0=False):
+    def std(self, *args, **kwargs):
         '''
         standard deviation of tallied values, weighted with their durations
 
@@ -1475,16 +1599,10 @@ class MonitorTimestamp(Monitor):
         -------
         standard deviation : float
         '''
-        x, duration = self.xduration(ex0=ex0)
-        sumduration = sum(duration)
-        if sumduration:
-            wmean = self.mean(ex0)
-            wvar = sum((vduration * (vx - wmean)**2) for vx, vduration in zip(x, duration)) / sumduration
-            return math.sqrt(wvar)
-        else:
-            return nan
+        self.set_x_weight()
+        return Monitor.std(self, *args, **kwargs)
 
-    def minimum(self, ex0=False):
+    def minimum(self, *args, **kwargs):
         '''
         minimum of tallied values
 
@@ -1497,13 +1615,10 @@ class MonitorTimestamp(Monitor):
         -------
         minimum : float
         '''
-        x, duration = self.xduration(ex0=ex0)
-        if x:
-            return min(x)
-        else:
-            return nan
+        self.set_x_weight()
+        return Monitor.minimum(self, *args, **kwargs)
 
-    def maximum(self, ex0=False):
+    def maximum(self, *args, **kwargs):
         '''
         maximum of tallied values
 
@@ -1516,13 +1631,10 @@ class MonitorTimestamp(Monitor):
         -------
         maximum : float
         '''
-        x, duration = self.xduration(ex0=ex0)
-        if x:
-            return max(x)
-        else:
-            return nan
+        self.set_x_weight()
+        return Monitor.maximum(self, *args, **kwargs)
 
-    def median(self, ex0=False):
+    def median(self, *args, **kwargs):
         '''
         median of tallied values weighted with their durations
 
@@ -1535,9 +1647,10 @@ class MonitorTimestamp(Monitor):
         -------
         median : float
         '''
-        return self.percentile(50, ex0=ex0)
+        self.set_x_weight()
+        return Monitor.median(self, *args, **kwargs)
 
-    def percentile(self, q, ex0=False):
+    def percentile(self, *args, **kwargs):
         '''
         q-th percentile of tallied values, weighted with their durations
 
@@ -1556,9 +1669,10 @@ class MonitorTimestamp(Monitor):
         q-th percentile: float
             0 returns the minimum, 50 the median and 100 the maximum
         '''
-        return Monitor.percentile(self, q, ex0=ex0)
+        self.set_x_weight()
+        return Monitor.percentile(self, *args, **kwargs)
 
-    def bin_duration(self, lowerbound, upperbound, ex0=False):
+    def bin_duration(self, *args, **kwargs):
         '''
         duration of tallied values with the value in range (lowerbound,upperbound]
 
@@ -1577,10 +1691,10 @@ class MonitorTimestamp(Monitor):
         -------
         duration of values >lowerbound and <=upperbound: float
         '''
-        x, duration = self.xduration(ex0=ex0)
-        return sum((vduration for vx, vduration in zip(x, duration) if (vx > lowerbound) and (vx <= upperbound)))
+        self.set_x_weight()
+        return Monitor.bin_weight(self, *args, **kwargs)
 
-    def value_duration(self, value):
+    def value_duration(self, *args, **kwargs):
         '''
         duration of tallied values equal to value or in value
 
@@ -1594,15 +1708,10 @@ class MonitorTimestamp(Monitor):
         -------
         duration of tallied values in value or equal to value : float
         '''
-        if isinstance(value, (list, tuple, set)):
-            value = [str(v) for v in value]
-        else:
-            value = [str(value)]
+        self.set_x_weight()
+        return Monitor.value_weight(self, *args, **kwargs)
 
-        x, duration = self.xduration(force_numeric=False, ex0=False)
-        return sum((vduration for vx, vduration in zip(x, duration) if (str(vx) in value)))
-
-    def value_number_of_entries(self, value):
+    def value_number_of_entries(self, *args, **kwargs):
         '''
         count of tallied values equal to value or in value
 
@@ -1616,15 +1725,10 @@ class MonitorTimestamp(Monitor):
         -------
         count of tallied values in value or equal to value : float
         '''
-        if isinstance(value, (list, tuple, set)):
-            value = [str(v) for v in value]
-        else:
-            value = [str(value)]
+        self.set_x_weight()
+        return Monitor.value_number_of_entries(self, *args, **kwargs)
 
-        x, duration = self.xduration(force_numeric=False, ex0=False)
-        return sum((1 for vx in x if (str(vx) in value)))
-
-    def duration(self, ex0=False):
+    def duration(self, *args, **kwargs):
         '''
         total duration
 
@@ -1637,10 +1741,10 @@ class MonitorTimestamp(Monitor):
         -------
         total duration : float
         '''
-        _, duration = self.xduration(ex0=ex0)
-        return sum(duration)
+        self.set_x_weight()
+        return Monitor.weight(self, *args, **kwargs)
 
-    def duration_zero(self):
+    def duration_zero(self, *args, **kwargs):
         '''
         total duration of samples with value 0
 
@@ -1648,9 +1752,10 @@ class MonitorTimestamp(Monitor):
         -------
         total duration of zero samples : float
         '''
-        return self.duration() - self.duration(ex0=True)
+        self.set_x_weight()
+        return Monitor.duration_zero(self, *args, **kwargs)
 
-    def number_of_entries(self, ex0=False):
+    def number_of_entries(self, *args, **kwargs):
         '''
         count of the number of entries (duration type)
 
@@ -1663,9 +1768,10 @@ class MonitorTimestamp(Monitor):
         -------
         number of entries : int
         '''
-        return len(self.xduration(ex0=ex0))
+        self.set_x_weight()
+        return Monitor.number_of_entries(self, *args, **kwargs)
 
-    def number_of_entries_zero(self):
+    def number_of_entries_zero(self, *args, **kwargs):
         '''
         count of the number of zero entries (duration type)
 
@@ -1673,7 +1779,8 @@ class MonitorTimestamp(Monitor):
         -------
         number of zero entries : int
         '''
-        return self.number_of_entries() - self.number_of_entries(ex0=True)
+        self.set_x_weight()
+        return Monitor.number_of_entries_zero(self, *args, **kwargs)
 
     def animate(self, *args, **kwargs):
         '''
@@ -1765,7 +1872,7 @@ class MonitorTimestamp(Monitor):
 
         return AnimateMonitor(monitor=self, *args, **kwargs)
 
-    def xduration(self, ex0=False, force_numeric=True):
+    def xduration(self, *args, **kwargs):
         '''
         tuple of array with x-values and array with durations
 
@@ -1782,40 +1889,36 @@ class MonitorTimestamp(Monitor):
         -------
         array/list with x-values and array with durations : tuple
         '''
-        thishash = hash((self, len(self._x), force_numeric))
+        return self.xweight(self, *args, **kwargs)
 
-        if MonitorTimestamp.cached_xduration[ex0][0] == thishash:
-            return MonitorTimestamp.cached_xduration[ex0][1]
+    def xweight(self, *args, **kwargs):
+        self.set_x_weight()
+        return Monitor.xweight(self, *args, **kwargs)
 
-        durationall = array.array('d')
-        for i, t in enumerate(self._t):
-            if i != 0:
-                durationall.append(t - lastt)  # NOQA
+    def set_x_weight(self):
+        if self.x_weight_len == len(self._xw):
+            return
+        self.x_weight_len = len(self._xw)   # stay valid until other length detected or invalidated
+
+        weightall = array.array('d')
+        lastt = None
+        for t in self._t:
+            if lastt is not None:
+                weightall.append(t - lastt)
             lastt = t
 
-        durationall.append(self.env._now - lastt)
+        weightall.append(self.env._now - lastt)
 
-        if self.xtypecode or (not force_numeric):
-            xall = self._x
-            typecode = self.xtypecode
+        self._weight = array.array('d')
+        if self.xtypecode:
+            self._x = array.array(self.xtypecode)
         else:
-            xall = list_to_array(self._x)
-            typecode = xall.typecode
+            self._x = []
 
-        duration = array.array('d')
-        if typecode:
-            x = array.array(typecode)
-        else:
-            x = []
-
-        for vx, vduration in zip(xall, durationall):
+        for vx, vweight in zip(self._xw, weightall):
             if vx != self.off:
-                if (not ex0) or (vx != 0):
-                    x.append(vx)
-                    duration.append(vduration)
-
-        MonitorTimestamp.cached_xduration[ex0] = (thishash, (x, duration))
-        return x, duration
+                self._x.append(vx)
+                self._weight.append(vweight)
 
     def xt(self, ex0=False, exoff=False, force_numeric=True, add_now=True):
         '''
@@ -1847,11 +1950,13 @@ class MonitorTimestamp(Monitor):
         The timestamps are not corrected for any reset_now() adjustment.
         '''
         if self.xtypecode or (not force_numeric):
-            xall = self._x
+            xall = self._xw
             typecode = self.xtypecode
+            off = self.off
         else:
-            xall = list_to_array(self._x)
+            xall = list_to_array(self._xw)
             typecode = xall.typecode
+            off = -inf  # float
 
         if typecode:
             x = array.array(typecode)
@@ -1866,8 +1971,9 @@ class MonitorTimestamp(Monitor):
             addt = []
         for vx, vt in zip(itertools.chain(xall, addx), itertools.chain(self._t, addt)):
             if not ex0 or (vx != 0):
-                x.append(vx)
-                t.append(vt)
+                if not exoff or (vx != off):
+                    x.append(vx)
+                    t.append(vt)
 
         return x, t
 
@@ -1926,6 +2032,7 @@ class MonitorTimestamp(Monitor):
         statistics (if as_str is True) : str
         '''
 
+        self.set_x_weight()
         return Monitor.print_statistics(self, show_header, show_legend, do_indent, as_str=as_str)
 
     def print_histograms(self, number_of_bins=None,
@@ -2014,6 +2121,7 @@ class MonitorTimestamp(Monitor):
         If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
         with a maximum of 30 classes.
         '''
+        self.set_x_weight()
         return Monitor.print_histogram(self, number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str)
 
 
@@ -2644,7 +2752,7 @@ class Queue(object):
         for m in (self.length, self.length_of_stay):
             if m not in exclude:
                 result.append(m.print_histogram(as_str=True))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str=as_str)
 
     def name(self, value=None):
         '''
@@ -4679,9 +4787,6 @@ class Environment(object):
             the alpha value to something else than 255.
         '''
         can_animate(try_only=False)
-        if Pythonista:
-            while g.in_draw:
-                pass
         extension = os.path.splitext(filename)[1].lower()
         if extension in ('.png', '.gif', '.bmp', '.tiff'):
             mode = 'RGBA'
@@ -4918,6 +5023,8 @@ class Environment(object):
         self._animate = False
         self.running = False
         self.stopped = True
+        if not Pythonista:
+            self.root.destroy()
         self.quit()
 
     def quit(self):
@@ -4926,7 +5033,6 @@ class Environment(object):
         if Pythonista:
             if g.animation_scene is not None:
                 g.animation_scene.view.close()
-        quit()
 
     def an_trace(self):
         self._trace = not self._trace
@@ -5423,8 +5529,12 @@ class Animate(object):
     offsety0 : float
         offsets the y-coordinate of the object at time t0 (default 0)
 
-    circle0 : tuple
-         the radius of the circle at time t0
+    circle0 : float or tuple/list
+         the circle spec of the circle at time t0 |n|
+         - radius |n|
+         - one item tuple/list containing the radius |n|
+         - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
+         (see class AnimateCircle for details)
 
     line0 : tuple
         the line(s) (xa,ya,xb,yb,xc,yc, ...) at time t0
@@ -5508,8 +5618,12 @@ class Animate(object):
     offsety1 : float
         offsets the y-coordinate of the object at time t1 (default offsety0)
 
-    circle1 : tuple
-         the radius of the circle at time t1 (default circle0)
+    circle1 : float or tuple/list
+         the circle spec of the circle at time t1 (default: circle0) |n|
+         - radius |n|
+         - one item tuple/list containing the radius |n|
+         - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
+         (see class AnimateCircle for details)
 
     line1 : tuple
         the line(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: line0) |n|
@@ -5772,8 +5886,12 @@ class Animate(object):
         offsety0 : float
             offsets the y-coordinate of the object at time t0 (default see below)
 
-        circle0 : tuple
-            the radius of the circle at time t0 (default see below)
+        circle0 : float or tuple/list
+            the circle spec of the circle at time t0 |n|
+            - radius |n|
+            - one item tuple/list containing the radius |n|
+            - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
+            (see class AnimateCircle for details)
 
         line0 : tuple
             the line(s) at time t0 (xa,ya,xb,yb,xc,yc, ...) (default see below)
@@ -5851,8 +5969,12 @@ class Animate(object):
         offsety1 : float
             offsets the y-coordinate of the object at time t1 (default offset0)
 
-        circle1: tuple
-             the radius of the circle at time t1 (default circle0)
+        circle1 : float or tuple/ist
+            the circle spec of the circle at time t1 |n|
+            - radius |n|
+            - one item tuple/list containing the radius |n|
+            - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
+            (see class AnimateCircle for details)
 
         line1 : tuple
             the line(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: line0) |n|
@@ -6143,15 +6265,19 @@ class Animate(object):
 
         Returns
         -------
-        circle : float or tuple
-            radius or one element tuple with the radius |n|
+        circle : float or tuple/list
+            either |n|
+            - radius |n|
+            - one item tuple/list containing the radius |n|
+            - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc |n|
+            (see class AnimateCircle for details) |n|
             default behaviour: linear interpolation between self.circle0 and self.circle1
         '''
         return interpolate(
             (self.env._now if t is None else t),
             self.t0, self.t1,
-            self.circle0[0] if isinstance(self.circle0, (list, tuple)) else self.circle0,
-            self.circle1[0] if isinstance(self.circle1, (list, tuple)) else self.circle1)
+            self.circle0,
+            self.circle1)
 
     def textcolor(self, t=None):
         '''
@@ -6488,8 +6614,9 @@ class Animate(object):
             offsetx = self.offsetx(t)
             offsety = self.offsety(t)
             angle = self.angle(t)
+            as_points = self.as_points(t)
 
-            if (self.type == 'polygon') or (self.type == 'rectangle') or (self.type == 'line'):
+            if self.type in ('polygon', 'rectangle', 'line', 'circle'):
                 if self.screen_coordinates:
                     linewidth = self.linewidth(t)
                 else:
@@ -6500,23 +6627,6 @@ class Animate(object):
 
                 cosa = math.cos(angle * math.pi / 180)
                 sina = math.sin(angle * math.pi / 180)
-
-                if self.type == 'rectangle':
-                    rectangle = self.rectangle(t)
-                    p = [
-                        rectangle[0], rectangle[1],
-                        rectangle[2], rectangle[1],
-                        rectangle[2], rectangle[3],
-                        rectangle[0], rectangle[3],
-                        rectangle[0], rectangle[1]]
-
-                elif self.type == 'line':
-                    p = self.line(t)
-                    fillcolor = (0, 0, 0, 0)
-
-                else:
-                    p = self.polygon(t)
-
                 if self.screen_coordinates:
                     qx = x
                     qy = y
@@ -6524,57 +6634,131 @@ class Animate(object):
                     qx = (x - self.env._x0) * self.env._scale
                     qy = (y - self.env._y0) * self.env._scale
 
-                r = []
-                minpx = inf
-                minpy = inf
-                maxpx = -inf
-                maxpy = -inf
-                minrx = inf
-                minry = inf
-                maxrx = -inf
-                maxry = -inf
-                for i in range(0, len(p), 2):
-                    px = p[i]
-                    py = p[i + 1]
-                    if not self.screen_coordinates:
-                        px *= self.env._scale
-                        py *= self.env._scale
-                    rx = px * cosa - py * sina
-                    ry = px * sina + py * cosa
-                    minpx = min(minpx, px)
-                    maxpx = max(maxpx, px)
-                    minpy = min(minpy, py)
-                    maxpy = max(maxpy, py)
-                    minrx = min(minrx, rx)
-                    maxrx = max(maxrx, rx)
-                    minry = min(minry, ry)
-                    maxry = max(maxry, ry)
-                    r.append(rx)
-                    r.append(ry)
-                if maxrx == -inf:
-                    maxpx = 0
-                    minpx = 0
-                    maxpy = 0
-                    minpy = 0
-                    maxrx = 0
-                    minrx = 0
-                    maxry = 0
-                    minry = 0
-                if self.type == 'polygon':
-                    if r[0:1] != r[-2:-1]:
-                        r.append(r[0])
-                        r.append(r[1])
+                if self.type == 'rectangle':
+                    rectangle = tuple(self.rectangle(t))
+                    self._image_ident = (tuple(rectangle), linewidth, linecolor, fillcolor,
+                        as_points, angle, self.screen_coordinates)
+                elif self.type == 'line':
+                    line = tuple(self.line(t))
+                    fillcolor = (0, 0, 0, 0)
+                    self._image_ident = (tuple(line), linewidth, linecolor,
+                        as_points, angle, self.screen_coordinates)
+                elif self.type == 'polygon':
+                    polygon = tuple(self.polygon(t))
+                    self._image_ident = (tuple(polygon), linewidth, linecolor, fillcolor,
+                        as_points, angle, self.screen_coordinates)
+                elif self.type == 'circle':
+                    circle = self.circle(t)
+                    if isinstance(circle, list):
+                        circle = tuple(circle)
+                    self._image_ident = (circle, linewidth, linecolor, fillcolor,
+                        angle, self.screen_coordinates)
 
-                rscaled = []
-                for i in range(0, len(r), 2):
-                    rscaled.append(r[i] - minrx + linewidth)
-                    rscaled.append(maxry - r[i + 1] + linewidth)
-                rscaled = tuple(rscaled)  # to make it hashable
-
-                as_points = self.as_points(t)
-                self._image_ident = (rscaled, minrx, maxrx, minry, maxry,
-                                     fillcolor, linecolor, linewidth, as_points)
                 if self._image_ident != self._image_ident_prev:
+                    if self.type == 'rectangle':
+                        p = [
+                            rectangle[0], rectangle[1],
+                            rectangle[2], rectangle[1],
+                            rectangle[2], rectangle[3],
+                            rectangle[0], rectangle[3],
+                            rectangle[0], rectangle[1]]
+
+                    elif self.type == 'line':
+                        p = line
+
+                    elif self.type == 'polygon':
+                        p = list(polygon)
+                        if p[0:1] != p[-2:-1]:
+                            p.append(p[0])  # close the polygon
+                            p.append(p[1])
+
+                    elif self.type == 'circle':
+                        arc_angle0 = 0
+                        arc_angle1 = 360
+                        draw_arc = (fillcolor[3] != 0)
+                        if isinstance(circle, (list, tuple)):
+                            radius0 = radius1 = circle[0]
+                            if len(circle) > 1:
+                                if circle[1] is not None:
+                                    radius1 = circle[1]
+                            if len(circle) > 3:
+                                arc_angle0 = circle[2]
+                                arc_angle1 = circle[3]
+                            if len(circle) > 4:
+                                draw_arc = bool(circle[4])
+                        else:
+                            radius0 = radius1 = circle
+                        if arc_angle0 > arc_angle1:
+                            arc_angle0, arc_angle1 = arc_angle1, arc_angle0
+                        arc_angle1 = min(arc_angle1, arc_angle0 + 360)
+
+                        if not self.screen_coordinates:
+                            radius0 *= self.env._scale
+                            radius1 *= self.env._scale
+                        nsteps = int(math.sqrt(max(radius0, radius1)) * 6)
+                        tarc_angle = 360 / nsteps
+                        p = [0, 0]
+
+                        arc_angle = arc_angle0
+                        ended = False
+                        while True:
+                            arc_angle_radians = math.pi * arc_angle / 180
+                            sint = math.sin(arc_angle_radians)
+                            cost = math.cos(arc_angle_radians)
+                            x, y = (radius0 * cost, radius1 * sint)
+                            p.append(x)
+                            p.append(y)
+                            if ended:
+                                break
+                            arc_angle += tarc_angle
+                            if arc_angle >= arc_angle1:
+                                arc_angle = arc_angle1
+                                ended = True
+                        p.append(0)
+                        p.append(0)
+
+                    r = []
+                    minpx = inf
+                    minpy = inf
+                    maxpx = -inf
+                    maxpy = -inf
+                    minrx = inf
+                    minry = inf
+                    maxrx = -inf
+                    maxry = -inf
+                    for i in range(0, len(p), 2):
+                        px = p[i]
+                        py = p[i + 1]
+                        if not self.screen_coordinates:
+                            px *= self.env._scale
+                            py *= self.env._scale
+                        rx = px * cosa - py * sina
+                        ry = px * sina + py * cosa
+                        minpx = min(minpx, px)
+                        maxpx = max(maxpx, px)
+                        minpy = min(minpy, py)
+                        maxpy = max(maxpy, py)
+                        minrx = min(minrx, rx)
+                        maxrx = max(maxrx, rx)
+                        minry = min(minry, ry)
+                        maxry = max(maxry, ry)
+                        r.append(rx)
+                        r.append(ry)
+                    if maxrx == -inf:
+                        maxpx = 0
+                        minpx = 0
+                        maxpy = 0
+                        minpy = 0
+                        maxrx = 0
+                        minrx = 0
+                        maxry = 0
+                        minry = 0
+
+                    rscaled = []
+                    for i in range(0, len(r), 2):
+                        rscaled.append(r[i] - minrx + linewidth)
+                        rscaled.append(maxry - r[i + 1] + linewidth)
+                    rscaled = tuple(rscaled)  # to make it hashable
 
                     if as_points:
                         self._image = Image.new('RGBA', (int(maxrx - minrx + 2 * linewidth),
@@ -6594,74 +6778,39 @@ class Animate(object):
                         if fillcolor[3] != 0:
                             draw.polygon(rscaled, fill=fillcolor)
                         if (linewidth > 0) and (linecolor[3] != 0):
-                            draw.line(rscaled, fill=linecolor,
-                                      width=int(linewidth))
+                            if self.type == 'circle' and not draw_arc:
+                                draw.line(rscaled[2:-2], fill=linecolor, width=int(linewidth))
+                                # get rid of the first and last point (=center)
+                            else:
+                                draw.line(rscaled, fill=linecolor, width=int(linewidth))
                         del draw
+                    self.minrx = minrx
+                    self.minry = minry
+                    self.maxrx = maxrx
+                    self.maxry = maxry
+                    self.minpx = minpx
+                    self.minpy = minpy
+                    self.maxpx = maxpx
+                    self.maxpy = maxpy
+                    if self.type == 'circle':
+                        self.radius0 = radius0
+                        self.radius1 = radius1
 
-                self.env._centerx = qx + (minrx + maxrx) / 2
-                self.env._centery = qy + (minry + maxry) / 2
-                self.env._dimx = maxpx - minpx
-                self.env._dimy = maxpy - minpy
+                if self.type == 'circle':
+                    self.env._centerx = qx
+                    self.env._centery = qy
+                    self.env._dimx = 2 * self.radius0
+                    self.env._dimy = 2 * self.radius1
+                else:
+                    self.env._centerx = qx + (self.minrx + self.maxrx) / 2
+                    self.env._centery = qy + (self.minry + self.maxry) / 2
+                    self.env._dimx = self.maxpx - self.minpx
+                    self.env._dimy = self.maxpy - self.minpy
 
-                self._image_x = qx + minrx - linewidth + \
+                self._image_x = qx + self.minrx - linewidth + \
                     (offsetx * cosa - offsety * sina)
-                self._image_y = qy + minry - linewidth + \
+                self._image_y = qy + self.minry - linewidth + \
                     (offsetx * sina + offsety * cosa)
-
-            elif self.type == 'circle':
-                if self.screen_coordinates:
-                    linewidth = self.linewidth(t)
-                else:
-                    linewidth = self.linewidth(t) * self.env._scale
-                fillcolor = self.env.colorspec_to_tuple(self.fillcolor(t))
-                linecolor = self.env.colorspec_to_tuple(self.linecolor(t))
-                circle = self.circle(t)
-                radius = circle[0] if isinstance(circle, (list, tuple)) else circle
-                if self.screen_coordinates:
-                    qx = x
-                    qy = y
-                else:
-                    qx = (x - self.env._x0) * self.env._scale
-                    qy = (y - self.env._y0) * self.env._scale
-                    linewidth *= self.env._scale
-                    radius *= self.env._scale
-
-                self._image_ident = (radius, linewidth, linecolor, fillcolor)
-                if self._image_ident != self._image_ident_prev:
-                    nsteps = int(math.sqrt(radius) * 6)
-                    tangle = 2 * math.pi / nsteps
-                    sint = math.sin(tangle)
-                    cost = math.cos(tangle)
-                    p = []
-                    x = radius
-                    y = 0
-
-                    for i in range(nsteps + 1):
-                        x, y = (x * cost - y * sint, x * sint + y * cost)
-                        p.append(x + radius + linewidth)
-                        p.append(y + radius + linewidth)
-
-                    self._image = Image.new('RGBA', (int(radius * 2 + 2 * linewidth),
-                                                     int(radius * 2 + 2 * linewidth)), (0, 0, 0, 0))
-                    draw = ImageDraw.Draw(self._image)
-                    if fillcolor[3] != 0:
-                        draw.polygon(p, fill=fillcolor)
-                    if (linewidth > 0) and (linecolor[3] != 0):
-                        draw.line(p, fill=linecolor, width=int(linewidth))
-                    del draw
-
-                dx = offsetx
-                dy = offsety
-                cosa = math.cos(angle * math.pi / 180)
-                sina = math.sin(angle * math.pi / 180)
-                ex = dx * cosa - dy * sina
-                ey = dx * sina + dy * cosa
-                self.env._centerx = qx
-                self.env._centery = qy
-                self.env._dimx = 2 * radius
-                self.env._dimy = 2 * radius
-                self._image_x = qx + ex - radius - linewidth - 1
-                self._image_y = qy + ey - radius - linewidth - 1
 
             elif self.type == 'image':
                 image = self.image(t)
@@ -8044,12 +8193,26 @@ class AnimatePoints(_Vis):
 
 class AnimateCircle(_Vis):
     '''
-    Displays a circle, optionally with a text
+    Displays a (partial) circle or (partial) ellipse , optionally with a text
 
     Parameters
     ----------
     radius : float
         radius of the circle
+
+    radius1 : float
+        the 'height of the ellipse. If None (default), a circle will be drawn
+
+    arc_angle0 : float
+        start angle of the circle (default 0)
+
+    arc_angle1 : float
+        end angle of the circle (default 360) |n|
+        when arc_angle1 > arc_angle0 + 360, only 360 degrees will be shown
+
+    draw_arc : bool
+        if False (default), no arcs will be drawn
+        if True, the arcs from and to the center will be drawn
 
     x : float
         position of anchor point (default 0)
@@ -8063,7 +8226,8 @@ class AnimateCircle(_Vis):
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se`` |n|
-        If '', the given coordimates are used untranslated
+        If '', the given coordimates are used untranslated |n|
+        The positions corresponds to a full circle even if arc_angle0 and/or arc_angle1 are specified.
 
     offsetx : float
         offsets the x-coordinate of the circle (default 0)
@@ -8083,12 +8247,8 @@ class AnimateCircle(_Vis):
         color of the contour (default transparent)
 
     angle : float
-        angle of the text (in degrees) |n|
+        angle of the circle/ellipse and/or text (in degrees) |n|
         default: 0
-
-    as_points : bool
-         if False (default), the contour lines are drawn |n|
-         if True, only the corner points are shown
 
     text : str, tuple or list
         the text to be displayed |n|
@@ -8142,7 +8302,8 @@ class AnimateCircle(_Vis):
     - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
     - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
     '''
-    def __init__(self, radius=100, x=0, y=0, fillcolor='fg', linecolor='', linewidth=1,
+    def __init__(self, radius=100, radius1=None, arc_angle0=0, arc_angle1=360,
+        draw_arc=False, x=0, y=0, fillcolor='fg', linecolor='', linewidth=1,
         text='', fontsize=15, textcolor='bg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
         offsetx=0, offsety=0, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
         visible=True, env=None, screen_coordinates=False):
@@ -8151,6 +8312,14 @@ class AnimateCircle(_Vis):
         # the checks hasattr are req'd to not override methods of inherited classes
         if not hasattr(self, 'radius'):
             self.radius = radius
+        if not hasattr(self, 'radius1'):
+            self.radius1 = radius1
+        if not hasattr(self, 'arc_angle0'):
+            self.arc_angle0 = arc_angle0
+        if not hasattr(self, 'arc_angle1'):
+            self.arc_angle1 = arc_angle1
+        if not hasattr(self, 'draw_arc'):
+            self.draw_arc = draw_arc
         if not hasattr(self, 'fillcolor'):
             self.fillcolor = fillcolor
         if not hasattr(self, 'linecolor'):
@@ -8226,7 +8395,7 @@ class AnimateImage(_Vis):
         ``w     c     e`` |n|
         ``sw    s    se`` |n|
         If '', the given coordimates are used untranslated
-        
+
     anchor : str
         specifies where the x and refer to |n|
         possible values are (default: sw) : |n|
@@ -8387,7 +8556,12 @@ class _AnimateVis(Animate):
         return _call(self.vis.spec, t, self.vis.arg)
 
     def circle(self, t):
-        return _call(self.vis.radius, t, self.vis.arg)
+        return (
+            _call(self.vis.radius, t, self.vis.arg),
+            _call(self.vis.radius1, t, self.vis.arg),
+            _call(self.vis.arc_angle0, t, self.vis.arg),
+            _call(self.vis.arc_angle1, t, self.vis.arg),
+            _call(self.vis.draw_arc, t, self.vis.arg))
 
     def image(self, t):
         return _call(self.vis.spec, t, self.vis.arg)
@@ -8531,13 +8705,13 @@ class _Animate_t_x_Line(Animate):
     def line(self, t):
         self.tnow = t
         l = []
-        value = self.monitor._x[-1]
+        value = self.monitor._xw[-1]
         lastt = t
         if self.as_level:
             l.append(self.t_to_x(lastt))
             l.append(self.value_to_y(value))
         self.done = False
-        for value, t in zip(reversed(self.monitor._x), reversed(self.monitor._t)):
+        for value, t in zip(reversed(self.monitor._xw), reversed(self.monitor._t)):
             if self.as_level:
                 l.append(self.t_to_x(lastt))
                 l.append(self.value_to_y(value))
@@ -12198,7 +12372,7 @@ class State(object):
             result.append(self.waiters().print_histograms(exclude=exclude, as_str=True))
         if self.value not in exclude:
             result.append(self.value.print_histogram(as_str=True))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str=as_str)
 
     def print_info(self, as_str=False):
         '''
@@ -12362,7 +12536,7 @@ class State(object):
         it is possible to individually control requesters().monitor(),
             value.monitor()
         '''
-        self.requesters().monitor(value)
+        self.waiters().monitor(value)
         self.value.monitor(value)
 
     def reset_monitors(self, monitor=None):
@@ -12632,7 +12806,7 @@ class Resource(object):
         for m in (self.capacity, self.available_quantity, self.claimed_quantity):
             if m not in exclude:
                 result.append(m.print_histogram(as_str=True))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str=as_str)
 
     def monitor(self, value):
         '''
@@ -12957,6 +13131,8 @@ def spec_to_image(spec):
 def _i(p, v0, v1):
     if v0 == v1:
         return v0  # avoid rounding problems
+    if (v0 is None) or (v1 is None):
+        return None
     return (1 - p) * v0 + p * v1
 
 
@@ -12984,7 +13160,7 @@ def interpolate(t, t0, t1, v0, v1):
 
     Returns
     -------
-    linear interpolation between v0 and v1 based on t between t0 and t : float or tuple
+    linear interpolation between v0 and v1 based on t between t0 and t1 : float or tuple
 
     Note
     ----
@@ -12993,8 +13169,7 @@ def interpolate(t, t0, t1, v0, v1):
     '''
     if v0 == v1:
         return v0
-    if (v0 is None) or (v1 is None):
-        return None
+
     if t1 == inf:
         return v0
     if t0 == t1:
@@ -13110,31 +13285,14 @@ def type_to_typecode_off(type):
 
 def list_to_array(l):
     float_result = array.array('d')
-    int_result = array.array('l')
-    int_ok = True
     for v in l:
         try:
             vfloat = float(v)
         except:
             vfloat = 0
         float_result.append(vfloat)
-        if int_ok:
-            try:
-                vint = int(v)
-            except:
-                vint = 0
-            if vint == vfloat:
-                try:
-                    int_result.append(vint)  # this may fail in case of a too large value
-                except:
-                    int_ok = False
-            else:
-                int_ok = False
 
-    if int_ok:
-        return int_result
-    else:
-        return float_result
+    return float_result
 
 
 def deep_flatten(l):
@@ -13215,7 +13373,7 @@ def return_or_print(result, as_str):
 
 def _call(c, t, self):
     '''
-    special function to suppory scalars, methods (with one parameter) and function with zero, one or two parameters
+    special function to support scalars, methods (with one parameter) and function with zero, one or two parameters
     '''
     if inspect.isfunction(c):
         nargs = c.__code__.co_argcount
@@ -13276,6 +13434,8 @@ def waiting():
 
 def random_seed(seed, randomstream=None):
     '''
+    Reseeds a randomstream
+
     Parameters
     ----------
     seed : hashable object, usually int
@@ -13286,8 +13446,6 @@ def random_seed(seed, randomstream=None):
     randomstream: randomstream
         randomstream to be used |n|
         if omitted, random will be used |n|
-        if used as random.Random(12299)
-        it assigns a new stream with the specified seed
     '''
     if randomstream is None:
         randomstream = random

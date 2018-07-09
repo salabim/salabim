@@ -11,7 +11,62 @@ Pythonista=(platform.system()=='Darwin')
 
 
 def test():
-    test80()
+    test82()
+
+def test82():
+    env = sim.Environment()
+    a = sim.Animate(circle0=(100,100, 0, 0, True), circle1=(100,None,0, 720, True), x0=200, y0=200, linewidth0=3, fillcolor0='blue', fillcolor1='green', t1=10)
+    b = sim.Animate(rectangle0=(-100, -10, 100, 10), x0=300, y0=600, angle1=360, t1=10)
+    b = sim.Animate(rectangle0=sim.centered_rectangle(10,10), x0=200, y0=200, fillcolor0='red')
+#    b = sim.Animate(rectangle0=(-100,-10, 100, 10), x0=300, y0=600)
+    sim.AnimateCircle(radius=100, radius1=300, x=lambda t: 700-t*10, y=200, fillcolor=lambda t: env.colorinterpolate(t,0,10,'yellow','blue'), arc_angle0=0, arc_angle1=lambda t: t * 10, draw_arc=True, linewidth=1, linecolor='red',
+                      text='Piet', angle=lambda t: t * 10, textcolor='black', text_anchor='e')
+    env.animate(True)
+    env.run()
+
+def test81():
+    def mtally(x, n):
+        for i in range(n):
+            m.tally(x)
+        mw.tally(x,n)
+
+    class X(sim.Component):
+        def process(self):
+            mt.tally('abc')
+            for i in range(10):
+                yield self.hold(1)
+                mt.tally(i)
+            env.main().activate()
+
+    sim.reset()
+    env=sim.Environment()
+    X()
+    mt=sim.MonitorTimestamp(name='mt')
+    mw = sim.Monitor(name='mw', weighted=True, weight_legend='de tijd')
+    m = sim.Monitor(name='m')
+
+    mtally(3,1)
+    mtally(5,2)
+    mtally(6,2)
+    mtally('test',2)
+    m.tally(3,1)
+
+    print(m.mean())
+    print(m.std())
+    print(mw.mean())
+    print(mw.std())
+    env.run()
+    m.monitor(False)
+    mt.monitor(False)
+    print(mt.mean(), mt.std())
+    for values in (True, False):
+        m.print_histogram(values=values)
+        mw.print_histogram(values=values)
+        mt.print_histogram(values=values)
+    print(m.weight(ex0=True))
+    print(mw.weight(ex0=True))
+    print(mt.duration(ex0=True))
+    print(mt.xt(exoff=True))
 
 def test80():
     env=sim.Environment(trace=False)
@@ -21,11 +76,12 @@ def test80():
             env.snapshot('manual/source/Pic1.png')
     env.animate(True)
     env.background_color('20%gray')
-    
+
     sim.AnimatePolygon(spec=(100, 100, 300, 100, 200,190), text='This is\na polygon')
     sim.AnimateLine(spec=(100, 200, 300, 300), text='This is a line')
     sim.AnimateRectangle(spec=(100, 10, 300, 30), text='This is a rectangle')
-    sim.AnimateCircle(radius=60, x=200, y=400,text='This is a rectangle')
+    sim.AnimateCircle(radius=60, x=100, y=400,text='This is a cicle')
+    sim.AnimateCircle(radius=60, radius1=30, x=300, y=400,text='This is an ellipse')
     sim.AnimatePoints(spec=(100,500, 150, 550, 180, 570, 250, 500, 300, 500), text='These are points')
     sim.AnimateText(text='This is a one-line text', x=100, y=600)
     sim.AnimateText(text='''\
@@ -45,11 +101,11 @@ Excepteur sint occaecat cupidatat non
 proident, sunt in culpa qui officia
 deserunt mollit anim id est laborum.
 ''', x=500, y=100)
-    
+
     sim.AnimateImage('Pas un pipe.jpg', x=500, y=400)
     X()
     env.run(100)
-    
+
 def test79():
     env = sim.Environment(trace=True)
     class X(sim.Component):

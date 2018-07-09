@@ -1,5 +1,43 @@
 salabim  changelog
 
+version 2.3.1  2018-07-09
+=========================
+New functionality
+-----------------
+Monitors can now be weighted. Initializing a Monitor instance has therefore a new parameter, weighted.
+If weighted is set to True, the tally method can be used to specify the weight.
+Monitor.weight() returns the sum of all weights.
+Monitor.value_weight() returns the sum of all weights equal to or in value
+Monitor.bin_weight() returns the sum of all weights > lowerbound and <= upperbound.
+The name of the weight (used in Print_histogram and print_statistics) can be specified by the user (default is weight).
+
+
+sim.Animate(circle0=) now supports also ellipses and circle arcs. Please consult the documentation for the correct
+parameter usage.
+It is highly recommended to use the new style AnimateCircle, which has some more parameters now:
+  radius1 is the height of the ellipse (if omitted, a circle will be drawn)
+  arc_angle0 is the start angle of the arc (default 0)
+  arc_angle1 is the end angle of the arc (default 360, thus a full circle)
+  draw_arc indicates whether the arcs should be drawn (default False)
+Note that all the parameters may be a scalar, a function with 0, 1 or 2 arguments or a method with one argument (t).
+Note also that the text is always positioned relative to the full circle/ellipse, regardless of the arc_angles.
+Example:
+  sim.AnimateCircle(radius=100, radius1=50, arc_angle1=lambda t: t*10)
+
+
+Bug fixes
+---------
+Bug in closing an animation under Spyder or Idle fixed.
+Bug in Environment.snaphot() under Pythonista fixed.
+
+
+Internal
+--------
+Major overhaul of monitor off values and handling of duration for MonitorTimestamped.
+Timestamped monitors now share most of their functionality with weighted monitors.
+
+
+
 version 2.3.0  2018-06-28
 =========================
 New functionality
