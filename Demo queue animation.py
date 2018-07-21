@@ -1,11 +1,24 @@
 import salabim as sim
 
+'''
+This us a demonstration of several ways to show queues dynamically and the corresponding statistics
+The model simply generates components that enter a queue and leave after a certain time.
+
+Note that the actual model code (in the process description of X does not contain any reference
+to the animation!
+'''
+
 
 class X(sim.Component):
     def setup(self, i):
         self.i = i
 
     def animation_objects(self, id):
+        '''
+        the way the component is determined by the id, specified in AnimateQueue
+        'text' means just the name
+        any other value represents the colour
+        '''
         if id == 'text':
             ao0 = sim.AnimateText(text=self.name(), textcolor='fg', text_anchor='nw')
             return 0, 16, ao0
@@ -51,4 +64,6 @@ sim.AnimateText(text=lambda: q.print_info(as_str=True), x=500, y=340,
 
 [X(i=i) for i in range(15)]
 env.animate(True)
+env.modelname('Demo queue animation')
 env.run()
+

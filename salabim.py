@@ -6,7 +6,7 @@ see www.salabim.org for more information, the documentation, updates and license
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.1'
+__version__ = '2.3.2'
 
 import heapq
 import random
@@ -429,7 +429,7 @@ class Monitor(object):
                 self._weight.append(1 if weight is None else weight)
             else:
                 if weight != 1:
-                    raise SalabimError('incorrect weight, for non weighted monitors')
+                    raise SalabimError('incorrect weight for non weighted monitor')
 
     def name(self, value=None):
         '''
@@ -1476,9 +1476,7 @@ class MonitorTimestamp(Monitor):
             self._xw.append(self.off)
         self._t = array.array('d')
         self._t.append(self.env._now)
-        Monitor.cached_xweight = {(ex0, force_numeric): (0, 0)
-            for ex0 in (False, True) for force_numeric in (False, True)}  # invalidate the cache
-        self.x_weight_len = -1  # invalidate _x and _weight
+        self.x_weight_t = None  # invalidate _x and _weight
 
     def monitor(self, value=None):
         '''
@@ -1502,7 +1500,6 @@ class MonitorTimestamp(Monitor):
                 self.tally(self._tally)
             else:
                 self._tally_off()  # can't use tally() here because self._tally should be untouched
-            self.x_weight_len = -1  # invalidate _x and _weight
         return self.monitor
 
     def tally(self, value):
@@ -1896,9 +1893,11 @@ class MonitorTimestamp(Monitor):
         return Monitor.xweight(self, *args, **kwargs)
 
     def set_x_weight(self):
-        if self.x_weight_len == len(self._xw):
+        if self.x_weight_t == self.env.t:
             return
-        self.x_weight_len = len(self._xw)   # stay valid until other length detected or invalidated
+        self.x_weight_t = self.env.t   # stay valid until new t detected or invalidated
+        Monitor.cached_xweight = {(ex0, force_numeric): (0, 0)
+            for ex0 in (False, True) for force_numeric in (False, True)}  # invalidate the cache
 
         weightall = array.array('d')
         lastt = None
@@ -2206,6 +2205,11 @@ class AnimateMonitor(object):
     layer : int
         layer (default 0)
 
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically upon termination of the parent
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -2214,7 +2218,7 @@ class AnimateMonitor(object):
     def __init__(self, monitor, linecolor='fg', linewidth=None, fillcolor='', bordercolor='fg', borderlinewidth=1,
         titlecolor='fg', nowcolor='red',
         titlefont='', titlefontsize=15,
-        as_points=None, as_level=None, title=None, x=0, y=0, vertical_offset=2,
+        as_points=None, as_level=None, title=None, x=0, y=0, vertical_offset=2, parent=None,
         vertical_scale=5, horizontal_scale=None, width=200, height=75, xy_anchor='sw', layer=0):
 
         _checkismonitor(monitor)
@@ -2238,6 +2242,8 @@ class AnimateMonitor(object):
         yll = y + monitor.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True)
 
         self.aos = []
+        self.parent = parent
+        self.env = monitor.env
         self.aos.append(AnimateRectangle(spec=(0, 0, width, height), offsetx=xll, offsety=yll,
             fillcolor=fillcolor, linewidth=borderlinewidth, linecolor=bordercolor,
             screen_coordinates=True, layer=layer))
@@ -2246,7 +2252,7 @@ class AnimateMonitor(object):
             screen_coordinates=True, fontsize=titlefontsize, font=titlefont, layer=layer))
         if monitor._timestamp:
             self.aos.append(_Animate_t_Line(line0=(), linecolor0=nowcolor,
-                monitor=self, width=width, height=height, t_scale=horizontal_scale,
+                monitor=monitor, width=width, height=height, t_scale=horizontal_scale,
                 layer=layer, offsetx0=xll, offsety0=yll,
                 screen_coordinates=True))
             self.aos.append(_Animate_t_x_Line(monitor=monitor, linecolor0=linecolor, line0=(),
@@ -2262,6 +2268,10 @@ class AnimateMonitor(object):
                 as_points=as_points,
                 width=width, height=height, value_offsety=vertical_offset, value_scale=vertical_scale,
                 index_scale=horizontal_scale, layer=layer, linewidth=linewidth))
+        self.env.sys_objects.append(self)
+
+    def update(self, t):
+        pass
 
     def remove(self):
         '''
@@ -2269,6 +2279,7 @@ class AnimateMonitor(object):
         '''
         for ao in self.aos:
             ao.remove()
+        self.env.sys_objects.remove(self)
 
 
 if Pythonista:
@@ -3764,7 +3775,11 @@ class Environment(object):
                     for ao in self.an_objects[:]:
                         if ao.parent == c:
                             self.an_objects.remove(ao)
+                    for so in self.sys_objects[:]:
+                        if so.parent == c:
+                            so.remove()
                     return
+
         if len(self.env._standbylist) > 0:
             self._pendingstandbylist = list(self.env._standbylist)
             self._standbylist = []
@@ -3808,6 +3823,9 @@ class Environment(object):
             for ao in self.an_objects[:]:
                 if ao.parent == c:
                     self.an_objects.remove(ao)
+            for so in self.sys_objects[:]:
+                if so.parent == c:
+                    so.remove()
             return
 
     def _print_event_list(self, s):
@@ -5447,7 +5465,7 @@ class Environment(object):
                 else:
                     if self._buffered_trace:
                         print(self._buffered_trace)
-                        logging.debug(self.buffered_trace)
+                        logging.debug(self._buffered_trace)
                         self._buffered_trace = False
                     print(line)
                     logging.debug(line)
@@ -5746,7 +5764,7 @@ class Animate(object):
                 self.type + ' and ' + type1)
 
         self.layer0 = layer
-        self.parent = (None if parent is None else parent)
+        self.parent = parent
         self.keep = keep
         self.visible0 = visible
         self.screen_coordinates = screen_coordinates
@@ -7358,6 +7376,11 @@ class AnimateQueue(object):
         if a parameter is a method as the instance |n|
         default: self (instance itself)
 
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically upon termination of the parent
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -7371,7 +7394,7 @@ class AnimateQueue(object):
     '''
 
     def __init__(self, queue, x=50, y=50, direction='w', max_length=None,
-        xy_anchor='sw', reverse=False, id=None, arg=None):
+        xy_anchor='sw', reverse=False, id=None, arg=None, parent=None):
         _checkisqueue(queue)
         self._queue = queue
         self.xy_anchor = xy_anchor
@@ -7383,7 +7406,9 @@ class AnimateQueue(object):
         self.direction = direction
         self.reverse = reverse
         self.current_aos = {}
-        self._queue.env.sys_objects.append(self)
+        self.parent = parent
+        self.env = queue.env
+        self.env.sys_objects.append(self)
 
     def update(self, t):
         prev_aos = self.current_aos
@@ -7433,7 +7458,7 @@ class AnimateQueue(object):
         for animation_objects in self.current_aos.values():
             for ao in animation_objects[2:]:
                 ao.remove()
-        self._queue.env.sys_objects.remove(self)
+        self.env.sys_objects.remove(self)
 
 
 class _Vis(object):
@@ -7506,6 +7531,11 @@ class AnimateText(_Vis):
         if a parameter is a method as the instance |n|
         default: self (instance itself)
 
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically upon termination of the parent
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -7519,7 +7549,7 @@ class AnimateText(_Vis):
 
     '''
     def __init__(self, text='', x=0, y=0, fontsize=15, textcolor='fg', font='', text_anchor='sw', angle=0,
-        visible=True, xy_anchor='', layer=0, env=None, screen_coordinates=False, arg=None,
+        visible=True, xy_anchor='', layer=0, env=None, screen_coordinates=False, arg=None, parent=None,
         offsetx=0, offsety=0, max_lines=0):
         self.env = g.default_env if env is None else env
 
@@ -7553,7 +7583,7 @@ class AnimateText(_Vis):
         if not hasattr(self, 'layer'):
             self.layer = layer
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao0 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         self.aos = (ao0,)
 
     def remove(self):
@@ -7568,7 +7598,7 @@ class AnimateRectangle(_Vis):
     Parameters
     ----------
     spec : four item tuple or list
-        should specify xlowerleft, ylowerleft, xupperright yupperrighg
+        should specify xlowerleft, ylowerleft, xupperright, yupperright
 
     x : float
         position of anchor point (default 0)
@@ -7650,6 +7680,11 @@ class AnimateRectangle(_Vis):
         if a parameter is a method as the instance |n|
         default: self (instance itself)
 
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically upon termination of the parent
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -7664,6 +7699,7 @@ class AnimateRectangle(_Vis):
     def __init__(self, spec=(), x=0, y=0, fillcolor='fg', linecolor='', linewidth=1,
         text='', fontsize=15, textcolor='bg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
         offsetx=0, offsety=0, as_points=False, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+        parent=None,
         visible=True, env=None, screen_coordinates=False):
 
         self.env = g.default_env if env is None else env
@@ -7712,8 +7748,8 @@ class AnimateRectangle(_Vis):
         if not hasattr(self, 'layer'):
             self.layer = layer
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(rectangle0=(), vis=self, screen_coordinates=screen_coordinates, env=env)
-        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao0 = _AnimateVis(rectangle0=(), vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -7811,6 +7847,11 @@ class AnimatePolygon(_Vis):
         if a parameter is a method as the instance |n|
         default: self (instance itself)
 
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically upon termination of the parent
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -7824,7 +7865,7 @@ class AnimatePolygon(_Vis):
     '''
     def __init__(self, spec=(), x=0, y=0, fillcolor='fg', linecolor='', linewidth=1,
         text='', fontsize=15, textcolor='bg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
-        offsetx=0, offsety=0, as_points=False, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+        offsetx=0, offsety=0, as_points=False, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None, parent=None,
         visible=True, env=None, screen_coordinates=False):
         self.env = g.default_env if env is None else env
 
@@ -7872,8 +7913,8 @@ class AnimatePolygon(_Vis):
         if not hasattr(self, 'layer'):
             self.layer = layer
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(polygon0=(), vis=self, screen_coordinates=screen_coordinates, env=env)
-        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao0 = _AnimateVis(polygon0=(), vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -7967,6 +8008,11 @@ class AnimateLine(_Vis):
         if a parameter is a method as the instance |n|
         default: self (instance itself)
 
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically upon termination of the parent
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -7981,6 +8027,7 @@ class AnimateLine(_Vis):
     def __init__(self, spec=(), x=0, y=0, linecolor='fg', linewidth=1,
         text='', fontsize=15, textcolor='fg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
         offsetx=0, offsety=0, as_points=False, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+        parent=None,
         visible=True, env=None, screen_coordinates=False):
         self.env = g.default_env if env is None else env
 
@@ -8027,8 +8074,8 @@ class AnimateLine(_Vis):
             self.layer = layer
         self.fillcolor = ''
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(line0=(), vis=self, screen_coordinates=screen_coordinates, env=env)
-        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao0 = _AnimateVis(line0=(), vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -8122,6 +8169,11 @@ class AnimatePoints(_Vis):
         if a parameter is a method as the instance |n|
         default: self (instance itself)
 
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically upon termination of the parent
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -8135,7 +8187,7 @@ class AnimatePoints(_Vis):
     '''
     def __init__(self, spec=(), x=0, y=0, linecolor='fg', linewidth=4,
         text='', fontsize=15, textcolor='fg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
-        offsetx=0, offsety=0, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+        offsetx=0, offsety=0, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None, parent=None,
         visible=True, env=None, screen_coordinates=False):
         self.env = g.default_env if env is None else env
 
@@ -8181,8 +8233,8 @@ class AnimatePoints(_Vis):
         self.fillcolor = ''
         self.arg = self if arg is None else arg
         ao0 = _AnimateVis(line0=(), as_points=True, vis=self,
-            screen_coordinates=screen_coordinates, env=env)
-        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+            screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -8291,6 +8343,11 @@ class AnimateCircle(_Vis):
         if a parameter is a method as the instance |n|
         default: self (instance itself)
 
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically upon termination of the parent
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -8305,7 +8362,7 @@ class AnimateCircle(_Vis):
     def __init__(self, radius=100, radius1=None, arc_angle0=0, arc_angle1=360,
         draw_arc=False, x=0, y=0, fillcolor='fg', linecolor='', linewidth=1,
         text='', fontsize=15, textcolor='bg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
-        offsetx=0, offsety=0, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+        offsetx=0, offsety=0, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None, parent=None,
         visible=True, env=None, screen_coordinates=False):
         self.env = g.default_env if env is None else env
 
@@ -8361,8 +8418,8 @@ class AnimateCircle(_Vis):
         if not hasattr(self, 'layer'):
             self.layer = layer
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(circle0=(), vis=self, screen_coordinates=screen_coordinates, env=env)
-        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao0 = _AnimateVis(circle0=(), vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
         self. aos = (ao0, ao1)
 
@@ -8454,6 +8511,11 @@ class AnimateImage(_Vis):
         if a parameter is a method as the instance |n|
         default: self (instance itself)
 
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically upon termination of the parent
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -8468,7 +8530,7 @@ class AnimateImage(_Vis):
 
     def __init__(self, spec='', x=0, y=0, width=None,
         text='', fontsize=15, textcolor='bg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
-        offsetx=0, offsety=0, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+        offsetx=0, offsety=0, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None, parent=None,
         anchor='sw', visible=True, env=None, screen_coordinates=False):
         self.env = g.default_env if env is None else env
 
@@ -8513,8 +8575,8 @@ class AnimateImage(_Vis):
             self.layer = layer
 
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(image='', vis=self, screen_coordinates=screen_coordinates, env=env)
-        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env)
+        ao0 = _AnimateVis(image='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
         self. aos = (ao0, ao1)
 
@@ -8683,8 +8745,9 @@ class _Animate_t_x_Line(Animate):
         Animate.__init__(self, *args, **kwargs)
 
     def t_to_x(self, t):
-        if self.tnow > self.t_width:
-            t = t + self.t_width - self.tnow
+        t = t - self.t0
+        if self.tnow - self.t0 > self.t_width:
+            t = t + self.t_width - (self.tnow - self.t0)
             if t < 0:
                 t = 0
                 self.done = True
@@ -8704,6 +8767,7 @@ class _Animate_t_x_Line(Animate):
 
     def line(self, t):
         self.tnow = t
+        self.t0 = self.monitor._t[0]
         l = []
         value = self.monitor._xw[-1]
         lastt = t
@@ -8733,6 +8797,7 @@ class _Animate_t_Line(Animate):
         Animate.__init__(self, *args, **kwargs)
 
     def line(self, t):
+        t = t - self.monitor._t[0]
         if t > self.t_width:
             t = self.t_width
         x = t * self.t_scale
@@ -9450,6 +9515,9 @@ class Component(object):
         for ao in self.env.an_objects[:]:
             if ao.parent == self:
                 self.env.an_objects.remove(ao)
+        for so in self.sys_objects[:]:
+            if so.parent == self:
+                so.remove()
 
     def standby(self, mode=None):
         '''
@@ -13252,17 +13320,17 @@ def fn(x, l, d):
 
 def _checkrandomstream(randomstream):
     if not isinstance(randomstream, random.Random):
-        raise SalabimError('Type randomstream or random.Random expected, got ' + type(randomstream))
+        raise SalabimError('Type randomstream or random.Random expected, got ' + str(type(randomstream)))
 
 
 def _checkismonitor(monitor):
     if not isinstance(monitor, Monitor):
-        raise SalabimError('Type Monitor or MonitorTimestamp expected, got ' + type(monitor))
+        raise SalabimError('Type Monitor or MonitorTimestamp expected, got ' + str(type(monitor)))
 
 
 def _checkisqueue(queue):
     if not isinstance(queue, Queue):
-        raise SalabimError('Type Queue expected, got ' + type(queue))
+        raise SalabimError('Type Queue expected, got ' + str(type(queue)))
 
 
 def type_to_typecode_off(type):

@@ -1,5 +1,45 @@
 salabim  changelog
 
+version 2.3.2  2018-07-21
+=========================
+New functionality
+-----------------
+The methods
+  AnimateText
+  AnimateRectangle
+  AnimateLine
+  AnimatePolygon
+  AnimatePoints
+  AnimateCircle
+  AnimateImage
+  AnimateQueue
+  AnimateMonitor
+  AnimateMonitorTimestamp
+now have an additional parameter, parent.
+When a process finishes, either by reaching the end or by a cancel, all animation objects with that
+component as its parent will be automatically removed.
+
+
+Bug fixes
+---------
+Fatal error when tracing standby components fixed.
+
+After a reset of a timestamped monitor, the animation of that monitor did not start at the left hand side of
+the graph. Fixed.
+
+Some minor error handling problems with checking for types fixed.
+
+
+Demonstration of animation features
+-----------------------------------
+In order to demonstrate the new style animation classes, the following files (with comments) are included
+in the GitHub distribution:
+Demo animation classes.py (requires the file Pas un pipe.py)
+Demo queue animation.py
+Demo animation dynamic.py
+Demo animation dynamic lambda.py
+
+
 version 2.3.1  2018-07-09
 =========================
 New functionality
