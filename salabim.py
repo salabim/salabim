@@ -6,7 +6,7 @@ see www.salabim.org for more information, the documentation, updates and license
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.2'
+__version__ = '2.3.2.1'
 
 import heapq
 import random
@@ -9515,7 +9515,7 @@ class Component(object):
         for ao in self.env.an_objects[:]:
             if ao.parent == self:
                 self.env.an_objects.remove(ao)
-        for so in self.sys_objects[:]:
+        for so in self.env.sys_objects[:]:
             if so.parent == self:
                 so.remove()
 

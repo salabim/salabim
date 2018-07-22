@@ -1,5 +1,12 @@
 salabim  changelog
 
+version 2.3.2.1  2018-07-22
+===========================
+Bug fixes
+---------
+Fatal error in Component.cancel() when tracing standby components fixed.
+
+
 version 2.3.2  2018-07-21
 =========================
 New functionality
