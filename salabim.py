@@ -6,7 +6,7 @@ see www.salabim.org for more information, the documentation, updates and license
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.2.1'
+__version__ = '2.3.2.2'
 
 import heapq
 import random
@@ -6747,9 +6747,6 @@ class Animate(object):
                     for i in range(0, len(p), 2):
                         px = p[i]
                         py = p[i + 1]
-                        if not self.screen_coordinates:
-                            px *= self.env._scale
-                            py *= self.env._scale
                         rx = px * cosa - py * sina
                         ry = px * sina + py * cosa
                         minpx = min(minpx, px)
