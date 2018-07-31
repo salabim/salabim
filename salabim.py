@@ -6,7 +6,7 @@ see www.salabim.org for more information, the documentation, updates and license
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.2.2'
+__version__ = '2.3.2.3'
 
 import heapq
 import random
@@ -157,7 +157,8 @@ class ItemFile(object):
             raise EOFError
 
     def _nextread(self):
-        remove = string.whitespace.replace(' ', '')
+        remove = string.whitespace
+        remove = remove.replace(' ', '').replace('\t', '')
         quotes = '\'"'
 
         for line in self.open_file:
@@ -189,7 +190,7 @@ class ItemFile(object):
                             result = ''
                             mode = c
 
-                        elif c == ' ':
+                        elif c in (' ', '\t'):
                             if result:
                                 yield result
                             result = ''
@@ -6710,10 +6711,10 @@ class Animate(object):
                             arc_angle0, arc_angle1 = arc_angle1, arc_angle0
                         arc_angle1 = min(arc_angle1, arc_angle0 + 360)
 
-                        if not self.screen_coordinates:
-                            radius0 *= self.env._scale
-                            radius1 *= self.env._scale
-                        nsteps = int(math.sqrt(max(radius0, radius1)) * 6)
+                        if self.screen_coordinates:
+                            nsteps = int(math.sqrt(max(radius0, radius1)) * 6)
+                        else:
+                            nsteps = int(math.sqrt(max(radius0 * self.env._scale, radius1 * self.env._scale)) * 6)
                         tarc_angle = 360 / nsteps
                         p = [0, 0]
 
@@ -6747,6 +6748,9 @@ class Animate(object):
                     for i in range(0, len(p), 2):
                         px = p[i]
                         py = p[i + 1]
+                        if not self.screen_coordinates:
+                            px *= self.env._scale
+                            py *= self.env._scale
                         rx = px * cosa - py * sina
                         ry = px * sina + py * cosa
                         minpx = min(minpx, px)
@@ -6792,12 +6796,12 @@ class Animate(object):
                         draw = ImageDraw.Draw(self._image)
                         if fillcolor[3] != 0:
                             draw.polygon(rscaled, fill=fillcolor)
-                        if (linewidth > 0) and (linecolor[3] != 0):
+                        if (round(linewidth) > 0) and (linecolor[3] != 0):
                             if self.type == 'circle' and not draw_arc:
                                 draw.line(rscaled[2:-2], fill=linecolor, width=int(linewidth))
                                 # get rid of the first and last point (=center)
                             else:
-                                draw.line(rscaled, fill=linecolor, width=int(linewidth))
+                                draw.line(rscaled, fill=linecolor, width=round(linewidth))
                         del draw
                     self.minrx = minrx
                     self.minry = minry

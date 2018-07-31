@@ -1,5 +1,18 @@
 salabim  changelog
 
+version 2.3.2.3  2018-07-31 
+===========================
+Bug fixes
+---------
+ItemFile.read_item(), ItemFile.read_item_int, ItemFile.read_item_float and ItemFile.read_bool
+did ignore tabs completely.
+From this version on, tabs are treated as whitespace, just like blanks.
+
+Error in scaling of lines, rectangles, polygons and points fixed.
+Line widths are now always rounded, which has the consequence that lines with a line width < 0.5 are not
+displayed.
+
+
 version 2.3.2.2  2018-07-24
 ===========================
 Bug fixes

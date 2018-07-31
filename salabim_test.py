@@ -11,16 +11,38 @@ Pythonista=(platform.system()=='Darwin')
 
 
 def test():
-    test82()
+    test83()
+    
+def test83():
+    l1 = []
+
+    test_input = '''
+    1   \t\t  2 3
+    4 5 6
+    7
+    '''
+    with sim.ItemFile(test_input) as f:
+        while True:
+            try:
+                print(f.read_item_int())
+            except EOFError:
+                break
+
+
+
 
 def test82():
     env = sim.Environment()
+    env.width(200)
+    y = sim.AnimateCircle(radius=100, x=900, y=600, linewidth=1 / env.scale(), fillcolor=('red',100), linecolor='black', draw_arc=True)
+#    x = sim.Animate(circle0=(100,100, 0, 60, False), x0=900, y0=600, linewidth0=3, fillcolor0='red', linecolor0='black')
     a = sim.Animate(circle0=(100,100, 0, 0, True), circle1=(100,None,0, 720, True), x0=200, y0=200, linewidth0=3, fillcolor0='blue', fillcolor1='green', t1=10)
     b = sim.Animate(rectangle0=(-100, -10, 100, 10), x0=300, y0=600, angle1=360, t1=10)
     b = sim.Animate(rectangle0=sim.centered_rectangle(10,10), x0=200, y0=200, fillcolor0='red')
 #    b = sim.Animate(rectangle0=(-100,-10, 100, 10), x0=300, y0=600)
     sim.AnimateCircle(radius=100, radius1=300, x=lambda t: 700-t*10, y=200, fillcolor=lambda t: env.colorinterpolate(t,0,10,'yellow','blue'), arc_angle0=0, arc_angle1=lambda t: t * 10, draw_arc=True, linewidth=1, linecolor='red',
                       text='Piet', angle=lambda t: t * 10, textcolor='black', text_anchor='e')
+
     env.animate(True)
     env.run()
 
