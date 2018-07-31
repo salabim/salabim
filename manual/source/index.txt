@@ -1,0 +1,31 @@
+.. Salabim documentation master file, created by
+   sphinx-quickstart on Tue Dec 13 08:15:30 2016.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
+.. |n| raw:: html
+
+   <br />
+
+Documentation for salabim
+=========================
+
+.. toctree::
+   :maxdepth: 2
+   
+   Introduction
+   Modeling
+   Component
+   Queue
+   Resource
+   State
+   Monitor and MonitorTimestamped
+   Distributions
+   Animation
+   Reading items from a file
+   Reference
+   About
+   Indices
+ 
+
+

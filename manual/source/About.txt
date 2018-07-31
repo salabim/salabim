@@ -1,0 +1,95 @@
+.. |n| raw:: html
+
+   <br />
+
+About
+-----
+
+Who is behind salabim?
+^^^^^^^^^^^^^^^^^^^^^^
+I, Ruud van der Ham, am the sole developer of salabim. I have a long history in simulation, both in 
+applications and tool building.
+
+It all started in the mid 70's when modeling container terminals in Prosim, a package
+in PL/1 that was inspired by Simula and run on big IBM 360/370 mainframes. |n|
+In the eighties, Prosim was ported to smaller computers, but at the same time I
+developed a discrete event simulation tool called Must to run on CP/M machines, later
+on MSDOS machines, again under PL/1. A bit later, Must was ported to Pascal and was
+used in many projects. Must was never ported to Windows. Instead, Hans Veeke (Delft University)
+came with Tomas, a package that is still available and runs under Delphi. |n|
+End 2016, I wanted an easy to use and open source package for a project, preferably
+in Python. Unfortunately, Simpy (particularly version 3) does not support the essential 
+process interaction methods activate, hold, passivate and standby. First I tried to 
+build a wrapper around Simpy 3, but that didn't work too well.
+
+That was the start of a new package, called salabim.
+One of the key features of salabim is the powerful animation engine that is heavily
+inspired by some more creative projects where every animation object can change position,
+shape, colour, orientation over time. Although rarely used in normal simulation models,
+all that functionality is available in salabim. |n|
+Over the year 2017, a lot of functionality was added as well bugs were fixed. During that year
+the package became available on PyPI and GitHub and the documentation was made available. |n|
+Large parts of salabim were actually developed on an iPad on the excellent Pythonista platform. The full
+functionality is thus available under iOS as well.
+
+Why is the package called salabim?  
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. code-block:: python
+
+    s = 'sim ulation'
+    print(s)
+    s = s[:4]
+    print(s)
+    s += 'salabim'
+    print(s)
+    s = ' ' * 4 + s[4:]
+    print(s)
+
+.. code-block:: none
+
+    sim ulation
+    sim
+    sim salabim
+        salabim
+ 
+Contributing and reporting issues
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+It is very much appreciated to contribute to the salabim, by issuing a pull request or issue on GitHub.
+
+Also, issues can be reported this way.
+
+Alternatively, the Google group can be used for this.
+
+Support
+^^^^^^^
+Ruud van der Ham is able and willing to help users with issues with the package or modelling in general.
+
+He is also available for consultancy and or trainings.
+
+Contact him or other users via the Google group or info@salabim.org.
+
+
+License
+^^^^^^^
+
+The MIT License (MIT)
+
+Copyright (c) 2016, 2017, 2018 Ruud van der Ham, ruud@salabim.org
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to who the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

@@ -1,0 +1,299 @@
+.. |n| raw:: html
+
+   <br />
+   
+Animation
+---------
+Animation is a very powerful tool to debug, test and demonstrate simulations.
+Salabim's animation engine also allows some user input.
+
+This section of the documentation is not yet complete. 
+
+Salabim animations can be
+ 
+* synchronized with the simulation clock and run in real time (synchronized)
+* advance per simulation event (non synchronized)
+
+In synchronized mode, one time unit in the simulation can correspond to any period in real time, e.g.
+
+* 1 time unit in simulation time --> 1 second real time (speed = 1) (default)
+* 1 time unit in simulation time --> 4 seconds real time (speed = 0.25)
+* 4 time units in simulation time --> 1 second real time (speed = 4)
+
+The most common way to start an animation is by calling 
+`` env.animate(True)`` or with a call to ``animation_parameters``.
+
+Animations can be started en stopped during execution (i.e. run). When main is active, the animation
+is always stopped.
+
+The animation uses a coordinate system that -by default- is in screen pixels. The lower left corner is (0,0).
+But, the user can change both the coordinate of the lower left corner (translation) as well as set the x-coordinate
+of the lower right hand corner (scaling). Note that x- and y-scaling are always the same. |n|
+Furthermore, it is possible to specify the colour of the background with ``animation_parameters``. 
+
+Prior to version 2.3.0 there was actually just one animation object class: Animate. This
+interface is described later as the new animation classes are easier to use and offer some
+additional functionality.
+
+New style animation classes can be used to put texts, rectangles, polygon, lines, series of points, circles
+or images on the screen. All types can be connected to an optional text.
+
+Here is a sample program to show of all the new style animation classes ::
+
+        env=sim.Environment(trace=False)
+        class X(sim.Component):
+            def process(self):
+                yield self.hold(1)
+                env.snapshot('manual/source/Pic1.png')
+        env.animate(True)
+        env.background_color('20%gray')
+        
+        sim.AnimatePolygon(spec=(100, 100, 300, 100, 200,190), text='This is\na polygon')
+        sim.AnimateLine(spec=(100, 200, 300, 300), text='This is a line')
+        sim.AnimateRectangle(spec=(100, 10, 300, 30), text='This is a rectangle')
+        sim.AnimateCircle(radius=60, x=100, y=400, text='This is a cicle')
+        sim.AnimateCircle(radius=60, radius1=30, x=300, y=400, text='This is an ellipse')              
+        sim.AnimatePoints(spec=(100,500, 150, 550, 180, 570, 250, 500, 300, 500), text='These are points')
+        sim.AnimateText(text='This is a one-line text', x=100, y=600)
+        sim.AnimateText(text='''\
+    Multi line text
+    -----------------
+    Lorem ipsum dolor sit amet, consectetur
+    adipiscing elit, sed do eiusmod tempor
+    incididunt ut labore et dolore magna aliqua.
+    Ut enim ad minim veniam, quis nostrud
+    exercitation ullamco laboris nisi ut
+    aliquip ex ea commodo consequat. Duis aute
+    irure dolor in reprehenderit in voluptate
+    velit esse cillum dolore eu fugiat nulla
+    pariatur.
+
+    Excepteur sint occaecat cupidatat non
+    proident, sunt in culpa qui officia
+    deserunt mollit anim id est laborum.
+    ''', x=500, y=100)
+        
+        sim.AnimateImage('Pas un pipe.jpg', x=500, y=400)
+        X()
+        env.run(100)
+
+Resulting in:
+
+.. image:: Pic1.png
+   
+Salabim is also able to animate the components of a queue, with ``AnimateQueue()``.
+It is possible to use the standard shape of components, which is a rectangle with the sequence number or define
+your own shape(s). The queue can be build up in west, east, north or south directions.
+It is possible to limit the number of componenrs shown.
+
+Monitors and timestamped monitors can be visualized dynamically now with ÀnimateMonitor()``.
+
+These features are demonstrated in *Demo queue animation.py* ::
+
+    import salabim as sim
+
+
+    class X(sim.Component):
+        def setup(self, i):
+            self.i = i
+
+        def animation_objects(self, id):
+            if id == 'text':
+                ao0 = sim.AnimateText(text=self.name(), textcolor='fg', text_anchor='nw')
+                return 0, 16, ao0
+            else:
+                ao0 = sim.AnimateRectangle((0, 0, 40, 20),
+                    text=self.name(), fillcolor=id, textcolor='white', arg=self)
+                return 45, 0, ao0
+
+        def process(self):
+            while True:
+                yield self.hold(sim.Uniform(0, 20)())
+                self.enter(q)
+                yield self.hold(sim.Uniform(0, 20)())
+                self.leave()
+
+                
+    env = sim.Environment(trace=False)
+    env.background_color('20%gray')
+
+    q = sim.Queue('queue')
+
+    sim.AnimateText('queue, normal', x=100, y=50, text_anchor='nw')
+    qa0 = sim.AnimateQueue(q, x=100, y=50, direction='e', id='blue')
+
+    sim.AnimateText('queue, limited to six components', x=100, y=250, text_anchor='nw')
+    qa1 = sim.AnimateQueue(q, x=100, y=250, direction='e', max_length=6, id='red')
+
+    sim.AnimateText('queue, reversed', x=100, y=150, text_anchor='nw')
+    qa2 = sim.AnimateQueue(q, x=100, y=150, direction='e', reverse=True, id='green')
+
+    sim.AnimateText('queue, text only', x=80, y=460, text_anchor='sw', angle=270)
+    qa3 = sim.AnimateQueue(q, x=100, y=460, direction='s', id='text')
+
+    sim.AnimateMonitor(q.length, x=10, y=480, width=450, height=100, horizontal_scale=5, vertical_scale=5)
+
+    sim.AnimateMonitor(q.length_of_stay, x=10, y=600, width=450, height=100, horizontal_scale=5, vertical_scale=5)
+
+    sim.AnimateText(text=lambda: q.length.print_histogram(as_str=True), x=500, y=700,
+        text_anchor='nw', font='narrow', fontsize=10)
+
+    sim.AnimateText(text=lambda: q.print_info(as_str=True), x=500, y=340,
+        text_anchor='nw', font='narrow', fontsize=10)
+
+    [X(i=i) for i in range(15)]
+    env.animate(True)
+    env.run() 
+   
+Here is snapshot of this powerful, dynamics (including the histogram!):
+
+.. image:: Pic2.png
+
+Advanced
+^^^^^^^^
+The various classes have a lot of parameters, like color, line width, font, etc.
+
+These parameters can be given just as a scalar, like:
+
+``sim.AnimateText(text='Hello world', x=200, y=300, textcolor='red')``
+
+But each of these parameters may also be a:
+
+* function with zero arguments
+* function with one argument being the time t
+* function with two arguments being 'arg' and the time t
+* a method with instance 'arg' and the time t
+
+The function or method is called at each animation frame update (usually 30 frames per second).
+
+This makes it for instance possible to show dynamically the mean of monitor m, like in
+
+``sim.AnimateRectangle(spec=(10, 10, 200, 30), text=lambda: str(m.mean())``
+
+Class Animate
+^^^^^^^^^^^^^
+This class can be used to show:
+
+* line (if line0 is specified)
+* rectangle (if rectangle0 is specified) 
+* polygon (if polygon0 is specified)
+* circle (if circle0 is specified)
+* text (if text is specified)
+* image (if image is specicified)
+
+Note that only one type is allowed per instance of Animate. 
+
+Nearly all attributes of an Animate object are interpolated between time t0 and t1.
+If t0 is not specified, now() is assumed.
+If t1 is not specified inf is assumed, which means that the attribute will be the '0' attribute. 
+
+E.g.:
+
+``Animate(x0=100,y0=100,rectangle0==(-10,-10,10,10))`` will show a square around (100,100) for ever |n|
+``Animate(x0=100,y0=100,x1=200,y1=0,rectangle0=(-10,-10,10,10))`` will still show the same square around (100,100) as t1 is not specified |n|
+``Animate(t1=env.now()+10,x0=100,y0=100,x1=200,y1=0,rectangle0=(-10,-10,10,10))`` will show a square moving from (100,100) to (200,0) in 10 units of time. |n|
+
+It also possible to let the rectangle change shape over time:
+
+``Animate(t1=env.now(),x0=100,y0=100,x1=200,y1=0,rectangle0=(-10,-10,10,10),rectangle1=(-20,-20,20,20))`` will show a moving and growing rectangle. |n|
+
+By default, the animation object will not change anymore after t1, but will remain visible. Alternatively, if
+keep=False is specified, the object will disappear at time t1.
+
+Also, colors, fontsizes, angles can be changed in a linear way over time. 
+
+E.g.:
+
+``Animate(t1=env.now()+10,text='Test',textcolor0='red',textcolor1='blue',angle0=0,angle1=360)`` will show a rotating text changing from red to blue in 10 units of time.
+
+The animation object can be updated with the update method. Here, once again, all the attributes can be specified to change over time. Note that the defaults for the '0' values are the actual values at t=now().
+
+Thus,
+
+``an=Animate(t0=0,t1=10,x0=0,x1=100,y0=0,circle0=(10,),circle1=(20,))``
+will show a horizontally moving, growing circle.
+
+Now, at time t=5, we issue
+``an.update(t1=10,y1=50,circle1=(10,))``
+Then x0 will be set 50 (halfway 0 an 100) and cicle0 to (15,) (halfway 10 and 20).
+Thus the circle will shrink to its original size and move vertically from (50,0) to (50,50).
+This concept is very useful for moving objects whose position and orientation are controlled by the simulation.
+
+Here we explain how an attribute changes during time. We use x as an example.
+Normally, x=x0 at t=t0 and x=x1 at t>=t1. between t=t0 and t=t1, x is linearly interpolated.
+An application can however override the x method. The prefered way is to subclass the Animate class:
+
+.. literalinclude:: ..\..\Demo animate 1.py
+           
+This code will show the current simulation time moving from left to right, uniformly accelerated.
+And the text will be shown a bit higher up, every second. It is not necessary to use t0, t1, x0, x1, but
+is a convenient way of setting attributes.
+
+The following methods may be overridden:
+
+======================  ========= ========= ========= ========= ========= =========
+method                  circle    image     line      polygon   rectangle text
+======================  ========= ========= ========= ========= ========= =========
+anchor                            -                                       
+angle                   -         -         -         -         -         -
+circle                  -
+fillcolor               -                             -         -
+fontsize                                                                  -
+image                             -
+layer                   -         -         -         -         -         -
+line                                        -
+linecolor               -                   -         -         -
+linewidth               -                   -         -         -
+max_lines                                                                 -
+offsetx                 -         -         -         -         -         -
+offsety                 -         -         -         -         -         -
+polygon                                               -
+rectangle                                                       -
+text                                                                      -
+text_anchor                                                               -
+textcolor                                                                 -
+visible                 -         -         -         -         -         -
+width                             -
+x                       -         -         -         -         -         -
+xy_anchor               -         -         -         -         -         -
+y                       -         -         -         -         -         -
+======================  ========= ========= ========= ========= ========= =========
+
+*Dashboard animation*
+
+Here we present an example model where the simulation code is completely separated from the animation code.
+This makes communication and debugging and switching off animation much easier.
+
+The example below generates 15 persons starting at time 0, 1, ... . These persons enter a queue called q and
+stay there 15 time units.
+
+The animation dashboard shows the first 10 persons in the queue q, along with the length of that q.
+
+.. literalinclude:: ..\..\Demo animate 2.py
+
+All animation initialization is in ``do_animation``, where first 10 rectangle and text Animate
+objects are created. These are classes that are inherited from sim.Animate.
+
+The AnimateWaitSquare defines a red rectangle at a specific position in the ``sim.Animate.__init__()`` call.
+Note that normally these squares should be displayed. But, here we have overridden the visible method.
+If there is no i-th component in the q, the square will be made invisible. Otherwise, it is visible.
+
+The AnimateWaitText is more or less defined in a similar way. It defines a text in white at a specific position.
+Only the text method is overridden and will return the name of the i-th component in the queue, if any. Otherwise 
+the null string will be returned.
+
+The length of the queue q could be defined also by subclassing sim.Animate, but here we just make a direct instance
+of Animate with the null string as the text to be displayed. And then we immediately override the text method with 
+a lambda function. Note that in this case, self is not available!
+
+
+Video production and snapshots
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+An animation can be recorded as an .mp4 video by sprecifying ``video=filename`` in the call to animation_parameters.
+The effect is that 30 time per second (scaled animation time) a frame is written. In this case, the animation does not
+run synchronized with the wall clock anymore. Depending on the complexity of the animation, the simulation might run
+faster of slower than real time. Other than with an ordinary animation, frames are never skipped.
+
+Once control is given back to main, the .mp4 file is closed.
+
+Salabim also suppports taking a snapshot of an animated screen with ``Environment.snapshot()``.

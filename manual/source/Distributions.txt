@@ -1,0 +1,296 @@
+.. |n| raw:: html
+
+   <br />
+   
+Distributions
+-------------
+Salabim can be used with the standard random module, but it is easier to use the salabim distributions.
+
+Internally, salabim uses the random module. There is always a seed associated with each distribution, which
+is normally random.random. 
+
+When a new environment is created, the random seed 1234567 will be set by default. However, it is possible to
+override this behaviour with the random_seed parameter:
+
+* any hashable value, to set another seed
+* null string (''): no reseeding
+* None: true random, non reproducible (based on current time)
+
+As a distribution is an instance of a class, it can be used in assignment, parameters, etc. E.g. ::
+
+    inter_arrival_time = sim.Uniform(10,15)
+    
+And then, to wait for a time sampled from this distribution ::
+
+    yield self.hold(inter_arrival_time.sample())
+    
+or ::
+    yield self.hold(inter_arrival_time())
+    
+or ::
+
+    yield self.hold(sim.Uniform(10,15).sample())
+    
+or ::
+
+    yield self.hold(sim.Uniform(10,15)())
+    
+All distributions are a subclass of _Distribution which supports the following methods:
+
+* mean()
+* sample()
+* direct calling as an alternative to sample, like Uniform(12,15)()
+* bounded_sample()  # see below
+
+For each distribution it is possible to limit the sampled values between a lowerbound and an upperbound, by using
+the method bounded_sample(). This is particularly useful when a duration is required, which has to be positive, but the distribution
+it self does not guarantee a positive value, e.g. ::
+
+    duration = sim.Normal(5,5).bounded_sample(lowerbound=0)
+    
+Salabim provides the following distribution classes:
+
+Beta
+^^^^
+Beta distribution with a given
+
+* alpha (shape)
+* beta (shape)
+
+E.g. ::
+
+    processing_time = sim.Beta(2,4)  # Beta with alpha=2, beta=4`
+
+Constant
+^^^^^^^^
+No sampling is required for this distribution, as it always returns the same value. E.g. ::
+
+    processing_time = sim.Constant(10)
+
+Erlang
+^^^^^^
+Erlang distribution with a givenl
+
+* shape (k)
+* rate (lambda) or scale (mu)
+
+E.g. ::
+
+    inter_arrival_time = sim.Erlang(2, rate=2)  # Erlang-2, with lambda = 2
+    
+Gamma
+^^^^^
+Gamma distribution with given
+
+* shape (k)
+* scale (teta) or rate (beta)
+
+E.g. ::
+
+    processing_time = sim.Gamma(2,3)  # Gamma with k=2, teta=3
+    
+Exponential
+^^^^^^^^^^^
+Exponential distribution with a given
+
+* mean or rate (lambda)
+
+E.g. ::
+
+     inter_arrival_time = sim.Exponential(10)  # on an average every 10 time units
+
+IntUniform
+^^^^^^^^^^
+Integer uniform distribution between a given 
+
+* lowerbound
+* upperbound (inclusive)
+
+E.g. ::
+
+    die = sim.IntUniform(1, 6)
+     
+Normal
+^^^^^^
+Normal distribution with a given
+
+* mean
+* standard deviation
+
+E.g. ::
+
+    processing_time = sim.Normal(10, 2)  # Normal with mean=10, standard deviation=2
+    
+Note that this might result in negative values, which might not correct if it is a duration. In that case,
+use bounded_sample like ::
+
+    yield self.hold(processing_time.bounded_sample())
+    
+Normally, sampling is done with the random.normalvariate method. Alternatively, the random.gauss method can be used.
+
+Poisson
+^^^^^^^
+Poisson distribution with a lambda
+
+E.g. ::
+
+    occurences_in_one_hour = sim.Poisson(10)  # Poisson distribution with lambda (and thus mean) = 10
+    
+Triangular
+^^^^^^^^^^
+Triangular distribution with a given
+
+* lowerbound
+* upperbound
+* median
+
+E.g. ::
+
+    processing_time = sim.Triangular(5, 15, 8)
+    
+Uniform
+^^^^^^^^
+Uniform distribution between a given 
+
+* lowerbound
+* upperbound
+
+E.g. ::
+
+    processing_time = sim.Uniform(5, 15)
+    
+Weibull
+^^^^^^^
+Weibull distribution with given
+
+* scale (alpha or k)
+* shape (beta or lambda)
+
+E.g. ::
+
+    time_between_failure = sim.Weibull(2, 5)  # Weibull with k=2. lambda=5
+    
+Cdf
+^^^
+Cumulative distribution function, specified as a list or tuple with x[i],p[i] values, where p[i] is the cumulative probability
+that xn<=pn. E.g. ::
+
+    processingtime = sim.Cdf((5, 0, 10, 50, 15, 90, 30, 95, 60, 100))
+    
+This means that 0% is <5, 50% is < 10, 90% is < 15, 95% is < 30 and 100% is <60.
+
+.. note:: It is required that p[0] is 0 and that p[i]<=p[i+1] and that x[i]<=x[i+1].
+
+It is not required that the last p[] is 100, as all p[]'s are automatically scaled. This means that the two distributions below are
+identical to the first example ::
+
+    processingtime = sim.Cdf((5, 0.00, 10, 0.50, 15, 0.90, 30, 0.95, 60, 1.00))
+    processingtime = sim.Cdf((5,    0, 10,   10, 15,   18, 30,   19, 60,   20))
+
+Pdf
+^^^
+Probability density function, specified as:
+
+1. list or tuple of x[i], p[i] where p[i] is the probability (density)
+2. list or tuple of x[i] followed by a list or tuple p[i]
+3. list or tuple of x[i] followed by a scalar (value not important)
+
+.. note:: It is required that the sum of p[i]'s is **greater than** 0.
+  
+E.g. ::
+
+    processingtime = sim.Pdf((5, 10, 10, 50, 15, 40))
+
+This means that 10% is 5, 50% is 10 and 40% is 15.
+
+It is not required that the sum of the p[i]'s is 100, as all p[]'s are automatically scaled. This means that the two distributions below are
+identical to the first example ::
+    
+    processingtime = sim.Pdf((5, 0.10, 10, 0.50, 15, 0.40)) 
+    processingtime = sim.Pdf((5,    2, 10,   10, 15,    8))
+
+And the same with the second form ::
+
+    processingtime = sim.Pdf((5, 10, 15), (10, 50, 40))
+
+If all x[i]'s have the same probability, the third form is very useful ::
+ 
+    dice = sim.Pdf((1,2,3,4,5,6),1)  # the distribution IntUniform(1,6) does the job as well
+    dice = sim.Pdf(range(1,7),1)  # same as above
+
+x[i] may be of any type, so it possible to use ::
+
+    color = sim.Pdf(('Green', 45, 'Yellow', 10, 'Red', 45))
+    cartype = sim.Pdf(ordertypes,1)
+    
+If the x-value is a salabim distribution, not the distribution but a sample of that distribution is returned when sampling ::
+
+    processingtime = sim.Pdf((sim.Uniform(5, 10), 50, sim.Uniform(10, 15), 40, sim.Uniform(15, 20), 10))
+    proctime=processingtime.sample()
+    
+Here proctime will have a probability of 50% being between 5 and 10, 40% between 10 and 15 and 10% between 15 and 20. 
+
+CumPdf
+^^^^^^
+Probability density function, specified as:
+
+1. list or tuple of x[i], p[i] where p[i] is the cumulative probability (density)
+2. list or tuple of x[i] followed by a list or tuple p[i]
+
+.. note:: It is required that p[i]<=p[i+1].
+  
+E.g. ::
+
+    processingtime = sim.CumPdf((5, 10, 10, 60, 15, 100))
+
+This means that 10% is 5, 50% is 10 and 40% is 15.
+
+It is not required that the sum of the p[i]'s is 100, as all p[]'s are automatically scaled. This means that the two distributions below are
+identical to the first example ::
+    
+    processingtime = sim.CumPdf((5, 0.10, 10, 0.60, 15, 1.00)) 
+    processingtime = sim.CumPdf((5,    2, 10,   12, 15,   20))
+
+And the same with the second form ::
+
+    processingtime = sim.CumPdf((5, 10, 15), (10, 60, 100))
+
+x[i] may be of any type, so it possible to use ::
+
+    color = sim.CumPdf(('Green', 45, 'Red', 100))
+    
+If the x-value is a salabim distribution, not the distribution but a sample of that distribution is returned when sampling ::
+
+    processingtime = sim.CumPdf((sim.Uniform(5, 10), 50, sim.Uniform(10, 15), 90, sim.Uniform(15, 20), 100))
+    proctime=processingtime.sample()
+    
+Here proctime will have a probability of 50% being between 5 and 10, 40% between 10 and 15 and 10% between 15 and 20. 
+  
+Distribution
+^^^^^^^^^^^^
+A special distribution is the Distribution class. Here, a string will contain the specification of the distribution.
+This is particularly useful when the distributions are specified in an external file. E.g. ::
+
+    with open('experiment1.txt', 'r') as f:
+        interarrivaltime = sim.Distribution(read(f))
+        processingtime = sim.Distribution(read(f))
+        numberofparcels = sim.Distribution(read(f))
+        
+With a file experiment.txt ::
+
+    Uniform(10,15)
+    Triangular(1,5,2)
+    IntUniform(10,20)
+
+or with abbreviation ::
+
+    Uni(10,15)
+    Tri(1,5,2)
+    Int(10,20)
+   
+or even ::
+
+    U(10,15)
+    T(1,5,2)
+    I(10,20)
+ 

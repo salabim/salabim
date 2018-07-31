@@ -1,0 +1,167 @@
+.. |n| raw:: html
+
+   <br />
+   
+Resource
+--------
+Resources are a powerful way of process interaction. 
+
+A resource has always a capacity (which can be zero). This capacity will be specified at time of creation, but
+may change over time.
+There are two of types resources:
+
+* standard resources, where each claim is associated with a component (the claimer). It is not necessary that the claimed quantities are integer.
+* anonymous resources, where only the claimed quantity is registered. This is most useful for dealing with levels, lengths, etc.
+
+Resources are defined like ::
+
+    clerks = Resource('clerks', capacity=3)
+
+And then a component can request a clerk :: 
+
+    yield self.request(clerks)  # request 1 from clerks 
+    
+It is also possible to request for more resources at once ::
+
+    yield self.request(clerks,(assistance,2))  # request 1 from clerks AND 2 from assistance
+
+Resources have a queue ``requesters`` containing all components trying to claim from the resource.
+And a queue ``claimers`` containing all components claiming from the resource
+(not for anonymous resources).
+
+It is possible to release a quantity from a resource with c.release(), e.g. ::
+
+    self.release(r)  # releases all claimed quantity from r
+    self.release((r,2))  # release quantity 2 from r
+    
+Alternatively, it is possible to release from a resource directly, e.g. ::
+
+    r.release()  # releases the total quantity from all claiming components
+    r.release(10)  # releases 10 from the resource; only valid for anonymous resources
+    
+After a release, all requesting components will be checked whether their claim can be honored.
+
+Resources have a number of monitors and timestamped monitors:
+
+* claimers().length
+* claimers().length_of_stay
+* requesters().length
+* requesters().length_of_stay
+* claimed_quantity
+* available_quantity
+* capacity
+* occupancy
+
+By default, all monitors are enabled.
+
+With ``r.print_statistics()`` the key statistics of these all monitors are printed.
+
+E.g.:
+
+.. code-block:: none
+
+    Statistics of clerk at     50000.000
+                                                                         all    excl.zero         zero
+    -------------------------------------------- -------------- ------------ ------------ ------------
+    Length of requesters of clerk                duration          50000        48499.381     1500.619
+                                                 mean                  8.427        8.687
+                                                 std.deviation         4.852        4.691
+
+                                                 minimum               0            1    
+                                                 median                9           10    
+                                                 90% percentile       14           14    
+                                                 95% percentile       16           16    
+                                                 maximum              21           21    
+
+    Length of stay in requesters of clerk        entries            4995         4933           62    
+                                                 mean                 84.345       85.405
+                                                 std.deviation        48.309       47.672
+
+                                                 minimum               0            0.006
+                                                 median               94.843       95.411
+                                                 90% percentile      142.751      142.975
+                                                 95% percentile      157.467      157.611
+                                                 maximum             202.153      202.153
+
+    Length of claimers of clerk                  duration          50000        50000            0    
+                                                 mean                  2.996        2.996
+                                                 std.deviation         0.068        0.068
+
+                                                 minimum               1            1    
+                                                 median                3            3    
+                                                 90% percentile        3            3    
+                                                 95% percentile        3            3    
+                                                 maximum               3            3    
+
+    Length of stay in claimers of clerk          entries            4992         4992            0    
+                                                 mean                 30           30    
+                                                 std.deviation         0.000        0.000
+
+                                                 minimum              30.000       30.000
+                                                 median               30           30    
+                                                 90% percentile       30           30    
+                                                 95% percentile       30           30    
+                                                 maximum              30.000       30.000
+
+    Capacity of clerk                            duration          50000        50000            0    
+                                                 mean                  3            3    
+                                                 std.deviation         0            0    
+
+                                                 minimum               3            3    
+                                                 median                3            3    
+                                                 90% percentile        3            3    
+                                                 95% percentile        3            3    
+                                                 maximum               3            3    
+
+    Available quantity of clerk                  duration          50000          187.145    49812.855
+                                                 mean                  0.004        1.078
+                                                 std.deviation         0.068        0.268
+
+                                                 minimum               0            1    
+                                                 median                0            1    
+                                                 90% percentile        0            1    
+                                                 95% percentile        0            2    
+                                                 maximum               2            2    
+
+    Claimed quantity of clerk                    duration          50000        50000            0    
+                                                 mean                  2.996        2.996
+                                                 std.deviation         0.068        0.068
+
+                                                 minimum               1            1    
+                                                 median                3            3    
+                                                 90% percentile        3            3    
+                                                 95% percentile        3            3    
+                                                 maximum               3            3      
+                                             
+With ``r.print_info()`` a summary of the contents of the queues can be printed.
+
+E.g. ::
+
+    Resource 0x112e8f0b8
+      name=clerk
+      capacity=3
+      requesting component(s):
+        customer.4995        quantity=1
+        customer.4996        quantity=1
+      claimed_quantity=3
+      claimed by:
+        customer.4992        quantity=1
+        customer.4993        quantity=1
+        customer.4994        quantity=1
+        
+The capacity may be changed with ``r.set_capacity(x)``. Note that this may lead to requesting
+components to be honored.
+
+Querying of the capacity, claimed quantity and available quantity can be done via the timestamped monitors:
+``r.capacity()``, ``r.claimed_quantity()`` and ``r.available_quantity()``
+
+It is possible to calculate the occupancy of a resource with ::
+
+    occupancy = r.claimed_quantity().mean / r.capacity().mean
+    
+or, by tallying at each change:
+
+    r.occupancy.mean()
+    
+Note that these two methods do not return the same result.
+
