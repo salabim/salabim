@@ -3,6 +3,20 @@ salabim  changelog
 
 version 2.3.2.4  2018-08-07
 ===========================
+New functionality
+-----------------
+The as_str parameter in the methods
+  print_histogram()
+  print_histograms()
+  print_statistics()
+  print_info()
+can now also be used to direct the output to the file as mentioned in as_str, like in
+    q=sim.Queue(name='queue')
+    with open('test.txt', 'w') as f:
+        q.print_statistics(as_str=f)
+If as_str is True, the output will be returned as a string.
+If as_str is False  (the default for all methods), the output will go to stdout.
+
 Bug fixes
 ---------
 Problem when printing 'values' histograms fixed.
@@ -11,18 +25,6 @@ Bug with drawing a circle with old style Animate() fixed.
 
 A syntax error when run under Python 2.7 with 'yield from' fixed. Be advised that salabim will
 drop Python 2.7 support in the future.
-
-The as_str parameter is the methods
-  print_histogram()
-  print_histograms()
-  print_statistics()
-  print_info()
-can now be used to direct the output to the file as mentioned in as_str, like in
-    q=sim.Queue(name='queue')
-    with open('test.txt', 'w') as f:
-        q.print_statistics(as_str=f)
-If as_str is True, the output will be returned as a string.
-If as_str is False  (the default for all methods), the output will go to stdout.
 
 
 version 2.3.2.3  2018-07-31 
