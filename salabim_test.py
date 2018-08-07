@@ -11,13 +11,86 @@ Pythonista=(platform.system()=='Darwin')
 
 
 def test():
-    test83()
+    test85()
     
+def test85():
+    env = sim.Environment()
+    q=sim.Queue(name='queue')
+    with open('test.txt', 'w') as f:
+        q.print_statistics(as_str=f)
+
+
+def test84():
+    
+
+    class carAnimateCircle1(sim.Animate):
+    
+        def __init__(self, car):
+            self.car = car
+            sim.Animate.__init__(self,
+                circle0=(car.R,), linecolor0='magenta', fillcolor0='white', linewidth0=1)
+    
+        def circle(self, t):
+            if self.car.mode() == 'Driving':
+                return (self.car.R,)
+            else:
+                return (0.1,)
+    
+        def fillcolor(self, t):
+            if self.car.mode() == 'Driving':
+                return ('yellow', 75)
+            else:
+                return ('white', 75) #'white'
+    
+    class carAnimateCircle(sim.Animate):
+    
+        def __init__(self, car):
+            self.car = car
+            sim.Animate.__init__(self,
+                circle0=(car.R,), linecolor0='magenta', fillcolor0='white', linewidth0=1)
+    
+        def circle(self, t):
+            if self.car.mode() == 'Driving':
+                return (self.car.R,)
+            else:
+                return (0.1,)
+    
+        def fillcolor(self, t):
+            if self.car.mode() == 'Driving':
+                return ('yellow', 75)
+            else:
+                return ('white', 75) #'white'
+    
+    class Car(sim.Component):
+        def setup(self, R):
+            self.R = R
+            sim.AnimateCircle(
+                 linecolor='magenta',
+                 radius=lambda car, t: self.R if car.mode() == 'Driving' else 0.1, 
+                 fillcolor=lambda car, t: ('yellow', 75) if car.mode() == 'Driving' else ('white', 75),
+                 arg=self
+                 )
+            
+             
+        def process(self):
+            while True:
+                yield self.hold(1, mode='Driving')
+                yield self.hold(1, mode='Stand still')
+        
+    env=sim.Environment()
+    Car(R=100)
+    env.animate(True)
+    env.x0(-200)
+    env.x1(200)
+    env.y0(-150)
+    
+    env.run()
+ 
 def test83():
     l1 = []
 
     test_input = '''
-    1   \t\t  2 3
+    1   \t\t  {2 3 67} 4  12000
     4 5 6
     7
     '''

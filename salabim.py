@@ -6,7 +6,7 @@ see www.salabim.org for more information, the documentation, updates and license
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.2.3'
+__version__ = '2.3.4'
 
 import heapq
 import random
@@ -20,7 +20,6 @@ import inspect
 import platform
 import sys
 import itertools
-import string
 import io
 import pickle
 import logging
@@ -73,10 +72,11 @@ class ItemFile(object):
         run_name = f.read_item()
         f.close()
 
-    Item files consists of individual items separated by whitespace |n|
-    If a blank is required in an item, use single or double quotes |n|
+    Item files consists of individual items separated by whitespace (blank or tab)|n|
+    If a blank or tab is required in an item, use single or double quotes |n|
     All text following # on a line is ignored |n|
-    All texts on a line within curly brackets {} is ignored and considered white space.
+    All texts on a line within curly brackets {} is ignored and considered white space. |n|
+    Curly braces cannot spawn multiple lines and cannot be nested.
 
     Example ::
 
@@ -157,8 +157,7 @@ class ItemFile(object):
             raise EOFError
 
     def _nextread(self):
-        remove = string.whitespace
-        remove = remove.replace(' ', '').replace('\t', '')
+        remove = '\r\n'
         quotes = '\'"'
 
         for line in self.open_file:
@@ -703,7 +702,7 @@ class Monitor(object):
         else:
             value = [str(value)]
 
-        x = self.x()
+        x = self.x(force_numeric=False)
         return sum(1 for vx in x if (str(vx).strip() in value))
 
     def value_weight(self, value):
@@ -900,7 +899,7 @@ class Monitor(object):
 
         values : bool
             if False (default), bins will be used |n|
-            if True, the individual values will be shown (in the right order).
+            if True, the individual values will be shown (sorted on the value).
             in that case, no cumulative values will be given |n|
 
         ex0 : bool
@@ -6691,10 +6690,10 @@ class Animate(object):
                             p.append(p[0])  # close the polygon
                             p.append(p[1])
 
-                    elif self.type == 'circle':
+                    elif self.type == 'circle':  # ***
                         arc_angle0 = 0
                         arc_angle1 = 360
-                        draw_arc = (fillcolor[3] != 0)
+                        draw_arc = False
                         if isinstance(circle, (list, tuple)):
                             radius0 = radius1 = circle[0]
                             if len(circle) > 1:
@@ -6801,7 +6800,7 @@ class Animate(object):
                                 draw.line(rscaled[2:-2], fill=linecolor, width=int(linewidth))
                                 # get rid of the first and last point (=center)
                             else:
-                                draw.line(rscaled, fill=linecolor, width=round(linewidth))
+                                draw.line(rscaled, fill=linecolor, width=int(round(linewidth)))
                         del draw
                     self.minrx = minrx
                     self.minry = minry
@@ -13368,7 +13367,9 @@ def deep_flatten(l):
 
     if hasattr(l, '__iter__') and not isinstance(l, str):
         for x in l:
-            yield from deep_flatten(x)
+            #  the two following lines are equivalent to yield from deep_flatten(x), which is not supported in Python 2.7
+            for xx in deep_flatten(x):
+                yield xx
     else:
         yield l
 
@@ -13434,10 +13435,13 @@ def _get_caller_frame():
 
 def return_or_print(result, as_str):
     result = '\n'.join(result)
-    if as_str:
+    if as_str == True:  # no check for just as_str as as_str is also (mis)used for print_redirection
         return result
     else:
-        print(result)
+        if as_str:
+            print(result, file=as_str)
+        else:
+            print(result)
 
 
 def _call(c, t, self):
