@@ -797,7 +797,7 @@ class Monitor(object):
             if False (default), print the statistics
             if True, return a string containing the statistics
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -913,7 +913,7 @@ class Monitor(object):
             if False (default), print the histogram
             if True, return a string containing the histogram
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -962,7 +962,7 @@ class Monitor(object):
             if False (default), print the histogram
             if True, return a string containing the histogram
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -2038,7 +2038,7 @@ class MonitorTimestamp(Monitor):
             if False (default), print the statistics
             if True, return a string containing the statistics
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -2083,7 +2083,7 @@ class MonitorTimestamp(Monitor):
             if False (default), print the histogram
             if True, return a string containing the histogram
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -2131,7 +2131,7 @@ class MonitorTimestamp(Monitor):
             if False (default), print the histogram
             if True, return a string containing the histogram
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -2723,7 +2723,7 @@ class Queue(object):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -2756,7 +2756,7 @@ class Queue(object):
             if False (default), print the statistics
             if True, return a string containing the statistics
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -2788,7 +2788,7 @@ class Queue(object):
             if False (default), print the histograms
             if True, return a string containing the histograms
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -3765,7 +3765,7 @@ class Environment(object):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -9111,11 +9111,11 @@ class Component(object):
             if False (default), print the info
             if True, return a string containing the info
 
-         file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
-       Returns
+        Returns
         -------
         info (if as_str is True) : str
         '''
@@ -10885,7 +10885,7 @@ class Exponential(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -10988,7 +10988,7 @@ class Normal(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -11095,7 +11095,7 @@ class IntUniform(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -11176,7 +11176,7 @@ class Uniform(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -11270,7 +11270,7 @@ class Triangular(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -11343,7 +11343,7 @@ class Constant(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -11420,7 +11420,7 @@ class Poisson(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -11510,7 +11510,7 @@ class Weibull(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -11611,7 +11611,7 @@ class Gamma(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -11694,7 +11694,7 @@ class Beta(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -11799,7 +11799,7 @@ class Erlang(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -11910,7 +11910,7 @@ class Cdf(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -12058,7 +12058,7 @@ class Pdf(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -12213,7 +12213,7 @@ class CumPdf(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -12352,7 +12352,7 @@ class Distribution(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -12536,7 +12536,7 @@ class State(object):
             if False (default), print the histograms
             if True, return a string containing the histograms
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -12561,7 +12561,7 @@ class State(object):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -12792,7 +12792,7 @@ class State(object):
             if False (default), print the statistics
             if True, return a string containing the statistics
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -12943,7 +12943,7 @@ class Resource(object):
             if False (default), print the statistics
             if True, return a string containing the statistics
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -12984,7 +12984,7 @@ class Resource(object):
             if False (default), print the histograms
             if True, return a string containing the histograms
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
@@ -13079,7 +13079,7 @@ class Resource(object):
             if False (default), print the info
             if True, return a string containing the info
 
-        file: flle
+        file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
