@@ -54,8 +54,8 @@
 
 
 \title{salabim Documentation}
-\date{Jul 23, 2018}
-\release{2.3.2}
+\date{Aug 08, 2018}
+\release{2.3.2.5}
 \author{Ruud van der Ham}
 \newcommand{\sphinxlogo}{\vbox{}}
 \renewcommand{\releasename}{Release}
@@ -70,11 +70,11 @@
 
 
 \chapter{Introduction}
-\label{\detokenize{Introduction:introduction}}\label{\detokenize{Introduction::doc}}\label{\detokenize{Introduction:documentation-for-salabim}}
+\label{\detokenize{Introduction::doc}}\label{\detokenize{Introduction:documentation-for-salabim}}\label{\detokenize{Introduction:introduction}}
 Salabim is a package for discrete event simulation in Python.
 It follows the methodology of process description as originally demonstrated in \sphinxstyleemphasis{Simula}
 and later in \sphinxstyleemphasis{Prosim}, \sphinxstyleemphasis{Must} and \sphinxstyleemphasis{Tomas}. 
-It is also quite similar to \sphinxstyleemphasis{SimPy 2}.
+The process interaction methods are also quite similar to \sphinxstyleemphasis{SimPy 2}.
 
 The package comprises discrete event simulation, queue handling, resources, statistical sampling and monitoring.
 On top of that real time animation is built in.
@@ -127,7 +127,7 @@ Pillow, tkinter
 &
 opencv, numpy
 &
-PIL
+Pillow
 \\
 \hline
 PyPy
@@ -139,7 +139,7 @@ Pillow, tkinter
 &
 N/A
 &
-PIL
+Pillow
 \\
 \hline
 Pythonista
@@ -150,9 +150,8 @@ Pythonista
 Pillow
 &
 N/A
-&\begin{itemize}
-\item {} 
-\end{itemize}
+&
+Pillow
 \\
 \hline
 \end{tabular}
@@ -162,7 +161,7 @@ N/A
 \item[{Several CPython packages, like \sphinxstyleemphasis{WinPython} support Pillow out of the box. If not, install with:}] \leavevmode
 \sphinxcode{pip install Pillow}
 
-\item[{Under Linux, PIL can be installed with:}] \leavevmode
+\item[{Under Linux, Pillow can be installed with:}] \leavevmode
 \sphinxcode{sudo apt-get purge python3-pil} 
 \sphinxcode{sudo apt-get install python3-pil python3-pil.imagetk}
 
@@ -189,7 +188,7 @@ However, for development, nothing can beat CPython or Pythonista.
 
 You can find the package along with some support files and sample models on www.github.com/salabim/salabim.
 From there you can directly download as a zip file and next extract all files.
-Alternatively the repository can be cloned.\textbar{}n\textbar{}
+Alternatively the repository can be cloned. 
 
 For Pythonista, the easiest way to download salabim is:
 \begin{itemize}
@@ -222,10 +221,10 @@ Optionally rename this directory to salabim
 Salabim itself is provided as one Python script, called salabim.py.
 You may place that file in any directory where your models reside. 
 
-If you want salabim to be available from other directories, without copying the salabim.py script,
-run the supplied install.py file.
+If you want salabim to be available from other directories, without copying the salabim.py script, either install from PyPI (see above)
+or run the supplied install.py file.
 In doing so, you will create (or update) a salabim directory in the site-package directory,
-which will contain a copy of the salabim package.
+which will then contain a copy of the salabim package.
 
 
 \section{Python}
@@ -437,7 +436,7 @@ the customer places itself at the tail of the waiting line.
 Then, the customer checks whether the clerk is idle, and if so, activates him immediately.
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
-\PYG{k}{while} \PYG{n}{clerk}\PYG{o}{.}\PYG{n}{ispassive}\PYG{p}{(}\PYG{p}{)}\PYG{p}{:}
+\PYG{k}{if} \PYG{n}{clerk}\PYG{o}{.}\PYG{n}{ispassive}\PYG{p}{(}\PYG{p}{)}\PYG{p}{:}
     \PYG{n}{clerk}\PYG{o}{.}\PYG{n}{activate}\PYG{p}{(}\PYG{p}{)}
 \end{sphinxVerbatim}
 
@@ -939,9 +938,9 @@ are no customers waiting.
 
 \section{The bank office example with standby}
 \label{\detokenize{Modeling:the-bank-office-example-with-standby}}
-The salabim package contains a powerful process mechanism, called standby. When a component
-is in standby mode, it will become current after each event. Normally, the standby will be
-used in a while loop where at every event a condition is checked.
+The salabim package contains yet another powerful process mechanism, called standby. When a component
+is in standby mode, it will become current after \sphinxstyleemphasis{each} event. Normally, the standby will be
+used in a while loop where at every event one or more conditions are checked.
 
 The model with standby is
 
@@ -977,7 +976,7 @@ data either with a cancel or by reaching the end of its process method.
 It is easy to create a data component by:
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
-\PYG{n}{box} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Component}\PYG{p}{(}\PYG{p}{)}
+\PYG{n}{data\PYGZus{}component} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Component}\PYG{p}{(}\PYG{p}{)}
 \end{sphinxVerbatim}
 
 Data components may be placed in a queue. You can’t activate this component as such as there is no associated process method.
@@ -998,7 +997,7 @@ And then there has to be at least one generator method, normally called process:
         \PYG{o}{.}\PYG{o}{.}\PYG{o}{.}\PYG{o}{.}
 \end{sphinxVerbatim}
 
-The process has to have at least one yield statement!
+The process has to have at least one yield (or yield from) statement!
 
 Creation and activation can be combined by making a new instance of the class:
 
@@ -1035,13 +1034,13 @@ specified delay:
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
 \PYG{n}{ship1}\PYG{o}{.}\PYG{n}{activate}\PYG{p}{(}\PYG{n}{at}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{)}
-\PYG{n}{ship2}\PYG{o}{.}\PYG{n}{activate}\PYG{p}{(}\PYG{n}{delay}\PYG{p}{(}\PYG{l+m+mi}{50}\PYG{p}{)}\PYG{p}{)}
+\PYG{n}{ship2}\PYG{o}{.}\PYG{n}{activate}\PYG{p}{(}\PYG{n}{delay}\PYG{o}{=}\PYG{l+m+mi}{50}\PYG{p}{)}
 \end{sphinxVerbatim}
 
 At time of creation it is sometimes useful to be able to set attributes, prepare for actions, etc.
 This is possible in salabim by defining an \_\_init\_\_ and/or a setup method:
 
-If the \_\_init\_\_ method is used, it is required to call the Component \_\_init\_\_ method from within the
+If the \_\_init\_\_ method is used, it is required to call the Component.\_\_init\_\_ method from within the
 overridden method:
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
@@ -1068,7 +1067,8 @@ of Component is executed.
 
 Now, ship.length will be 250.
 
-Note that setup gets all arguments and keyword arguments, that are not ‘consumed’  by \_\_init\_\_.
+Note that setup gets all arguments and keyword arguments, that are not ‘consumed’  by \_\_init\_\_ and/or
+the process call.
 
 Only in very specific cases, \_\_init\_\_ will be necessary.
 
@@ -1099,6 +1099,9 @@ waiting
 
 \item {} 
 standby
+
+\item {} 
+interrupted
 
 \end{itemize}
 
@@ -1320,7 +1323,7 @@ standby
 \subsection{Creation of a component}
 \label{\detokenize{Component:creation-of-a-component}}
 Although it is possible to create a component directly with \sphinxtitleref{x=sim.Component()}, this
-makes it virtually impossible to make that component into an active component,
+makes it very hard to make that component into an active component,
 because there’s no process method. So, nearly always we define a class based on
 sim.Component
 
@@ -1331,7 +1334,7 @@ sim.Component
 \end{sphinxVerbatim}
 
 If we then say \sphinxtitleref{car=Car()}, a component is created and it activated from process. This
-process has to be a generator function, so needs to contain at least one yield statement.
+process has to be a generator function, so needs to contain at least one yield (or yield from) statement.
 
 The result is that car is put on the future event list (for time now) and when it’s its
 turn, the component becomes current.
@@ -1342,7 +1345,7 @@ And instead of starting at process, the component may be initialized to start at
 like \sphinxtitleref{car=Car(process=’wash’)}.
 
 And, finally, if there is a process method, you can disable the automatic activation (i.e.
-make it a data component) , by specifying \sphinxtitleref{process=None}.
+make it a data component) , by specifying \sphinxtitleref{process=’‘}.
 
 If there is no process method, and process= is not given, the component becomes a data component.
 
@@ -1353,9 +1356,9 @@ Activate is the way to turn a data component into a live component. If you do no
 the generator function process is assumed. So you can say
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
-\PYG{n}{car0} \PYG{o}{=} \PYG{n}{Car}\PYG{p}{(}\PYG{n}{process}\PYG{o}{=}\PYG{k+kc}{None}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} data component}
+\PYG{n}{car0} \PYG{o}{=} \PYG{n}{Car}\PYG{p}{(}\PYG{n}{process}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} data component}
 \PYG{n}{car0}\PYG{o}{.}\PYG{n}{activate}\PYG{p}{(}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} activate @ process if exists, otherwise error}
-\PYG{n}{car1} \PYG{o}{=} \PYG{n}{Car}\PYG{p}{(}\PYG{n}{process}\PYG{o}{=}\PYG{k+kc}{None}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} data component}
+\PYG{n}{car1} \PYG{o}{=} \PYG{n}{Car}\PYG{p}{(}\PYG{n}{process}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} data component}
 \PYG{n}{car1}\PYG{o}{.}\PYG{n}{activate}\PYG{p}{(}\PYG{n}{process}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{wash}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} activate @ wash}
 \end{sphinxVerbatim}
 \begin{itemize}
@@ -1382,6 +1385,9 @@ is specified, only the fail\_at will be updated and the component will stay wait
 \item {} 
 If the component to be activated is standby, the component will get a new scheduled time and become
 scheduled.
+
+\item {} 
+If the component is interrupted, the component will be activated at the specified time.
 
 \end{itemize}
 
@@ -1413,6 +1419,9 @@ If the component to be activated is waiting, the wait will be
 terminated, the attribute failed set and the component will become scheduled. It is recommended to
 use the more versatile activate method.
 
+\item {} 
+If the component is interrupted, the component will be activated at the specified time.
+
 \end{itemize}
 
 
@@ -1429,19 +1438,22 @@ use yield seld.passivate() is this case.
 If the component to be passivated is passive, the component remains passive.
 
 \item {} 
-If the component to be passivated is scheduled, the component will be passivated.
+If the component to be passivated is scheduled, the component becomes passive.
 
 \item {} 
-If the component to be held is standby, the component will be passivated.
+If the component to be held is standby, the component becomes passive.
 
 \item {} 
 If the component to be activated is requesting, the request will be terminated, the attribute failed
-set and the component will become pass It is recommended to use the more versatile activate method.
+set and the component becomes passive. It is recommended to use the more versatile activate method.
 
 \item {} 
 If the component to be activated is waiting, the wait will be
-terminated, the attribute failed set and the component will become scheduled. It is recommended to
+terminated, the attribute failed set and the component becomes passive. It is recommended to
 use the more versatile activate method.
+
+\item {} 
+If the component is interrupted, the component becomes passive.
 
 \end{itemize}
 
@@ -1451,18 +1463,18 @@ use the more versatile activate method.
 Cancel has the effect that the component becomes a data component.
 \begin{itemize}
 \item {} 
-If the component to be cancelled is current, use always yield self.cancel().
+If the component to be cancelled is current, always use yield self.cancel().
 
 \item {} 
-If the component to be cancelled is passive, scheduled or standby, the component will become a data component.
+If the component to be cancelled is passive, scheduled, interrupted  or standby, the component becomes a data component.
 
 \item {} 
 If the component to be cancelled is requesting, the request will be terminated, the attribute failed
-set and the component will become a data component.
+set and the component becomes a data component.
 
 \item {} 
 If the component to be cancelled is waiting, the wait will be terminated, the attribute failed
-set and the component will become a data component.
+set and the component becomes a data component.
 
 \end{itemize}
 
@@ -1485,18 +1497,41 @@ Although theoretically possible it is not recommended to use standby for non cur
 Request has the effect that the component will check whether the requested quantity from a resource is available. It is
 possible to check for multiple availability of a certain quantity from several resources.
 By default, there is no limit on the time to wait for the resource(s) to become available. But, it is possible to set
-a time at which the condition has to be met. If that failed, the component becomes current at the given point of time.
+a time with fail\_at at which the condition has to be met. If that failed, the component becomes current at the given point of time.
 The code should then check whether the request had failed. That can be checked with the Component.failed() method.
 
-If the component is canceled, activated, passivated or held the failed flag will be set as well.
+If the component is canceled, activated, passivated, interrupted or held the failed flag will be set as well.
+\begin{itemize}
+\item {} 
+If the component is current, use always yield self.request()
+
+\item {} 
+Although theoretically possible it is not recommended to use request for non current components.
+
+\end{itemize}
 
 
 \subsection{wait}
 \label{\detokenize{Component:wait}}
 Wait has the effect that the component will check whether the value of a state meets a given condition.
+available. It is
+possible to check for multiple states.
+By default, there is no limit on the time to wait for the condition(s) to be met. But, it is possible to set
+a time with fail\_at at which the condition has to be met. If that failed, the component becomes current at the given point of time.
+The code should then check whether the wait had failed. That can be checked with the Component.failed() method.
+
+If the component is canceled, activated, passivated, interrupted or held the failed flag will be set as well.
+\begin{itemize}
+\item {} 
+If the component is current, use always yield self.wait()
+
+\item {} 
+Although theoretically possible it is not recommended to use wait for non current components.
+
+\end{itemize}
 
 
-\chapter{interrupt}
+\subsection{interrupt}
 \label{\detokenize{Component:interrupt}}
 With interrupt components that are not current or data can be temporarily be interrupted. Once a resume is called for
 the component, the component will continue (for scheduled with the remaining time, for waiting or requesting possibly with
@@ -1505,13 +1540,13 @@ the remaining fail\_at duration.
 
 \section{Usage of process interaction methods within a function or method}
 \label{\detokenize{Component:usage-of-process-interaction-methods-within-a-function-or-method}}
-There is a way to put process interaction statement in another function or method. This requires a little bit
-different way than just calling the method.
+There is a way to put process interaction statement in another function or method.
+This requires a slightly different way than just calling the method.
 
 As an example, let’s assume that we want a method that holds a component for a number of minutes and that the time unit is actually seconds.
 So we need a method to wait 60 times the given parameter
 
-So we start with a not so nice solution:
+We start with a not so nice solution:
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
 \PYG{k}{class} \PYG{n+nc}{X}\PYG{p}{(}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{Component}\PYG{p}{)}\PYG{p}{:}
@@ -1549,17 +1584,17 @@ So remember if the method contains a yield statement (technically speaking that�
 Salabim has a class Queue for queue handling of components. The advantage over the standard list and deque are:
 \begin{itemize}
 \item {} 
-double linked, resulting in easy and efficient insertion at any place
+double linked, resulting in easy and efficient insertion and deletion at any place
 
 \item {} 
-data collection and statistics
+builtin data collection and statistics
 
 \item {} 
 priority sorting
 
 \end{itemize}
 
-Salabim uses queues internally for resource and states as well.
+Salabim uses queues internally for resources and states as well.
 
 Definition of a queue is simple:
 
@@ -1669,7 +1704,7 @@ returns a set with all queues where c is in
 c.count()
 &\sphinxstartmulticolumn{2}%
 \begin{varwidth}[t]{\sphinxcolwidth{2}{3}}
-returns number if queues c is in
+returns number of queues c is in
 \par
 \vskip-\baselineskip\strut\end{varwidth}%
 \sphinxstopmulticolumn
@@ -1737,7 +1772,7 @@ It is possible to do a number of operations that work on the queues:
 Salabim keeps track of the enter time in a queue: \sphinxcode{c.enter\_time(q)}
 
 Unless disabled explicitly, the length of the queue and length of stay of components are monitored in
-\sphinxcode{q.length} and \sphinxcode{q.length\_of\_stay}. It is possible to obtain a number of statistics on these monitors (cf. Monitor).
+\sphinxcode{q.length} and \sphinxcode{q.length\_of\_stay}. It is possible to obtain a number of statistics on these monitors (cf. Monitor and MonitorTimestamp).
 
 With \sphinxcode{q.print\_statistics()} the key statistics of these two monitors are printed.
 
@@ -1783,7 +1818,7 @@ Queue 0x20e116153c8
 \label{\detokenize{Resource::doc}}\label{\detokenize{Resource:resource}}
 Resources are a powerful way of process interaction.
 
-A resource has always a capacity (which can be zero). This capacity will be specified at time of creation, but
+A resource has always a capacity (which can be zero and even negative). This capacity will be specified at time of creation, but
 may change over time.
 There are two of types resources:
 \begin{itemize}
@@ -1855,6 +1890,9 @@ available\_quantity
 
 \item {} 
 capacity
+
+\item {} 
+occupancy
 
 \end{itemize}
 
@@ -1969,13 +2007,21 @@ It is possible to calculate the occupancy of a resource with
 \PYG{n}{occupancy} \PYG{o}{=} \PYG{n}{r}\PYG{o}{.}\PYG{n}{claimed\PYGZus{}quantity}\PYG{p}{(}\PYG{p}{)}\PYG{o}{.}\PYG{n}{mean} \PYG{o}{/} \PYG{n}{r}\PYG{o}{.}\PYG{n}{capacity}\PYG{p}{(}\PYG{p}{)}\PYG{o}{.}\PYG{n}{mean}
 \end{sphinxVerbatim}
 
+or, by tallying at each change:
+\begin{quote}
+
+r.occupancy.mean()
+\end{quote}
+
+Note that these two methods do not return the same result.
+
 
 \chapter{State}
 \label{\detokenize{State::doc}}\label{\detokenize{State:state}}
-States together with the Component.wait method provide a powerful way of process interaction.
+States together with the Component.wait() method provide a powerful way of process interaction.
 
 A state will have a certain value at a given time. In its simplest form a component can then wait for
-a specific value of a state. Once that value is reached, the compoent will be resumed.
+a specific value of a state. Once that value is reached, the component will be resumed.
 
 Definition is simple, like \sphinxcode{dooropen=sim.State('dooropen')}. The default initial value is False, meaning
 the door is closed.
@@ -2157,18 +2203,20 @@ in any case.
 
 
 \chapter{Monitor and MonitorTimestamp}
-\label{\detokenize{Monitor and MonitorTimestamped::doc}}\label{\detokenize{Monitor and MonitorTimestamped:monitor-and-monitortimestamp}}
+\label{\detokenize{Monitor and MonitorTimestamp::doc}}\label{\detokenize{Monitor and MonitorTimestamp:monitor-and-monitortimestamp}}
 Monitors and timestamped monitors are a way to collect data from the simulation. They are automatically collected
 for resources, queues and states. On top of that the user can define its own (timestamped) monitors.
 
+Monitors can be used to get statistics and as a feed for graphical tools, like matplotlib.
+
 
 \section{Monitor}
-\label{\detokenize{Monitor and MonitorTimestamped:monitor}}
+\label{\detokenize{Monitor and MonitorTimestamp:monitor}}
 The Monitor class collects values which do not have a direct relation with the current time,
 e.g. the processing time of a part.
 
 We define the monitor with \sphinxcode{processingtime=sim.Monitor('processingtime')} and then
-collect values by \sphinxcode{processingtime.tally(env.now()-start)}
+collect values by \sphinxcode{processingtime.tally(this\_duration)}
 
 By default, the collected values are stored in a list. Alternatively, it is possible to store
 the values in an array of one of the following types:
@@ -2319,7 +2367,12 @@ Monitoring with arrays takes up less space. Particularly when tallying a large
 number of values, this is strongly advised.
 
 Note that if non numeric values are stored (only possible with the default setting (‘any’)),
-a tallied values is converted to a numeric value if possible, or 0 if not.
+a tallied value is converted, if required, to a numeric value if possible, or 0 if not.
+
+It is possible to use monitors with weighted data. In that case, the monitor has to be defined
+with \sphinxcode{weighted=True}.
+For those weighted monitors, the tally method has an additional parameter weight which defaults to 0.
+All statistics will take the weights into account.
 
 There is set of statistical data available:
 \begin{itemize}
@@ -2328,6 +2381,12 @@ number\_of\_entries
 
 \item {} 
 number\_of\_entries\_zero
+
+\item {} 
+weight
+
+\item {} 
+weight\_zero
 
 \item {} 
 mean
@@ -2348,7 +2407,16 @@ maximum
 percentile
 
 \item {} 
-bin\_count (number of entries between to given values)
+bin\_number\_of\_entries (number of entries between two given values)
+
+\item {} 
+bin\_weight (total weight of entries between two given values)
+
+\item {} 
+value\_number\_of\_entries (number of entries equal to a given value or set of values)
+
+\item {} 
+value\_weight (total weight of entries equal to a given value or set of values)
 
 \end{itemize}
 
@@ -2442,9 +2510,42 @@ maximum             202.153      202.153
           inf         0       0   100
 \end{sphinxVerbatim}
 
+If neither number\_of\_bins, nor lowerbound nor bin\_width are specified, the histogram will be autoscaled.
+
+Histograms can be printed with their values, instead of bins. This is particularly useful for non
+numeric tallied values, like names:
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{k+kn}{import} \PYG{n+nn}{salabim} \PYG{k}{as} \PYG{n+nn}{sim}
+
+\PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{p}{)}
+
+\PYG{n}{monitor\PYGZus{}names}\PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Monitor}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{names}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{k}{for} \PYG{n}{\PYGZus{}} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{l+m+mi}{10000}\PYG{p}{)}\PYG{p}{:}
+    \PYG{n}{name} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Pdf}\PYG{p}{(}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{John}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+m+mi}{30}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{Peter}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+m+mi}{20}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{Mike}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+m+mi}{20}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{Andrew}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+m+mi}{20}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{Ruud}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+m+mi}{5}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{Jan}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+m+mi}{5}\PYG{p}{)}\PYG{p}{)}\PYG{o}{.}\PYG{n}{sample}\PYG{p}{(}\PYG{p}{)}
+    \PYG{n}{monitor\PYGZus{}names}\PYG{o}{.}\PYG{n}{tally}\PYG{p}{(}\PYG{n}{name}\PYG{p}{)}
+
+\PYG{n}{monitor\PYGZus{}names}\PYG{o}{.}\PYG{n}{print\PYGZus{}histograms}\PYG{p}{(}\PYG{n}{values}\PYG{o}{=}\PYG{k+kc}{True}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+The ouput of this:
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+Histogram of names
+entries          10000
+
+value               entries
+Andrew                 2031( 20.3\PYGZpc{}) ****************
+Jan                     495(  5.0\PYGZpc{}) ***
+John                   2961( 29.6\PYGZpc{}) ***********************
+Mike                   1989( 19.9\PYGZpc{}) ***************
+Peter                  2048( 20.5\PYGZpc{}) ****************
+Ruud                    476(  4.8\PYGZpc{}) ***
+\end{sphinxVerbatim}
+
 
 \section{MonitorTimestamp}
-\label{\detokenize{Monitor and MonitorTimestamped:monitortimestamp}}
+\label{\detokenize{Monitor and MonitorTimestamp:monitortimestamp}}
 The MonitorTimestamp class collects tallied values along with the current (simulation) time.
 e.g. the number of parts a machine is working on.
 
@@ -2621,7 +2722,7 @@ Monitoring with arrays takes up less space. Particularly when tallying a large
 number of values, this is strongly advised.
 
 Note that if non numeric x-values are stored (only possible with the default setting (‘any’)),
-a tallied values is converted to a numeric value if possible, or 0 if not.
+a tallied values is converted, if required, to a numeric value if possible, or 0 if not.
 
 During the simulation run, it is possible to retrieve the last tallied value (which represents the ‘current’ value)
 by calling Monitor.tally() without arguments. 
@@ -2638,13 +2739,19 @@ It’s even possible to directly call the timestamped monitor to get the current
 For the same reason, the standard length monitor of a queue can be used to get the current length of a queue: \sphinxcode{q.length()} although
 the more Pythonic \sphinxcode{len(q)} is prefered.
 
-There is whole set of statistical data available, which are all weighted with the duration:
+There is whole set of statistical data available, which are all weighted with their duration:
 \begin{itemize}
 \item {} 
 duration
 
 \item {} 
 duration\_zero (time that the value was zero)
+
+\item {} 
+number\_of\_entries
+
+\item {} 
+number\_of\_entries\_zero
 
 \item {} 
 mean
@@ -2665,10 +2772,16 @@ maximum
 percentile
 
 \item {} 
-bin\_count (number of entries between to given values)
+bin\_number\_of\_entries (number of entries between two given values)
 
 \item {} 
-histogram (numpy definition)
+bin\_duration (total duration of entries between two given values)
+
+\item {} 
+value\_number\_of\_entries (number of entries equal to a given value or set of values)
+
+\item {} 
+value\_duration (total duration of entries equal to a given value or set of values)
 
 \end{itemize}
 
@@ -2776,6 +2889,11 @@ maximum              21           21
        30             0       0   100                                                                                   \textbar{}
           inf         0       0   100
 \end{sphinxVerbatim}
+
+If neither number\_of\_bins, nor lowerbound nor bin\_width are specified, the histogram will be autoscaled.
+
+Histograms can be printed with their values, instead of bins. This is particularly useful for non
+numeric tallied values, like names.
 
 
 \chapter{Distributions}
@@ -2885,7 +3003,7 @@ No sampling is required for this distribution, as it always returns the same val
 
 \section{Erlang}
 \label{\detokenize{Distributions:erlang}}
-Erlang distribution with a given
+Erlang distribution with a givenl
 \begin{itemize}
 \item {} 
 shape (k)
@@ -3144,6 +3262,60 @@ If the x-value is a salabim distribution, not the distribution but a sample of t
 Here proctime will have a probability of 50\% being between 5 and 10, 40\% between 10 and 15 and 10\% between 15 and 20.
 
 
+\section{CumPdf}
+\label{\detokenize{Distributions:cumpdf}}
+Probability density function, specified as:
+\begin{enumerate}
+\item {} 
+list or tuple of x{[}i{]}, p{[}i{]} where p{[}i{]} is the cumulative probability (density)
+
+\item {} 
+list or tuple of x{[}i{]} followed by a list or tuple p{[}i{]}
+
+\end{enumerate}
+
+\begin{sphinxadmonition}{note}{Note:}
+It is required that p{[}i{]}\textless{}=p{[}i+1{]}.
+\end{sphinxadmonition}
+
+E.g.
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{processingtime} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{CumPdf}\PYG{p}{(}\PYG{p}{(}\PYG{l+m+mi}{5}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{,} \PYG{l+m+mi}{60}\PYG{p}{,} \PYG{l+m+mi}{15}\PYG{p}{,} \PYG{l+m+mi}{100}\PYG{p}{)}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+This means that 10\% is 5, 50\% is 10 and 40\% is 15.
+
+It is not required that the sum of the p{[}i{]}’s is 100, as all p{[}{]}’s are automatically scaled. This means that the two distributions below are
+identical to the first example
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{processingtime} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{CumPdf}\PYG{p}{(}\PYG{p}{(}\PYG{l+m+mi}{5}\PYG{p}{,} \PYG{l+m+mf}{0.10}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{,} \PYG{l+m+mf}{0.60}\PYG{p}{,} \PYG{l+m+mi}{15}\PYG{p}{,} \PYG{l+m+mf}{1.00}\PYG{p}{)}\PYG{p}{)}
+\PYG{n}{processingtime} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{CumPdf}\PYG{p}{(}\PYG{p}{(}\PYG{l+m+mi}{5}\PYG{p}{,}    \PYG{l+m+mi}{2}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{,}   \PYG{l+m+mi}{12}\PYG{p}{,} \PYG{l+m+mi}{15}\PYG{p}{,}   \PYG{l+m+mi}{20}\PYG{p}{)}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+And the same with the second form
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{processingtime} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{CumPdf}\PYG{p}{(}\PYG{p}{(}\PYG{l+m+mi}{5}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{,} \PYG{l+m+mi}{15}\PYG{p}{)}\PYG{p}{,} \PYG{p}{(}\PYG{l+m+mi}{10}\PYG{p}{,} \PYG{l+m+mi}{60}\PYG{p}{,} \PYG{l+m+mi}{100}\PYG{p}{)}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+x{[}i{]} may be of any type, so it possible to use
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{color} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{CumPdf}\PYG{p}{(}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{Green}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+m+mi}{45}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{Red}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+m+mi}{100}\PYG{p}{)}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+If the x-value is a salabim distribution, not the distribution but a sample of that distribution is returned when sampling
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{processingtime} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{CumPdf}\PYG{p}{(}\PYG{p}{(}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{Uniform}\PYG{p}{(}\PYG{l+m+mi}{5}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{)}\PYG{p}{,} \PYG{l+m+mi}{50}\PYG{p}{,} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Uniform}\PYG{p}{(}\PYG{l+m+mi}{10}\PYG{p}{,} \PYG{l+m+mi}{15}\PYG{p}{)}\PYG{p}{,} \PYG{l+m+mi}{90}\PYG{p}{,} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Uniform}\PYG{p}{(}\PYG{l+m+mi}{15}\PYG{p}{,} \PYG{l+m+mi}{20}\PYG{p}{)}\PYG{p}{,} \PYG{l+m+mi}{100}\PYG{p}{)}\PYG{p}{)}
+\PYG{n}{proctime}\PYG{o}{=}\PYG{n}{processingtime}\PYG{o}{.}\PYG{n}{sample}\PYG{p}{(}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+Here proctime will have a probability of 50\% being between 5 and 10, 40\% between 10 and 15 and 10\% between 15 and 20.
+
+
 \section{Distribution}
 \label{\detokenize{Distributions:distribution}}
 A special distribution is the Distribution class. Here, a string will contain the specification of the distribution.
@@ -3183,10 +3355,16 @@ or even
 
 \chapter{Animation}
 \label{\detokenize{Animation::doc}}\label{\detokenize{Animation:animation}}
-Animation is a very powerful tool to debug, test and demonstrate simulations.
+Animation is a powerful tool to debug, test and demonstrate simulations.
+
+It is possible to show a number of shapes (lines, rectangles, circles, etc), texts as well (images) in a window. These objects can be dynamically updated.
+(Timestamped) monitors may be animated by showing the current value against the time or index.
+Furthermore the components in a queue may be shown in a highly customizable way.
+As text animation may be dynamically updated, it is even possible to show the current state, (monitor) statistics, etc. in the animation windows.
+
 Salabim’s animation engine also allows some user input.
 
-This section of the documentation is not yet complete.
+It is important to realize that animation calls can be still given when animation is actually off. In that case, there is hardly any impact on the performance.
 
 Salabim animations can be
 \begin{itemize}
@@ -3223,7 +3401,7 @@ of the lower right hand corner (scaling). Note that x- and y-scaling are always 
 Furthermore, it is possible to specify the colour of the background with \sphinxcode{animation\_parameters}.
 
 Prior to version 2.3.0 there was actually just one animation object class: Animate. This
-interface is described later as the new animation classes are easier to use and offer some
+interface is described later as the new animation classes are easier to use and even offer some
 additional functionality.
 
 New style animation classes can be used to put texts, rectangles, polygon, lines, series of points, circles
@@ -3233,10 +3411,6 @@ Here is a sample program to show of all the new style animation classes
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
     \PYG{n}{env}\PYG{o}{=}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{trace}\PYG{o}{=}\PYG{k+kc}{False}\PYG{p}{)}
-    \PYG{k}{class} \PYG{n+nc}{X}\PYG{p}{(}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{Component}\PYG{p}{)}\PYG{p}{:}
-        \PYG{k}{def} \PYG{n+nf}{process}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{)}\PYG{p}{:}
-            \PYG{k}{yield} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{hold}\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{p}{)}
-            \PYG{n}{env}\PYG{o}{.}\PYG{n}{snapshot}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{manual/source/Pic1.png}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
     \PYG{n}{env}\PYG{o}{.}\PYG{n}{animate}\PYG{p}{(}\PYG{k+kc}{True}\PYG{p}{)}
     \PYG{n}{env}\PYG{o}{.}\PYG{n}{background\PYGZus{}color}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{20}\PYG{l+s+si}{\PYGZpc{}g}\PYG{l+s+s1}{ray}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
 
@@ -3266,7 +3440,6 @@ Here is a sample program to show of all the new style animation classes
 \PYG{l+s+s1}{\PYGZsq{}\PYGZsq{}\PYGZsq{}}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{500}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{)}
 
     \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateImage}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{Pas un pipe.jpg}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{500}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{400}\PYG{p}{)}
-    \PYG{n}{X}\PYG{p}{(}\PYG{p}{)}
     \PYG{n}{env}\PYG{o}{.}\PYG{n}{run}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{)}
 \end{sphinxVerbatim}
 
@@ -3274,12 +3447,12 @@ Resulting in:
 
 \noindent\sphinxincludegraphics{{Pic1}.png}
 
-Salabim is also able to animate the components of a queue, with \sphinxcode{AnimateQueue()}.
+Animation of the components of a queue is accomplished with \sphinxcode{AnimateQueue()}.
 It is possible to use the standard shape of components, which is a rectangle with the sequence number or define
 your own shape(s). The queue can be build up in west, east, north or south directions.
-It is possible to limit the number of componenrs shown.
+It is possible to limit the number of component shown.
 
-Monitors and timestamped monitors can be visualized dynamically now with ÀnimateMonitor(){}`{}`.
+Monitors and timestamped monitors can be visualized dynamically with \sphinxcode{AnimateMonitor()}.
 
 These features are demonstrated in \sphinxstyleemphasis{Demo queue animation.py}
 
@@ -3369,7 +3542,7 @@ a method with instance ‘arg’ and the time t
 
 \end{itemize}
 
-The function or method is called at each animation frame update (usually 30 frames per second).
+The function or method is called at each animation frame update (maximum of 30 frames per second).
 
 This makes it for instance possible to show dynamically the mean of monitor m, like in
 
@@ -3908,7 +4081,7 @@ The input file is read per item, where blanks, linefeeds, tabs are treated as se
 Any text on a line after a \# character is ignored. 
 Any text within curly brackets ( \{\} ) is ignored (and treated as an item separator). 
 Note that this strictly on a per line basis. 
-If a blank is to be included in a string, use single or double quotes.  
+If a blank or tab is to be included in a string, use single or double quotes.  
 The recommended way to end a list of values is //
 
 So, a typical input file is
@@ -3952,7 +4125,7 @@ quoted. This can be very useful during testing as the input is part of the sourc
 
 
 \chapter{Reference}
-\label{\detokenize{Reference:reference}}\label{\detokenize{Reference::doc}}
+\label{\detokenize{Reference::doc}}\label{\detokenize{Reference:reference}}
 
 \section{Animation}
 \label{\detokenize{Reference:animation}}\index{Animate (class in salabim)}
@@ -6483,12 +6656,19 @@ float
 \index{print\_info() (salabim.Beta method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Beta.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Beta.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the distribution
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -6565,12 +6745,19 @@ float
 \index{print\_info() (salabim.Cdf method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Cdf.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Cdf.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the distribution
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -6636,12 +6823,19 @@ float
 \index{print\_info() (salabim.Constant method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Constant.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Constant.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the distribution
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -6744,12 +6938,19 @@ float
 \index{print\_info() (salabim.Distribution method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Distribution.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Distribution.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the distribution
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -6829,12 +7030,19 @@ float
 \index{print\_info() (salabim.Erlang method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Erlang.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Erlang.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the distribution
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -6910,12 +7118,19 @@ float
 \index{print\_info() (salabim.Exponential method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Exponential.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Exponential.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the distribution
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -6993,12 +7208,19 @@ float
 \index{print\_info() (salabim.Gamma method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Gamma.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Gamma.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the distribution
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -7081,12 +7303,19 @@ float
 \index{print\_info() (salabim.Normal method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Normal.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Normal.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the distribution
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -7180,12 +7409,19 @@ float
 \index{print\_info() (salabim.Pdf method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Pdf.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Pdf.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the distribution
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -7255,12 +7491,19 @@ float
 \index{print\_info() (salabim.Poisson method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Poisson.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Poisson.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the distribution
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -7335,12 +7578,19 @@ float
 \index{print\_info() (salabim.Triangular method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Triangular.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Triangular.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the distribution
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -7410,12 +7660,19 @@ float
 \index{print\_info() (salabim.Uniform method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Uniform.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Uniform.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the distribution
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -7484,12 +7741,19 @@ float
 \index{print\_info() (salabim.Weibull method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Weibull.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Weibull.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the distribution
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -8323,12 +8587,19 @@ returns None if component is at the head.
 \index{print\_info() (salabim.Component method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Component.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Component.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the component
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -9463,12 +9734,19 @@ Only for advance use with animation / GUI event loops
 \index{print\_info() (salabim.Environment method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Environment.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the environment
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -10006,10 +10284,11 @@ Alternatively, the file can be opened and closed explicitely, like
 \PYG{n}{f}\PYG{o}{.}\PYG{n}{close}\PYG{p}{(}\PYG{p}{)}
 \end{sphinxVerbatim}
 
-Item files consists of individual items separated by whitespace 
-If a blank is required in an item, use single or double quotes 
+Item files consists of individual items separated by whitespace (blank or tab)\textbar{}n\textbar{}
+If a blank or tab is required in an item, use single or double quotes 
 All text following \# on a line is ignored 
-All texts on a line within curly brackets \{\} is ignored and considered white space.
+All texts on a line within curly brackets \{\} is ignored and considered white space. 
+Curly braces cannot spawn multiple lines and cannot be nested.
 
 Example
 
@@ -10571,7 +10850,7 @@ For weighted monitors, the weighted percentile is returned
 \index{print\_histogram() (salabim.Monitor method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Monitor.print_histogram}}\pysiglinewithargsret{\sphinxbfcode{print\_histogram}}{\emph{number\_of\_bins=None}, \emph{lowerbound=None}, \emph{bin\_width=None}, \emph{values=False}, \emph{ex0=False}, \emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.print_histogram}}\pysiglinewithargsret{\sphinxbfcode{print\_histogram}}{\emph{number\_of\_bins=None}, \emph{lowerbound=None}, \emph{bin\_width=None}, \emph{values=False}, \emph{ex0=False}, \emph{as\_str=False}, \emph{file=None}}{}
 print monitor statistics and histogram
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -10604,6 +10883,10 @@ in that case, no cumulative values will be given
 if False (default), print the histogram
 if True, return a string containing the histogram
 
+\item[{file: file}] \leavevmode
+if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
 \end{description}
 \begin{quote}\begin{description}
 \item[{Returns}] \leavevmode
@@ -10624,7 +10907,7 @@ with a maximum of 30 classes.
 \index{print\_histograms() (salabim.Monitor method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Monitor.print_histograms}}\pysiglinewithargsret{\sphinxbfcode{print\_histograms}}{\emph{number\_of\_bins=None}, \emph{lowerbound=None}, \emph{bin\_width=None}, \emph{values=False}, \emph{ex0=False}, \emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.print_histograms}}\pysiglinewithargsret{\sphinxbfcode{print\_histograms}}{\emph{number\_of\_bins=None}, \emph{lowerbound=None}, \emph{bin\_width=None}, \emph{values=False}, \emph{ex0=False}, \emph{as\_str=False}, \emph{file=None}}{}
 print monitor statistics and histogram
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -10643,7 +10926,7 @@ default: 1
 
 \item {} 
 \sphinxstyleliteralstrong{values} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), bins will be used 
-if True, the individual values will be shown (in the right order).
+if True, the individual values will be shown (sorted on the value).
 in that case, no cumulative values will be given 
 
 \item {} 
@@ -10652,6 +10935,10 @@ in that case, no cumulative values will be given
 \item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the histogram
 if True, return a string containing the histogram
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
 
 \end{itemize}
 
@@ -10674,7 +10961,7 @@ Exactly same functionality as Monitor.print\_histogram()
 \index{print\_statistics() (salabim.Monitor method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Monitor.print_statistics}}\pysiglinewithargsret{\sphinxbfcode{print\_statistics}}{\emph{show\_header=True}, \emph{show\_legend=True}, \emph{do\_indent=False}, \emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.print_statistics}}\pysiglinewithargsret{\sphinxbfcode{print\_statistics}}{\emph{show\_header=True}, \emph{show\_legend=True}, \emph{do\_indent=False}, \emph{as\_str=False}, \emph{file=None}}{}
 print monitor statistics
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -10690,6 +10977,10 @@ print monitor statistics
 \item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the statistics
 if True, return a string containing the statistics
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
 
 \end{itemize}
 
@@ -11464,7 +11755,7 @@ float
 \index{print\_histogram() (salabim.MonitorTimestamp method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.print_histogram}}\pysiglinewithargsret{\sphinxbfcode{print\_histogram}}{\emph{number\_of\_bins=None}, \emph{lowerbound=None}, \emph{bin\_width=None}, \emph{values=False}, \emph{ex0=False}, \emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.print_histogram}}\pysiglinewithargsret{\sphinxbfcode{print\_histogram}}{\emph{number\_of\_bins=None}, \emph{lowerbound=None}, \emph{bin\_width=None}, \emph{values=False}, \emph{ex0=False}, \emph{as\_str=False}, \emph{file=None}}{}
 print timestamped monitor statistics and histogram
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -11493,6 +11784,10 @@ in that case, nu cumulative values will be given
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the histogram
 if True, return a string containing the histogram
 
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
 \end{itemize}
 
 \item[{Returns}] \leavevmode
@@ -11513,7 +11808,7 @@ with a maximum of 30 classes.
 \index{print\_histograms() (salabim.MonitorTimestamp method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.print_histograms}}\pysiglinewithargsret{\sphinxbfcode{print\_histograms}}{\emph{number\_of\_bins=None}, \emph{lowerbound=None}, \emph{bin\_width=None}, \emph{values=False}, \emph{ex0=False}, \emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.print_histograms}}\pysiglinewithargsret{\sphinxbfcode{print\_histograms}}{\emph{number\_of\_bins=None}, \emph{lowerbound=None}, \emph{bin\_width=None}, \emph{values=False}, \emph{ex0=False}, \emph{as\_str=False}, \emph{file=None}}{}
 print timedstamped monitor statistics and histogram
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -11546,6 +11841,10 @@ in that case, no cumulative values will be given
 if False (default), print the histogram
 if True, return a string containing the histogram
 
+\item[{file: file}] \leavevmode
+if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
 \end{description}
 \begin{quote}\begin{description}
 \item[{Returns}] \leavevmode
@@ -11567,7 +11866,7 @@ Exactly same functionality as MonitorTimestamped.print\_histogram()
 \index{print\_statistics() (salabim.MonitorTimestamp method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.print_statistics}}\pysiglinewithargsret{\sphinxbfcode{print\_statistics}}{\emph{show\_header=True}, \emph{show\_legend=True}, \emph{do\_indent=False}, \emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.print_statistics}}\pysiglinewithargsret{\sphinxbfcode{print\_statistics}}{\emph{show\_header=True}, \emph{show\_legend=True}, \emph{do\_indent=False}, \emph{as\_str=False}, \emph{file=None}}{}
 print timestamped monitor statistics
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -11583,6 +11882,10 @@ print timestamped monitor statistics
 \item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the statistics
 if True, return a string containing the statistics
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
 
 \end{itemize}
 
@@ -12484,7 +12787,7 @@ Component
 \index{print\_histograms() (salabim.Queue method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Queue.print_histograms}}\pysiglinewithargsret{\sphinxbfcode{print\_histograms}}{\emph{exclude=()}, \emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Queue.print_histograms}}\pysiglinewithargsret{\sphinxbfcode{print\_histograms}}{\emph{exclude=()}, \emph{as\_str=False}, \emph{file=None}}{}
 prints the histograms of the length timestamped and length\_of\_stay monitor of the queue
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -12495,6 +12798,10 @@ default: ()
 \item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the histograms
 if True, return a string containing the histograms
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
 
 \end{itemize}
 
@@ -12511,12 +12818,19 @@ str
 \index{print\_info() (salabim.Queue method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Queue.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Queue.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints information about the queue
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -12531,12 +12845,19 @@ str
 \index{print\_statistics() (salabim.Queue method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Queue.print_statistics}}\pysiglinewithargsret{\sphinxbfcode{print\_statistics}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Queue.print_statistics}}\pysiglinewithargsret{\sphinxbfcode{print\_statistics}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints a summary of statistics of a queue
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the statistics
 if True, return a string containing the statistics
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{statistics (if as\_str is True)}
@@ -12884,7 +13205,7 @@ All derived named are updated as well.
 \index{print\_histograms() (salabim.Resource method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Resource.print_histograms}}\pysiglinewithargsret{\sphinxbfcode{print\_histograms}}{\emph{exclude=()}, \emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Resource.print_histograms}}\pysiglinewithargsret{\sphinxbfcode{print\_histograms}}{\emph{exclude=()}, \emph{as\_str=False}, \emph{file=None}}{}
 prints histograms of the requesters and claimers queue as well as
 the capacity, available\_quantity and claimed\_quantity timstamped monitors of the resource
 \begin{quote}\begin{description}
@@ -12896,6 +13217,10 @@ default: ()
 \item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the histograms
 if True, return a string containing the histograms
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
 
 \end{itemize}
 
@@ -12912,12 +13237,19 @@ str
 \index{print\_info() (salabim.Resource method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Resource.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Resource.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints info about the resource
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -12932,12 +13264,19 @@ str
 \index{print\_statistics() (salabim.Resource method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Resource.print_statistics}}\pysiglinewithargsret{\sphinxbfcode{print\_statistics}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Resource.print_statistics}}\pysiglinewithargsret{\sphinxbfcode{print\_statistics}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints a summary of statistics of a resource
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the statistics
 if True, return a string containing the statistics
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{statistics (if as\_str is True)}
@@ -13268,7 +13607,7 @@ All derived named are updated as well.
 \index{print\_histograms() (salabim.State method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.State.print_histograms}}\pysiglinewithargsret{\sphinxbfcode{print\_histograms}}{\emph{exclude=()}, \emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.State.print_histograms}}\pysiglinewithargsret{\sphinxbfcode{print\_histograms}}{\emph{exclude=()}, \emph{as\_str=False}, \emph{file=None}}{}
 print histograms of the waiters queue and the value timestamped monitor
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -13279,6 +13618,10 @@ default: ()
 \item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the histograms
 if True, return a string containing the histograms
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
 
 \end{itemize}
 
@@ -13295,12 +13638,19 @@ str
 \index{print\_info() (salabim.State method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.State.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.State.print_info}}\pysiglinewithargsret{\sphinxbfcode{print\_info}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints info about the state
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the info
 if True, return a string containing the info
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{info (if as\_str is True)}
@@ -13315,12 +13665,19 @@ str
 \index{print\_statistics() (salabim.State method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.State.print_statistics}}\pysiglinewithargsret{\sphinxbfcode{print\_statistics}}{\emph{as\_str=False}}{}
+\phantomsection\label{\detokenize{Reference:salabim.State.print_statistics}}\pysiglinewithargsret{\sphinxbfcode{print\_statistics}}{\emph{as\_str=False}, \emph{file=None}}{}
 prints a summary of statistics of the state
 \begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the statistics
 if True, return a string containing the statistics
+
+\item {} 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+otherwise, the output is directed to the file
+
+\end{itemize}
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{statistics (if as\_str is True)}
@@ -13737,8 +14094,8 @@ PIL.Image.Image
 I, Ruud van der Ham, am the sole developer of salabim. I have a long history in simulation, both in
 applications and tool building.
 
-It all started in the mid 70’s when modeling container terminal in Prosim, a package
-in PL/1 that was inspired by Simula and run big IBM 360/370 mainframes. 
+It all started in the mid 70’s when modeling container terminals in Prosim, a package
+in PL/1 that was inspired by Simula and run on big IBM 360/370 mainframes. 
 In the eighties, Prosim was ported to smaller computers, but at the same time I
 developed a discrete event simulation tool called Must to run on CP/M machines, later
 on MSDOS machines, again under PL/1. A bit later, Must was ported to Pascal and was
@@ -13750,14 +14107,14 @@ process interaction methods activate, hold, passivate and standby. First I tried
 build a wrapper around Simpy 3, but that didn’t work too well.
 
 That was the start of a new package, called salabim.
-One of the main features of salabim is the powerful animation engine that is heavily
+One of the key features of salabim is the powerful animation engine that is heavily
 inspired by some more creative projects where every animation object can change position,
 shape, colour, orientation over time. Although rarely used in normal simulation models,
 all that functionality is available in salabim. 
-Over the year 2017, a lot of functionality was added as well bug were fixed. During that year
+Over the year 2017, a lot of functionality was added as well bugs were fixed. During that year
 the package became available on PyPI and GitHub and the documentation was made available. 
 Large parts of salabim were actually developed on an iPad on the excellent Pythonista platform. The full
-functionality is thus available under iOS.
+functionality is thus available under iOS as well.
 
 
 \section{Why is the package called salabim?}
@@ -13793,6 +14150,8 @@ Alternatively, the Google group can be used for this.
 \section{Support}
 \label{\detokenize{About:support}}
 Ruud van der Ham is able and willing to help users with issues with the package or modelling in general.
+
+He is also available for consultancy and or trainings.
 
 Contact him or other users via the Google group or \sphinxhref{mailto:info@salabim.org}{info@salabim.org}.
 
