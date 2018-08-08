@@ -11,81 +11,81 @@ Pythonista=(platform.system()=='Darwin')
 
 
 def test():
-    test85()
-    
+    test78()
+
 def test85():
     env = sim.Environment()
     q=sim.Queue(name='queue')
     with open('test.txt', 'w') as f:
-        q.print_statistics(as_str=f)
+        q.print_statistics(file=f)
 
 
 def test84():
-    
+
 
     class carAnimateCircle1(sim.Animate):
-    
+
         def __init__(self, car):
             self.car = car
             sim.Animate.__init__(self,
                 circle0=(car.R,), linecolor0='magenta', fillcolor0='white', linewidth0=1)
-    
+
         def circle(self, t):
             if self.car.mode() == 'Driving':
                 return (self.car.R,)
             else:
                 return (0.1,)
-    
+
         def fillcolor(self, t):
             if self.car.mode() == 'Driving':
                 return ('yellow', 75)
             else:
                 return ('white', 75) #'white'
-    
+
     class carAnimateCircle(sim.Animate):
-    
+
         def __init__(self, car):
             self.car = car
             sim.Animate.__init__(self,
                 circle0=(car.R,), linecolor0='magenta', fillcolor0='white', linewidth0=1)
-    
+
         def circle(self, t):
             if self.car.mode() == 'Driving':
                 return (self.car.R,)
             else:
                 return (0.1,)
-    
+
         def fillcolor(self, t):
             if self.car.mode() == 'Driving':
                 return ('yellow', 75)
             else:
                 return ('white', 75) #'white'
-    
+
     class Car(sim.Component):
         def setup(self, R):
             self.R = R
             sim.AnimateCircle(
                  linecolor='magenta',
-                 radius=lambda car, t: self.R if car.mode() == 'Driving' else 0.1, 
+                 radius=lambda car, t: self.R if car.mode() == 'Driving' else 0.1,
                  fillcolor=lambda car, t: ('yellow', 75) if car.mode() == 'Driving' else ('white', 75),
                  arg=self
                  )
-            
-             
+
+
         def process(self):
             while True:
                 yield self.hold(1, mode='Driving')
                 yield self.hold(1, mode='Stand still')
-        
+
     env=sim.Environment()
     Car(R=100)
     env.animate(True)
     env.x0(-200)
     env.x1(200)
     env.y0(-150)
-    
+
     env.run()
- 
+
 def test83():
     l1 = []
 
@@ -232,17 +232,19 @@ def test78():
     s=sim.State()
     env.run(500)
     as_str=False
+    f= open('test.txt', 'w')
     d=sim.Normal(4)
     d1=sim.Distribution('Normal(4)')
-    q.print_histograms(as_str=as_str)
-    q.print_statistics(as_str=as_str)
-    q.print_info(as_str=as_str)
-    env.print_info(as_str=as_str)
-    x.print_info(as_str=as_str)
-    s.print_info(as_str=as_str)
-    r.print_info(as_str=as_str)
-    d.print_info(as_str=as_str)
-    d1.print_info(as_str=as_str)
+    q.print_histograms(as_str=as_str, file=f)
+    q.print_statistics(as_str=as_str, file=f)
+    q.print_info(as_str=as_str, file=f)
+    env.print_info(as_str=as_str, file=f)
+    x.print_info(as_str=as_str, file=f)
+    s.print_info(as_str=as_str, file=f)
+    r.print_info(as_str=as_str, file=f)
+    d.print_info(as_str=as_str, file=f)
+    d1.print_info(as_str=as_str,file=f)
+    f.close()
 
 def test77():
 

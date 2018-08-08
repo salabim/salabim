@@ -6,7 +6,7 @@ see www.salabim.org for more information, the documentation, updates and license
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.4'
+__version__ = '2.3.2.5'
 
 import heapq
 import random
@@ -778,7 +778,7 @@ class Monitor(object):
         '''
         return self.weight() - self.weight(ex0=True)
 
-    def print_statistics(self, show_header=True, show_legend=True, do_indent=False, as_str=False):
+    def print_statistics(self, show_header=True, show_legend=True, do_indent=False, as_str=False, file=None):
         '''
         print monitor statistics
 
@@ -796,6 +796,10 @@ class Monitor(object):
         as_str: bool
             if False (default), print the statistics
             if True, return a string containing the statistics
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -820,7 +824,7 @@ class Monitor(object):
 
         if self.weight() == 0:
             result.append(pad(self.name(), l) + 'no data')
-            return return_or_print(result, as_str)
+            return return_or_print(result, as_str, file)
         if self.weighted:
             result.append(pad(self.name(), l) + pad(self.weight_legend, 14) +
               '{}{}{}'.format(fn(self.weight(), 13, 3),
@@ -845,7 +849,7 @@ class Monitor(object):
               format(fn(self.percentile(95), 13, 3), fn(self.percentile(95, ex0=True), 13, 3)))
         result.append(indent + 'maximum       {}{}'.
               format(fn(self.maximum(), 13, 3), fn(self.maximum(ex0=True), 13, 3)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def histogram_autoscale(self, ex0=False):
         '''
@@ -878,7 +882,7 @@ class Monitor(object):
         return bin_width, lowerbound, number_of_bins
 
     def print_histograms(self, number_of_bins=None,
-        lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False):
+        lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None):
         '''
         print monitor statistics and histogram
 
@@ -909,6 +913,10 @@ class Monitor(object):
             if False (default), print the histogram
             if True, return a string containing the histogram
 
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
         Returns
         -------
         histogram (if as_str is True) : str
@@ -919,10 +927,10 @@ class Monitor(object):
         with a maximum of 30 classes. |n|
         Exactly same functionality as Monitor.print_histogram()
         '''
-        return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str)
+        return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str, file=file)
 
     def print_histogram(self, number_of_bins=None,
-      lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False):
+      lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None):
         '''
         print monitor statistics and histogram
 
@@ -953,6 +961,10 @@ class Monitor(object):
         as_str: bool
             if False (default), print the histogram
             if True, return a string containing the histogram
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -1044,7 +1056,7 @@ class Monitor(object):
                         result.append('{} {}{}{} {}'.
                               format(fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s))
         result.append('')
-        return return_or_print(result, as_str=as_str)
+        return return_or_print(result, as_str=as_str, file=file)
 
     def key(self, x):
         try:
@@ -2007,7 +2019,7 @@ class MonitorTimestamp(Monitor):
         '''
         return tuple(reversed(self.xt(ex0=ex0, exoff=exoff, force_numeric=force_numeric, add_now=add_now)))
 
-    def print_statistics(self, show_header=True, show_legend=True, do_indent=False, as_str=False):
+    def print_statistics(self, show_header=True, show_legend=True, do_indent=False, as_str=False, file=None):
         '''
         print timestamped monitor statistics
 
@@ -2026,16 +2038,20 @@ class MonitorTimestamp(Monitor):
             if False (default), print the statistics
             if True, return a string containing the statistics
 
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
         Returns
         -------
         statistics (if as_str is True) : str
         '''
 
         self.set_x_weight()
-        return Monitor.print_statistics(self, show_header, show_legend, do_indent, as_str=as_str)
+        return Monitor.print_statistics(self, show_header, show_legend, do_indent, as_str=as_str, file=file)
 
     def print_histograms(self, number_of_bins=None,
-      lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False):
+      lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None):
         '''
         print timedstamped monitor statistics and histogram
 
@@ -2067,6 +2083,10 @@ class MonitorTimestamp(Monitor):
             if False (default), print the histogram
             if True, return a string containing the histogram
 
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
         Returns
         -------
         histogram (if as_str is True) : str
@@ -2077,10 +2097,10 @@ class MonitorTimestamp(Monitor):
         with a maximum of 30 classes. |n|
         Exactly same functionality as MonitorTimestamped.print_histogram()
         '''
-        return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str)
+        return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str, file=file)
 
     def print_histogram(
-        self, number_of_bins=None, lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False):
+        self, number_of_bins=None, lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None):
         '''
         print timestamped monitor statistics and histogram
 
@@ -2111,6 +2131,10 @@ class MonitorTimestamp(Monitor):
             if False (default), print the histogram
             if True, return a string containing the histogram
 
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
         Returns
         -------
         histogram (if as_str is True) : str
@@ -2121,7 +2145,8 @@ class MonitorTimestamp(Monitor):
         with a maximum of 30 classes.
         '''
         self.set_x_weight()
-        return Monitor.print_histogram(self, number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str)
+        return Monitor.print_histogram(
+            self, number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str, file=file)
 
 
 class AnimateMonitor(object):
@@ -2688,7 +2713,7 @@ class Queue(object):
     def __repr__(self):
         return objectclass_to_str(self) + '(' + self.name() + ')'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the queue
 
@@ -2697,6 +2722,10 @@ class Queue(object):
         as_str: bool
             if False (default), print the info
             if True, return a string containing the info
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -2715,9 +2744,9 @@ class Queue(object):
                 mx = mx.successor
         else:
             result.append('  no components')
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
-    def print_statistics(self, as_str=False):
+    def print_statistics(self, as_str=False, file=None):
         '''
         prints a summary of statistics of a queue
 
@@ -2726,6 +2755,10 @@ class Queue(object):
         as_str: bool
             if False (default), print the statistics
             if True, return a string containing the statistics
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -2739,9 +2772,9 @@ class Queue(object):
         result.append('')
         result.append(self.length_of_stay.print_statistics(
             show_header=False, show_legend=False, do_indent=True, as_str=True))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
-    def print_histograms(self, exclude=(), as_str=False):
+    def print_histograms(self, exclude=(), as_str=False, file=None):
         '''
         prints the histograms of the length timestamped and length_of_stay monitor of the queue
 
@@ -2755,6 +2788,10 @@ class Queue(object):
             if False (default), print the histograms
             if True, return a string containing the histograms
 
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
         Returns
         -------
         histograms (if as_str is True) : str
@@ -2763,7 +2800,7 @@ class Queue(object):
         for m in (self.length, self.length_of_stay):
             if m not in exclude:
                 result.append(m.print_histogram(as_str=True))
-        return return_or_print(result, as_str=as_str)
+        return return_or_print(result, as_str, file)
 
     def name(self, value=None):
         '''
@@ -3718,7 +3755,7 @@ class Environment(object):
         for ao in self.sys_objects:
             ao.update(t)
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the environment
 
@@ -3727,6 +3764,10 @@ class Environment(object):
         as_str: bool
             if False (default), print the info
             if True, return a string containing the info
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -3738,7 +3779,7 @@ class Environment(object):
         result.append('  now=' + time_to_string(self._now - self._offset))
         result.append('  current_component=' + self._current_component.name())
         result.append('  trace=' + str(self._trace))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def step(self):
         '''
@@ -6690,7 +6731,7 @@ class Animate(object):
                             p.append(p[0])  # close the polygon
                             p.append(p[1])
 
-                    elif self.type == 'circle':  # ***
+                    elif self.type == 'circle':
                         arc_angle0 = 0
                         arc_angle1 = 360
                         draw_arc = False
@@ -9060,7 +9101,7 @@ class Component(object):
         registry.remove(self)
         return self
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the component
 
@@ -9070,7 +9111,11 @@ class Component(object):
             if False (default), print the info
             if True, return a string containing the info
 
-        Returns
+         file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
+       Returns
         -------
         info (if as_str is True) : str
         '''
@@ -9113,7 +9158,7 @@ class Component(object):
             for s, value, _ in self._waits:
                 result.append('    ' + pad(s.name(), 20) +
                     ' value=' + str(value))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def hasprocess(self):
         if hasattr(self, 'process'):
@@ -10830,7 +10875,7 @@ class Exponential(_Distribution):
     def __repr__(self):
         return('Exponential')
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -10839,6 +10884,10 @@ class Exponential(_Distribution):
         as_str: bool
             if False (default), print the info
             if True, return a string containing the info
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -10849,7 +10898,7 @@ class Exponential(_Distribution):
         result.append('  mean=' + str(self._mean))
         result.append('  rate (lambda)=' + str(1 / self._mean))
         result.append('  randomstream=' + hex(id(self.randomstream)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -10929,7 +10978,7 @@ class Normal(_Distribution):
     def __repr__(self):
         return 'Normal'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -10938,6 +10987,10 @@ class Normal(_Distribution):
         as_str: bool
             if False (default), print the info
             if True, return a string containing the info
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -10954,7 +11007,7 @@ class Normal(_Distribution):
         if self._use_gauss:
             result.append('  use_gauss=True')
         result.append('  randomstream=' + hex(id(self.randomstream)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -11032,7 +11085,7 @@ class IntUniform(_Distribution):
     def __repr__(self):
         return 'IntUniform'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -11041,6 +11094,10 @@ class IntUniform(_Distribution):
         as_str: bool
             if False (default), print the info
             if True, return a string containing the info
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -11051,7 +11108,7 @@ class IntUniform(_Distribution):
         result.append('  lowerbound=' + str(self._lowerbound))
         result.append('  upperbound=' + str(self._upperbound))
         result.append('  randomstream=' + hex(id(self.randomstream)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -11109,7 +11166,7 @@ class Uniform(_Distribution):
     def __repr__(self):
         return 'Uniform'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -11118,6 +11175,10 @@ class Uniform(_Distribution):
         as_str: bool
             if False (default), print the info
             if True, return a string containing the info
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -11128,7 +11189,7 @@ class Uniform(_Distribution):
         result.append('  lowerbound=' + str(self._lowerbound))
         result.append('  upperbound=' + str(self._upperbound))
         result.append('  randomstream=' + hex(id(self.randomstream)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -11199,7 +11260,7 @@ class Triangular(_Distribution):
     def __repr__(self):
         return 'Triangular'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -11208,6 +11269,10 @@ class Triangular(_Distribution):
         as_str: bool
             if False (default), print the info
             if True, return a string containing the info
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -11219,7 +11284,7 @@ class Triangular(_Distribution):
         result.append('  high=' + str(self._high))
         result.append('  mode=' + str(self._mode))
         result.append('  randomstream=' + hex(id(self.randomstream)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -11268,7 +11333,7 @@ class Constant(_Distribution):
     def __repr__(self):
         return 'Constant'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -11278,6 +11343,10 @@ class Constant(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
         Returns
         -------
         info (if as_str is True) : str
@@ -11286,7 +11355,7 @@ class Constant(_Distribution):
         result.append('Constant distribution ' + hex(id(self)))
         result.append('  value=' + str(self._value))
         result.append('  randomstream=' + hex(id(self.randomstream)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -11341,7 +11410,7 @@ class Poisson(_Distribution):
     def __repr__(self):
         return 'Poisson'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -11351,6 +11420,10 @@ class Poisson(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
         Returns
         -------
         info (if as_str is True) : str
@@ -11358,7 +11431,7 @@ class Poisson(_Distribution):
         result = []
         result.append('Poissonl distribution ' + hex(id(self)))
         result.append('  mean (lambda)' + str(self._lambda_))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -11427,7 +11500,7 @@ class Weibull(_Distribution):
     def __repr__(self):
         return 'Weibull'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -11436,6 +11509,10 @@ class Weibull(_Distribution):
         as_str: bool
             if False (default), print the info
             if True, return a string containing the info
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -11446,7 +11523,7 @@ class Weibull(_Distribution):
         result.append('  scale (alpha or k)=' + str(self._scale))
         result.append('  shape (beta or lambda)=' + str(self._shape))
         result.append('  randomstream=' + hex(id(self.randomstream)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -11524,7 +11601,7 @@ class Gamma(_Distribution):
     def __repr__(self):
         return 'Gamma'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -11533,6 +11610,10 @@ class Gamma(_Distribution):
         as_str: bool
             if False (default), print the info
             if True, return a string containing the info
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -11544,7 +11625,7 @@ class Gamma(_Distribution):
         result.append('  scale (teta)=' + str(self._scale))
         result.append('  rate (beta)=' + str(1 / self._scale))
         result.append('  randomstream=' + hex(id(self.randomstream)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -11603,7 +11684,7 @@ class Beta(_Distribution):
     def __repr__(self):
         return 'Beta'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -11612,6 +11693,10 @@ class Beta(_Distribution):
         as_str: bool
             if False (default), print the info
             if True, return a string containing the info
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -11622,7 +11707,7 @@ class Beta(_Distribution):
         result.append('  alpha=' + str(self._alpha))
         result.append('  beta=' + str(self._beta))
         result.append('  randomstream=' + hex(id(self.randomstream)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -11704,7 +11789,7 @@ class Erlang(_Distribution):
     def __repr__(self):
         return 'Erlang'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -11713,6 +11798,10 @@ class Erlang(_Distribution):
         as_str: bool
             if False (default), print the info
             if True, return a string containing the info
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -11724,7 +11813,7 @@ class Erlang(_Distribution):
         result.append('  rate (lambda)=' + str(self._rate))
         result.append('  scale (mu)=' + str(1 / self._rate))
         result.append('  randomstream=' + hex(id(self.randomstream)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -11811,7 +11900,7 @@ class Cdf(_Distribution):
     def __repr__(self):
         return 'Cdf'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -11821,6 +11910,10 @@ class Cdf(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
         Returns
         -------
         info (if as_str is True) : str
@@ -11828,7 +11921,7 @@ class Cdf(_Distribution):
         result = []
         result.append('Cdf distribution ' + hex(id(self)))
         result.append('  randomstream=' + hex(id(self.randomstream)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -11955,7 +12048,7 @@ class Pdf(_Distribution):
     def __repr__(self):
         return 'Pdf'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -11965,6 +12058,10 @@ class Pdf(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
         Returns
         -------
         info (if as_str is True) : str
@@ -11972,7 +12069,7 @@ class Pdf(_Distribution):
         result = []
         result.append('Pdf distribution ' + hex(id(self)))
         result.append('  randomstream=' + hex(id(self.randomstream)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -12106,7 +12203,7 @@ class CumPdf(_Distribution):
     def __repr__(self):
         return 'CumPdf'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -12116,6 +12213,10 @@ class CumPdf(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
         Returns
         -------
         info (if as_str is True) : str
@@ -12123,7 +12224,7 @@ class CumPdf(_Distribution):
         result = []
         result.append('CumPdf distribution ' + hex(id(self)))
         result.append('  randomstream=' + hex(id(self.randomstream)))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def sample(self):
         '''
@@ -12241,7 +12342,7 @@ class Distribution(_Distribution):
     def __repr__(self):
         return self._distribution.__repr__()
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints information about the distribution
 
@@ -12251,11 +12352,15 @@ class Distribution(_Distribution):
             if False (default), print the info
             if True, return a string containing the info
 
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
         Returns
         -------
         info (if as_str is True) : str
         '''
-        return self._distribution.print_info(as_str=as_str)
+        return self._distribution.print_info(as_str=as_str, file=file)
 
     def sample(self):
         '''
@@ -12417,7 +12522,7 @@ class State(object):
     def __repr__(self):
         return objectclass_to_str(self) + ' (' + self.name() + ')'
 
-    def print_histograms(self, exclude=(), as_str=False):
+    def print_histograms(self, exclude=(), as_str=False, file=None):
         '''
         print histograms of the waiters queue and the value timestamped monitor
 
@@ -12431,6 +12536,10 @@ class State(object):
             if False (default), print the histograms
             if True, return a string containing the histograms
 
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
         Returns
         -------
         histograms (if as_str is True) : str
@@ -12440,9 +12549,9 @@ class State(object):
             result.append(self.waiters().print_histograms(exclude=exclude, as_str=True))
         if self.value not in exclude:
             result.append(self.value.print_histogram(as_str=True))
-        return return_or_print(result, as_str=as_str)
+        return return_or_print(result, as_str, file)
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints info about the state
 
@@ -12451,6 +12560,10 @@ class State(object):
         as_str: bool
             if False (default), print the info
             if True, return a string containing the info
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -12476,7 +12589,7 @@ class State(object):
                 result.append('    ' + pad(c.name(), 20), ' value(s): ' + values)
         else:
             result.append('  no waiting components')
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def __call__(self):
         return self._value
@@ -12669,7 +12782,7 @@ class State(object):
         '''
         return self._sequence_number
 
-    def print_statistics(self, as_str=False):
+    def print_statistics(self, as_str=False, file=None):
         '''
         prints a summary of statistics of the state
 
@@ -12678,6 +12791,10 @@ class State(object):
         as_str: bool
             if False (default), print the statistics
             if True, return a string containing the statistics
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -12693,7 +12810,7 @@ class State(object):
             as_str=True))
         result.append('')
         result.append(self.value.print_statistics(show_header=False, show_legend=False, do_indent=True, as_str=True))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def waiters(self):
         '''
@@ -12816,7 +12933,7 @@ class Resource(object):
         for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
             m.reset(monitor)
 
-    def print_statistics(self, as_str=False):
+    def print_statistics(self, as_str=False, file=None):
         '''
         prints a summary of statistics of a resource
 
@@ -12825,6 +12942,10 @@ class Resource(object):
         as_str: bool
             if False (default), print the statistics
             if True, return a string containing the statistics
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -12846,9 +12967,9 @@ class Resource(object):
         for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
             result.append(m.print_statistics(show_header=False, show_legend=show_legend, do_indent=True, as_str=True))
             result.append('')
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
-    def print_histograms(self, exclude=(), as_str=False):
+    def print_histograms(self, exclude=(), as_str=False, file=None):
         '''
         prints histograms of the requesters and claimers queue as well as
         the capacity, available_quantity and claimed_quantity timstamped monitors of the resource
@@ -12863,6 +12984,10 @@ class Resource(object):
             if False (default), print the histograms
             if True, return a string containing the histograms
 
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
         Returns
         -------
         histograms (if as_str is True) : str
@@ -12874,7 +12999,7 @@ class Resource(object):
         for m in (self.capacity, self.available_quantity, self.claimed_quantity):
             if m not in exclude:
                 result.append(m.print_histogram(as_str=True))
-        return return_or_print(result, as_str=as_str)
+        return return_or_print(result, as_str, file)
 
     def monitor(self, value):
         '''
@@ -12944,7 +13069,7 @@ class Resource(object):
     def __repr__(self):
         return objectclass_to_str(self) + ' (' + self.name() + ')'
 
-    def print_info(self, as_str=False):
+    def print_info(self, as_str=False, file=None):
         '''
         prints info about the resource
 
@@ -12953,6 +13078,10 @@ class Resource(object):
         as_str: bool
             if False (default), print the info
             if True, return a string containing the info
+
+        file: flle
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
 
         Returns
         -------
@@ -12986,7 +13115,7 @@ class Resource(object):
                     mx = mx.successor
                     result.append('    ' + pad(c.name(), 20) +
                         ' quantity=' + str(c._claims[self]))
-        return return_or_print(result, as_str)
+        return return_or_print(result, as_str, file)
 
     def _tryrequest(self):
         mx = self._requesters._head.successor
@@ -13185,13 +13314,15 @@ def spec_to_image(spec):
     image : PIL.Image.Image
     '''
     if isinstance(spec, str):
-        can_animate(try_only=False)
-        if spec == '':
-            im = Image.new('RGBA', (0, 0), (0, 0, 0, 0))
-        else:
-            im = Image.open(spec)
-            im = im.convert('RGBA')
+        if can_animate(try_only=True):
+            if spec == '':
+                im = Image.new('RGBA', (0, 0), (0, 0, 0, 0))
+            else:
+                im = Image.open(spec)
+                im = im.convert('RGBA')
             return im
+        else:
+            return None  # will never be used!
     else:
         return spec
 
@@ -13367,7 +13498,7 @@ def deep_flatten(l):
 
     if hasattr(l, '__iter__') and not isinstance(l, str):
         for x in l:
-            #  the two following lines are equivalent to yield from deep_flatten(x), which is not supported in Python 2.7
+            #  the two following lines are equivalent to 'yield from deep_flatten(x)' (not supported in Python 2.7)
             for xx in deep_flatten(x):
                 yield xx
     else:
@@ -13433,15 +13564,15 @@ def _get_caller_frame():
     return frame
 
 
-def return_or_print(result, as_str):
+def return_or_print(result, as_str, file):
     result = '\n'.join(result)
-    if as_str == True:  # no check for just as_str as as_str is also (mis)used for print_redirection
+    if as_str:
         return result
     else:
-        if as_str:
-            print(result, file=as_str)
-        else:
+        if file is None:
             print(result)
+        else:
+            print(result, file=file)
 
 
 def _call(c, t, self):
@@ -13750,7 +13881,7 @@ def can_animate(try_only=True):
     global ImageTk
     global tkinter
     try:
-        import PIL  # NOQA
+        import PIL  # NOQA ***
         from PIL import Image
         from PIL import ImageDraw
         from PIL import ImageFont
