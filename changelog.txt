@@ -1,11 +1,18 @@
 salabim  changelog
 
+version 2.3.2.6  2018-08-09
+===========================
+
+Bug fix
+-------
+Under Python 2.7 autoscaling histogram sometimes did result into a TypeError. Fixed.
+
 
 version 2.3.2.5  2018-08-08
 ===========================
 
 New functionality
-=================
+-----------------
 The functionality to print to another file rather than stdout in all methods
   print_histogram()
   print_histograms()

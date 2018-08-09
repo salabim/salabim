@@ -6,7 +6,7 @@ see www.salabim.org for more information, the documentation, updates and license
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.2.5'
+__version__ = '2.3.2.6'
 
 import heapq
 import random
@@ -873,7 +873,7 @@ class Monitor(object):
             exp = 10 ** i
             for bin_width in (exp, exp * 2, exp * 5):
                 lowerbound = math.floor(xmin / bin_width) * bin_width
-                number_of_bins = math.ceil((xmax - lowerbound) / bin_width)
+                number_of_bins = int(math.ceil((xmax - lowerbound) / bin_width))
                 if number_of_bins <= 30:
                     done = True
                     break
