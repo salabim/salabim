@@ -54,8 +54,8 @@
 
 
 \title{salabim Documentation}
-\date{Aug 08, 2018}
-\release{2.3.2.5}
+\date{Aug 22, 2018}
+\release{2.3.3}
 \author{Ruud van der Ham}
 \newcommand{\sphinxlogo}{\vbox{}}
 \renewcommand{\releasename}{Release}
@@ -70,7 +70,7 @@
 
 
 \chapter{Introduction}
-\label{\detokenize{Introduction::doc}}\label{\detokenize{Introduction:documentation-for-salabim}}\label{\detokenize{Introduction:introduction}}
+\label{\detokenize{Introduction:documentation-for-salabim}}\label{\detokenize{Introduction:introduction}}\label{\detokenize{Introduction::doc}}
 Salabim is a package for discrete event simulation in Python.
 It follows the methodology of process description as originally demonstrated in \sphinxstyleemphasis{Simula}
 and later in \sphinxstyleemphasis{Prosim}, \sphinxstyleemphasis{Must} and \sphinxstyleemphasis{Tomas}. 
@@ -241,7 +241,7 @@ A good way to start learning about Python is \sphinxurl{https://www.python.org/a
 
 
 \chapter{Modeling}
-\label{\detokenize{Modeling::doc}}\label{\detokenize{Modeling:modeling}}
+\label{\detokenize{Modeling:modeling}}\label{\detokenize{Modeling::doc}}
 
 \section{A simple model}
 \label{\detokenize{Modeling:a-simple-model}}
@@ -966,7 +966,7 @@ construction.
 
 
 \chapter{Component}
-\label{\detokenize{Component::doc}}\label{\detokenize{Component:component}}
+\label{\detokenize{Component:component}}\label{\detokenize{Component::doc}}
 Components are the key elements of salabim simulations.
 
 Components can be either data or active. An active component has one or more process descriptions and is activated
@@ -1580,7 +1580,7 @@ So remember if the method contains a yield statement (technically speaking that�
 
 
 \chapter{Queue}
-\label{\detokenize{Queue::doc}}\label{\detokenize{Queue:queue}}
+\label{\detokenize{Queue:queue}}\label{\detokenize{Queue::doc}}
 Salabim has a class Queue for queue handling of components. The advantage over the standard list and deque are:
 \begin{itemize}
 \item {} 
@@ -1815,7 +1815,7 @@ Queue 0x20e116153c8
 
 
 \chapter{Resource}
-\label{\detokenize{Resource::doc}}\label{\detokenize{Resource:resource}}
+\label{\detokenize{Resource:resource}}\label{\detokenize{Resource::doc}}
 Resources are a powerful way of process interaction.
 
 A resource has always a capacity (which can be zero and even negative). This capacity will be specified at time of creation, but
@@ -2017,7 +2017,7 @@ Note that these two methods do not return the same result.
 
 
 \chapter{State}
-\label{\detokenize{State::doc}}\label{\detokenize{State:state}}
+\label{\detokenize{State:state}}\label{\detokenize{State::doc}}
 States together with the Component.wait() method provide a powerful way of process interaction.
 
 A state will have a certain value at a given time. In its simplest form a component can then wait for
@@ -2203,7 +2203,7 @@ in any case.
 
 
 \chapter{Monitor and MonitorTimestamp}
-\label{\detokenize{Monitor and MonitorTimestamp::doc}}\label{\detokenize{Monitor and MonitorTimestamp:monitor-and-monitortimestamp}}
+\label{\detokenize{Monitor and MonitorTimestamp:monitor-and-monitortimestamp}}\label{\detokenize{Monitor and MonitorTimestamp::doc}}
 Monitors and timestamped monitors are a way to collect data from the simulation. They are automatically collected
 for resources, queues and states. On top of that the user can define its own (timestamped) monitors.
 
@@ -2897,7 +2897,7 @@ numeric tallied values, like names.
 
 
 \chapter{Distributions}
-\label{\detokenize{Distributions::doc}}\label{\detokenize{Distributions:distributions}}
+\label{\detokenize{Distributions:distributions}}\label{\detokenize{Distributions::doc}}
 Salabim can be used with the standard random module, but it is easier to use the salabim distributions.
 
 Internally, salabim uses the random module. There is always a seed associated with each distribution, which
@@ -3354,7 +3354,7 @@ or even
 
 
 \chapter{Animation}
-\label{\detokenize{Animation::doc}}\label{\detokenize{Animation:animation}}
+\label{\detokenize{Animation:animation}}\label{\detokenize{Animation::doc}}
 Animation is a powerful tool to debug, test and demonstrate simulations.
 
 It is possible to show a number of shapes (lines, rectangles, circles, etc), texts as well (images) in a window. These objects can be dynamically updated.
@@ -3459,17 +3459,30 @@ These features are demonstrated in \sphinxstyleemphasis{Demo queue animation.py}
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
 \PYG{k+kn}{import} \PYG{n+nn}{salabim} \PYG{k}{as} \PYG{n+nn}{sim}
 
+\PYG{l+s+sd}{\PYGZsq{}\PYGZsq{}\PYGZsq{}}
+\PYG{l+s+sd}{This us a demonstration of several ways to show queues dynamically and the corresponding statistics}
+\PYG{l+s+sd}{The model simply generates components that enter a queue and leave after a certain time.}
+
+\PYG{l+s+sd}{Note that the actual model code (in the process description of X does not contain any reference}
+\PYG{l+s+sd}{to the animation!}
+\PYG{l+s+sd}{\PYGZsq{}\PYGZsq{}\PYGZsq{}}
+
 
 \PYG{k}{class} \PYG{n+nc}{X}\PYG{p}{(}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{Component}\PYG{p}{)}\PYG{p}{:}
     \PYG{k}{def} \PYG{n+nf}{setup}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{i}\PYG{p}{)}\PYG{p}{:}
         \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{i} \PYG{o}{=} \PYG{n}{i}
 
     \PYG{k}{def} \PYG{n+nf}{animation\PYGZus{}objects}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n+nb}{id}\PYG{p}{)}\PYG{p}{:}
+        \PYG{l+s+sd}{\PYGZsq{}\PYGZsq{}\PYGZsq{}}
+\PYG{l+s+sd}{        the way the component is determined by the id, specified in AnimateQueue}
+\PYG{l+s+sd}{        \PYGZsq{}text\PYGZsq{} means just the name}
+\PYG{l+s+sd}{        any other value represents the colour}
+\PYG{l+s+sd}{        \PYGZsq{}\PYGZsq{}\PYGZsq{}}
         \PYG{k}{if} \PYG{n+nb}{id} \PYG{o}{==} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{text}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{:}
             \PYG{n}{ao0} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateText}\PYG{p}{(}\PYG{n}{text}\PYG{o}{=}\PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{name}\PYG{p}{(}\PYG{p}{)}\PYG{p}{,} \PYG{n}{textcolor}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{fg}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{text\PYGZus{}anchor}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{nw}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
             \PYG{k}{return} \PYG{l+m+mi}{0}\PYG{p}{,} \PYG{l+m+mi}{16}\PYG{p}{,} \PYG{n}{ao0}
         \PYG{k}{else}\PYG{p}{:}
-            \PYG{n}{ao0} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateRectangle}\PYG{p}{(}\PYG{p}{(}\PYG{l+m+mi}{0}\PYG{p}{,} \PYG{l+m+mi}{0}\PYG{p}{,} \PYG{l+m+mi}{40}\PYG{p}{,} \PYG{l+m+mi}{20}\PYG{p}{)}\PYG{p}{,}
+            \PYG{n}{ao0} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateRectangle}\PYG{p}{(}\PYG{p}{(}\PYG{o}{\PYGZhy{}}\PYG{l+m+mi}{20}\PYG{p}{,} \PYG{l+m+mi}{0}\PYG{p}{,} \PYG{l+m+mi}{20}\PYG{p}{,} \PYG{l+m+mi}{20}\PYG{p}{)}\PYG{p}{,}
                 \PYG{n}{text}\PYG{o}{=}\PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{name}\PYG{p}{(}\PYG{p}{)}\PYG{p}{,} \PYG{n}{fillcolor}\PYG{o}{=}\PYG{n+nb}{id}\PYG{p}{,} \PYG{n}{textcolor}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{white}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{arg}\PYG{o}{=}\PYG{n+nb+bp}{self}\PYG{p}{)}
             \PYG{k}{return} \PYG{l+m+mi}{45}\PYG{p}{,} \PYG{l+m+mi}{0}\PYG{p}{,} \PYG{n}{ao0}
 
@@ -3486,21 +3499,14 @@ These features are demonstrated in \sphinxstyleemphasis{Demo queue animation.py}
 
 \PYG{n}{q} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Queue}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{queue}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
 
-\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateText}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{queue, normal}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{50}\PYG{p}{,} \PYG{n}{text\PYGZus{}anchor}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{nw}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-\PYG{n}{qa0} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateQueue}\PYG{p}{(}\PYG{n}{q}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{50}\PYG{p}{,} \PYG{n}{direction}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{e}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n+nb}{id}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{blue}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{qa0} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateQueue}\PYG{p}{(}\PYG{n}{q}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{50}\PYG{p}{,} \PYG{n}{title}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{queue, normal}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{direction}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{e}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n+nb}{id}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{blue}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{qa1} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateQueue}\PYG{p}{(}\PYG{n}{q}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{250}\PYG{p}{,} \PYG{n}{title}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{queue, maximum 6 components}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{direction}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{e}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{max\PYGZus{}length}\PYG{o}{=}\PYG{l+m+mi}{6}\PYG{p}{,} \PYG{n+nb}{id}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{red}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{qa2} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateQueue}\PYG{p}{(}\PYG{n}{q}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{150}\PYG{p}{,} \PYG{n}{title}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{queue, reversed}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{direction}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{e}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{reverse}\PYG{o}{=}\PYG{k+kc}{True}\PYG{p}{,} \PYG{n+nb}{id}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{green}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{qa3} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateQueue}\PYG{p}{(}\PYG{n}{q}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{440}\PYG{p}{,} \PYG{n}{title}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{queue, text only}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{direction}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{s}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n+nb}{id}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{text}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
 
-\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateText}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{queue, limited to six components}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{250}\PYG{p}{,} \PYG{n}{text\PYGZus{}anchor}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{nw}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-\PYG{n}{qa1} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateQueue}\PYG{p}{(}\PYG{n}{q}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{250}\PYG{p}{,} \PYG{n}{direction}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{e}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{max\PYGZus{}length}\PYG{o}{=}\PYG{l+m+mi}{6}\PYG{p}{,} \PYG{n+nb}{id}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{red}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateMonitor}\PYG{p}{(}\PYG{n}{q}\PYG{o}{.}\PYG{n}{length}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{10}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{450}\PYG{p}{,} \PYG{n}{width}\PYG{o}{=}\PYG{l+m+mi}{480}\PYG{p}{,} \PYG{n}{height}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{horizontal\PYGZus{}scale}\PYG{o}{=}\PYG{l+m+mi}{5}\PYG{p}{,} \PYG{n}{vertical\PYGZus{}scale}\PYG{o}{=}\PYG{l+m+mi}{5}\PYG{p}{)}
 
-\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateText}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{queue, reversed}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{150}\PYG{p}{,} \PYG{n}{text\PYGZus{}anchor}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{nw}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-\PYG{n}{qa2} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateQueue}\PYG{p}{(}\PYG{n}{q}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{150}\PYG{p}{,} \PYG{n}{direction}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{e}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{reverse}\PYG{o}{=}\PYG{k+kc}{True}\PYG{p}{,} \PYG{n+nb}{id}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{green}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-
-\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateText}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{queue, text only}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{80}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{460}\PYG{p}{,} \PYG{n}{text\PYGZus{}anchor}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{sw}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{angle}\PYG{o}{=}\PYG{l+m+mi}{270}\PYG{p}{)}
-\PYG{n}{qa3} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateQueue}\PYG{p}{(}\PYG{n}{q}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{460}\PYG{p}{,} \PYG{n}{direction}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{s}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n+nb}{id}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{text}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-
-\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateMonitor}\PYG{p}{(}\PYG{n}{q}\PYG{o}{.}\PYG{n}{length}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{10}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{480}\PYG{p}{,} \PYG{n}{width}\PYG{o}{=}\PYG{l+m+mi}{450}\PYG{p}{,} \PYG{n}{height}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{horizontal\PYGZus{}scale}\PYG{o}{=}\PYG{l+m+mi}{5}\PYG{p}{,} \PYG{n}{vertical\PYGZus{}scale}\PYG{o}{=}\PYG{l+m+mi}{5}\PYG{p}{)}
-
-\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateMonitor}\PYG{p}{(}\PYG{n}{q}\PYG{o}{.}\PYG{n}{length\PYGZus{}of\PYGZus{}stay}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{10}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{600}\PYG{p}{,} \PYG{n}{width}\PYG{o}{=}\PYG{l+m+mi}{450}\PYG{p}{,} \PYG{n}{height}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{horizontal\PYGZus{}scale}\PYG{o}{=}\PYG{l+m+mi}{5}\PYG{p}{,} \PYG{n}{vertical\PYGZus{}scale}\PYG{o}{=}\PYG{l+m+mi}{5}\PYG{p}{)}
+\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateMonitor}\PYG{p}{(}\PYG{n}{q}\PYG{o}{.}\PYG{n}{length\PYGZus{}of\PYGZus{}stay}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{10}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{570}\PYG{p}{,} \PYG{n}{width}\PYG{o}{=}\PYG{l+m+mi}{480}\PYG{p}{,} \PYG{n}{height}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{horizontal\PYGZus{}scale}\PYG{o}{=}\PYG{l+m+mi}{5}\PYG{p}{,} \PYG{n}{vertical\PYGZus{}scale}\PYG{o}{=}\PYG{l+m+mi}{5}\PYG{p}{)}
 
 \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateText}\PYG{p}{(}\PYG{n}{text}\PYG{o}{=}\PYG{k}{lambda}\PYG{p}{:} \PYG{n}{q}\PYG{o}{.}\PYG{n}{length}\PYG{o}{.}\PYG{n}{print\PYGZus{}histogram}\PYG{p}{(}\PYG{n}{as\PYGZus{}str}\PYG{o}{=}\PYG{k+kc}{True}\PYG{p}{)}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{500}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{700}\PYG{p}{,}
     \PYG{n}{text\PYGZus{}anchor}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{nw}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{font}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{narrow}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{fontsize}\PYG{o}{=}\PYG{l+m+mi}{10}\PYG{p}{)}
@@ -3510,6 +3516,7 @@ These features are demonstrated in \sphinxstyleemphasis{Demo queue animation.py}
 
 \PYG{p}{[}\PYG{n}{X}\PYG{p}{(}\PYG{n}{i}\PYG{o}{=}\PYG{n}{i}\PYG{p}{)} \PYG{k}{for} \PYG{n}{i} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{l+m+mi}{15}\PYG{p}{)}\PYG{p}{]}
 \PYG{n}{env}\PYG{o}{.}\PYG{n}{animate}\PYG{p}{(}\PYG{k+kc}{True}\PYG{p}{)}
+\PYG{n}{env}\PYG{o}{.}\PYG{n}{modelname}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{Demo queue animation}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
 \PYG{n}{env}\PYG{o}{.}\PYG{n}{run}\PYG{p}{(}\PYG{p}{)}
 \end{sphinxVerbatim}
 
@@ -5644,6 +5651,82 @@ All parameters, apart from queue and arg can be specified as:
 
 \end{fulllineitems}
 
+\index{AnimateEntry (class in salabim)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.AnimateEntry}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{AnimateEntry}}{\emph{x=0}, \emph{y=0}, \emph{number\_of\_chars=20}, \emph{value=''}, \emph{fillcolor='fg'}, \emph{color='bg'}, \emph{text=''}, \emph{action=None}, \emph{env=None}, \emph{xy\_anchor='sw'}}{}
+defines a button
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{x} (\sphinxstyleliteralemphasis{int}) \textendash{} x-coordinate of centre of the button in screen coordinates (default 0)
+
+\item {} 
+\sphinxstyleliteralstrong{y} (\sphinxstyleliteralemphasis{int}) \textendash{} y-coordinate of centre of the button in screen coordinates (default 0)
+
+\item {} 
+\sphinxstyleliteralstrong{number\_of\_chars} (\sphinxstyleliteralemphasis{int}) \textendash{} number of characters displayed in the entry field (default 20)
+
+\item {} 
+\sphinxstyleliteralstrong{fillcolor} (\sphinxstyleliteralemphasis{colorspec}) \textendash{} color of the entry background (default foreground\_color)
+
+\item {} 
+\sphinxstyleliteralstrong{color} (\sphinxstyleliteralemphasis{colorspec}) \textendash{} color of the text (default background\_color)
+
+\item {} 
+\sphinxstyleliteralstrong{value} (\sphinxstyleliteralemphasis{str}) \textendash{} initial value of the text of the entry (default null string) 
+
+\item {} 
+\sphinxstyleliteralstrong{action} (\sphinxstyleliteralemphasis{function}) \textendash{} action to take when the Enter-key is pressed 
+the function should have no arguments 
+
+\item {} 
+\sphinxstyleliteralstrong{xy\_anchor} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies where x and y are relative to 
+possible values are (default: sw): 
+\sphinxcode{nw    n    ne} 
+\sphinxcode{w     c     e} 
+\sphinxcode{sw    s    se}
+
+\item {} 
+\sphinxstyleliteralstrong{env} ({\hyperref[\detokenize{Reference:salabim.Environment}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Environment}}}}) \textendash{} environment where the component is defined 
+if omitted, default\_env will be used
+
+\end{itemize}
+
+\end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+This class is not available under Pythonista.
+\end{sphinxadmonition}
+\index{get() (salabim.AnimateEntry method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.AnimateEntry.get}}\pysiglinewithargsret{\sphinxbfcode{get}}{}{}
+get the current value of the entry
+\begin{quote}\begin{description}
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{Current value of the entry}
+
+\item[{Return type}] \leavevmode
+str
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{remove() (salabim.AnimateEntry method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.AnimateEntry.remove}}\pysiglinewithargsret{\sphinxbfcode{remove}}{}{}
+removes the entry object. 
+the ui object is removed from the ui queue,
+so effectively ending this ui
+
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
 \index{AnimateImage (class in salabim)}
 
 \begin{fulllineitems}
@@ -6190,7 +6273,7 @@ All parameters, apart from queue and arg can be specified as:
 \index{AnimateQueue (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.AnimateQueue}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{AnimateQueue}}{\emph{queue}, \emph{x=50}, \emph{y=50}, \emph{direction='w'}, \emph{max\_length=None}, \emph{xy\_anchor='sw'}, \emph{reverse=False}, \emph{id=None}, \emph{arg=None}, \emph{parent=None}}{}
+\phantomsection\label{\detokenize{Reference:salabim.AnimateQueue}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{AnimateQueue}}{\emph{queue}, \emph{x=50}, \emph{y=50}, \emph{direction='w'}, \emph{max\_length=None}, \emph{xy\_anchor='sw'}, \emph{reverse=False}, \emph{title=None}, \emph{titlecolor='fg'}, \emph{titlefontsize=15}, \emph{titlefont=''}, \emph{titleoffsetx=None}, \emph{titleoffsety=None}, \emph{layer=0}, \emph{id=None}, \emph{arg=None}, \emph{parent=None}}{}
 Animates the component in a queue.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -6225,6 +6308,30 @@ possible values are (default: sw):
 \sphinxcode{sw    s    se}
 
 \item {} 
+\sphinxstyleliteralstrong{titlecolor} (\sphinxstyleliteralemphasis{colorspec}) \textendash{} color of the title (default foreground color)
+
+\item {} 
+\sphinxstyleliteralstrong{titlefont} ({\hyperref[\detokenize{Reference:salabim.Animate.font}]{\sphinxcrossref{\sphinxstyleliteralemphasis{font}}}}) \textendash{} font of the title (default ‘’)
+
+\item {} 
+\sphinxstyleliteralstrong{titlefontsize} (\sphinxstyleliteralemphasis{int}) \textendash{} size of the font of the title (default 15)
+
+\item {} 
+\sphinxstyleliteralstrong{title} (\sphinxstyleliteralemphasis{str}) \textendash{} title to be shown above queue 
+default: name of the queue
+
+\item {} 
+\sphinxstyleliteralstrong{titleoffsetx} (\sphinxstyleliteralemphasis{float}) \textendash{} x-offset of the title relative to the start of the queue 
+default: 25 if direction is w, -25 otherwise
+
+\item {} 
+\sphinxstyleliteralstrong{titleoffsety} (\sphinxstyleliteralemphasis{float}) \textendash{} y-offset of the title relative to the start of the queue 
+default: -25 if direction is s, -25 otherwise
+
+\item {} 
+\sphinxstyleliteralstrong{layer} (\sphinxstyleliteralemphasis{int}) \textendash{} layer (default 0)
+
+\item {} 
 \sphinxstyleliteralstrong{id} (\sphinxstyleliteralemphasis{any}) \textendash{} the animation works by calling the animation\_objects method of each component, optionally
 with id. By default, this is self, but can be overriden, particularly with the queue
 
@@ -6245,7 +6352,7 @@ automatically upon termination of the parent
 \begin{sphinxadmonition}{note}{Note:}
 All measures are in screen coordinates 
 
-All parameters, apart from queue and arg can be specified as: 
+All parameters, apart from queue, id, arg and parent can be specified as: 
 - a scalar, like 10 
 - a function with zero arguments, like lambda: title 
 - a function with one argument, being the time t, like lambda t: t + 10 
@@ -6459,7 +6566,7 @@ so effectively ending this ui
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{Reference:salabim.AnimateSlider.v}}\pysiglinewithargsret{\sphinxbfcode{v}}{\emph{value=None}}{}
-value 
+value
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode
 \sphinxstyleliteralstrong{value} (\sphinxstyleliteralemphasis{float}) \textendash{} new value 
@@ -9322,7 +9429,7 @@ When the run is not issued, no acction will be taken.
 \index{animation\_parameters() (salabim.Environment method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Environment.animation_parameters}}\pysiglinewithargsret{\sphinxbfcode{animation\_parameters}}{\emph{animate=True}, \emph{synced=None}, \emph{speed=None}, \emph{width=None}, \emph{height=None}, \emph{x0=None}, \emph{y0=None}, \emph{x1=None}, \emph{background\_color=None}, \emph{foreground\_color=None}, \emph{fps=None}, \emph{modelname=None}, \emph{use\_toplevel=None}, \emph{show\_fps=None}, \emph{show\_time=None}, \emph{video=None}, \emph{video\_repeat=None}, \emph{video\_pingpong=None}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.animation_parameters}}\pysiglinewithargsret{\sphinxbfcode{animation\_parameters}}{\emph{animate=True}, \emph{synced=None}, \emph{speed=None}, \emph{width=None}, \emph{height=None}, \emph{x0=None}, \emph{y0=None}, \emph{x1=None}, \emph{background\_color=None}, \emph{foreground\_color=None}, \emph{fps=None}, \emph{modelname=None}, \emph{use\_toplevel=None}, \emph{tkinter\_init=None}, \emph{tkinter\_exit=None}, \emph{show\_fps=None}, \emph{show\_time=None}, \emph{video=None}, \emph{video\_repeat=None}, \emph{video\_pingpong=None}}{}
 set animation parameters
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -9388,6 +9495,18 @@ other modules using tkinter, it might be necessary to
 initialize the root with tkinter.TopLevel().
 In that case, set this parameter to True. 
 if False (default), the root will be initialized with tkinter.Tk()
+
+\item {} 
+\sphinxstyleliteralstrong{tkinter\_init} (\sphinxstyleliteralemphasis{function}\sphinxstyleliteralemphasis{ or }\sphinxstyleliteralemphasis{method}\sphinxstyleliteralemphasis{ (}\sphinxstyleliteralemphasis{with parameter self=env}\sphinxstyleliteralemphasis{)}) \textendash{} if specified and not run under Pythonista, this function will be called immediately
+after the setup of tkinter. The function gets one parameter, the root. 
+With this, the animation can use more UI elements and then salabim provides. 
+The name of root can be retrieved with self.root
+
+\item {} 
+\sphinxstyleliteralstrong{tkinter\_exit} (\sphinxstyleliteralemphasis{function}\sphinxstyleliteralemphasis{ or }\sphinxstyleliteralemphasis{method}\sphinxstyleliteralemphasis{ (}\sphinxstyleliteralemphasis{with parameter self=env}\sphinxstyleliteralemphasis{)}) \textendash{} if specified and not run under Pythonista, this function will be called immediately
+before the destruction tkinter. The function gets one parameter, the environment. 
+With this, the animation can use more UI elements and then salabim provides. 
+The name of root can be retrieved with self.root
 
 \item {} 
 \sphinxstyleliteralstrong{show\_fps} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True, show the number of frames per second 
@@ -14182,7 +14301,7 @@ SOFTWARE.
 
 
 \chapter{Indices and tables}
-\label{\detokenize{Indices::doc}}\label{\detokenize{Indices:indices-and-tables}}\begin{itemize}
+\label{\detokenize{Indices:indices-and-tables}}\label{\detokenize{Indices::doc}}\begin{itemize}
 \item {} 
 \DUrole{xref,std,std-ref}{genindex}
 
