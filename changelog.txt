@@ -1,11 +1,43 @@
 salabim  changelog
 
+version 2.3.3  2018-08-22
+=========================
+New functionality
+-----------------
+The class AnimateEntry adds a new UI element to salabim. With this, it is possible to ask for the user to
+enter a text. The Enter key will call an action function, which can be used to get the entered text.
+In most cases, the entry animation will have to be removed then. See the manual or docstring for details.
+AnimateEntry is not supported under Pythonista.
+Note that the API of this class is still experimental and might change in future releases.
+
+Improved functionality
+----------------------
+AnimateQueue() and Queue.animate() can now display a title near the start of the queue animation.
+This makes it very easy to show the contents of a queue, with just one line of code
+By default, the name of the queue will be displayed next to the queue. There are several parameters
+to control the text placement and appearance. See the manual or docstring for details.
+
+Changed functionality
+---------------------
+When there are no more events on the event chain, main was activated at time=inf, which made it
+difficult to get useful time stamped statistics.
+Therefore, from this version on main will become active at the time of the last event, when there are no more events. This condition is also properly traced now.
+
+Bug fixes
+---------
+When a timestamped monitor was run till inf, the print_histogram method did not work properly. Fixed.
+
+The linenumber in trace for 'request honor' or 'wait honor' was not correct. Fixed.
+
+
 version 2.3.2.6  2018-08-09
 ===========================
 
 Bug fix
 -------
 Under Python 2.7 autoscaling histogram sometimes did result into a TypeError. Fixed.
+
+The wrong line number was displayed when tracing request honor and request wait. Fixed.
 
 
 version 2.3.2.5  2018-08-08

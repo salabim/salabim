@@ -6,7 +6,7 @@ see www.salabim.org for more information, the documentation, updates and license
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.2.6'
+__version__ = '2.3.3'
 
 import heapq
 import random
@@ -1046,12 +1046,15 @@ class Monitor(object):
                             count = self.bin_number_of_entries(lb, ub)
 
                         perc = count / weight_total
-                        cumperc += perc
-                        scale = 80
-                        n = int(perc * scale)
-                        ncum = int(cumperc * scale) + 1
-                        s = ('*' * n) + (' ' * (scale - n))
-                        s = s[:ncum - 1] + '|' + s[ncum + 1:]
+                        if weight_total == inf:
+                            s = ''
+                        else:
+                            cumperc += perc
+                            scale = 80
+                            n = int(perc * scale)
+                            ncum = int(cumperc * scale) + 1
+                            s = ('*' * n) + (' ' * (scale - n))
+                            s = s[:ncum - 1] + '|' + s[ncum + 1:]
 
                         result.append('{} {}{}{} {}'.
                               format(fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s))
@@ -3682,6 +3685,7 @@ class Environment(object):
         self._synced = True
         self._step_pressed = False
         self.stopped = False
+        self.last_s0 = ''
         if Pythonista:
             self._width, self._height = ui.get_screen_size()
             self._width = int(self._width)
@@ -3705,6 +3709,8 @@ class Environment(object):
         self._video_out = None
         self._video_repeat = 1
         self._video_pingpong = False
+        self.tkinter_init = None
+        self.tkinter_exit = None
         self.an_modelname()
         self.an_clocktext()
 
@@ -3828,8 +3834,9 @@ class Environment(object):
         if self._event_list:
             (t, _, c) = heapq.heappop(self._event_list)
         else:
-            t = inf
+            t = self.env._now
             c = self._main
+            self.print_trace('', '', 'run ended', 'no more events', s0=c.lineno_txt())
         c._on_event_list = False
         self.env._now = t
 
@@ -3878,6 +3885,7 @@ class Environment(object):
       animate=True, synced=None, speed=None, width=None, height=None,
       x0=None, y0=None, x1=None, background_color=None, foreground_color=None,
       fps=None, modelname=None, use_toplevel=None,
+      tkinter_init=None, tkinter_exit=None,
       show_fps=None, show_time=None,
       video=None, video_repeat=None, video_pingpong=None):
         '''
@@ -3947,6 +3955,18 @@ class Environment(object):
             initialize the root with tkinter.TopLevel().
             In that case, set this parameter to True. |n|
             if False (default), the root will be initialized with tkinter.Tk()
+
+        tkinter_init : function or method (with parameter self=env)
+            if specified and not run under Pythonista, this function will be called immediately
+            after the setup of tkinter. The function gets one parameter, the root. |n|
+            With this, the animation can use more UI elements and then salabim provides. |n|
+            The name of root can be retrieved with self.root 
+
+        tkinter_exit : function or method (with parameter self=env)
+            if specified and not run under Pythonista, this function will be called immediately
+            before the destruction tkinter. The function gets one parameter, the environment. |n|
+            With this, the animation can use more UI elements and then salabim provides. |n|
+            The name of root can be retrieved with self.root 
 
         show_fps : bool
             if True, show the number of frames per second |n|
@@ -4050,6 +4070,9 @@ class Environment(object):
 
         if use_toplevel is not None:
             self.use_toplevel = use_toplevel
+            
+        self.tkinter_init = tkinter_init
+        self.tkinter_exit = tkinter_exit
 
         if animate is None:
             animate = self._animate  # no change
@@ -4142,6 +4165,8 @@ class Environment(object):
                     g.canvas.configure(background=self.colorspec_to_hex('bg', False))
                     g.canvas.pack()
                     g.canvas_objects = []
+                    if self.tkinter_init is not None:
+                        self.tkinter_init(self)   
 
                 self.uninstall_uios()  # this causes all ui objects to be (re)installed
 
@@ -4170,6 +4195,7 @@ class Environment(object):
                 self._video_out.release()
             self._video_out = None
             self._video = ''
+            
 
     def uninstall_uios(self):
         for uio in self.ui_objects:
@@ -4714,6 +4740,7 @@ class Environment(object):
             self.root.mainloop()
 
     def simulate_and_animate_loop(self):
+     
         while True:
             tick_start = time.time()
 
@@ -5433,7 +5460,7 @@ class Environment(object):
             s = 'line numbers refers to'
         for fullfilename, iref in self._source_files.items():
             if ref == iref:
-                self.print_trace('', '', s, os.path.basename(fullfilename), '')
+                self.print_trace('', '', s, (os.path.basename(fullfilename)), '')
                 break
 
     def _frame_to_lineno(self, frame):
@@ -5499,6 +5526,7 @@ class Environment(object):
                             break
 
                     s0 = self._frame_to_lineno(_get_caller_frame())
+                self.last_s0 = s0
                 line = pad(s0, 7) + pad(s1, 10) + ' ' + pad(s2, 20) + ' ' + \
                     pad(s3, max(len(s3), 36)) + ' ' + s4.strip()
                 if _optional:
@@ -7065,6 +7093,113 @@ class Animate(object):
                             pixels[x, y] = (255, 255, 255, 0)
 
 
+class AnimateEntry(object):
+    '''
+    defines a button
+
+    Parameters
+    ----------
+    x : int
+        x-coordinate of centre of the button in screen coordinates (default 0)
+
+    y : int
+        y-coordinate of centre of the button in screen coordinates (default 0)
+
+    number_of_chars : int
+        number of characters displayed in the entry field (default 20)
+
+    fillcolor : colorspec
+        color of the entry background (default foreground_color)
+
+    color : colorspec
+        color of the text (default background_color)
+
+    value : str
+        initial value of the text of the entry (default null string) |n|
+
+    action :  function
+        action to take when the Enter-key is pressed |n|
+        the function should have no arguments |n|
+
+    xy_anchor : str
+        specifies where x and y are relative to |n|
+        possible values are (default: sw): |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
+
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
+
+    Note
+    ----
+    This class is not available under Pythonista.
+    '''
+    def __init__(self, x=0, y=0, number_of_chars=20, value='',
+        fillcolor='fg', color='bg', text='', action=None, env=None, xy_anchor='sw'):
+        if Pythonista:
+            raise SalabimError('AnimateEntry not supported under Pythonista')
+        self.env = g.default_env if env is None else env
+        self.env.ui_objects.append(self)
+        self.type = 'entry'
+        self.value = value
+        self.sequence = self.env.serialize()
+        self.x = x
+        self.y = y
+        self.number_of_chars = number_of_chars
+        self.fillcolor = self.env.colorspec_to_tuple(fillcolor)
+        self.color = self.env.colorspec_to_tuple(color)
+        self.action = action
+        self.xy_anchor = xy_anchor 
+        self.installed = False
+
+    def install(self):
+        x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
+        y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
+
+        self.entry = tkinter.Entry(
+            self.env.root)
+        self.entry.configure(
+            width=self.number_of_chars,
+            foreground=self.env.colorspec_to_hex(self.color, False),
+            background=self.env.colorspec_to_hex(self.fillcolor, False),
+            relief=tkinter.FLAT)
+        self.entry.bind("<Return>", self.on_enter)
+        self.entry_window = g.canvas.create_window(
+            x, self.env._height - y,
+            anchor=tkinter.SW, window=self.entry)
+        self.entry.insert(0, self.value)
+        self.installed = True        
+        
+
+    def on_enter(self, ev):
+        if self.action is not None:
+            self.action()
+        
+    def get(self):
+        '''
+        get the current value of the entry
+        
+        Returns
+        -------
+        Current value of the entry : str
+        '''
+        return(self.entry.get())
+
+
+    def remove(self):
+        '''
+        removes the entry object. |n|
+        the ui object is removed from the ui queue,
+        so effectively ending this ui
+        '''
+        if self in self.env.ui_objects:
+            self.env.ui_objects.remove(self)
+        if self.installed:
+            self.entry.destroy()
+            self.installed = False
+    
 class AnimateButton(object):
     '''
     defines a button
@@ -7309,7 +7444,7 @@ class AnimateSlider(object):
 
     def v(self, value=None):
         '''
-        value |n|
+        value
 
         Parameters
         ----------
@@ -7408,6 +7543,30 @@ class AnimateQueue(object):
         ``w     c     e`` |n|
         ``sw    s    se``
 
+    titlecolor : colorspec
+        color of the title (default foreground color)
+
+    titlefont : font
+        font of the title (default '')
+
+    titlefontsize : int
+        size of the font of the title (default 15)
+
+    title : str
+        title to be shown above queue |n|
+        default: name of the queue
+
+    titleoffsetx : float
+        x-offset of the title relative to the start of the queue |n|
+        default: 25 if direction is w, -25 otherwise
+
+    titleoffsety : float
+        y-offset of the title relative to the start of the queue |n|
+        default: -25 if direction is s, -25 otherwise
+
+    layer : int
+        layer (default 0)
+
     id : any
         the animation works by calling the animation_objects method of each component, optionally
         with id. By default, this is self, but can be overriden, particularly with the queue
@@ -7426,7 +7585,7 @@ class AnimateQueue(object):
     ----
     All measures are in screen coordinates |n|
 
-    All parameters, apart from queue and arg can be specified as: |n|
+    All parameters, apart from queue, id, arg and parent can be specified as: |n|
     - a scalar, like 10 |n|
     - a function with zero arguments, like lambda: title |n|
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
@@ -7435,7 +7594,10 @@ class AnimateQueue(object):
     '''
 
     def __init__(self, queue, x=50, y=50, direction='w', max_length=None,
-        xy_anchor='sw', reverse=False, id=None, arg=None, parent=None):
+        xy_anchor='sw', reverse=False,
+        title=None, titlecolor='fg', titlefontsize=15, titlefont='', titleoffsetx=None, titleoffsety=None,
+        layer=0,
+        id=None, arg=None, parent=None):
         _checkisqueue(queue)
         self._queue = queue
         self.xy_anchor = xy_anchor
@@ -7449,6 +7611,22 @@ class AnimateQueue(object):
         self.current_aos = {}
         self.parent = parent
         self.env = queue.env
+        self.vx = 0
+        self.vy = 0
+        self.vangle = 0
+        self.vlayer = 0
+        self.vanchor = 'e'
+        self.titleoffsetx = titleoffsetx
+        self.titleoffsety = titleoffsety
+        self.titlefont = titlefont
+        self.titlefontsize = titlefontsize
+        self.titlecolor = titlecolor
+        self.title = title
+        self.layer = layer
+        self.aotitle = AnimateText(text=lambda: self.vtitle, textcolor=lambda: self.vtitlecolor,
+            x=lambda: self.vx, y=lambda: self.vy, text_anchor=lambda: self.vanchor, angle=lambda: self.vangle,
+            screen_coordinates=True, fontsize=lambda: self.vtitlefontsize, font=lambda: self.vtitlefont,
+            layer=lambda: self.vlayer)
         self.env.sys_objects.append(self)
 
     def update(self, t):
@@ -7460,8 +7638,36 @@ class AnimateQueue(object):
         y = _call(self.y, t, self.arg)
         direction = _call(self.direction, t, self.arg)
         reverse = _call(self.reverse, t, self.arg)
+        titleoffsetx = _call(self.titleoffsetx, t, self.arg)
+        titleoffsety = _call(self.titleoffsety, t, self.arg)
+        title = _call(self.title, t, self.arg)
+        self.vtitle = self._queue.name() if title is None else title
+        self.vtitlefont = _call(self.titlefont, t, self.arg)
+        self.vtitlefontsize = _call(self.titlefontsize, t, self.arg)
+        self.vtitlecolor = _call(self.titlecolor, t, self.arg)
+        self.vlayer = _call(self.layer, t, self.arg)
         x += self._queue.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True)
         y += self._queue.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True)
+        if direction == 'e':
+            self.vx = x + (-25 if titleoffsetx is None else titleoffsetx)
+            self.vy = y + (25 if self.titleoffsety is None else titleoffsety)
+            self.vanchor = 'sw'
+            self.vangle = 0
+        elif direction == 'w':
+            self.vx = x + (25 if titleoffsetx is None else titleoffsetx)
+            self.vy = y + (25 if self.titleoffsety is None else titleoffsety)
+            self.vanchor = 'se'
+            self.vangle = 0
+        elif direction == 'n':
+            self.vx = x + (-25 if titleoffsetx is None else titleoffsetx)
+            self.vy = y + (25if self.titleoffsety is None else titleoffsety)
+            self.vanchor='se'
+            self.vangle = 90
+        elif direction == 's':
+            self.vx = x + (-25 if titleoffsetx is None else titleoffsetx)
+            self.vy = y + (-25if self.titleoffsety is None else titleoffsety)
+            self.vanchor='se'
+            self.vangle = 90
 
         factor_x, factor_y = \
             {'w': (-1, 0), 'n': (0, 1), 'e': (1, 0), 's': (0, -1)}[direction.lower()]
@@ -7499,6 +7705,7 @@ class AnimateQueue(object):
         for animation_objects in self.current_aos.values():
             for ao in animation_objects[2:]:
                 ao.remove()
+        self.aotitle.remove()
         self.env.sys_objects.remove(self)
 
 
@@ -9213,7 +9420,7 @@ class Component(object):
             self._waits = []
             self._failed = True
 
-    def _reschedule(self, scheduled_time, urgent, caller, extra=''):
+    def _reschedule(self, scheduled_time, urgent, caller, extra='', s0=None):
         if scheduled_time < self.env._now:
             raise SalabimError(
                 'scheduled time ({:0.3f}) before now ({:0.3f})'.
@@ -9229,7 +9436,8 @@ class Component(object):
                     'scheduled for {:10.3f}'.format(scheduled_time - self.env._offset) +
                     _urgenttxt(urgent) + '@' + self.lineno_txt(),
                     _modetxt(self._mode),
-                    extra))
+                    extra),
+                s0=s0)
 
     def activate(self, at=None, delay=0, urgent=False, process=None,
       keep_request=False, keep_wait=False, mode=None, **kwargs):
@@ -9753,7 +9961,7 @@ class Component(object):
                 r.available_quantity.tally(r._capacity - r._claimed_quantity)
             self._requests = collections.defaultdict(int)
             self._remove()
-            self._reschedule(self.env._now, False, 'request honor')
+            self._reschedule(self.env._now, False, 'request honor', s0=self.env.last_s0)
         return honored
 
     def _release(self, r, q=None, s0=None):
@@ -10022,7 +10230,7 @@ class Component(object):
                     self.leave(s._waiters)
             self._waits = []
             self._remove()
-            self._reschedule(self.env._now, False, 'wait honor')
+            self._reschedule(self.env._now, False, 'wait honor', s0=self.env.last_s0)
 
         return honored
 
@@ -13635,6 +13843,11 @@ def requesting():
 def waiting():
     return 'waiting'
 
+def tkinter_init(env):
+    pass
+
+def tkinter_exit(env):
+    pass
 
 def random_seed(seed, randomstream=None):
     '''
@@ -13881,7 +14094,7 @@ def can_animate(try_only=True):
     global ImageTk
     global tkinter
     try:
-        import PIL  # NOQA ***
+        import PIL  # NOQA
         from PIL import Image
         from PIL import ImageDraw
         from PIL import ImageFont

@@ -11,18 +11,44 @@ Pythonista=(platform.system()=='Darwin')
 
 
 def test():
-    test78()
+    test84()
 
+def test86():
+
+    class X(sim.Component):
+        def setup(self, i):
+            self.i = i
+
+        def process(self):
+            while True:
+                yield self.hold(sim.Uniform(0,2)())
+                self.enter(q)
+                yield self.hold(sim.Uniform(0,2)())
+                self.leave(q)
+
+    env = sim.Environment(trace=False)
+    q = sim.Queue('wachtrij' )
+    qa0 = sim.AnimateQueue(q, x=500, y=300, direction='n')
+    [X(i=i) for i in range(15)]
+    env.animate(True)
+    env.run(5)
+    
+    qa0.remove()
+    env.run()
+    
 def test85():
-    env = sim.Environment()
+    env = sim.Environment(trace=True)
     q=sim.Queue(name='queue')
     with open('test.txt', 'w') as f:
         q.print_statistics(file=f)
+    env.run()
 
 
 def test84():
-
-
+    def action():
+        print(en.get())
+        en.remove()
+        
     class carAnimateCircle1(sim.Animate):
 
         def __init__(self, car):
@@ -76,6 +102,7 @@ def test84():
             while True:
                 yield self.hold(1, mode='Driving')
                 yield self.hold(1, mode='Stand still')
+                
 
     env=sim.Environment()
     Car(R=100)
@@ -83,9 +110,15 @@ def test84():
     env.x0(-200)
     env.x1(200)
     env.y0(-150)
+    sim.AnimateLine((0,0,100-3,100-3), screen_coordinates=True)
+
+
+    en=sim.AnimateEntry(x=100, y=100, action=action)
 
     env.run()
 
+
+    
 def test83():
     l1 = []
 
@@ -261,7 +294,7 @@ def test77():
         def setup(self, i):
             self.i = i
 
-        def animation_objects(self,id ):
+        def animation_objects1(self,id ):
             if id =='text':
                 ao0 = sim.AnimateText(text=self.name(), textcolor='black')
                 return 0, 20, ao0
@@ -280,7 +313,7 @@ def test77():
     qa0 = sim.AnimateQueue(q, x=lambda t: 100+t*10, y=y, direction='e', reverse=False, id='blue')
     qa1 = sim.AnimateQueue(q, x=100, y=y, direction='e', reverse=False, max_length=6, id='red')
     qa2 = sim.AnimateQueue(q, x=100, y=y, direction='e', reverse=True, max_length=6, id='green')
-    qa3 = sim.AnimateQueue(q, x=100, y=200, direction='n', id='text')
+    qa3 = sim.AnimateQueue(q, x=100, y=200, direction='n', id='text', title='A very long title')
     [X(i=i) for i in range(15)]
     env.animate(True)
     env.run(5)
