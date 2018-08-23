@@ -11,7 +11,31 @@ Pythonista=(platform.system()=='Darwin')
 
 
 def test():
-    test84()
+    test87()
+    
+def test87():
+    def dump_an_objects():
+        print('dump')
+        for ao in env.an_objects:
+            print(ao.type, ao.text(env.t) if ao.type=='text' else '')
+            
+    class X(sim.Component):
+        def process(self):
+            start = env.t
+            an = sim.AnimateText('Hello', x=lambda t: (t - start) *100 , y=100)
+            dump_an_objects()
+            yield self.hold(5)
+            an.remove()
+            dump_an_objects()
+            yield self.hold(6)
+
+    env = sim.Environment(trace=False)
+    env.animate(True)
+    sim.AnimateText('abc', x=100,y=200)
+    X()
+
+    env.run(6)
+    
 
 def test86():
 
@@ -20,7 +44,7 @@ def test86():
             self.i = i
 
         def process(self):
-            while True:
+            for i in range(2):
                 yield self.hold(sim.Uniform(0,2)())
                 self.enter(q)
                 yield self.hold(sim.Uniform(0,2)())
@@ -31,9 +55,7 @@ def test86():
     qa0 = sim.AnimateQueue(q, x=500, y=300, direction='n')
     [X(i=i) for i in range(15)]
     env.animate(True)
-    env.run(5)
-    
-    qa0.remove()
+
     env.run()
     
 def test85():

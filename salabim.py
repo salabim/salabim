@@ -6,7 +6,7 @@ see www.salabim.org for more information, the documentation, updates and license
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.3'
+__version__ = '2.3.3.1'
 
 import heapq
 import random
@@ -3709,8 +3709,6 @@ class Environment(object):
         self._video_out = None
         self._video_repeat = 1
         self._video_pingpong = False
-        self.tkinter_init = None
-        self.tkinter_exit = None
         self.an_modelname()
         self.an_clocktext()
 
@@ -3885,7 +3883,6 @@ class Environment(object):
       animate=True, synced=None, speed=None, width=None, height=None,
       x0=None, y0=None, x1=None, background_color=None, foreground_color=None,
       fps=None, modelname=None, use_toplevel=None,
-      tkinter_init=None, tkinter_exit=None,
       show_fps=None, show_time=None,
       video=None, video_repeat=None, video_pingpong=None):
         '''
@@ -3955,18 +3952,6 @@ class Environment(object):
             initialize the root with tkinter.TopLevel().
             In that case, set this parameter to True. |n|
             if False (default), the root will be initialized with tkinter.Tk()
-
-        tkinter_init : function or method (with parameter self=env)
-            if specified and not run under Pythonista, this function will be called immediately
-            after the setup of tkinter. The function gets one parameter, the root. |n|
-            With this, the animation can use more UI elements and then salabim provides. |n|
-            The name of root can be retrieved with self.root 
-
-        tkinter_exit : function or method (with parameter self=env)
-            if specified and not run under Pythonista, this function will be called immediately
-            before the destruction tkinter. The function gets one parameter, the environment. |n|
-            With this, the animation can use more UI elements and then salabim provides. |n|
-            The name of root can be retrieved with self.root 
 
         show_fps : bool
             if True, show the number of frames per second |n|
@@ -4071,9 +4056,6 @@ class Environment(object):
         if use_toplevel is not None:
             self.use_toplevel = use_toplevel
             
-        self.tkinter_init = tkinter_init
-        self.tkinter_exit = tkinter_exit
-
         if animate is None:
             animate = self._animate  # no change
         else:
@@ -4165,8 +4147,6 @@ class Environment(object):
                     g.canvas.configure(background=self.colorspec_to_hex('bg', False))
                     g.canvas.pack()
                     g.canvas_objects = []
-                    if self.tkinter_init is not None:
-                        self.tkinter_init(self)   
 
                 self.uninstall_uios()  # this causes all ui objects to be (re)installed
 
@@ -4568,7 +4548,7 @@ class Environment(object):
             if self._event_list:
                 return self._event_list[0][0]
             else:
-                return inf
+                return self._now  # here the event list is empty, so return last event time
 
     def main(self):
         '''
@@ -4825,10 +4805,11 @@ class Environment(object):
 
             self.animation_post_tick(self.t)
 
-            for co in canvas_objects_iter:
+            while co is not None:
                 g.canvas.delete(co)
                 g.canvas_objects.remove(co)
-
+                co = next(canvas_objects_iter, None)
+                
             for uio in self.ui_objects:
                 if not uio.installed:
                     uio.install()
@@ -13842,12 +13823,6 @@ def requesting():
 
 def waiting():
     return 'waiting'
-
-def tkinter_init(env):
-    pass
-
-def tkinter_exit(env):
-    pass
 
 def random_seed(seed, randomstream=None):
     '''

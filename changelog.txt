@@ -1,5 +1,20 @@
 salabim  changelog
 
+
+version 2.3.3.1  2018-08-23
+===========================
+
+Implementation note
+-------------------
+Not documented tkinter_init and tkinit_exit code removed.
+
+Bug fix
+-------
+From version 2.3.3 main will be reactivated once there are no more events. This functionality was not
+supported when running animated. Fixed.
+
+Sometimes an animation object was not removed correctly (under tkinter). Fixed.
+
 version 2.3.3  2018-08-22
 =========================
 New functionality
