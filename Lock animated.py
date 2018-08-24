@@ -54,7 +54,7 @@ def do_animation():
         x0=xbound[left], y0=-waterdepth, x1=xbound[right], modelname='Lock', speed=8, background_color='20%gray')
 
     for side in [left, right]:
-        sim.AnimateQueue(queue=wait[side], x=xdoor[side], y=10 + ylevel[side], direction='n')
+        sim.AnimateQueue(queue=wait[side], x=xdoor[side], y=10 + ylevel[side], direction='n', title='')
 
     sim.AnimateRectangle(spec=(xbound[left], ylevel[left] - waterdepth,
                             xdoor[left], ylevel[left]), fillcolor='aqua')
@@ -83,7 +83,7 @@ def do_animation():
 
     sim.AnimateQueue(
         queue=lockqueue, x=lambda: xdoor[-lock.sideq], y=lock_y,
-        direction=lambda: 'w' if lock.sideq == left else 'e')
+        direction=lambda: 'w' if lock.sideq == left else 'e', title='')
 
 
 def set_iat(val):

@@ -57,13 +57,13 @@ def do_animation():
         sim.AnimateText(x=xsign, y=y + yvisitor_dim / 2,
             text=str(floor.n), fontsize=xvisitor_dim / 2)
 
-        sim.AnimateQueue(queue=floor.visitors, x=xwait - xvisitor_dim, y=floor.y, direction='w')
+        sim.AnimateQueue(queue=floor.visitors, x=xwait - xvisitor_dim, y=floor.y, direction='w', title='')
 
     for car in cars:
         x = xcar[car]
         car.pic = sim.AnimateRectangle(x=x, y=car.y,
            spec=(0, 0, capacity * xvisitor_dim, yvisitor_dim), fillcolor='lightblue', linewidth=0)
-        sim.AnimateQueue(queue=car.visitors, x=xcar[car], y=car.y, direction='e', arg=car)
+        sim.AnimateQueue(queue=car.visitors, x=xcar[car], y=car.y, direction='e', title='', arg=car)
 
     ncars_last = ncars
     sim.AnimateSlider(x=510, y=0, width=90, height=20,
