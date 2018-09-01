@@ -20,7 +20,7 @@ class X(sim.Component):
         any other value represents the colour
         '''
         if id == 'text':
-            ao0 = sim.AnimateText(text=self.name(), textcolor='fg', text_anchor='nw')
+            ao0 = sim.AnimateText(text=self.name(), textcolor='fg', text_anchor='nw', offsetx=-20)
             return 0, 16, ao0
         else:
             ao0 = sim.AnimateRectangle((-20, 0, 20, 20),
@@ -40,10 +40,10 @@ env.background_color('20%gray')
 
 q = sim.Queue('queue')
 
-qa0 = sim.AnimateQueue(q, x=100, y=50, title='queue, normal', direction='e', id='blue')
-qa1 = sim.AnimateQueue(q, x=100, y=250, title='queue, maximum 6 components', direction='e', max_length=6, id='red')
-qa2 = sim.AnimateQueue(q, x=100, y=150, title='queue, reversed', direction='e', reverse=True, id='green')
-qa3 = sim.AnimateQueue(q, x=100, y=440, title='queue, text only', direction='s', id='text')
+qa0 = sim.AnimateQueue(q, x=100, y=25, title='queue, normal', direction='e', id='blue')
+qa1 = sim.AnimateQueue(q, x=100, y=75, title='queue, reversed', direction='e', reverse=True, id='green')
+qa2 = sim.AnimateQueue(q, x=100, y=125, title='queue, maximum 6 components', direction='e', max_length=6, id='red')
+qa3 = sim.AnimateQueue(q, x=100, y=350, title='queue, text only', direction='s', id='text')
 
 sim.AnimateMonitor(q.length, x=10, y=450, width=480, height=100, horizontal_scale=5, vertical_scale=5)
 
@@ -59,4 +59,3 @@ sim.AnimateText(text=lambda: q.print_info(as_str=True), x=500, y=340,
 env.animate(True)
 env.modelname('Demo queue animation')
 env.run()
-

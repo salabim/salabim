@@ -6,7 +6,7 @@ see www.salabim.org for more information, the documentation, updates and license
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.3.1'
+__version__ = '2.3.3.2'
 
 import heapq
 import random
@@ -2398,6 +2398,8 @@ if Pythonista:
                     ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True)
                     uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True)
 
+                    if uio.type == 'entry':
+                        raise SalabimError('AnimateEntry not supported on Pythonista')
                     if uio.type == 'button':
                         linewidth = uio.linewidth
 
@@ -3682,6 +3684,7 @@ class Environment(object):
         self._animate = False
         self.running = False
         self.t = 0
+        self.video_t = 0
         self._synced = True
         self._step_pressed = False
         self.stopped = False
@@ -3832,9 +3835,12 @@ class Environment(object):
         if self._event_list:
             (t, _, c) = heapq.heappop(self._event_list)
         else:
-            t = self.env._now
             c = self._main
-            self.print_trace('', '', 'run ended', 'no more events', s0=c.lineno_txt())
+            if self.end_on_empty_eventlist:
+                t = self.env._now
+                self.print_trace('', '', 'run ended', 'no events left', s0=c.lineno_txt())
+            else:
+                t = inf
         c._on_event_list = False
         self.env._now = t
 
@@ -4055,7 +4061,7 @@ class Environment(object):
 
         if use_toplevel is not None:
             self.use_toplevel = use_toplevel
-            
+
         if animate is None:
             animate = self._animate  # no change
         else:
@@ -4175,7 +4181,6 @@ class Environment(object):
                 self._video_out.release()
             self._video_out = None
             self._video = ''
-            
 
     def uninstall_uios(self):
         for uio in self.ui_objects:
@@ -4548,7 +4553,10 @@ class Environment(object):
             if self._event_list:
                 return self._event_list[0][0]
             else:
-                return self._now  # here the event list is empty, so return last event time
+                if self.end_on_empty_eventlist:
+                    return self._now
+                else:
+                    return inf
 
     def main(self):
         '''
@@ -4677,11 +4685,19 @@ class Environment(object):
 
         Note
         ----
+        if neither till nor duration is specified, the main component will be reactivated at
+        the time there are no more events on the eventlist, i.e. usualy not at inf. |n|
+        if you want to run till inf, issue run(sim.inf) |n|
         only issue run() from the main level
         '''
+
+        self.end_on_empty_eventlist = False
+        extra = ''
         if till is None:
             if duration is None:
                 scheduled_time = inf
+                self.end_on_empty_eventlist = True
+                extra = '*'
             else:
                 if duration == inf:
                     scheduled_time = inf
@@ -4694,7 +4710,7 @@ class Environment(object):
                 raise SalabimError('both duration and till specified')
 
         self._main.frame = _get_caller_frame()
-        self._main._reschedule(scheduled_time, urgent, 'run')
+        self._main._reschedule(scheduled_time, urgent, 'run', extra=extra)
 
         self.running = True
         while self.running:
@@ -4720,7 +4736,7 @@ class Environment(object):
             self.root.mainloop()
 
     def simulate_and_animate_loop(self):
-     
+
         while True:
             tick_start = time.time()
 
@@ -4809,7 +4825,7 @@ class Environment(object):
                 g.canvas.delete(co)
                 g.canvas_objects.remove(co)
                 co = next(canvas_objects_iter, None)
-                
+
             for uio in self.ui_objects:
                 if not uio.installed:
                     uio.install()
@@ -7119,8 +7135,6 @@ class AnimateEntry(object):
     '''
     def __init__(self, x=0, y=0, number_of_chars=20, value='',
         fillcolor='fg', color='bg', text='', action=None, env=None, xy_anchor='sw'):
-        if Pythonista:
-            raise SalabimError('AnimateEntry not supported under Pythonista')
         self.env = g.default_env if env is None else env
         self.env.ui_objects.append(self)
         self.type = 'entry'
@@ -7132,7 +7146,7 @@ class AnimateEntry(object):
         self.fillcolor = self.env.colorspec_to_tuple(fillcolor)
         self.color = self.env.colorspec_to_tuple(color)
         self.action = action
-        self.xy_anchor = xy_anchor 
+        self.xy_anchor = xy_anchor
         self.installed = False
 
     def install(self):
@@ -7151,23 +7165,21 @@ class AnimateEntry(object):
             x, self.env._height - y,
             anchor=tkinter.SW, window=self.entry)
         self.entry.insert(0, self.value)
-        self.installed = True        
-        
+        self.installed = True
 
     def on_enter(self, ev):
         if self.action is not None:
             self.action()
-        
+
     def get(self):
         '''
         get the current value of the entry
-        
+
         Returns
         -------
         Current value of the entry : str
         '''
         return(self.entry.get())
-
 
     def remove(self):
         '''
@@ -7180,7 +7192,8 @@ class AnimateEntry(object):
         if self.installed:
             self.entry.destroy()
             self.installed = False
-    
+
+
 class AnimateButton(object):
     '''
     defines a button
@@ -7641,14 +7654,14 @@ class AnimateQueue(object):
             self.vangle = 0
         elif direction == 'n':
             self.vx = x + (-25 if titleoffsetx is None else titleoffsetx)
-            self.vy = y + (25if self.titleoffsety is None else titleoffsety)
-            self.vanchor='se'
-            self.vangle = 90
+            self.vy = y + (-25 - self.vtitlefontsize if self.titleoffsety is None else titleoffsety)
+            self.vanchor = 'sw'
+            self.vangle = 0
         elif direction == 's':
             self.vx = x + (-25 if titleoffsetx is None else titleoffsetx)
-            self.vy = y + (-25if self.titleoffsety is None else titleoffsety)
-            self.vanchor='se'
-            self.vangle = 90
+            self.vy = y + (25if self.titleoffsety is None else titleoffsety)
+            self.vanchor = 'sw'
+            self.vangle = 0
 
         factor_x, factor_y = \
             {'w': (-1, 0), 'n': (0, 1), 'e': (1, 0), 's': (0, -1)}[direction.lower()]
@@ -9411,10 +9424,15 @@ class Component(object):
             self._push(scheduled_time, urgent)
         self._status = scheduled
         if self.env._trace:
+            if extra == '*':
+                scheduled_time_str = 'ends on no events left  '
+                extra = ' '
+            else:
+                scheduled_time_str = 'scheduled for {:10.3f}'.format(scheduled_time - self.env._offset) 
             self.env.print_trace(
                 '', '', self.name() + ' ' + caller,
                 merge_blanks(
-                    'scheduled for {:10.3f}'.format(scheduled_time - self.env._offset) +
+                    scheduled_time_str +
                     _urgenttxt(urgent) + '@' + self.lineno_txt(),
                     _modetxt(self._mode),
                     extra),
@@ -13823,6 +13841,7 @@ def requesting():
 
 def waiting():
     return 'waiting'
+
 
 def random_seed(seed, randomstream=None):
     '''

@@ -1,5 +1,30 @@
 salabim  changelog
 
+version 2.3.3.2  2018-08-25
+===========================
+Changed functionality
+---------------------
+If Environment.run() is given a till or a duration, main will become active at the specified time.
+If not, main will become active when there are no more events on the event list. This will be shown
+in the trace with 'ends on no events left'.
+So, if you don't want a simulation to stop at the moment the event list becomes empty, issue
+    env.run(sim.inf)
+This can particularly be useful if you don't want to stop an animation when there are no events left.
+
+
+The placement of the title of AnimateQueue() and Queue.animate() when the direction is 'n' or 's' has
+been changed. Now the title is always displayed horizontally.
+
+
+Implementation note
+-------------------
+Error reporting for AnimateEntry on Pythonista now only when actually animating.
+
+
+Big fix
+-------
+On Pythonista, setting env.video parameter without animating, caused a crash. Fixed.
+
 
 version 2.3.3.1  2018-08-23
 ===========================
@@ -14,6 +39,7 @@ From version 2.3.3 main will be reactivated once there are no more events. This 
 supported when running animated. Fixed.
 
 Sometimes an animation object was not removed correctly (under tkinter). Fixed.
+
 
 version 2.3.3  2018-08-22
 =========================
