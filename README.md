@@ -1,6 +1,4 @@
-![Logo](http://www.salabim.org/salabim_logo_red_black_300px.png)
-
-discrete event simulation in Python
+![Logo](http://www.salabim.org/salabim logo red black with payof 300px wide.png)
 
 Fully object oriented simulation, similar to must and Tomas.
 
