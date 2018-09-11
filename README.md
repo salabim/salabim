@@ -1,4 +1,4 @@
-![Logo](http://www.salabim.org/salabim logo red black with payof 300px wide.png)
+![Logo](http://www.salabim.org/salabim_logo_red_black_with_payoff_300px_wide.png)
 
 Fully object oriented simulation, similar to must and Tomas.
 
