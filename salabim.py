@@ -6,7 +6,7 @@ see www.salabim.org for more information, the documentation, updates and license
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.3.2'
+__version__ = '2.3.4'
 
 import heapq
 import random
@@ -23,6 +23,7 @@ import itertools
 import io
 import pickle
 import logging
+import types
 
 Pythonista = (sys.platform == 'ios')
 Windows = (sys.platform.startswith('win'))
@@ -72,7 +73,7 @@ class ItemFile(object):
         run_name = f.read_item()
         f.close()
 
-    Item files consists of individual items separated by whitespace (blank or tab)|n|
+    Item files consist of individual items separated by whitespace (blank or tab)|n|
     If a blank or tab is required in an item, use single or double quotes |n|
     All text following # on a line is ignored |n|
     All texts on a line within curly brackets {} is ignored and considered white space. |n|
@@ -246,7 +247,9 @@ class Monitor(object):
 
     merge: list, tuple or set
         the monitor will be created by merging the monitors mentioned in the list |n|
-        note that the types of all to be merged monitors should be the same. |n|
+        note that the types of all to be merged monitors should be the same and
+        that either all to be merged monitors are weighted or all to be merged monitors
+        are non weighted. |n|
         default: no merge
 
     env : Environment
@@ -798,7 +801,7 @@ class Monitor(object):
             if True, return a string containing the statistics
 
         file: file
-            if None(default), all output is directed to stdout |n|
+            if Noneb(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
         Returns
@@ -1901,7 +1904,7 @@ class MonitorTimestamp(Monitor):
         -------
         array/list with x-values and array with durations : tuple
         '''
-        return self.xweight(self, *args, **kwargs)
+        return Monitor.xweight(self, *args, **kwargs)
 
     def xweight(self, *args, **kwargs):
         self.set_x_weight()
@@ -3794,39 +3797,26 @@ class Environment(object):
 
         for advanced use with animation / GUI loops
         '''
-        if len(self.env._pendingstandbylist) > 0:
-            c = self.env._pendingstandbylist.pop(0)
-            if c._status == standby:  # skip cancelled components
-                c._status = current
-                c._scheduled_time = inf
-                self.env._current_component = c
-                if self._trace:
-                    self.print_trace('{:10.3f}'.format(self._now - self.env._offset), c.name(),
-                        'current (standby)', s0=c.lineno_txt(), _optional=self._suppress_trace_standby)
-                try:
-                    next(c._process)
-                    return
-                except StopIteration:
-                    if self._trace:
-                        gi_code = c._process.gi_code
-                        gs = inspect.getsourcelines(gi_code)
-                        s0 = self.filename_lineno_to_str(gi_code.co_filename, len(gs[0]) + gs[1] - 1) + '+'
-                    else:
-                        s0 = None
-                    for r in list(c._claims):
-                        c._release(r, s0=s0)
-                    if self._trace:
-                        self.print_trace('', '', c.name() + ' ended', s0=s0)
-                    c._status = data
+        if not self._current_component._skip_standby:
+            if len(self.env._pendingstandbylist) > 0:
+                c = self.env._pendingstandbylist.pop(0)
+                if c._status == standby:  # skip cancelled components
+                    c._status = current
                     c._scheduled_time = inf
-                    c._process = None
-                    for ao in self.an_objects[:]:
-                        if ao.parent == c:
-                            self.an_objects.remove(ao)
-                    for so in self.sys_objects[:]:
-                        if so.parent == c:
-                            so.remove()
-                    return
+                    self.env._current_component = c
+                    if self._trace:
+                        self.print_trace('{:10.3f}'.format(self._now - self.env._offset), c.name(),
+                            'current (standby)', s0=c.lineno_txt(), _optional=self._suppress_trace_standby)
+                    try:
+                        next(c._process)
+                        return
+                    except TypeError:
+                        c._process(**c._process_kwargs)
+                        self._terminate(c)
+                        return
+                    except StopIteration:
+                        self._terminate(c)
+                        return
 
         if len(self.env._standbylist) > 0:
             self._pendingstandbylist = list(self.env._standbylist)
@@ -3855,30 +3845,43 @@ class Environment(object):
             self.running = False
             return
         c._check_fail()
-        try:
-            next(c._process)
-            return
-        except StopIteration:
+        if c._process_isgenerator:
+            try:
+                next(c._process)
+            except StopIteration:
+                self._terminate(c)
+        else:
+            c._process(**c._process_kwargs)
+            self._terminate(c)
+
+    def _terminate(self, c):
+        if c._process_isgenerator:
             if self._trace:
                 gi_code = c._process.gi_code
                 gs = inspect.getsourcelines(gi_code)
                 s0 = self.filename_lineno_to_str(gi_code.co_filename, len(gs[0]) + gs[1] - 1) + '+'
             else:
                 s0 = None
-            for r in list(c._claims):
-                c._release(r, s0=s0)
+        else:
             if self._trace:
-                self.print_trace('', '', c.name() + ' ended', s0=s0)
-            c._status = data
-            c._scheduled_time = inf
-            c._process = None
-            for ao in self.an_objects[:]:
-                if ao.parent == c:
-                    self.an_objects.remove(ao)
-            for so in self.sys_objects[:]:
-                if so.parent == c:
-                    so.remove()
-            return
+                gs = inspect.getsourcelines(c._process)
+                s0 = self.filename_lineno_to_str(c._process.__code__.co_filename, len(gs[0]) + gs[1] - 1) + '+'
+            else:
+                s0 = None
+
+        for r in list(c._claims):
+            c._release(r, s0=s0)
+        if self._trace:
+            self.print_trace('', '', c.name() + ' ended', s0=s0)
+        c._status = data
+        c._scheduled_time = inf
+        c._process = None
+        for ao in self.an_objects[:]:
+            if ao.parent == c:
+                self.an_objects.remove(ao)
+        for so in self.sys_objects[:]:
+            if so.parent == c:
+                so.remove()
 
     def _print_event_list(self, s):
         print('eventlist ', s)
@@ -3912,12 +3915,12 @@ class Environment(object):
         width : int
             width of the animation in screen coordinates |n|
             if omitted, no change. At init of the environment, the width will be
-            set to 1024 for CPython and the current screen width for Pythonista.
+            set to 1024 for non Pythonista and the current screen width for Pythonista.
 
         height : int
             height of the animation in screen coordinates |n|
             if omitted, no change. At init of the environment, the height will be
-            set to 768 for CPython and the current screen height for Pythonista.
+            set to 768 for non Pythonista and the current screen height for Pythonista.
 
         x0 : float
             user x-coordinate of the lower left corner |n|
@@ -3930,7 +3933,7 @@ class Environment(object):
         x1 : float
             user x-coordinate of the lower right corner |n|
             if omitted, no change. At init of the environment, x1 will be set to 1024
-            for CPython and the current screen width for Pythonista.
+            for non Pythonista and the current screen width for Pythonista.
 
         background_color : colorspec
             color of the background |n|
@@ -3970,10 +3973,11 @@ class Environment(object):
         video : str
             if video is not omitted, a video with the name video
             will be created. |n|
+            Normally, use .mp4 as extension. |n|
             If the video extension is not .gif, a codec may be added
             by appending a plus sign and the four letter code name,
-            like 'myvideo.avi+DIVX'.
-            If no codec is given, MP4V will be used.
+            like 'myvideo.avi+DIVX'. |n|
+            If no codec is given, MP4V will be used as codec.
 
         video_repeat : int
             number of times gif should be repeated |n|
@@ -4266,6 +4270,96 @@ class Environment(object):
         It is not possible to set this value explicitely.
         '''
         return self._scale
+
+    def user_to_screencoordinates_x(self, userx):
+        '''
+        converts a user x coordinate to a screen x coordinate
+
+        Parameters
+        ----------
+        userx : float
+            user x coordinate to be converted
+
+        Returns
+        -------
+        screen x coordinate : float
+        '''
+        return (userx - self._x0) * self._scale
+
+    def user_to_screencoordinates_y(self, usery):
+        '''
+        converts a user x coordinate to a screen x coordinate
+
+        Parameters
+        ----------
+        usery : float
+            user y coordinate to be converted
+
+        Returns
+        -------
+        screen y coordinate : float
+        '''
+        return (usery - self._y0) * self._scale
+
+    def user_to_screencoordinates_size(self, usersize):
+        '''
+        converts a user size to a value to be used with screen coordinates
+
+        Parameters
+        ----------
+        usersize : float
+            user size to be converted
+
+        Returns
+        -------
+        value corresponding with usersize in screen coordinates : float
+        '''
+        return usersize * self._scale
+
+    def screen_to_usercoordinates_x(self, screenx):
+        '''
+        converts a screen x coordinate to a user x coordinate
+
+        Parameters
+        ----------
+        screenx : float
+            screen x coordinate to be converted
+
+        Returns
+        -------
+        user x coordinate : float
+        '''
+        return self._x0 + screenx / self._scale
+
+    def screen_to_usercoordinates_y(self, screeny):
+        '''
+        converts a screen x coordinate to a user x coordinate
+
+        Parameters
+        ----------
+        screeny : float
+            screen y coordinate to be converted
+
+        Returns
+        -------
+        user y coordinate : float
+        '''
+        return self._y0 + screeny / self._scale
+
+    def screen_to_usercoordinates_size(self, screensize):
+        '''
+        converts a screen size to a value to be used with user coordinates
+
+        Parameters
+        ----------
+        screensize : float
+            screen size to be converted
+
+        Returns
+        -------
+        value corresponding with screensize in user coordinates : float
+        '''
+        return screensize / self._scale
 
     def width(self, value=None):
         '''
@@ -7131,6 +7225,7 @@ class AnimateEntry(object):
 
     Note
     ----
+    All measures are in screen coordinates |n|
     This class is not available under Pythonista.
     '''
     def __init__(self, x=0, y=0, number_of_chars=20, value='',
@@ -7253,8 +7348,9 @@ class AnimateButton(object):
 
     Note
     ----
-    On CPython/PyPy platforms, the tkinter functionality is used.
-    On Pythonista, this is emulated by salabim
+    All measures are in screen coordinates |n|
+    On Pythonista, this functionality is emulated by salabim
+    On other platforms, the tkinter functionality is used.
     '''
 
     def __init__(self, x=0, y=0, width=80, height=30,
@@ -7393,8 +7489,9 @@ class AnimateSlider(object):
     Note
     ----
     The current value of the slider is the v attibute of the slider. |n|
-    On CPython/PyPy platforms, the tkinter functionality is used. |n|
-    On Pythonista, this is emulated by salabim
+    All measures are in screen coordinates |n|
+    On Pythonista, this functionality is emulated by salabim
+    On other platforms, the tkinter functionality is used.
     '''
 
     def __init__(self, layer=0, x=0, y=0, width=100, height=20,
@@ -9101,6 +9198,12 @@ class Component(object):
         If False (default), the component will be paused when stepping |n|
         Can be queried or set later with the suppress_pause_at_step method.
 
+    skip_standby : bool
+        skip_standby indicator |n|
+        if True, after this component became current, do not activate standby components |n|
+        If False (default), after the component became current  activate standby components |n|
+        Can be queried or set later with the skip_standby method.
+
     mode : str preferred
         mode |n|
         will be used in trace and can be used in animations |n|
@@ -9113,7 +9216,7 @@ class Component(object):
     '''
 
     def __init__(self, name=None, at=None, delay=None, urgent=None,
-      process=None, suppress_trace=False, suppress_pause_at_step=False, mode=None,
+      process=None, suppress_trace=False, suppress_pause_at_step=False, skip_standby=False, mode=None,
       env=None, **kwargs):
         if env is None:
             self.env = g.default_env
@@ -9129,6 +9232,7 @@ class Component(object):
         self._on_event_list = False
         self._scheduled_time = inf
         self._failed = False
+        self._skip_standby = skip_standby
         self._creation_time = self.env._now
         self._suppress_trace = suppress_trace
         self._suppress_pause_at_step = suppress_pause_at_step
@@ -9141,8 +9245,9 @@ class Component(object):
             self._mode_time = self.env._now
 
         if process is None:
-            if self.hasprocess():
+            if hasattr(self, 'process'):
                 p = self.process
+                process_name = 'process'
             else:
                 p = None
         else:
@@ -9150,9 +9255,10 @@ class Component(object):
                 p = None
             else:
                 try:
-                    p = eval('self.' + process)
-                except:
-                    raise SalabimError('self.' + process + ' not found')
+                    p = getattr(self, process)
+                    process_name = process
+                except AttributeError:
+                    raise SalabimError('self.' + process + ' does not exist')
         if p is None:
             if at is not None:
                 raise SalabimError('at is not allowed for a data component')
@@ -9170,23 +9276,29 @@ class Component(object):
         else:
             self.env.print_trace('', '', self.name() +
                 ' create', _modetxt(self._mode))
-            if not inspect.isgeneratorfunction(p):
-                raise SalabimError(process, 'has no yield statement')
 
+            kwargs_p = {}
             if kwargs:
                 try:
                     parameters = inspect.signature(p).parameters
                 except AttributeError:
                     parameters = inspect.getargspec(p)[0]  # pre Python 3.4
-                kwargs_p = {}
+
                 for kwarg in list(kwargs):
                     if kwarg in parameters:
                         kwargs_p[kwarg] = kwargs[kwarg]
                         del kwargs[kwarg]  # here kwargs consumes the used arguments
+
+            if inspect.isgeneratorfunction(p):
                 self._process = p(**kwargs_p)
+                self._process_isgenerator = True
             else:
-                self._process = p()
-            extra = 'process=' + self._process.__name__
+                self._process = p
+                self._process_isgenerator = False
+                self._process_kwargs = kwargs_p
+
+            extra = 'process=' + process_name
+
             if urgent is None:
                 urgent = False
             if delay is None:
@@ -9361,14 +9473,6 @@ class Component(object):
                     ' value=' + str(value))
         return return_or_print(result, as_str, file)
 
-    def hasprocess(self):
-        if hasattr(self, 'process'):
-            if inspect.isgeneratorfunction(self.process):
-                return True
-            else:
-                raise SalabimError('process has no yield statement')
-        return False
-
     def _push(self, t, urgent):
         self.env._seq += 1
         if urgent:
@@ -9428,7 +9532,7 @@ class Component(object):
                 scheduled_time_str = 'ends on no events left  '
                 extra = ' '
             else:
-                scheduled_time_str = 'scheduled for {:10.3f}'.format(scheduled_time - self.env._offset) 
+                scheduled_time_str = 'scheduled for {:10.3f}'.format(scheduled_time - self.env._offset)
             self.env.print_trace(
                 '', '', self.name() + ' ' + caller,
                 merge_blanks(
@@ -9496,22 +9600,21 @@ class Component(object):
         p = None
         if process is None:
             if self._status == data:
-                if self.hasprocess():
+                if hasattr(self, 'process'):
                     p = self.process
+                    process_name = 'process'
                 else:
                     raise SalabimError('no process for data component')
         else:
             try:
-                p = eval('self.' + process)
-            except:
-                raise SalabimError('self.' + process + ' not found')
+                p = getattr(self, process)
+                process_name = process
+            except AttributeError:
+                raise SalabimError('self.' + process + ' does not exist')
 
         if p is None:
             extra = ''
         else:
-            if not inspect.isgeneratorfunction(p):
-                raise SalabimError(process, 'has no yield statement')
-
             if kwargs:
                 try:
                     parameters = inspect.signature(p).parameters
@@ -9521,8 +9624,16 @@ class Component(object):
                 for kwarg in kwargs:
                     if kwarg not in parameters:
                         raise TypeError("unexpected keyword argument '" + kwarg + "'")
-            self._process = p(**kwargs)
-            extra = 'process=' + self._process.__name__
+
+            if inspect.isgeneratorfunction(p):
+                self._process = p(**kwargs)
+                self._process_isgenerator = True
+            else:
+                self._process = p
+                self._process_isgenerator = False
+                self._process_kwargs = kwargs
+
+            extra = 'process=' + process_name
 
         if self._status != current:
             self._remove()
@@ -10372,6 +10483,24 @@ class Component(object):
             self._suppress_pause_at_step = value
         return self._suppress_pause_at_step
 
+    def skip_standby(self, value=None):
+        '''
+        Parameters
+        ----------
+        value: bool
+            new skip_standby value |n|
+            if omitted, no change
+
+        Returns
+        -------
+        skip_standby indicator : bool
+            components with the skip_standby indicator of True, will not activate standby components after
+            the component became current.
+        '''
+        if value is not None:
+            self._skip_standby = value
+        return self._skip_standby
+
     def mode(self, value=None):
         '''
         Parameters
@@ -10942,10 +11071,14 @@ class Component(object):
         if self == self.env._main:
             frame = self.frame
         else:
-            frame = self._process.gi_frame
-            if frame.f_lasti == -1:  # checks whether generator is created
-                plus = ' '
-
+            if self._process_isgenerator:
+                frame = self._process.gi_frame
+                if frame.f_lasti == -1:  # checks whether generator is created
+                    plus = ' '
+            else:
+                gs = inspect.getsourcelines(self._process)
+                s0 = self.env.filename_lineno_to_str(self._process.__code__.co_filename, gs[1]) + ' '
+                return s0
         return self.env._frame_to_lineno(frame) + plus
 
 
@@ -10992,7 +11125,8 @@ class _Distribution():
         ----
         If, after number_of_tries retries, the sampled value is still not within the given bounds,
         fail_value  will be returned |n|
-        Samples that cannot be converted (only possible with Pdf) to float are assumed to be within the bounds.
+        Samples that cannot be converted (only possible with Pdf and CumPdf) to float
+        are assumed to be within the bounds.
         '''
         if (lowerbound == -inf) and (upperbound == inf):
             return self.sample()
@@ -13454,6 +13588,99 @@ class Resource(object):
             will be numbered)
         '''
         return self._sequence_number
+
+
+class _PeriodComponent(Component):
+    def setup(self, pm):
+        self.pm = pm
+
+    def process(self):
+        for iperiod, duration in itertools.cycle(enumerate(self.pm.periods)):
+            self.pm.perperiod[self.pm.iperiod].monitor(False)
+            self.pm.iperiod = iperiod
+            if self.pm.m._timestamp:
+                self.pm.perperiod[self.pm.iperiod].tally(self.pm.m())
+            self.pm.perperiod[self.pm.iperiod].monitor(True)
+            yield self.hold(duration)
+
+
+class PeriodMonitor(object):
+    '''
+    defines a number of (timestamped) period monitors for a given monitor.
+
+    Parameters
+    ----------
+    patent_monitor : Monitor.monitor or MonitorTimestamp.monitor 
+        parent_monitor to be divided into several period monitors for given time periods.
+
+    periods : list or tuple of floats
+        specifies the length of the period intervals. |n|
+        default: 24 * [1], meaning periods 0-1, 1-2, ..., 23-24 |n|
+        the periods do not have to be all the same.
+
+    period_monitor_names : list or tuple of string
+        specifies the names of the period monitors.
+        It is required that the length of period equals the length of period_monitor_names.
+        By default the names are composed of the name of the parent monitor
+
+    Note
+    ----
+    The period monitors can be accessed by indexing the instance of PeriodMonitor.
+    '''
+
+    @staticmethod
+    def new_tally(self, x):
+        for m in self.period_monitors:
+            m.perperiod[m.iperiod].tally(x)
+        self.org_tally(x)
+
+    @staticmethod
+    def new_reset(self, monitor=None):
+        for m in self.period_monitors:
+            for iperiod in range(len(m.periods)):
+                m.perperiod[iperiod].reset()
+        self.org_reset(monitor=monitor)
+
+    def __getitem__(self, i):
+        return self.perperiod[i]
+        
+    def remove(self):
+        '''
+        removes the period monitor
+        '''
+        self.pc.cancel()
+        del(self.periods)
+        self.m.period_monitors.remove(self)
+
+    def __init__(self, parent_monitor, periods=None, period_monitor_names=None):
+        self.pc = _PeriodComponent(pm=self, skip_standby=True, suppress_trace=True)
+        if periods is None:
+            periods = 24 * [1]
+        self.periods = periods
+        cum = 0
+        if period_monitor_names is None:
+            period_monitor_names = []
+            for duration in periods:
+                period_monitor_names.append(
+                    parent_monitor.name() + '.period [' + str(cum) + ' - ' + str(cum + duration) + ']')
+                cum += duration
+
+        self.m = parent_monitor
+        if not hasattr(self, 'period_monitors'):
+            self.m.period_monitors = []
+            self.m.org_tally = self.m.tally
+            self.m.tally = types.MethodType(self.new_tally, self.m)
+            self.m.org_reset = self.m.reset
+            self.m.reset = types.MethodType(self.new_reset, self.m)
+            self.m.period_monitors.append(self)
+
+        self.iperiod = 0
+        if self.m._timestamp:
+            self.perperiod = [MonitorTimestamp(
+                name=period_monitor_name, monitor=False) for period_monitor_name in period_monitor_names]
+        else:
+            self.perperiod = [Monitor(
+                name=period_monitor_name, monitor=False) for period_monitor_name in period_monitor_names]
 
 
 def colornames():

@@ -1,5 +1,79 @@
 salabim  changelog
 
+version 2.3.4  2018-09-20
+=========================
+New functionality
+-----------------
+From this version, salabim supports so called period monitors with the class PeriodMonitor.
+These period monitors can be used to get statistics about (timestamped) monitors per specific period.
+For instance if the time unit is hours a period monitor with 24 periods of 1, will give 24 monitors
+containing data about hour 0-1, 1-2, ... 23-24 (modulo 24).
+It is not necessary that the durations are all the same.
+The most obvious use case of this new functionality is to get period information about the builtin 
+queue monitors length and length_of_stay. 
+  qlength_per_hours= sim.PeriodMonitor(q.length, periods=24 * [1])
+  q_length_of_stay_per_hour = sim.PeriodMonitor(q.length_of_stay, periods=24 * [1])
+Then after a run, the histogram of the length of stay for hour 0-1 (modulo 24) can be printed with
+  q_length_of_stay_per_hour[0].print_histogram()
+And the mean length for hour 2-3 (modulo 24) can be retrieved with
+  q_length_per_hour[2].mean()
+Have a look at the sample program 'Demo periodmonitor.py' for an example, and the docstring or the
+latest documentation for the exact API specification.
+Please note that this class is still experimental functionality that might change in a future version.
+
+
+It is now possible to indicate that after a specific component returns control to the event scheduler,
+standby component should not be activated. This is particularly useful when a data collection component
+becomes current every so often. In that case, activating standby component is not useful and will just 
+consume processing power.
+There are two ways to indicate that a component should skip standby activation:
+- Component.skip_standby()
+- at initialization of a component, with the skip_standby parameter.
+Component.skip_standby() can also be used to query the current value.
+
+
+New methods
+-----------
+Added the methods
+- Environment.user_to_screen_coordinates_x()
+- Environment.user_to_screen_coordinates_y()
+- Environment.user_to_screen_coordinates_size()
+- Environment.screen_to_usercoordinates_x()
+- Environment.screen_to_usercoordinates_y()
+- Environment.screen_to_usercoordinates_size()
+to convert between user and screen coordinates and vice versa.
+These methods are particularly useful for position and sizing AnimateButtons, AnimateSliders or AnimateEntries. 
+
+
+Improved functionality
+----------------------
+It is no longer required that a process of a component contains a yield statement.
+So now ordinary methods (non generators) can now be activated.
+This is particularly useful for decision processes that do not consume any time.
+Note that these non generator methods can also be called with (keyword) parameters.
+
+
+Implementation notes
+--------------------
+Check for hasprocess() changed.
+Substantial refactoring to allow for non generator processes to be supported, particularly
+with respect to proper tracing.
+
+Process as defined in Component inititalization and Component.activate are no longer assessed
+by eval(), but by getattr(), resulting in more stable code.
+
+
+Bug fixes
+---------
+Bug in MonitorTimestamp.xduration() fixed.
+
+
+Announcement
+------------
+Python 2.7 will no longer be supported as from 31 December 2018.
+Please upgrade to Python 3.x as soon as possible.
+
+
 version 2.3.3.2  2018-08-25
 ===========================
 Changed functionality

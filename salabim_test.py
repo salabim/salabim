@@ -5,20 +5,162 @@ import string
 import time
 import logging
 import inspect
+import types
+import itertools
 
 import platform
 Pythonista=(platform.system()=='Darwin')
 
 
 def test():
-    test87()
-    
+    test91()
+
+def test91():
+    env = sim.Environment(trace=True)
+    env.animation_parameters(animate=True, x0=-10, x1=10, y0=-10)
+#    sim.AnimateLine((0,0,5,5))
+    print(env.scale())
+    print((env.screen_to_usercoordinates_x(0),env.screen_to_usercoordinates_y(0),env.screen_to_usercoordinates_x(1024),env.screen_to_usercoordinates_y(768)), env.screen_to_usercoordinates_size(1))    
+    sim.AnimateLine((env.screen_to_usercoordinates_x(0),env.screen_to_usercoordinates_y(0),env.screen_to_usercoordinates_x(1024),env.screen_to_usercoordinates_y(768)), linewidth=env.screen_to_usercoordinates_size(1))
+    sim.AnimateLine((env.user_to_screencoordinates_x(10),env.user_to_screencoordinates_y(-10), env.user_to_screencoordinates_x(-10),env.user_to_screencoordinates_y(10)), linewidth=env.user_to_screencoordinates_size(env.screen_to_usercoordinates_size(1)), screen_coordinates=True)
+    print('start')
+    env.run(sim.inf)
+
+def test90():
+    class X(sim.Component):
+
+        def process(self):
+            while True:
+                yield self.hold(sim.Uniform(0, 20)())
+                self.enter(q)
+                yield self.hold(sim.Uniform(0, 20)())
+                self.leave()
+
+    class Y(sim.Component):
+        def process(self):
+            while True:
+                yield self.standby()
+
+    class PeriodMonitor(sim.Component):
+        @staticmethod
+        def new_tally(self, x):
+            for m in self.period_monitors:
+                m.perperiod[m.iperiod].tally(x)
+            self.org_tally(x)
+
+        @staticmethod
+        def new_reset(self, monitor=None):
+            for m in self.period_monitors:
+                for iperiod in range(len(m.periods)):
+                    m.perperiod[iperiod].reset()
+            self.org_reset(monitor=monitor)
+
+        def __getitem__(self, i):
+            return self.perperiod[i]
+
+        def setup(self, monitor, periods=None):
+            try:  # salabim version <= 2.3.3.2 does not support skip_standby
+                self.skip_standby(True)
+            except AttributeError:
+                pass
+            if periods is None:
+                periods = 24 * [1]
+            self.m = monitor
+            if not hasattr(self, 'period_monitors'):
+                self.m.period_monitors = []
+                self.m.org_tally = self.m.tally
+                self.m.tally = types.MethodType(self.new_tally, self.m)
+                self.m.org_reset = self.m.reset
+                self.m.reset = types.MethodType(self.new_reset, self.m)
+                self.m.period_monitors.append(self)
+
+            self.iperiod=0
+            self.periods = periods
+            if self.m._timestamp:
+                self.perperiod = [sim.MonitorTimestamp(name=self.m.name() +'.period[' + str(i) + ']',
+                    monitor=False) for i in range(len(self.periods))]
+            else:
+                self.perperiod = [sim.Monitor(name=self.m.name() +'.period[' + str(i) + ']',
+                    monitor=False) for i in range(len(self.periods))]
+
+        def process(self):
+
+            while True:
+                for iperiod, duration in enumerate(self.periods):
+                    self.perperiod[self.iperiod].monitor(False)
+                    self.iperiod = iperiod
+                    if self.m._timestamp:
+                        self.perperiod[self.iperiod].tally(self.m())
+                    self.perperiod[self.iperiod].monitor(True)
+                    yield self.hold(duration)
+
+    env = sim.Environment(trace=False)
+    env.suppress_trace_standby(False)
+    q = sim.Queue(name='q')
+
+    qlength_per_hour = PeriodMonitor(monitor=q.length, periods=(24 * [1]), suppress_trace=True)
+    qlength_of_stay_per_hour = PeriodMonitor(monitor=q.length_of_stay, periods=(24 * [1]), suppress_trace=True)
+    [X() for i in range(15)]
+    Y()
+    env.run(2 * 24)
+    q.reset_monitors()
+    env.run(30 * 24)
+    q.length.print_histogram()
+    t = 0
+    for hour in range(24):
+        qlength_per_hour[hour].print_histogram()
+        t += qlength_per_hour[hour].mean()
+#        qlength_of_stay_per_hour[hour].print_histogram()
+    print(t/24)
+    print(q.length.mean())
+
+
+def test89():
+    class X(sim.Component):
+        pass
+
+    env=sim.Environment()
+    all_components = []
+    for _ in range(5):
+        X().register(all_components)
+    print(next((x for x in all_components if x.name()=='x.8'),None))
+
+def test88():
+    class Y(sim.Component):
+        def process(self):
+            yield self.hold(10)
+            yield self.hold(3)
+
+
+    class X(sim.Component):
+        def process(self, d):
+            env.print_trace('','entering',str(d))
+#            yield self.hold(1)
+            return
+            pass
+        def p1(self):
+            pass
+
+    env=sim.Environment(trace=True)
+    Y()
+    x=X(d=3, at=3, process='process')
+    env.run(4)
+    x.passivate()
+    env.run(1)
+    x.activate(process='p1', at=50)
+    env.run(1)
+    x.standby()
+
+
+    env.run()
+    print(sim.random.sample(range(6),2))
+
 def test87():
     def dump_an_objects():
         print('dump')
         for ao in env.an_objects:
             print(ao.type, ao.text(env.t) if ao.type=='text' else '')
-            
+
     class X(sim.Component):
         def process(self):
             start = env.t
@@ -35,7 +177,7 @@ def test87():
     X()
 
     env.run(6)
-    
+
 
 def test86():
 
@@ -57,7 +199,7 @@ def test86():
     env.animate(True)
 
     env.run()
-    
+
 def test85():
     env = sim.Environment(trace=True)
     q=sim.Queue(name='queue')
@@ -70,7 +212,7 @@ def test84():
     def action():
         print(en.get())
         en.remove()
-        
+
     class carAnimateCircle1(sim.Animate):
 
         def __init__(self, car):
@@ -124,7 +266,7 @@ def test84():
             while True:
                 yield self.hold(1, mode='Driving')
                 yield self.hold(1, mode='Stand still')
-                
+
 
     env=sim.Environment()
     Car(R=100)
@@ -140,7 +282,7 @@ def test84():
     env.run()
 
 
-    
+
 def test83():
     l1 = []
 
@@ -288,8 +430,11 @@ def test78():
     env.run(500)
     as_str=False
     f= open('test.txt', 'w')
+    f=None
     d=sim.Normal(4)
     d1=sim.Distribution('Normal(4)')
+    print(q.length.print_histograms(as_str=True))
+    assert False
     q.print_histograms(as_str=as_str, file=f)
     q.print_statistics(as_str=as_str, file=f)
     q.print_info(as_str=as_str, file=f)
