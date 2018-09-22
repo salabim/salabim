@@ -1,5 +1,14 @@
 salabim  changelog
 
+version 2.3.4.1  2018-09-22
+===========================
+Bug fixes
+---------
+Joren van Lindert showed that the percentile calculation for (timestamped) monitors was incorrect.
+A new algorithm is implemented.
+
+Bug in merging (timestamped)monitors fixed.
+
 version 2.3.4  2018-09-20
 =========================
 New functionality
