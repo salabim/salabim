@@ -10,7 +10,7 @@ see www.salabim.org for more information, the documentation, updates and license
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.5'
+__version__ = '2.3.4.1'
 
 import heapq
 import random
