@@ -13,7 +13,22 @@ Pythonista=(platform.system()=='Darwin')
 
 
 def test():
-    test91()
+    test92()
+    
+def test92():
+    import numpy as np
+
+
+    env = sim.Environment()
+    monitor = sim.Monitor(weighted=True)
+    
+    for i in [1,3,7,9,1000,0,0] + (6 * [7]):
+        monitor.tally(i,1)
+    
+    for p in (50, 90, 95, 100):
+        print(f'{p:5.1f}% percentile  {monitor.percentile(p):10.4f}  {np.percentile(monitor.x(), p):10.4f}')
+        
+        
 
 def test91():
     env = sim.Environment(trace=True)

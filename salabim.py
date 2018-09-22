@@ -1,12 +1,16 @@
-'''
-salabim  discrete event simulation
+'''          _         _      _            
+ ___   __ _ | |  __ _ | |__  (_) _ __ ___  
+/ __| / _` || | / _` || '_ \ | || '_ ` _ \ 
+\__ \| (_| || || (_| || |_) || || | | | | |
+|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|
+Discrete event simulation in Python
 
 see www.salabim.org for more information, the documentation, updates and license information.
 '''
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.4'
+__version__ = '2.3.5'
 
 import heapq
 import random
@@ -298,7 +302,8 @@ class Monitor(object):
                 self._x = array.array(self.xtypecode, itertools.chain(*[m._x for m in merge]))
             else:
                 self._x = list(itertools.chain(*[m._x for m in merge]))
-            self._weight = array.array('float', itertools.chain(*[m._weight for m in merge]))
+            if self.weighted:
+                self._weight = array.array('float', itertools.chain(*[m._weight for m in merge]))
             self._monitor = monitor
         self.setup(*args, **kwargs)
 
@@ -622,25 +627,31 @@ class Monitor(object):
         ----
         For weighted monitors, the weighted percentile is returned
         '''
-
+        # algorithm based on
+        # https://stats.stackexchange.com/questions/13169/defining-quantiles-over-a-weighted-sample
         q = max(0, min(q, 100))
         x, weight = self.xweight(ex0=ex0)
         if len(x) == 1:
             return x[0]
         sumweight = sum(weight)
+        n = len(weight)
         if not sumweight:
             return nan
         xweight = sorted(zip(x, weight), key=lambda v: v[0])
+
         x_sorted, weight_sorted = zip(*xweight)
-        weight_sorted = [0] + list(weight_sorted)
-        threshold = sumweight * q / 100
-        vcum_imin1 = 0
-        for i, v in enumerate(weight_sorted):
-            vcum_i = vcum_imin1 + v
-            if vcum_i > threshold:
+
+        cum = 0
+        s = []
+        for k in range(n):
+            s.append((k * weight_sorted[k] + cum))
+            cum += (n -1) * weight_sorted[k]
+            
+        for k in range(n-1):
+            if s[k + 1] > s[n - 1] * q / 100:
                 break
-            vcum_imin1 = vcum_i
-        return interpolate(threshold, vcum_imin1, vcum_i, x_sorted[i - 1], x_sorted[min(i, len(x_sorted) - 1)])
+        
+        return x_sorted[k] + (x_sorted[k+1] - x_sorted[k]) * (q/100 * s[n - 1] - s[k]) / (s[k + 1] - s[k])
 
     def bin_number_of_entries(self, lowerbound, upperbound, ex0=False):
         '''
@@ -1357,6 +1368,7 @@ class MonitorTimestamp(Monitor):
                 self._xw = array.array(self.xtypecode)
             else:
                 self._xw = []
+            self.x_weight_t = None
 
             curx = [self.off] * len(merge)
             self._t = array.array('d')
