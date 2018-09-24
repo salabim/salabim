@@ -54,8 +54,8 @@
 
 
 \title{salabim Documentation}
-\date{Aug 22, 2018}
-\release{2.3.3}
+\date{Sep 24, 2018}
+\release{2.3.4.1}
 \author{Ruud van der Ham}
 \newcommand{\sphinxlogo}{\vbox{}}
 \renewcommand{\releasename}{Release}
@@ -70,7 +70,7 @@
 
 
 \chapter{Introduction}
-\label{\detokenize{Introduction:documentation-for-salabim}}\label{\detokenize{Introduction:introduction}}\label{\detokenize{Introduction::doc}}
+\label{\detokenize{Introduction::doc}}\label{\detokenize{Introduction:introduction}}\label{\detokenize{Introduction:documentation-for-salabim}}
 Salabim is a package for discrete event simulation in Python.
 It follows the methodology of process description as originally demonstrated in \sphinxstyleemphasis{Simula}
 and later in \sphinxstyleemphasis{Prosim}, \sphinxstyleemphasis{Must} and \sphinxstyleemphasis{Tomas}. 
@@ -966,7 +966,7 @@ construction.
 
 
 \chapter{Component}
-\label{\detokenize{Component:component}}\label{\detokenize{Component::doc}}
+\label{\detokenize{Component::doc}}\label{\detokenize{Component:component}}
 Components are the key elements of salabim simulations.
 
 Components can be either data or active. An active component has one or more process descriptions and is activated
@@ -1580,7 +1580,7 @@ So remember if the method contains a yield statement (technically speaking that�
 
 
 \chapter{Queue}
-\label{\detokenize{Queue:queue}}\label{\detokenize{Queue::doc}}
+\label{\detokenize{Queue::doc}}\label{\detokenize{Queue:queue}}
 Salabim has a class Queue for queue handling of components. The advantage over the standard list and deque are:
 \begin{itemize}
 \item {} 
@@ -2203,7 +2203,7 @@ in any case.
 
 
 \chapter{Monitor and MonitorTimestamp}
-\label{\detokenize{Monitor and MonitorTimestamp:monitor-and-monitortimestamp}}\label{\detokenize{Monitor and MonitorTimestamp::doc}}
+\label{\detokenize{Monitor and MonitorTimestamp::doc}}\label{\detokenize{Monitor and MonitorTimestamp:monitor-and-monitortimestamp}}
 Monitors and timestamped monitors are a way to collect data from the simulation. They are automatically collected
 for resources, queues and states. On top of that the user can define its own (timestamped) monitors.
 
@@ -2894,6 +2894,11 @@ If neither number\_of\_bins, nor lowerbound nor bin\_width are specified, the hi
 
 Histograms can be printed with their values, instead of bins. This is particularly useful for non
 numeric tallied values, like names.
+
+
+\section{PeriodMonitor}
+\label{\detokenize{Monitor and MonitorTimestamp:periodmonitor}}
+To be documented.
 
 
 \chapter{Distributions}
@@ -4060,7 +4065,7 @@ Salabim also suppports taking a snapshot of an animated screen with \sphinxcode{
 
 
 \chapter{Reading items from a file}
-\label{\detokenize{Reading items from a file::doc}}\label{\detokenize{Reading items from a file:reading-items-from-a-file}}
+\label{\detokenize{Reading items from a file:reading-items-from-a-file}}\label{\detokenize{Reading items from a file::doc}}
 Salabim models often need to read input values from a file.
 
 As these data are quite often quite unstructured, using the standard read facilities of text files can be rather tedious.
@@ -4132,7 +4137,7 @@ quoted. This can be very useful during testing as the input is part of the sourc
 
 
 \chapter{Reference}
-\label{\detokenize{Reference::doc}}\label{\detokenize{Reference:reference}}
+\label{\detokenize{Reference:reference}}\label{\detokenize{Reference::doc}}
 
 \section{Animation}
 \label{\detokenize{Reference:animation}}\index{Animate (class in salabim)}
@@ -5512,8 +5517,9 @@ if omitted, default\_env will be used
 \end{description}\end{quote}
 
 \begin{sphinxadmonition}{note}{Note:}
-On CPython/PyPy platforms, the tkinter functionality is used.
-On Pythonista, this is emulated by salabim
+All measures are in screen coordinates 
+On Pythonista, this functionality is emulated by salabim
+On other platforms, the tkinter functionality is used.
 \end{sphinxadmonition}
 \index{remove() (salabim.AnimateButton method)}
 
@@ -5696,6 +5702,7 @@ if omitted, default\_env will be used
 \end{description}\end{quote}
 
 \begin{sphinxadmonition}{note}{Note:}
+All measures are in screen coordinates 
 This class is not available under Pythonista.
 \end{sphinxadmonition}
 \index{get() (salabim.AnimateEntry method)}
@@ -6549,8 +6556,9 @@ if omitted, default\_env will be used
 
 \begin{sphinxadmonition}{note}{Note:}
 The current value of the slider is the v attibute of the slider. 
-On CPython/PyPy platforms, the tkinter functionality is used. 
-On Pythonista, this is emulated by salabim
+All measures are in screen coordinates 
+On Pythonista, this functionality is emulated by salabim
+On other platforms, the tkinter functionality is used.
 \end{sphinxadmonition}
 \index{remove() (salabim.AnimateSlider method)}
 
@@ -6714,7 +6722,8 @@ depending on distribution type (usually float)
 \begin{sphinxadmonition}{note}{Note:}
 If, after number\_of\_tries retries, the sampled value is still not within the given bounds,
 fail\_value  will be returned 
-Samples that cannot be converted (only possible with Pdf) to float are assumed to be within the bounds.
+Samples that cannot be converted (only possible with Pdf and CumPdf) to float
+are assumed to be within the bounds.
 \end{sphinxadmonition}
 
 \end{fulllineitems}
@@ -7895,7 +7904,7 @@ float
 \label{\detokenize{Reference:component}}\index{Component (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Component}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Component}}{\emph{name=None}, \emph{at=None}, \emph{delay=None}, \emph{urgent=None}, \emph{process=None}, \emph{suppress\_trace=False}, \emph{suppress\_pause\_at\_step=False}, \emph{mode=None}, \emph{env=None}, \emph{**kwargs}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Component}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Component}}{\emph{name=None}, \emph{at=None}, \emph{delay=None}, \emph{urgent=None}, \emph{process=None}, \emph{suppress\_trace=False}, \emph{suppress\_pause\_at\_step=False}, \emph{skip\_standby=False}, \emph{mode=None}, \emph{env=None}, \emph{**kwargs}}{}
 Component object
 
 A salabim component is used as component (primarily for queueing)
@@ -7948,6 +7957,12 @@ Can be queried or set later with the suppress\_trace method.
 if True, if this component becomes current, do not pause when stepping 
 If False (default), the component will be paused when stepping 
 Can be queried or set later with the suppress\_pause\_at\_step method.
+
+\item {} 
+\sphinxstyleliteralstrong{skip\_standby} (\sphinxstyleliteralemphasis{bool}) \textendash{} skip\_standby indicator 
+if True, after this component became current, do not activate standby components 
+If False (default), after the component became current  activate standby components 
+Can be queried or set later with the skip\_standby method.
 
 \item {} 
 \sphinxstyleliteralstrong{mode} (\sphinxstyleliteralemphasis{str preferred}) \textendash{} mode 
@@ -9082,6 +9097,25 @@ bluecar=Car(color=’blue’)
 
 \end{fulllineitems}
 
+\index{skip\_standby() (salabim.Component method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Component.skip_standby}}\pysiglinewithargsret{\sphinxbfcode{skip\_standby}}{\emph{value=None}}{}~\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{value} (\sphinxstyleliteralemphasis{bool}) \textendash{} new skip\_standby value 
+if omitted, no change
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{skip\_standby indicator} \textendash{} components with the skip\_standby indicator of True, will not activate standby components after
+the component became current.
+
+\item[{Return type}] \leavevmode
+bool
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
 \index{standby() (salabim.Component method)}
 
 \begin{fulllineitems}
@@ -9429,7 +9463,7 @@ When the run is not issued, no acction will be taken.
 \index{animation\_parameters() (salabim.Environment method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Environment.animation_parameters}}\pysiglinewithargsret{\sphinxbfcode{animation\_parameters}}{\emph{animate=True}, \emph{synced=None}, \emph{speed=None}, \emph{width=None}, \emph{height=None}, \emph{x0=None}, \emph{y0=None}, \emph{x1=None}, \emph{background\_color=None}, \emph{foreground\_color=None}, \emph{fps=None}, \emph{modelname=None}, \emph{use\_toplevel=None}, \emph{tkinter\_init=None}, \emph{tkinter\_exit=None}, \emph{show\_fps=None}, \emph{show\_time=None}, \emph{video=None}, \emph{video\_repeat=None}, \emph{video\_pingpong=None}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.animation_parameters}}\pysiglinewithargsret{\sphinxbfcode{animation\_parameters}}{\emph{animate=True}, \emph{synced=None}, \emph{speed=None}, \emph{width=None}, \emph{height=None}, \emph{x0=None}, \emph{y0=None}, \emph{x1=None}, \emph{background\_color=None}, \emph{foreground\_color=None}, \emph{fps=None}, \emph{modelname=None}, \emph{use\_toplevel=None}, \emph{show\_fps=None}, \emph{show\_time=None}, \emph{video=None}, \emph{video\_repeat=None}, \emph{video\_pingpong=None}}{}
 set animation parameters
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -9449,12 +9483,12 @@ e.g. if 2, 2 simulation time units will be displayed per second.
 \item {} 
 \sphinxstyleliteralstrong{width} (\sphinxstyleliteralemphasis{int}) \textendash{} width of the animation in screen coordinates 
 if omitted, no change. At init of the environment, the width will be
-set to 1024 for CPython and the current screen width for Pythonista.
+set to 1024 for non Pythonista and the current screen width for Pythonista.
 
 \item {} 
 \sphinxstyleliteralstrong{height} (\sphinxstyleliteralemphasis{int}) \textendash{} height of the animation in screen coordinates 
 if omitted, no change. At init of the environment, the height will be
-set to 768 for CPython and the current screen height for Pythonista.
+set to 768 for non Pythonista and the current screen height for Pythonista.
 
 \item {} 
 \sphinxstyleliteralstrong{x0} (\sphinxstyleliteralemphasis{float}) \textendash{} user x-coordinate of the lower left corner 
@@ -9467,7 +9501,7 @@ if omitted, no change. At init of the environment, y0 will be set to 0.
 \item {} 
 \sphinxstyleliteralstrong{x1} (\sphinxstyleliteralemphasis{float}) \textendash{} user x-coordinate of the lower right corner 
 if omitted, no change. At init of the environment, x1 will be set to 1024
-for CPython and the current screen width for Pythonista.
+for non Pythonista and the current screen width for Pythonista.
 
 \item {} 
 \sphinxstyleliteralstrong{background\_color} (\sphinxstyleliteralemphasis{colorspec}) \textendash{} color of the background 
@@ -9497,18 +9531,6 @@ In that case, set this parameter to True.
 if False (default), the root will be initialized with tkinter.Tk()
 
 \item {} 
-\sphinxstyleliteralstrong{tkinter\_init} (\sphinxstyleliteralemphasis{function}\sphinxstyleliteralemphasis{ or }\sphinxstyleliteralemphasis{method}\sphinxstyleliteralemphasis{ (}\sphinxstyleliteralemphasis{with parameter self=env}\sphinxstyleliteralemphasis{)}) \textendash{} if specified and not run under Pythonista, this function will be called immediately
-after the setup of tkinter. The function gets one parameter, the root. 
-With this, the animation can use more UI elements and then salabim provides. 
-The name of root can be retrieved with self.root
-
-\item {} 
-\sphinxstyleliteralstrong{tkinter\_exit} (\sphinxstyleliteralemphasis{function}\sphinxstyleliteralemphasis{ or }\sphinxstyleliteralemphasis{method}\sphinxstyleliteralemphasis{ (}\sphinxstyleliteralemphasis{with parameter self=env}\sphinxstyleliteralemphasis{)}) \textendash{} if specified and not run under Pythonista, this function will be called immediately
-before the destruction tkinter. The function gets one parameter, the environment. 
-With this, the animation can use more UI elements and then salabim provides. 
-The name of root can be retrieved with self.root
-
-\item {} 
 \sphinxstyleliteralstrong{show\_fps} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True, show the number of frames per second 
 if False, do not show the number of frames per second (default)
 
@@ -9519,10 +9541,11 @@ if False, do not show the time
 \item {} 
 \sphinxstyleliteralstrong{video} (\sphinxstyleliteralemphasis{str}) \textendash{} if video is not omitted, a video with the name video
 will be created. 
+Normally, use .mp4 as extension. 
 If the video extension is not .gif, a codec may be added
 by appending a plus sign and the four letter code name,
-like ‘myvideo.avi+DIVX’.
-If no codec is given, MP4V will be used.
+like ‘myvideo.avi+DIVX’. 
+If no codec is given, MP4V will be used as codec.
 
 \item {} 
 \sphinxstyleliteralstrong{video\_repeat} (\sphinxstyleliteralemphasis{int}) \textendash{} number of times gif should be repeated 
@@ -9977,6 +10000,9 @@ for the same time
 \end{description}\end{quote}
 
 \begin{sphinxadmonition}{note}{Note:}
+if neither till nor duration is specified, the main component will be reactivated at
+the time there are no more events on the eventlist, i.e. usualy not at inf. 
+if you want to run till inf, issue run(sim.inf) 
 only issue run() from the main level
 \end{sphinxadmonition}
 
@@ -9999,6 +10025,63 @@ float
 \begin{sphinxadmonition}{note}{Note:}
 It is not possible to set this value explicitely.
 \end{sphinxadmonition}
+
+\end{fulllineitems}
+
+\index{screen\_to\_usercoordinates\_size() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.screen_to_usercoordinates_size}}\pysiglinewithargsret{\sphinxbfcode{screen\_to\_usercoordinates\_size}}{\emph{screensize}}{}
+converts a screen size to a value to be used with user coordinates
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{screensize} (\sphinxstyleliteralemphasis{float}) \textendash{} screen size to be converted
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{value corresponding with screensize in user coordinates}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{screen\_to\_usercoordinates\_x() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.screen_to_usercoordinates_x}}\pysiglinewithargsret{\sphinxbfcode{screen\_to\_usercoordinates\_x}}{\emph{screenx}}{}
+converts a screen x coordinate to a user x coordinate
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{screenx} (\sphinxstyleliteralemphasis{float}) \textendash{} screen x coordinate to be converted
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{user x coordinate}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{screen\_to\_usercoordinates\_y() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.screen_to_usercoordinates_y}}\pysiglinewithargsret{\sphinxbfcode{screen\_to\_usercoordinates\_y}}{\emph{screeny}}{}
+converts a screen x coordinate to a user x coordinate
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{screeny} (\sphinxstyleliteralemphasis{float}) \textendash{} screen y coordinate to be converted
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{user y coordinate}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
 
 \end{fulllineitems}
 
@@ -10182,6 +10265,63 @@ parentheses, like
 \sphinxcode{if env.trace():}
 \end{quote}
 \end{sphinxadmonition}
+
+\end{fulllineitems}
+
+\index{user\_to\_screencoordinates\_size() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.user_to_screencoordinates_size}}\pysiglinewithargsret{\sphinxbfcode{user\_to\_screencoordinates\_size}}{\emph{usersize}}{}
+converts a user size to a value to be used with screen coordinates
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{usersize} (\sphinxstyleliteralemphasis{float}) \textendash{} user size to be converted
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{value corresponding with usersize in screen coordinates}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{user\_to\_screencoordinates\_x() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.user_to_screencoordinates_x}}\pysiglinewithargsret{\sphinxbfcode{user\_to\_screencoordinates\_x}}{\emph{userx}}{}
+converts a user x coordinate to a screen x coordinate
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{userx} (\sphinxstyleliteralemphasis{float}) \textendash{} user x coordinate to be converted
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{screen x coordinate}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{user\_to\_screencoordinates\_y() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.user_to_screencoordinates_y}}\pysiglinewithargsret{\sphinxbfcode{user\_to\_screencoordinates\_y}}{\emph{usery}}{}
+converts a user x coordinate to a screen x coordinate
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{usery} (\sphinxstyleliteralemphasis{float}) \textendash{} user y coordinate to be converted
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{screen y coordinate}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
 
 \end{fulllineitems}
 
@@ -10403,7 +10543,7 @@ Alternatively, the file can be opened and closed explicitely, like
 \PYG{n}{f}\PYG{o}{.}\PYG{n}{close}\PYG{p}{(}\PYG{p}{)}
 \end{sphinxVerbatim}
 
-Item files consists of individual items separated by whitespace (blank or tab)\textbar{}n\textbar{}
+Item files consist of individual items separated by whitespace (blank or tab)\textbar{}n\textbar{}
 If a blank or tab is required in an item, use single or double quotes 
 All text following \# on a line is ignored 
 All texts on a line within curly brackets \{\} is ignored and considered white space. 
@@ -10549,7 +10689,9 @@ e.g. duration or minutes. Default: weight.
 
 \item {} 
 \sphinxstyleliteralstrong{merge} (\sphinxstyleliteralemphasis{list}\sphinxstyleliteralemphasis{, }\sphinxstyleliteralemphasis{tuple}\sphinxstyleliteralemphasis{ or }{\hyperref[\detokenize{Reference:salabim.State.set}]{\sphinxcrossref{\sphinxstyleliteralemphasis{set}}}}) \textendash{} the monitor will be created by merging the monitors mentioned in the list 
-note that the types of all to be merged monitors should be the same. 
+note that the types of all to be merged monitors should be the same and
+that either all to be merged monitors are weighted or all to be merged monitors
+are non weighted. 
 default: no merge
 
 \item {} 
@@ -11098,7 +11240,7 @@ print monitor statistics
 if True, return a string containing the statistics
 
 \item {} 
-\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
+\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if Noneb(default), all output is directed to stdout 
 otherwise, the output is directed to the file
 
 \end{itemize}
@@ -12275,6 +12417,47 @@ tuple
 The value self.off is stored when monitoring is turned off 
 The timestamps are not corrected for any reset\_now() adjustment.
 \end{sphinxadmonition}
+
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
+
+
+\section{PeriodMonitor}
+\label{\detokenize{Reference:periodmonitor}}\index{PeriodMonitor (class in salabim)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.PeriodMonitor}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{PeriodMonitor}}{\emph{parent\_monitor}, \emph{periods=None}, \emph{period\_monitor\_names=None}}{}
+defines a number of (timestamped) period monitors for a given monitor.
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{patent\_monitor} ({\hyperref[\detokenize{Reference:salabim.Monitor.monitor}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Monitor.monitor}}}}\sphinxstyleliteralemphasis{ or }{\hyperref[\detokenize{Reference:salabim.MonitorTimestamp.monitor}]{\sphinxcrossref{\sphinxstyleliteralemphasis{MonitorTimestamp.monitor}}}}) \textendash{} parent\_monitor to be divided into several period monitors for given time periods.
+
+\item {} 
+\sphinxstyleliteralstrong{periods} (\sphinxstyleliteralemphasis{list}\sphinxstyleliteralemphasis{ or }\sphinxstyleliteralemphasis{tuple of floats}) \textendash{} specifies the length of the period intervals. 
+default: 24 * {[}1{]}, meaning periods 0-1, 1-2, …, 23-24 
+the periods do not have to be all the same.
+
+\item {} 
+\sphinxstyleliteralstrong{period\_monitor\_names} (\sphinxstyleliteralemphasis{list}\sphinxstyleliteralemphasis{ or }\sphinxstyleliteralemphasis{tuple of string}) \textendash{} specifies the names of the period monitors.
+It is required that the length of period equals the length of period\_monitor\_names.
+By default the names are composed of the name of the parent monitor
+
+\end{itemize}
+
+\end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+The period monitors can be accessed by indexing the instance of PeriodMonitor.
+\end{sphinxadmonition}
+\index{remove() (salabim.PeriodMonitor method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.PeriodMonitor.remove}}\pysiglinewithargsret{\sphinxbfcode{remove}}{}{}
+removes the period monitor
 
 \end{fulllineitems}
 
@@ -14206,7 +14389,7 @@ PIL.Image.Image
 
 
 \chapter{About}
-\label{\detokenize{About::doc}}\label{\detokenize{About:about}}
+\label{\detokenize{About:about}}\label{\detokenize{About::doc}}
 
 \section{Who is behind salabim?}
 \label{\detokenize{About:who-is-behind-salabim}}
