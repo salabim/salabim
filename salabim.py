@@ -1,16 +1,17 @@
-'''          _         _      _            
- ___   __ _ | |  __ _ | |__  (_) _ __ ___  
-/ __| / _` || | / _` || '_ \ | || '_ ` _ \ 
-\__ \| (_| || || (_| || |_) || || | | | | |
-|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|
+'''
+             _         _      _               ____      _____     _  _       ____
+ ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \    |___ /    | || |     |___ \
+/ __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |     |_ \    | || |_      __) |
+\__ \| (_| || || (_| || |_) || || | | | | |   / __/  _  ___) | _ |__   _| _  / __/
+|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|(_)|____/ (_)   |_|  (_)|_____|
 Discrete event simulation in Python
 
-see www.salabim.org for more information, the documentation, updates and license information.
+see www.salabim.org for more information, the documentation and license information
 '''
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.4.1'
+__version__ = '2.3.4.2'
 
 import heapq
 import random
@@ -631,6 +632,7 @@ class Monitor(object):
         # https://stats.stackexchange.com/questions/13169/defining-quantiles-over-a-weighted-sample
         q = max(0, min(q, 100))
         x, weight = self.xweight(ex0=ex0)
+
         if len(x) == 1:
             return x[0]
         sumweight = sum(weight)
@@ -645,13 +647,13 @@ class Monitor(object):
         s = []
         for k in range(n):
             s.append((k * weight_sorted[k] + cum))
-            cum += (n -1) * weight_sorted[k]
-            
-        for k in range(n-1):
+            cum += (n - 1) * weight_sorted[k]
+
+        for k in range(n - 1):
             if s[k + 1] > s[n - 1] * q / 100:
                 break
-        
-        return x_sorted[k] + (x_sorted[k+1] - x_sorted[k]) * (q/100 * s[n - 1] - s[k]) / (s[k + 1] - s[k])
+
+        return x_sorted[k] + (x_sorted[k + 1] - x_sorted[k]) * (q / 100 * s[n - 1] - s[k]) / (s[k + 1] - s[k])
 
     def bin_number_of_entries(self, lowerbound, upperbound, ex0=False):
         '''
@@ -850,6 +852,7 @@ class Monitor(object):
 
         result.append(indent + 'mean          {}{}'.
               format(fn(self.mean(), 13, 3), fn(self.mean(ex0=True), 13, 3)))
+
         result.append(indent + 'std.deviation {}{}'.
               format(fn(self.std(), 13, 3), fn(self.std(ex0=True), 13, 3)))
         result.append('')
@@ -1923,9 +1926,10 @@ class MonitorTimestamp(Monitor):
         return Monitor.xweight(self, *args, **kwargs)
 
     def set_x_weight(self):
-        if self.x_weight_t == self.env.t:
+        
+        if self.x_weight_t == max(self.env.t, self.env._now):
             return
-        self.x_weight_t = self.env.t   # stay valid until new t detected or invalidated
+        self.x_weight_t = max(self.env.t, self.env._now)   # stay valid until new t/now detected or invalidated
         Monitor.cached_xweight = {(ex0, force_numeric): (0, 0)
             for ex0 in (False, True) for force_numeric in (False, True)}  # invalidate the cache
 
@@ -9993,7 +9997,7 @@ class Component(object):
         fail_delay = kwargs.pop('fail_delay', None)
         mode = kwargs.pop('mode', None)
         if kwargs:
-            raise TypeError("request() got an expected keyword argument '" + tuple(kwargs)[0] + "'")
+            raise TypeError("request() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
         if self._status != current:
             self._checkisnotdata()
@@ -10246,7 +10250,7 @@ class Component(object):
         all = kwargs.pop('all', False)
         mode = kwargs.pop('mode', None)
         if kwargs:
-            raise TypeError("wait() got an expected keyword argument '" + tuple(kwargs)[0] + "'")
+            raise TypeError("wait() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
         if self._status != current:
             self._checkisnotdata()
@@ -13622,7 +13626,7 @@ class PeriodMonitor(object):
 
     Parameters
     ----------
-    patent_monitor : Monitor.monitor or MonitorTimestamp.monitor 
+    patent_monitor : Monitor.monitor or MonitorTimestamp.monitor
         parent_monitor to be divided into several period monitors for given time periods.
 
     periods : list or tuple of floats
@@ -13655,7 +13659,7 @@ class PeriodMonitor(object):
 
     def __getitem__(self, i):
         return self.perperiod[i]
-        
+
     def remove(self):
         '''
         removes the period monitor
