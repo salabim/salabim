@@ -1,5 +1,133 @@
 salabim  changelog
 
+version 2.4.0  2018-10-07
+=========================
+New Functionality
+-----------------
+Complete overhaul of Monitor/MonitorTimestamp internals, resulting in more consistent operation.
+The documentation has been updated accordingly.
+MonitorTimestamp is phased out and replaced by level monitors, which are instances of Monitor.
+Timestamped monitors are now called level monitors, whereas non timestamped monitors are now called
+non level monitors.
+Non level monitors now always timestamp the entry, which makes period slices and more useful animation possible.
+It is no longer required (and possible) to indicate that a non level monitor is weighted. If a weight is
+required, just tally with a weight != 1.
+
+Animation of non level monitors is now also shown on a timescale, thus making it easier to see
+the relation with a level monitor, e.g. length and length_of_stay of a queue.
+
+This has a number of consequences for the API:
+
+MonitorTimestamp ==> Monitor(level=True)
+Merging of monitors not anymore part of the init, but is a separate method:
+  m = Monitor(merge=(m1, m2, m3)) ==> m = m1.merge(m2, m3)
+
+It is no longer necessary (and possible) to specify weighted=True in init of Monitor.
+All non level monitors now support weighted, if required.
+  m = Monitor(weighted=True) ==> m = Monitor()
+    
+The (level monitor only) method .get() or direct call can now also be used to get the value of the level at a 
+specified time within the monitored period, e.g.
+  print('queue length at time 100 was', q.length.get(100))
+or alternatively:
+  print('queue length at time 100 was', q.length(100))  
+  
+It is now possible to slice a monitor with Monitor.slice(), which has two applications:
+- to get statistics on a monitor with respect to a given time period, most likely a subrun
+- to get statistics on a monitor with respect to a recurring time period, like hour 0-1, hour 0-2, etc.
+Examples:
+   for i in range(10):
+       start = i * 1000
+       stop = (i+1) * 1000
+       print(f'mean length of q in [{start},{stop})={q.length.slice(start,stop).mean()}'
+       print(f'mean length of stay in [{start},{stop})={q.length_of_stay.slice(start,stop).mean()}'
+       
+   for i in range(24):
+       print(f'mean length of q in hour {i}={q.length.slice(i, i+1, 24).mean()}'
+       print(f'mean length of stay of q in hour {i}={q.length_of_stay.slice(i, i+1, 24).mean()}'
+
+Instead of slice(), a monitor can be sliced as well with the standard slice operator [], like:
+   q.length[1000:2000].print_histogram()
+   q.length[2:3:24].print_histogram()
+
+
+It is now possible to change the format of times in trace, animation, etc. with the method
+  Environment.time_to_str_format()
+For instance, if 5 decimals in the trace are to be shown instead of the default 3, issue:
+  env.time_to_str_format('{:10.5f}')
+Make sure that the format represents 10 characters.
+See the docstring / documentation for more information.
+
+
+From now on it is possible, but definitely not required, to set the dimension of the time unit when defining an environment, like
+   env = sim.Environment(time_unit='hours')
+Salabim supports 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds' and 'n/a' as dimension.
+
+If the time unit is set, times can be specified in any dimension, like
+   yield self.hold(env.seconds(20))
+The following methods for conversion to the current time unit are available:
+  Environment.years()
+  Environment.weeks() 
+  Environment.days() 
+  Environment.hours()
+  Environment.minutes() 
+  Environment.seconds()
+  Environment.milliseconds()
+  Environment.microseconds()
+Example:
+  env = sim.Environment(time_unit='hours')
+  env.run(env.days(10))
+This effectively let the simulation run for 240 (hours).
+                     
+The following methods for conversion from time current time unit are available:
+  Environment.to_years()
+  Environment.to_weeks()
+  Environment.to_days()
+  Environment.to_hours()
+  Environment.to_minutes()
+  Environment.to_seconds()
+  Environment.to_milliseconds() 
+  Environment.to_microseconds()
+Example:
+  env = sim.Environment(time_unit='hours')
+  env.run(env.days(14))
+  print('it is now', env.to_days(env.now()), 'weeks')
+  #  output: it is now 2 weeks
+          
+Finally, the current time unit dimension can be queried with Environment.get_time_unit().
+Example:
+  env = sim.Environment(time_unit='hours')
+  env.run(env.days(10))
+  print('it is now', env.now()), env.get_time_unit())
+  #  output: it is now 240 hours
+
+All distributions, apart from IntUniform, Poisson and Beta now have an additional parameter, time_unit.
+If the time_unit is specified at initialization of Environment(), the time_unit of the distribution
+can now be specified.
+As an example, suppose env has been initialized with env = sim.Environment(time_unit='hours').
+If we then define a duration distribution as:
+   duration_dis = sim.Uniform(10, 20, 'days')
+, the distribution is effectively uniform between 240 and 480 (hours).
+This facility makes specification of duration distribution easier and more intuitive.
+Refer to the docstrings or documentation for details.
+    
+By default the time unit dimension is 'n/a', which means that conversions are not possible.
+
+The documentation has a new chapter Miscellaneous/Time units covering this topic.
+
+
+Announcement
+------------
+The class PeriodMonitor that was added in version 2.3.4 will be phased out in a future release.
+Slicing monitors (see above) is much more reliable and versatile.
+
+
+Reminder
+--------
+Python 2.7 will no longer be supported as from 31 December 2018.
+Please upgrade to Python 3.x as soon as possible.
+
+
 version 2.3.4.2  2018-09-29
 ===========================
 Bug fixes

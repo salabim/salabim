@@ -1,17 +1,17 @@
-'''
-             _         _      _               ____      _____     _  _       ____
- ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \    |___ /    | || |     |___ \
-/ __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |     |_ \    | || |_      __) |
-\__ \| (_| || || (_| || |_) || || | | | | |   / __/  _  ___) | _ |__   _| _  / __/
-|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|(_)|____/ (_)   |_|  (_)|_____|
+'''          _         _      _               ____      _  _        ___
+ ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \    | || |      / _ \
+/ __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |   | || |_    | | | |
+\__ \| (_| || || (_| || |_) || || | | | | |   / __/  _ |__   _| _ | |_| |
+|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|(_)   |_|  (_) \___/
 Discrete event simulation in Python
 
 see www.salabim.org for more information, the documentation and license information
 '''
+
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.3.4.2'
+__version__ = '2.4.0'
 
 import heapq
 import random
@@ -29,6 +29,7 @@ import io
 import pickle
 import logging
 import types
+import bisect
 
 Pythonista = (sys.platform == 'ios')
 Windows = (sys.platform.startswith('win'))
@@ -226,6 +227,16 @@ class Monitor(object):
         it is possible to control monitoring later,
         with the monitor method
 
+    level : bool
+        if False (default), individual values are tallied, optionally with weight |n|
+        if True, the tallied vslues are interpreted as levels
+
+    initial_tally : any, preferably int, float or translatable into int or float
+        initial value for the a level monitor |n|
+        it is important to set the value correctly.
+        default: 0 |n|
+        not available for non level monitors
+
     type : str
         specifies how tallied values are to be stored
             - 'any' (default) stores values in a list. This allows
@@ -242,20 +253,9 @@ class Monitor(object):
             - 'uint64' integer >= 0 <= 18446744073709551615 8 bytes
             - 'float' float 8 bytes
 
-    weighted : bool
-        if True, tallied values may be given weight.
-        if False (default), weights are not allowed
-
     weight_legend : str
-        used in print_statistics and print_histogram to indicate the dimension of weight,
-        e.g. duration or minutes. Default: weight.
-
-    merge: list, tuple or set
-        the monitor will be created by merging the monitors mentioned in the list |n|
-        note that the types of all to be merged monitors should be the same and
-        that either all to be merged monitors are weighted or all to be merged monitors
-        are non weighted. |n|
-        default: no merge
+        used in print_statistics and print_histogram to indicate the dimension of weight or duration (for
+        level monitors, e.g. minutes. Default: weight for non level monitors, duration for level monitors.
 
     env : Environment
         environment where the monitor is defined |n|
@@ -264,49 +264,269 @@ class Monitor(object):
 
     cached_xweight = {(ex0, force_numeric): (0, 0) for ex0 in (False, True) for force_numeric in (False, True)}
 
-    def __init__(self, name=None, monitor=True, type=None, merge=None, weighted=False, weight_legend='weight',
+    def __init__(self, name=None, monitor=True, level=False, initial_tally=None,
+        type=None, weight_legend=None,
         env=None, *args, **kwargs):
         if env is None:
             self.env = g.default_env
         else:
             self.env = env
         _set_name(name, self.env._nameserializeMonitor, self)
-        self._timestamp = False
-        self.weighted = weighted
-        self.weight_legend = weight_legend
-        if merge is None:
-            if type is None:
-                type = 'any'
-            try:
-                self.xtypecode, _ = type_to_typecode_off(type)
-            except KeyError:
-                raise SalabimError('type (' + type + ') not recognized')
-            self.reset(monitor)
-        else:
-            if not merge:
-                raise SalabimError('merge list empty')
-            for m in merge:
-                if not isinstance(m, Monitor):
-                    raise SalabimError('non Monitor item found in merge list')
-
-            self.xtypecode = merge[0].xtypecode
-            self.weighted = merge[0].weighted
-            for m in merge:
-                if m.xtypecode != self.xtypecode:
-                    raise SalabimError('not all types in merge list are equal')
-                if m.weighted != self.weighted:
-                    raise SalabimError('not all weighted flags in merge list are equal')
-            if type is not None:
-                if type_to_typecode_off(type)[0] != self.xtypecode:
-                    raise SalabimError('type does not match the type of the monitors in the merge list')
-            if self.xtypecode:
-                self._x = array.array(self.xtypecode, itertools.chain(*[m._x for m in merge]))
+        self._level = level
+        self._weight_legend = ('duration' if self._level else 'weight') if weight_legend is None else weight_legend
+        if self._level:
+            if weight_legend is None:
+                self.weight_legend = 'duration'
             else:
-                self._x = list(itertools.chain(*[m._x for m in merge]))
-            if self.weighted:
-                self._weight = array.array('float', itertools.chain(*[m._weight for m in merge]))
-            self._monitor = monitor
+                self.weight_legend = weight_legend
+            if initial_tally is None:
+                self._tally = 0
+            else:
+                self._tally = initial_tally
+        else:
+            if initial_tally is not None:
+                raise SalabimError('initial_tally not available for non level monitors')
+            if weight_legend is None:
+                self.weight_legend = 'weight'
+            else:
+                self.weight_legend = weight_legend
+
+        if type is None:
+            type = 'any'
+        try:
+            self.xtypecode, self.off = type_to_typecode_off(type)
+        except KeyError:
+            raise SalabimError('type (' + type + ') not recognized')
+        self.xtype = type
+        self.reset(monitor)
         self.setup(*args, **kwargs)
+
+    def merge(self, *monitors, **kwargs):
+        '''
+        merges this monitor with other monitors
+
+        Parameters
+        ----------
+        monitors : sequence
+           zero of more monitors to be merged to this monitor
+
+        name : str
+            name of the merged monitor |n|
+            default: name of this monitor + '.merged'
+
+        Returns
+        -------
+        merged monitor : Monitor
+
+        Note
+        ----
+        Level monitors can only be merged with level monitors |n|
+        Non level monitors can only be merged with non level monitors |n|
+        Only monitors with the same type can be merged |n|
+        If no monitors are specified, a copy is created. |n|
+        For level monitors, merging means summing the available x-values|n|
+        '''
+        name = kwargs.pop('name', None)
+        if kwargs:
+            raise TypeError("merge() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
+
+        for m in monitors:
+            if not isinstance(m, Monitor):
+                raise SalabimError('non Monitor item found in merge list')
+            if self._level != m._level:
+                raise SalabimError('not possible to mix level monitor with non level monitor')
+            if self.xtype != m.xtype:
+                raise SalabimError('not possible to mix types')
+        if name is None:
+            name = self.name() + '.merged'
+
+        new = Monitor(name=name, type=self.xtype, level=self._level)
+
+        merge = [self] + list(monitors)
+
+        if new._level:
+            if new.xtypecode:
+                new._x = array.array(self.xtypecode)
+            else:
+                new._x = []
+
+            curx = [new.off] * len(merge)
+            new._t = array.array('d')
+            for t, index, x in heapq.merge(
+                *[zip(merge[index]._t, itertools.repeat(index), merge[index]._x) for index in range(len(merge))]):
+                if new.xtypecode:
+                    curx[index] = x
+                else:
+                    try:
+                        curx[index] = float(x)
+                    except:
+                        curx[index] = 0
+
+                sum = 0
+                for xi in curx:
+                    if xi is new.off:
+                        sum = new.off
+                        break
+                    sum += xi
+
+                if self._t and (t == self._t[-1]):
+                    new._x[-1] = sum
+                else:
+                    new._t.append(t)
+                    new._x.append(sum)
+
+        else:
+            for t, _, x, weight in heapq.merge(
+                *[zip(merge[index]._t, itertools.repeat(index), merge[index]._x,
+                merge[index]._weight if merge[index]._weight else (1,) * len(merge[index]._x))
+                for index in range(len(merge))]):
+                if weight == 1:
+                    if new._weight:
+                        new._weight.append(weight)
+                else:
+                    if not new._weight:
+                        new._weight = array.array('d', (1,) * len(new._x))
+                    new._weight.append(weight)
+                new._t.append(t)
+                new._x.append(x)
+        new.monitor(False)
+        return new
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            return self.slice(key.start, key.stop, key.step)
+        else:
+            return self.slice(key)
+
+    def slice(self, start=None, stop=None, modulo=None, name=None):
+        '''
+        slices this monitor (creates a subset)
+
+        Parameters
+        ----------
+        start : float
+           if modulo is not given, the start of the slice |n|
+           if modulo is given, this is indicates the slice period start (modulo modulo)
+
+        stop : float
+           if modulo is not given, the end of the slice |n|
+           if modulo is given, this is indicates the slice period end (modulo modulo) |n|
+           note that stop is excluded from the slice (open at right hand side)
+
+        modulo : float
+            specifies the distance between slice periods |n|
+            if not specified, just one slice subset is used.
+
+        name : str
+            name of the sliced monitor |n|
+            default: name of this monitor + '.sliced'
+
+        Returns
+        -------
+        sliced monitor : Monitor
+        '''
+        new = Monitor(name='slice', type=self.xtype, level=self._level)
+        if name is None:
+            name = self.name() + '.sliced'
+        new = Monitor(level=self._level, type=self.xtype, name=name)
+        actions = []
+        if modulo is None:
+            if start is None:
+                start = -inf
+            else:
+                start += self.env._offset
+            start = max(start, self.start)
+            if stop is None:
+                stop = inf
+            else:
+                stop += self.env._offset
+            stop = min(stop, self.env.now())
+            actions.append((start, 'a', 0, 0))
+            actions.append((stop, 'b', 0, 0))  # non inclusive
+        else:
+            if start is None:
+                raise SalabimError('No start specified')
+            if stop is None:
+                raise SalabimError('No stop specified')
+            if stop <= start:
+                raise SalabimError('stop must be > start')
+            if stop - start >= modulo:
+                raise SalabimError('stop must be < start + modulo')
+            start = start % modulo
+            stop = stop % modulo
+            start1 = self.start - (self.start % modulo) + start
+            len1 = (stop - start) % modulo
+            while start1 < self.env._now:
+                actions.append((start1, 'a', 0, 0))
+                actions.append((start1 + len1, 'b', 0, 0))  # non inclusive
+                start1 += modulo
+
+        if new._level:
+            if new.xtypecode:
+                new._x = array.array(self.xtypecode)
+            else:
+                new._x = []
+            new._t = array.array('d')
+            curx = new.off
+            new._t.append(self.start)
+            new._x.append(curx)
+
+        enabled = False
+        for (t, type, x, weight) in heapq.merge(
+            actions,
+            zip(self._t, itertools.repeat('c'), self._x,
+            self._weight if (self._weight and not self._level) else (1,) * len(self._x))):
+            if new._level:
+                if type == 'a':
+                    enabled = True
+                    if new._t[-1] == t:
+                        new._x[-1] = curx
+                    else:
+                        if new._x[-1] == curx:
+                            new._t[-1] = t
+                        else:
+                            new._t.append(t)
+                            new._x.append(curx)
+                elif type == 'b':
+                    enabled = False
+                    if new._t[-1] == t:
+                        new._x[-1] = self.off
+                    else:
+                        if new._x[-1] == self.off:
+                            new._t[-1] = t
+                        else:
+                            new._t.append(t)
+                            new._x.append(self.off)
+                else:
+                    if enabled:
+                        if curx != x:
+                            if new._t[-1] == t:
+                                new._x[-1] = x
+                            else:
+                                if x == new._x[-1]:
+                                    new._t[-1] = t
+                                else:
+                                    new._t.append(t)
+                                    new._x.append(x)
+                    curx = x
+            else:
+                if type == 'a':
+                    enabled = True
+                elif type == 'b':
+                    enabled = False
+                else:
+                    if enabled:
+                        if weight == 1:
+                            if new._weight:
+                                new._weight.append(weight)
+                        else:
+                            if not new._weight:
+                                new._weight = array.array('d', (1,) * len(new._x))
+                            new._weight.append(weight)
+                        new._t.append(t)
+                        new._x.append(x)
+        new.monitor(False)
+        return new
 
     def setup(self):
         '''
@@ -363,7 +583,44 @@ class Monitor(object):
         return self
 
     def __repr__(self):
-        return objectclass_to_str(self) + ' (' + self.name() + ')'
+        return objectclass_to_str(self) + ('[level]'if self._level else '') + ' (' + self.name() + ')'
+
+    def __call__(self, t=None):  # direct moneypatching __call__ doesn't work
+        if not self._level:
+            raise SalabimError('get not available for non level monitors')
+        if t is None:
+            return self._tally
+        if t < self._t[0] or t > self.env._now:
+            return self.off
+        if t == self.env._now:
+            return self._tally  # even if monitor is off, the current value is valid
+        i = bisect.bisect_left(list(zip(self._t, itertools.count())), (t, float('inf')))
+        return self._x[i - 1]
+
+    def get(self, t=None):
+        '''
+        Parameters
+        ----------
+        t : float
+            time at which the value of the level is to be returned |n|
+            default: now
+
+        Returns
+        -------
+        last tallied value : any, usually float
+
+            Instead of this method, the level monitor can also be called directly, like |n|
+
+            level = sim.Monitor('level', level=True) |n|
+            ... |n|
+            print(level()) |n|
+            print(level.get())  # identical |n|
+
+        Note
+        ----
+        If the value is not available, self.off will be returned.
+        '''
+        self.__call__(t)
 
     def reset_monitors(self, monitor=None):
         '''
@@ -393,15 +650,25 @@ class Monitor(object):
             if False, monitoring is disabled
             if omitted, no change of monitoring state
         '''
+        if monitor is not None:
+            self._monitor = monitor
 
-        if monitor is None:
-            monitor = self._monitor
         if self.xtypecode:
             self._x = array.array(self.xtypecode)
         else:
             self._x = []
-        if self.weighted:
-            self._weight = array.array('d')
+        self._weight = False
+        self._t = array.array('d')
+        if self._level:
+            self._weight = True  # signal for statistics that weights are present (although not stored in _weight)
+            if self._monitor:
+                self._x.append(self._tally)
+            else:
+                self._x.append(self.off)
+            self._t.append(self.env._now)
+        else:
+            self._weight = False  # weights are only stored if there is a non 1 weight
+        self.start = self.env.now()
         self.monitor(monitor)
         Monitor.cached_xweight = {(ex0, force_numeric): (0, 0)
             for ex0 in (False, True) for force_numeric in (False, True)}  # invalidate the cache
@@ -423,22 +690,55 @@ class Monitor(object):
         '''
         if value is not None:
             self._monitor = value
+            if self._level:
+                if self._monitor:
+                    self.tally(self._tally)
+                else:
+                    self._tally_off()  # can't use tally() here because self._tally should be untouched
         return self.monitor
 
-    def tally(self, x, weight=1):
+    def tally(self, value, weight=1):
         '''
         Parameters
         ----------
         x : any, preferably int, float or translatable into int or float
             value to be tallied
+
+        weight: float
+            weight to be tallied |n|
+            default : 1 |n|
         '''
-        if self._monitor:
-            self._x.append(x)
-            if self.weighted:
-                self._weight.append(1 if weight is None else weight)
-            else:
-                if weight != 1:
-                    raise SalabimError('incorrect weight for non weighted monitor')
+        if self._level:
+            if weight != 1:
+                if self._level:
+                    raise SalabimError('incorrect weight for level monitor')
+            self._tally = value
+            if self._monitor:
+                t = self.env._now
+                if self._t[-1] == t:
+                    self._x[-1] = value
+                else:
+                    self._x.append(value)
+                    self._t.append(t)
+        else:
+            if self._monitor:
+                if weight == 1:
+                    if self._weight:
+                        self._weight.append(weight)
+                else:
+                    if not self._weight:
+                        self._weight = array.array('d', (1,) * len(self._x))
+                    self._weight.append(weight)
+                self._x.append(value)
+                self._t.append(self.env._now)
+
+    def _tally_off(self):
+        t = self.env._now
+        if self._t[-1] == t:
+            self._x[-1] = self.off
+        else:
+            self._x.append(self.off)
+            self._t.append(t)
 
     def name(self, value=None):
         '''
@@ -495,21 +795,14 @@ class Monitor(object):
 
         Note
         ----
-        For weighted monitors, the weighted mean is returned
+        For weighs are applied , the weighted mean is returned
         '''
-        if self.weighted:
-            x, weight = self.xweight(ex0=ex0)
-            sumweight = sum(weight)
-            if sumweight:
-                return sum(vx * vweight for vx, vweight in zip(x, weight)) / sumweight
-            else:
-                return nan
+        x, weight = self._xweight(ex0=ex0)
+        sumweight = sum(weight)
+        if sumweight:
+            return sum(vx * vweight for vx, vweight in zip(x, weight)) / sumweight
         else:
-            x = self.x(ex0=ex0)
-            if x:
-                return sum(x) / len(x)
-            else:
-                return nan
+            return nan
 
     def std(self, ex0=False):
         '''
@@ -526,25 +819,16 @@ class Monitor(object):
 
         Note
         ----
-        For weighted monitors, the weighted standard deviation is returned
+        For weights are applied, the weighted standard deviation is returned
         '''
-        if self.weighted:
-            x, weight = self.xweight(ex0=ex0)
-            sumweight = sum(weight)
-            if sumweight:
-                wmean = self.mean(ex0=ex0)
-                wvar = sum((vweight * (vx - wmean)**2) for vx, vweight in zip(x, weight)) / sumweight
-                return math.sqrt(wvar)
-            else:
-                return nan
+        x, weight = self._xweight(ex0=ex0)
+        sumweight = sum(weight)
+        if sumweight:
+            wmean = self.mean(ex0=ex0)
+            wvar = sum((vweight * (vx - wmean)**2) for vx, vweight in zip(x, weight)) / sumweight
+            return math.sqrt(wvar)
         else:
-            x = self.x(ex0=ex0)
-            if x:
-                wmean = self.mean(ex0=ex0)
-                wvar = sum(((vx - wmean)**2) for vx in x) / len(x)
-                return math.sqrt(wvar)
-            else:
-                return nan
+            return nan
 
     def minimum(self, ex0=False):
         '''
@@ -559,7 +843,7 @@ class Monitor(object):
         -------
         minimum : float
         '''
-        x = self.x(ex0=ex0)
+        x = self._xweight(ex0=ex0)[0]
         if x:
             return min(x)
         else:
@@ -579,7 +863,7 @@ class Monitor(object):
         maximum : float
         '''
 
-        x = self.x(ex0=ex0)
+        x = self._xweight(ex0=ex0)[0]
         if x:
             return max(x)
         else:
@@ -600,7 +884,7 @@ class Monitor(object):
 
         Note
         ----
-        For weighted monitors, the weighted median is returned
+        If weight are applied, the weighted median is returned
         '''
         return self.percentile(50, ex0=ex0)
 
@@ -626,12 +910,12 @@ class Monitor(object):
 
         Note
         ----
-        For weighted monitors, the weighted percentile is returned
+        If weights are applied, the weighted percentile is returned
         '''
         # algorithm based on
         # https://stats.stackexchange.com/questions/13169/defining-quantiles-over-a-weighted-sample
         q = max(0, min(q, 100))
-        x, weight = self.xweight(ex0=ex0)
+        x, weight = self._xweight(ex0=ex0)
 
         if len(x) == 1:
             return x[0]
@@ -673,8 +957,14 @@ class Monitor(object):
         Returns
         -------
         number of values >lowerbound and <=upperbound : int
+
+        Note
+        ----
+        Not available for level monitors
         '''
-        x = self.x(ex0=ex0)
+        if self._level:
+            raise SalabimError('bin_number_of_entries not available for level monitors')
+        x = self._xweight(ex0=ex0)[0]
         return sum(1 for vx in x if (vx > lowerbound) and (vx <= upperbound))
 
     def bin_weight(self, lowerbound, upperbound):
@@ -695,8 +985,44 @@ class Monitor(object):
         Returns
         -------
         total weight of values >lowerbound and <=upperbound : int
+
+        Note
+        ----
+        Not available for level monitors
         '''
-        x, weight = self.xweight()
+        if self._level:
+            raise SalabimError('bin_weight not available for level monitors')
+        return self.sys_bin_weight(lowerbound, upperbound)
+
+    def bin_duration(self, lowerbound, upperbound):
+        '''
+        total duration of tallied values in range (lowerbound,upperbound]
+
+        Parameters
+        ----------
+        lowerbound : float
+            non inclusive lowerbound
+
+        upperbound : float
+            inclusive upperbound
+
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+
+        Returns
+        -------
+        total duration of values >lowerbound and <=upperbound : int
+
+        Note
+        ----
+        Not available for level monitors
+        '''
+        if not self._level:
+            raise SalabimError('bin_duration not available for non level monitors')
+        return self.sys_bin_weight(lowerbound, upperbound)
+
+    def sys_bin_weight(self, lowerbound, upperbound):
+        x, weight = self._xweight()
         return sum((vweight for vx, vweight in zip(x, weight) if (vx > lowerbound) and (vx <= upperbound)))
 
     def value_number_of_entries(self, value):
@@ -712,13 +1038,19 @@ class Monitor(object):
         Returns
         -------
         number of tallied values in value or equal to value : int
+
+        Note
+        ----
+        Not available for level monitors
         '''
+        if self._level:
+            raise SalabimError('value_number_of_entries not available for level monitors')
         if isinstance(value, (list, tuple, set)):
             value = [str(v) for v in value]
         else:
             value = [str(value)]
 
-        x = self.x(force_numeric=False)
+        x = self._xweight(force_numeric=False)[0]
         return sum(1 for vx in x if (str(vx).strip() in value))
 
     def value_weight(self, value):
@@ -734,8 +1066,40 @@ class Monitor(object):
         Returns
         -------
         total of weights of tallied values in value or equal to value : int
+
+        Note
+        ----
+        Not available for level monitors
         '''
-        x, weight = self.xweight(force_numeric=False)  # can't use self._weight, because of MonitorTimestamp
+        if self._level:
+            raise SalabimError('value_weight not supported for level monitors')
+        return self.sys_value_weight(value)
+
+    def value_duration(self, value):
+        '''
+        total duration of tallied values equal to value or in value
+
+        Parameters
+        ----------
+        value : any
+            if list, tuple or set, check whether the tallied value is in value |n|
+            otherwise, check whether the tallied value equals the given value
+
+        Returns
+        -------
+        total of duration of tallied values in value or equal to value : int
+
+        Note
+        ----
+        Not available for non level monitors
+        '''
+        if not self._level:
+            raise SalabimError('value_weight not available for non level monitors')
+        return self.sys_value_weight(value)
+
+    def sys_value_weight(self, value):
+        x, weight = self._xweight(force_numeric=False)
+
         if isinstance(value, (list, tuple, set)):
             value = [str(v) for v in value]
         else:
@@ -755,8 +1119,15 @@ class Monitor(object):
         Returns
         -------
         number of entries : int
+
+        Note
+        ----
+        Not available for level monitors
         '''
-        return len(self.x(ex0=ex0))
+        if self._level:
+            raise SalabimError('number_of_entries not available for level monitors')
+        x = self._xweight(ex0=ex0)[0]
+        return len(x)
 
     def number_of_entries_zero(self):
         '''
@@ -765,7 +1136,13 @@ class Monitor(object):
         Returns
         -------
         number of zero entries : int
+
+        Note
+        ----
+        Not available for level monitors
         '''
+        if self._level:
+            raise SalabimError('number_of_entries_zero not available for level monitors')
         return self.number_of_entries() - self.number_of_entries(ex0=True)
 
     def weight(self, ex0=False):
@@ -780,8 +1157,38 @@ class Monitor(object):
         Returns
         -------
         sum of weights : float
+
+        Note
+        ----
+        Not available for level monitors
         '''
-        x, weight = self.xweight(ex0=ex0)
+        if self._level:
+            raise SalabimError('weight not available for level monitors')
+        return self.sys_weight(ex0)
+
+    def duration(self, ex0=False):
+        '''
+        total duration
+
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
+
+        Returns
+        -------
+        total duration : float
+
+        Note
+        ----
+        Not available for non level monitors
+        '''
+        if not self._level:
+            raise SalabimError('duration not available for non level monitors')
+        return self.sys_weight(ex0)
+
+    def sys_weight(self, ex0=False):
+        x, weight = self._xweight(ex0=ex0)
         return sum(weight)
 
     def weight_zero(self):
@@ -791,8 +1198,33 @@ class Monitor(object):
         Returns
         -------
         sum of weights of zero entries : float
+
+        Note
+        ----
+        Not available for level monitors
         '''
-        return self.weight() - self.weight(ex0=True)
+        if self._level:
+            raise SalabimError('weight_zero not available for level monitors')
+        return self.sys_weight_zero()
+
+    def duration_zero(self):
+        '''
+        total duratiom of zero entries
+
+        Returns
+        -------
+        total duration of zero entries : float
+
+        Note
+        ----
+        Not available for non level monitors
+        '''
+        if not self._level:
+            raise SalabimError('duration_zero not available for non level monitors')
+        return self.sys_weight_zero()
+
+    def sys_weight_zero(self):
+        return self.sys_weight() - self.sys_weight(ex0=True)
 
     def print_statistics(self, show_header=True, show_legend=True, do_indent=False, as_str=False, file=None):
         '''
@@ -838,13 +1270,13 @@ class Monitor(object):
             result.append(
                 pad('-' * (l - 1) + ' ', l) + '-------------- ------------ ------------ ------------')
 
-        if self.weight() == 0:
+        if self.sys_weight() == 0:
             result.append(pad(self.name(), l) + 'no data')
             return return_or_print(result, as_str, file)
-        if self.weighted:
+        if self._weight:
             result.append(pad(self.name(), l) + pad(self.weight_legend, 14) +
-              '{}{}{}'.format(fn(self.weight(), 13, 3),
-              fn(self.weight(ex0=True), 13, 3), fn(self.weight_zero(), 13, 3)))
+              '{}{}{}'.format(fn(self.sys_weight(), 13, 3),
+              fn(self.sys_weight(ex0=True), 13, 3), fn(self.sys_weight_zero(), 13, 3)))
         else:
             result.append(pad(self.name(), l) + pad('entries', 14) +
               '{}{}{}'.format(fn(self.number_of_entries(), 13, 3),
@@ -995,54 +1427,66 @@ class Monitor(object):
         result = []
         result.append('Histogram of ' + self.name() + ('[ex0]' if ex0 else ''))
 
-        x, weight = self.xweight(ex0=ex0, force_numeric=not values)
+        x, weight = self._xweight(ex0=ex0, force_numeric=not values)
         weight_total = sum(weight)
 
         if weight_total == 0:
             result.append('')
             result.append('no data')
         else:
-
             if values:
                 nentries = len(x)
-                if self.weighted:
+                if self._weight:
                     result.append(pad(self.weight_legend, 13) +
                         '{}'.format(fn(weight_total, 13, 3)))
-                result.append(pad('entries', 13) + '{}'.
-                    format(fn(nentries, 13, 3)))
+                if not self._level:
+                    result.append(pad('entries', 13) + '{}'.
+                        format(fn(nentries, 13, 3)))
                 result.append('')
-                if self.weighted:
-                    result.append('value                ' + rpad(self.weight_legend, 13) + '        entries')
+                if self._level:
+                    result.append('value                ' + rpad(self.weight_legend, 13) + '     %')
                 else:
-                    result.append('value               entries')
+                    if self._weight:
+                        result.append('value                ' +
+                            rpad(self.weight_legend, 13) + '     % entries     %')
+                    else:
+                        result.append('value               entries     %')
                 as_set = {str(x).strip() for x in set(x)}
 
                 values = sorted(list(as_set), key=self.key)
 
                 for value in values:
-                    if self.weighted:
-                        count = self.value_weight(value)
-                        count_entries = self.value_number_of_entries(value)
+                    if self._level:
+                        count = self.value_duration(value)
                     else:
-                        count = self.value_number_of_entries(value)
+                        if self._weight:
+                            count = self.value_weight(value)
+                            count_entries = self.value_number_of_entries(value)
+                        else:
+                            count = self.value_number_of_entries(value)
 
                     perc = count / weight_total
                     scale = 80
                     n = int(perc * scale)
                     s = ('*' * n) + (' ' * (scale - n))
 
-                    if self.weighted:
-                        result.append(pad(str(value), 20) + fn(count, 14, 3) + '(' + fn(perc * 100, 5, 1) + '%)' +
-                           rpad(str(count_entries), 7) + '(' + fn(count_entries * 100 / nentries, 5, 1) + '%) ' + s)
+                    if self._level:
+                        result.append(pad(str(value), 20) + fn(count, 14, 3) + fn(perc * 100, 6, 1) + ' ' + s)
                     else:
-                        result.append(
-                            pad(str(value), 20) + rpad(str(count), 7) + '(' + fn(perc * 100, 5, 1) + '%) ' + s)
+                        if self._weight:
+                            result.append(pad(str(value), 20) + fn(count, 14, 3) +
+                                fn(perc * 100, 6, 1) +
+                                rpad(str(count_entries), 8) +
+                                fn(count_entries * 100 / nentries, 6, 1) + ' ' + s)
+                        else:
+                            result.append(
+                                pad(str(value), 20) + rpad(str(count), 7) + fn(perc * 100, 6, 1) + ' ' + s)
             else:
                 bin_width, lowerbound, number_of_bins = self.histogram_autoscale()
                 result.append(self.print_statistics(show_header=False, show_legend=True, do_indent=False, as_str=True))
                 if number_of_bins >= 0:
                     result.append('')
-                    if self.weighted:
+                    if self._weight:
                         result.append('           <= ' + rpad(self.weight_legend, 13) + '     %  cum%')
                     else:
                         result.append('           <=       entries     %  cum%')
@@ -1057,8 +1501,8 @@ class Monitor(object):
                             ub = inf
                         else:
                             ub = lowerbound + (i + 1) * bin_width
-                        if self.weighted:
-                            count = self.bin_weight(lb, ub)
+                        if self._weight:
+                            count = self.sys_bin_weight(lb, ub)
                         else:
                             count = self.bin_number_of_entries(lb, ub)
 
@@ -1119,14 +1563,6 @@ class Monitor(object):
 
         titlefontsize : int
             size of the font of the title (default 15)
-
-        as_points : bool
-            if False, lines will be drawn between the points |n|
-            if True (default),  only the points will be shown
-
-        as_level : bool
-            if True (default for lines), the timestamped monitor is considered to be a level
-            if False (default for points), just the tallied values will be shown, and connected (for lines)
 
         title : str
             title to be shown above panel |n|
@@ -1197,8 +1633,14 @@ class Monitor(object):
         Returns
         -------
         all tallied values : array/list
+
+        Note
+        ----
+        Not available for level monitors. Use xduration(), xt() or tx() instead.
         '''
-        return self.xweight(ex0=ex0, force_numeric=force_numeric)[0]
+        if self._level:
+            raise SalabimError('x not available for level monitors')
+        return self._xweight(ex0=ex0, force_numeric=force_numeric)[0]
 
     def xweight(self, ex0=False, force_numeric=True):
         '''
@@ -1216,695 +1658,18 @@ class Monitor(object):
         Returns
         -------
         all tallied values : array/list
-        '''
-        thishash = hash((self, len(self._x)))
-
-        if Monitor.cached_xweight[(ex0, force_numeric)][0] == thishash:
-            return Monitor.cached_xweight[(ex0, force_numeric)][1]
-
-        if self.xtypecode or (not force_numeric):
-            xall = self._x
-            typecode = self.xtypecode
-        else:
-            xall = list_to_array(self._x)
-            typecode = xall.typecode
-
-        if ex0:
-            x = [vx for vx in xall if vx != 0]
-            if typecode:
-                x = array.array(typecode, x)
-        else:
-            x = xall
-
-        if self.weighted:
-            if ex0:
-                xweight = (x, array.array('d', [vweight for vx, vweight in zip(x, self._weight) if vx != 0]))
-            else:
-                xweight = (x, self._weight)
-        else:
-            xweight = (x, array.array('d', (1,) * len(x)))
-
-        Monitor.cached_xweight[(ex0, force_numeric)] = (thishash, xweight)
-        return xweight
-
-
-class MonitorTimestamp(Monitor):
-    '''
-    monitortimestamp object
-
-    Parameters
-    ----------
-    name : str
-        name of the timestamped monitor
-        if the name ends with a period (.),
-        auto serializing will be applied |n|
-        if the name end with a comma,
-        auto serializing starting at 1 will be applied |n|
-        if omitted, the name will be derived from the class
-        it is defined in (lowercased)
-
-    initial_tally : any, usually float
-        initial value to be tallied (default 0) |n|
-        if it important to provide the value at time=now
-
-    monitor : bool
-        if True (default), monitoring will be on. |n|
-        if False, monitoring is disabled |n|
-        it is possible to control monitoring later,
-        with the monitor method
-
-    type : str
-        specifies how tallied values are to be stored
-        Using a int, uint of float type results in less memory usage and better
-        performance. Note that the getter should never return the number not to use
-        as this is used to indicate 'off'
-
-            - 'any' (default) stores values in a list. This allows for
-               non numeric values. In calculations the values are
-               forced to a numeric value (0 if not possible) do not use -inf
-            - 'bool' bool (False, True). Actually integer >= 0 <= 254 1 byte do not use 255
-            - 'int8' integer >= -127 <= 127 1 byte do not use -128
-            - 'uint8' integer >= 0 <= 254 1 byte do not use 255
-            - 'int16' integer >= -32767 <= 32767 2 bytes do not use -32768
-            - 'uint16' integer >= 0 <= 65534 2 bytes do not use 65535
-            - 'int32' integer >= -2147483647 <= 2147483647 4 bytes do not use -2147483648
-            - 'uint32' integer >= 0 <= 4294967294 4 bytes do not use 4294967295
-            - 'int64' integer >= -9223372036854775807 <= 9223372036854775807 8 bytes do not use -9223372036854775808
-            - 'uint64' integer >= 0 <= 18446744073709551614 8 bytes do not use 18446744073709551615
-            - 'float' float 8 bytes do not use -inf
-
-    merge: list, tuple or set
-        the monitor will be created by merging the monitors mentioned in the list |n|
-        merging means summing the available x-values|n|
-        note that the types of all to be merged monitors should be the same. |n|
-        initial_tally may not be specified when merge is specified. |n|
-        default: no merge
-
-    env : Environment
-        environment where the monitor is defined |n|
-        if omitted, default_env will be used
-
-    Note
-    ----
-    A MonitorTimestamp collects both the value and the time.
-    All statistics are based on the durations as weights.
-
-    Example
-    -------
-        Tallied at time   0: 10 (xnow in definition of monitortimestamp) |n|
-        Tallied at time  50: 11 |n|
-        Tallied at time  70: 12 |n|
-        Tallied at time  80: 10 |n|
-        Now = 100
-
-        This results in:  |n|
-        x=  10 duration 50 |n|
-        x=  11 duration 20 |n|
-        x=  12 duration 10 |n|
-        x=  10 duration 20
-
-        And thus a mean of (10*50+11*20+12*10+10*20)/(50+20+10+20)
-    '''
-
-    def __init__(self, name=None, initial_tally=None, monitor=True, type=None,
-        merge=None, env=None, *args, **kwargs):
-        if env is None:
-            self.env = g.default_env
-        else:
-            self.env = env
-        self._timestamp = True
-        self.weighted = True
-        self.weight_legend = 'duration'
-        _set_name(name, self.env._nameserializeComponent, self)
-        if merge is None:
-            if type is None:
-                type = 'any'
-            try:
-                self.xtypecode, self.off = type_to_typecode_off(type)
-            except KeyError:
-                raise SalabimError('type (' + type + ') not recognized')
-
-            if initial_tally is None:
-                self._tally = 0
-            else:
-                self._tally = initial_tally
-            self.reset(monitor=monitor)
-        else:
-            if initial_tally is not None:
-                raise SalabimError('initial_tally cannot be combined with merge')
-            if not merge:
-                raise SalabimError('merge list empty')
-
-            for m in merge:
-                if not isinstance(m, MonitorTimestamp):
-                    raise SalabimError('non MonitorTimestamp item found in merge list')
-
-            self.xtypecode = merge[0].xtypecode
-            for m in merge:
-                if m.xtypecode != self.xtypecode:
-                    raise SalabimError('not all types in merge list are equal')
-            if type is not None:
-                if type != self.xtypecode:
-                    raise SalabimError('type does not match the type of the monitors in the merge list')
-            self.off = merge[0].off
-            if self.xtypecode:
-                self._xw = array.array(self.xtypecode)
-            else:
-                self._xw = []
-            self.x_weight_t = None
-
-            curx = [self.off] * len(merge)
-            self._t = array.array('d')
-            for t, index, x in heapq.merge(
-                *[zip(merge[index]._t, itertools.repeat(index), merge[index]._xw) for index in range(len(merge))]):
-                if self.xtypecode:
-                    curx[index] = x
-                else:
-                    try:
-                        curx[index] = float(x)
-                    except:
-                        curx[index] = 0
-
-                sum = 0
-                for xi in curx:
-                    if xi is self.off:
-                        sum = self.off
-                        break
-                    sum += xi
-
-                if self._t and (t == self._t[-1]):
-                    self._xw[-1] = sum
-                else:
-                    self._t.append(t)
-                    self._xw.append(sum)
-            if not monitor:
-                self._t.append(self.env._now)
-                self._xw.append(self.off)
-
-        self.setup(*args, **kwargs)
-
-    def setup(self):
-        '''
-        called immediately after initialization of a monitortimestamp.
-
-        by default this is a dummy method, but it can be overridden.
-
-        only keyword arguments are passed
-        '''
-        pass
-
-    def register(self, *args, **kwargs):
-        '''
-        registers the timestamped monitor in the registry
-
-        Parameters
-        ----------
-        registry : list
-            list of (to be) registered objects
-
-        Returns
-        -------
-        timestamped monitor (self) : MonitorTimestamped
 
         Note
         ----
-        Use MonitorTimestamped.deregister if timestamped monitor does not longer need to be registered.
+        not available for level monitors
         '''
-        return Monitor.register(self, *args, **kwargs)
+        if self._level:
+            raise SalabimError('xweight not available for level monitors')
+        return self._xweight(ex0, force_numeric)
 
-    def deregister(self, *args, **kwargs):
+    def xduration(self, ex0=False, force_numeric=True):
         '''
-        deregisters the timestamped monitor in the registry
-
-        Parameters
-        ----------
-        registry : list
-            list of registered objects
-
-        Returns
-        -------
-        timestamped monitor (self): MonitorTimestamped
-        '''
-        return Monitor.deregister(self, *args, **kwargs)
-
-    def __repr__(self):
-        return objectclass_to_str(self) + ' (' + self.name() + ')'
-
-    def __call__(self):  # direct moneypatching __call__ doesn't work
-        return self._tally
-
-    def get(self):
-        '''
-        Returns
-        -------
-        last tallied value : any, usually float
-
-            Instead of this method, the timestamped monitor can also be called directly, like |n|
-
-            level = sim.MonitorTimestamp('level') |n|
-            ... |n|
-            print(level()) |n|
-            print(level.get())  # identical |n|
-        '''
-        return self._tally
-
-    def reset_monitors(self, monitor=None):
-        '''
-        resets timestamped monitor
-
-        Parameters
-        ----------
-        monitor : bool
-            if True (default), monitoring will be on. |n|
-            if False, monitoring is disabled |n|
-            if omitted, the monitor state remains unchanged
-
-        Note
-        ----
-        Exactly same functionality as MonitorTimestamped.reset()
-        '''
-        self.reset(monitor)
-
-    def reset(self, monitor=None):
-        '''
-        resets timestamped monitor
-
-        Parameters
-        ----------
-        monitor : bool
-            if True (default), monitoring will be on. |n|
-            if False, monitoring is disabled |n|
-            if omitted, the monitor state remains unchanged
-        '''
-        if monitor is not None:
-            self._monitor = monitor
-        if self.xtypecode:
-            self._xw = array.array(self.xtypecode)
-        else:
-            self._xw = []
-
-        if self._monitor:
-            self._xw.append(self._tally)
-        else:
-            self._xw.append(self.off)
-        self._t = array.array('d')
-        self._t.append(self.env._now)
-        self.x_weight_t = None  # invalidate _x and _weight
-
-    def monitor(self, value=None):
-        '''
-        enables/disabled timestamped monitor
-
-        Parameters
-        ----------
-        value : bool
-            if True, monitoring will be on. |n|
-            if False, monitoring is disabled |n|
-            if omitted, no change
-
-        Returns
-        -------
-        True, if monitoring enabled. False, if not : bool
-        '''
-
-        if value is not None:
-            self._monitor = value
-            if self._monitor:
-                self.tally(self._tally)
-            else:
-                self._tally_off()  # can't use tally() here because self._tally should be untouched
-        return self.monitor
-
-    def tally(self, value):
-        '''
-        tally value
-
-        Arguments
-        ---------
-        value : any, usually float
-        '''
-        self._tally = value
-        if self._monitor:
-            t = self.env._now
-            if self._t[-1] == t:
-                self._xw[-1] = value
-            else:
-                self._xw.append(value)
-                self._t.append(t)
-
-    def _tally_off(self):
-        t = self.env._now
-        if self._t[-1] == t:
-            self._xw[-1] = self.off
-        else:
-            self._xw.append(self.off)
-            self._t.append(t)
-
-    def name(self, value=None):
-        '''
-        Parameters
-        ----------
-        value : str
-            new name of the monitor
-            if omitted, no change
-
-        Returns
-        -------
-        Name of the monitor : str
-
-        Note
-        ----
-        base_name and sequence_number are not affected if the name is changed
-        '''
-        if value is not None:
-            self._name = value
-        return self._name
-
-    def base_name(self):
-        '''
-        Returns
-        -------
-        base name of the monitortimestamp (the name used at initialization): str
-        '''
-        return self._base_name
-
-    def sequence_number(self):
-        '''
-        Returns
-        -------
-        sequence_number of the monitortimestamp : int
-            (the sequence number at initialization) |n|
-            normally this will be the integer value of a serialized name,
-            but also non serialized names (without a dot or a comma at the end)
-            will be numbered)
-        '''
-        return self._sequence_number
-
-    def mean(self, *args, **kwargs):
-        '''
-        mean of tallied values, weighted with their durations
-
-        Parameters
-        ----------
-        ex0 : bool
-            if False (default), include zeroes. if True, exclude zeroes
-
-        Returns
-        -------
-        mean : float
-        '''
-        self.set_x_weight()
-        return Monitor.mean(self, *args, **kwargs)
-
-    def std(self, *args, **kwargs):
-        '''
-        standard deviation of tallied values, weighted with their durations
-
-        Parameters
-        ----------
-        ex0 : bool
-            if False (default), include zeroes. if True, exclude zeroes
-
-        Returns
-        -------
-        standard deviation : float
-        '''
-        self.set_x_weight()
-        return Monitor.std(self, *args, **kwargs)
-
-    def minimum(self, *args, **kwargs):
-        '''
-        minimum of tallied values
-
-        Parameters
-        ----------
-        ex0 : bool
-            if False (default), include zeroes. if True, exclude zeroes
-
-        Returns
-        -------
-        minimum : float
-        '''
-        self.set_x_weight()
-        return Monitor.minimum(self, *args, **kwargs)
-
-    def maximum(self, *args, **kwargs):
-        '''
-        maximum of tallied values
-
-        Parameters
-        ----------
-        ex0 : bool
-            if False (default), include zeroes. if True, exclude zeroes
-
-        Returns
-        -------
-        maximum : float
-        '''
-        self.set_x_weight()
-        return Monitor.maximum(self, *args, **kwargs)
-
-    def median(self, *args, **kwargs):
-        '''
-        median of tallied values weighted with their durations
-
-        Parameters
-        ----------
-        ex0 : bool
-            if False (default), include zeroes. if True, exclude zeroes
-
-        Returns
-        -------
-        median : float
-        '''
-        self.set_x_weight()
-        return Monitor.median(self, *args, **kwargs)
-
-    def percentile(self, *args, **kwargs):
-        '''
-        q-th percentile of tallied values, weighted with their durations
-
-        Parameters
-        ----------
-        q : float
-            percentage of the distribution |n|
-            values <0 are treated a 0 |n|
-            values >100 are treated as 100
-
-        ex0 : bool
-            if False (default), include zeroes. if True, exclude zeroes
-
-        Returns
-        -------
-        q-th percentile: float
-            0 returns the minimum, 50 the median and 100 the maximum
-        '''
-        self.set_x_weight()
-        return Monitor.percentile(self, *args, **kwargs)
-
-    def bin_duration(self, *args, **kwargs):
-        '''
-        duration of tallied values with the value in range (lowerbound,upperbound]
-
-        Parameters
-        ----------
-        lowerbound : float
-            non inclusive lowerbound
-
-        upperbound : float
-            inclusive upperbound
-
-        ex0 : bool
-            if False (default), include zeroes. if True, exclude zeroes
-
-        Returns
-        -------
-        duration of values >lowerbound and <=upperbound: float
-        '''
-        self.set_x_weight()
-        return Monitor.bin_weight(self, *args, **kwargs)
-
-    def value_duration(self, *args, **kwargs):
-        '''
-        duration of tallied values equal to value or in value
-
-        Parameters
-        ----------
-        value : any
-            if list, tuple or set, check whether the tallied value is in value |n|
-            otherwise, check whether the tallied value equals the given value
-
-        Returns
-        -------
-        duration of tallied values in value or equal to value : float
-        '''
-        self.set_x_weight()
-        return Monitor.value_weight(self, *args, **kwargs)
-
-    def value_number_of_entries(self, *args, **kwargs):
-        '''
-        count of tallied values equal to value or in value
-
-        Parameters
-        ----------
-        value : any
-            if list, tuple or set, check whether the tallied value is in value |n|
-            otherwise, check whether the tallied value equals the given value
-
-        Returns
-        -------
-        count of tallied values in value or equal to value : float
-        '''
-        self.set_x_weight()
-        return Monitor.value_number_of_entries(self, *args, **kwargs)
-
-    def duration(self, *args, **kwargs):
-        '''
-        total duration
-
-        Parameters
-        ----------
-        ex0 : bool
-            if False (default), include samples with value 0. if True, exclude zero samples.
-
-        Returns
-        -------
-        total duration : float
-        '''
-        self.set_x_weight()
-        return Monitor.weight(self, *args, **kwargs)
-
-    def duration_zero(self, *args, **kwargs):
-        '''
-        total duration of samples with value 0
-
-        Returns
-        -------
-        total duration of zero samples : float
-        '''
-        self.set_x_weight()
-        return Monitor.duration_zero(self, *args, **kwargs)
-
-    def number_of_entries(self, *args, **kwargs):
-        '''
-        count of the number of entries (duration type)
-
-        Parameters
-        ----------
-        ex0 : bool
-            if False (default), include zeroes. if True, exclude zeroes
-
-        Returns
-        -------
-        number of entries : int
-        '''
-        self.set_x_weight()
-        return Monitor.number_of_entries(self, *args, **kwargs)
-
-    def number_of_entries_zero(self, *args, **kwargs):
-        '''
-        count of the number of zero entries (duration type)
-
-        Returns
-        -------
-        number of zero entries : int
-        '''
-        self.set_x_weight()
-        return Monitor.number_of_entries_zero(self, *args, **kwargs)
-
-    def animate(self, *args, **kwargs):
-        '''
-        animates the timestamed monitor in a panel
-
-        Parameters
-        ----------
-        linecolor : colorspec
-            color of the line or points (default foreground color)
-
-        linewidth : int
-            width of the line or points (default 1 for line, 3 for points)
-
-        fillcolor : colorspec
-            color of the panel (default transparent)
-
-        bordercolor : colorspec
-            color of the border (default foreground color)
-
-        borderlinewidth : int
-            width of the line around the panel (default 1)
-
-        nowcolor : colorspec
-            color of the line indicating now (default red)
-
-        titlecolor : colorspec
-            color of the title (default foreground color)
-
-        titlefont : font
-            font of the title (default '')
-
-        titlefontsize : int
-            size of the font of the title (default 15)
-
-        as_points : bool
-            if False (default), lines will be drawn between the points |n|
-            if True,  only the points will be shown
-
-        title : str
-            title to be shown above panel |n|
-            default: name of the monitor
-
-        x : int
-            x-coordinate of panel, relative to xy_anchor, default 0
-
-        y : int
-            y-coordinate of panel, relative to xy_anchor. default 0
-
-        xy_anchor : str
-            specifies where x and y are relative to |n|
-            possible values are (default: sw): |n|
-            ``nw    n    ne`` |n|
-            ``w     c     e`` |n|
-            ``sw    s    se``
-
-        vertical_offset : float
-            the vertical position of x within the panel is
-             vertical_offset + x * vertical_scale (default 0)
-
-        vertical_scale : float
-            the vertical position of x within the panel is
-            vertical_offset + x * vertical_scale (default 5)
-
-        horizontal_scale : float
-            for timescaled monitors the relative horizontal position of time t within the panel is on
-            t * horizontal_scale, possibly shifted (default 1)|n|
-            for non timescaled monitors, the relative horizontal position of index i within the panel is on
-            i * horizontal_scale, possibly shifted (default 5)|n|
-
-        width : int
-            width of the panel (default 200)
-
-        height : int
-            height of the panel (default 75)
-
-        layer : int
-            layer (default 0)
-
-        Returns
-        -------
-        reference to AnimateMonitor object : AnimateMonitor
-
-        Note
-        ----
-        It is recommended to use sim.AnimateMonitor instead |n|
-
-        All measures are in screen coordinates |n|
-        '''
-
-        return AnimateMonitor(monitor=self, *args, **kwargs)
-
-    def xduration(self, *args, **kwargs):
-        '''
-        tuple of array with x-values and array with durations
+        array/list of tallied values
 
         Parameters
         ----------
@@ -1917,41 +1682,15 @@ class MonitorTimestamp(Monitor):
 
         Returns
         -------
-        array/list with x-values and array with durations : tuple
+        all tallied values : array/list
+
+        Note
+        ----
+        not available for non level monitors
         '''
-        return Monitor.xweight(self, *args, **kwargs)
-
-    def xweight(self, *args, **kwargs):
-        self.set_x_weight()
-        return Monitor.xweight(self, *args, **kwargs)
-
-    def set_x_weight(self):
-        
-        if self.x_weight_t == max(self.env.t, self.env._now):
-            return
-        self.x_weight_t = max(self.env.t, self.env._now)   # stay valid until new t/now detected or invalidated
-        Monitor.cached_xweight = {(ex0, force_numeric): (0, 0)
-            for ex0 in (False, True) for force_numeric in (False, True)}  # invalidate the cache
-
-        weightall = array.array('d')
-        lastt = None
-        for t in self._t:
-            if lastt is not None:
-                weightall.append(t - lastt)
-            lastt = t
-
-        weightall.append(self.env._now - lastt)
-
-        self._weight = array.array('d')
-        if self.xtypecode:
-            self._x = array.array(self.xtypecode)
-        else:
-            self._x = []
-
-        for vx, vweight in zip(self._xw, weightall):
-            if vx != self.off:
-                self._x.append(vx)
-                self._weight.append(vweight)
+        if not self._level:
+            raise SalabimError('xduration not available for non level monitors')
+        return self._xweight(ex0, force_numeric)
 
     def xt(self, ex0=False, exoff=False, force_numeric=True, add_now=True):
         '''
@@ -1963,7 +1702,8 @@ class MonitorTimestamp(Monitor):
             if False (default), include zeroes. if True, exclude zeroes
 
         exoff : bool
-            if False (default), include self.off. if True, exclude self.off's
+            if False (default), include self.off. if True, exclude self.off's |n|
+            non level monitors will return all values, regardless of exoff
 
         force_numeric : bool
             if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
@@ -1971,7 +1711,8 @@ class MonitorTimestamp(Monitor):
 
         add_now : bool
             if True (default), the last tallied x-value and the current time is added to the result |n|
-            if False, the result ends with the last tallied value and the time that was tallied
+            if False, the result ends with the last tallied value and the time that was tallied |n|
+            non level monitors will never add now
 
         Returns
         -------
@@ -1982,33 +1723,38 @@ class MonitorTimestamp(Monitor):
         The value self.off is stored when monitoring is turned off |n|
         The timestamps are not corrected for any reset_now() adjustment.
         '''
+        if not self._level:
+            exoff = False
+            add_now = False
+
         if self.xtypecode or (not force_numeric):
-            xall = self._xw
+            x = self._x
             typecode = self.xtypecode
             off = self.off
         else:
-            xall = list_to_array(self._xw)
-            typecode = xall.typecode
+            x = list_to_array(self._x)
+            typecode = x.typecode
             off = -inf  # float
 
         if typecode:
-            x = array.array(typecode)
+            xx = array.array(typecode)
         else:
-            x = []
+            xx = []
         t = array.array('d')
         if add_now:
-            addx = [xall[-1]]
+            addx = [x[-1]]
             addt = [self.env._now]
         else:
             addx = []
             addt = []
-        for vx, vt in zip(itertools.chain(xall, addx), itertools.chain(self._t, addt)):
+
+        for vx, vt in zip(itertools.chain(x, addx), itertools.chain(self._t, addt)):
             if not ex0 or (vx != 0):
                 if not exoff or (vx != off):
-                    x.append(vx)
+                    xx.append(vx)
                     t.append(vt)
 
-        return x, t
+        return xx, t
 
     def tx(self, ex0=False, exoff=False, force_numeric=False, add_now=True):
         '''
@@ -2020,15 +1766,17 @@ class MonitorTimestamp(Monitor):
             if False (default), include zeroes. if True, exclude zeroes
 
         exoff : bool
-            if False (default), include self.off. if True, exclude self.off's
+            if False (default), include self.off. if True, exclude self.off's |n|
+            non level monitors will return all values, regardless of exoff
 
         force_numeric : bool
             if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
             if False, do not interpret x-values, return as list if type is list
 
         add_now : bool
-            if True (default), the current time and the last tallied x-value added to the result |n|
-            if False, the result ends with the time of the last tally and the last tallied x-value
+            if True (default), the last tallied x-value and the current time is added to the result |n|
+            if False, the result ends with the last tallied value and the time that was tallied |n|
+            non level monitors will never add now
 
         Returns
         -------
@@ -2041,139 +1789,66 @@ class MonitorTimestamp(Monitor):
         '''
         return tuple(reversed(self.xt(ex0=ex0, exoff=exoff, force_numeric=force_numeric, add_now=add_now)))
 
-    def print_statistics(self, show_header=True, show_legend=True, do_indent=False, as_str=False, file=None):
-        '''
-        print timestamped monitor statistics
+    def _xweight(self, ex0=False, force_numeric=True):
+        if self._level:
+            thishash = hash((self, len(self._x), max(self.env.t, self.env._now)))
+        else:
+            thishash = hash((self, len(self._x)))
+        if Monitor.cached_xweight[(ex0, force_numeric)][0] == thishash:
+            return Monitor.cached_xweight[(ex0, force_numeric)][1]
 
-        Parameters
-        ----------
-        show_header: bool
-            primarily for internal use
+        if self.xtypecode or (not force_numeric):
+            x = self._x
+            typecode = self.xtypecode
+        else:
+            x = list_to_array(self._x)
+            typecode = x.typecode
 
-        show_legend: bool
-            primarily for internal use
+        if self._level:
+            weightall = array.array('d')
+            lastt = None
+            for t in self._t:
+                if lastt is not None:
+                    weightall.append(t - lastt)
+                lastt = t
 
-        do_indent: bool
-            primarily for internal use
+            weightall.append(self.env._now - lastt)
 
-        as_str: bool
-            if False (default), print the statistics
-            if True, return a string containing the statistics
+            weight = array.array('d')
+            if typecode:
+                xx = array.array(typecode)
+            else:
+                xx = []
 
-        file: file
-            if None(default), all output is directed to stdout |n|
-            otherwise, the output is directed to the file
+            for vx, vweight in zip(x, weightall):
+                if vx != self.off:
+                    xx.append(vx)
+                    weight.append(vweight)
+            xweight = (xx, weight)
+        else:
 
-        Returns
-        -------
-        statistics (if as_str is True) : str
-        '''
+            if ex0:
+                x = [vx for vx in x if vx != 0]
+                if typecode:
+                    x = array.array(typecode, x)
 
-        self.set_x_weight()
-        return Monitor.print_statistics(self, show_header, show_legend, do_indent, as_str=as_str, file=file)
+            weight = self._weight
 
-    def print_histograms(self, number_of_bins=None,
-      lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None):
-        '''
-        print timedstamped monitor statistics and histogram
+            if self._weight:
+                if ex0:
+                    xweight = (x, array.array('d', [vweight for vx, vweight in zip(x, self._weight) if vx != 0]))
+                else:
+                    xweight = (x, self._weight)
+            else:
+                xweight = (x, array.array('d', (1,) * len(x)))
 
-        Parameters
-        ----------
-        number_of_bins : int
-            number of bins |n|
-            default: 30 |n|
-            if <0, also the header of the histogram will be surpressed
-
-        lowerbound: float
-            first bin |n|
-            default: 0
-
-        bin_width : float
-            width of the bins |n|
-            default: 1
-
-        values : bool
-            if False (default), bins will be used |n|
-            if True, the individual values will be shown (in the right order).
-            in that case, no cumulative values will be given |n|
-
-        ex0 : bool
-            if False (default), include zeroes. if True, exclude zeroes
-
-
-        as_str: bool
-            if False (default), print the histogram
-            if True, return a string containing the histogram
-
-        file: file
-            if None(default), all output is directed to stdout |n|
-            otherwise, the output is directed to the file
-
-        Returns
-        -------
-        histogram (if as_str is True) : str
-
-        Note
-        ----
-        If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
-        with a maximum of 30 classes. |n|
-        Exactly same functionality as MonitorTimestamped.print_histogram()
-        '''
-        return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str, file=file)
-
-    def print_histogram(
-        self, number_of_bins=None, lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None):
-        '''
-        print timestamped monitor statistics and histogram
-
-        Parameters
-        ----------
-        number_of_bins : int
-            number of bins |n|
-            default: 30 |n|
-            if <0, also the header of the histogram will be surpressed
-
-        lowerbound: float
-            first bin |n|
-            default: 0
-
-        bin_width : float
-            width of the bins |n|
-            default: 1
-
-        values : bool
-            if False (default), bins will be used |n|
-            if True, the individual values will be shown (in the right order).
-            in that case, nu cumulative values will be given |n|
-
-        ex0 : bool
-            if False (default), include zeroes. if True, exclude zeroes
-
-        as_str: bool
-            if False (default), print the histogram
-            if True, return a string containing the histogram
-
-        file: file
-            if None(default), all output is directed to stdout |n|
-            otherwise, the output is directed to the file
-
-        Returns
-        -------
-        histogram (if as_str is True) : str
-
-        Note
-        ----
-        If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
-        with a maximum of 30 classes.
-        '''
-        self.set_x_weight()
-        return Monitor.print_histogram(
-            self, number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str, file=file)
+        Monitor.cached_xweight[(ex0, force_numeric)] = (thishash, xweight)
+        return xweight
 
 
 class AnimateMonitor(object):
     '''
-    animates a (timestamped) monitor in a panel
+    animates a monitor in a panel
 
     Parameters
     ----------
@@ -2203,14 +1878,6 @@ class AnimateMonitor(object):
 
     titlefontsize : int
         size of the font of the title (default 15)
-
-    as_points : bool
-        if False (default for timestamped monitors), lines will be drawn between the points |n|
-        if True (default for non timestamped monitors),  only the points will be shown
-
-    as_level : bool
-        if True (default for lines), the timestamped monitor is considered to be a level
-        if False (default for points), just the tallied values will be shown, and connected (for lines)
 
     title : str
         title to be shown above panel |n|
@@ -2265,7 +1932,7 @@ class AnimateMonitor(object):
     def __init__(self, monitor, linecolor='fg', linewidth=None, fillcolor='', bordercolor='fg', borderlinewidth=1,
         titlecolor='fg', nowcolor='red',
         titlefont='', titlefontsize=15,
-        as_points=None, as_level=None, title=None, x=0, y=0, vertical_offset=2, parent=None,
+        title=None, x=0, y=0, vertical_offset=2, parent=None,
         vertical_scale=5, horizontal_scale=None, width=200, height=75, xy_anchor='sw', layer=0):
 
         _checkismonitor(monitor)
@@ -2273,17 +1940,11 @@ class AnimateMonitor(object):
         if title is None:
             title = monitor.name()
 
-        if as_points is None:
-            as_points = not monitor._timestamp
-
-        if as_level is None:
-            as_level = not as_points
-
         if linewidth is None:
-            linewidth = 3 if as_points else 1
+            linewidth = 1 if monitor._level else 3
 
         if horizontal_scale is None:
-            horizontal_scale = 1 if monitor._timestamp else 5
+            horizontal_scale = 1
 
         xll = x + monitor.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True)
         yll = y + monitor.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True)
@@ -2297,24 +1958,16 @@ class AnimateMonitor(object):
         self.aos.append(AnimateText(text=title, textcolor=titlecolor,
             offsetx=xll, offsety=yll + height + titlefontsize * 0.15, text_anchor='sw',
             screen_coordinates=True, fontsize=titlefontsize, font=titlefont, layer=layer))
-        if monitor._timestamp:
-            self.aos.append(_Animate_t_Line(line0=(), linecolor0=nowcolor,
-                monitor=monitor, width=width, height=height, t_scale=horizontal_scale,
-                layer=layer, offsetx0=xll, offsety0=yll,
-                screen_coordinates=True))
-            self.aos.append(_Animate_t_x_Line(monitor=monitor, linecolor0=linecolor, line0=(),
-                linewidth0=linewidth,
-                screen_coordinates=True, offsetx0=xll, offsety0=yll,
-                width=width, height=height, value_offsety=vertical_offset, value_scale=vertical_scale,
-                as_points=as_points, as_level=as_level,
-                linewidth=linewidth, t_scale=horizontal_scale, layer=layer))
-        else:
-            self.aos.append(_Animate_index_x_Line(monitor=monitor, line0=(), linecolor0=linecolor,
-                linewidth0=linewidth,
-                screen_coordinates=True, xll=xll, yll=yll,
-                as_points=as_points,
-                width=width, height=height, value_offsety=vertical_offset, value_scale=vertical_scale,
-                index_scale=horizontal_scale, layer=layer, linewidth=linewidth))
+
+        self.aos.append(_Animate_t_Line(line0=(), linecolor0=nowcolor,
+            monitor=monitor, width=width, height=height, t_scale=horizontal_scale,
+            layer=layer, offsetx0=xll, offsety0=yll,
+            screen_coordinates=True))
+        self.aos.append(_Animate_t_x_Line(monitor=monitor, linecolor0=linecolor, line0=(),
+            linewidth0=linewidth, as_points=not monitor._level,
+            screen_coordinates=True, offsetx0=xll, offsety0=yll,
+            width=width, height=height, value_offsety=vertical_offset, value_scale=vertical_scale,
+            linewidth=linewidth, t_scale=horizontal_scale, layer=layer))
         self.env.sys_objects.append(self)
 
     def update(self, t):
@@ -2568,8 +2221,8 @@ class Queue(object):
         self._iter_sequence = 0
         self._iter_touched = {}
         self._isinternal = False
-        self.length = MonitorTimestamp(
-            'Length of ' + self.name(), initial_tally=0, monitor=monitor, type='uint32', env=self.env)
+        self.length = Monitor(
+            'Length of ' + self.name(), level=True, initial_tally=0, monitor=monitor, type='uint32', env=self.env)
         self.length_of_stay = Monitor(
             'Length of stay in ' + self.name(), monitor=monitor, type='float')
         if fill is not None:
@@ -2656,7 +2309,7 @@ class Queue(object):
 
     def reset_monitors(self, monitor=None):
         '''
-        resets queue monitor length_of_stay and timestamped monitor length
+        resets queue monitor length_of_stay and length
 
         Parameters
         ----------
@@ -2735,7 +2388,7 @@ class Queue(object):
         return self
 
     def __repr__(self):
-        return objectclass_to_str(self) + '(' + self.name() + ')'
+        return objectclass_to_str(self) + ' (' + self.name() + ')'
 
     def print_info(self, as_str=False, file=None):
         '''
@@ -2763,7 +2416,7 @@ class Queue(object):
             mx = self._head.successor
             while mx != self._tail:
                 result.append('    ' + pad(mx.component.name(), 20) +
-                    ' enter_time' + time_to_string(mx.enter_time - self.env._offset) +
+                    ' enter_time' + self.env.time_to_str(mx.enter_time - self.env._offset) +
                     ' priority=' + str(mx.priority))
                 mx = mx.successor
         else:
@@ -2800,7 +2453,7 @@ class Queue(object):
 
     def print_histograms(self, exclude=(), as_str=False, file=None):
         '''
-        prints the histograms of the length timestamped and length_of_stay monitor of the queue
+        prints the histograms of the length and length_of_stay monitor of the queue
 
         Parameters
         ----------
@@ -3621,6 +3274,10 @@ class Environment(object):
         if the null string (''), no action on random is taken |n|
         if None (the default), 1234567 will be used.
 
+    time_unit : str
+        Supported time_units: |n|
+        'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds', 'n/a'
+
     name : str
         name of the environment |n|
         if the name ends with a period (.),
@@ -3651,7 +3308,7 @@ class Environment(object):
     _nameserialize = {}
     cached_modelname_width = [None, None]
 
-    def __init__(self, trace=False, random_seed=None, name=None,
+    def __init__(self, trace=False, random_seed=None, time_unit='n/a', name=None,
       print_trace_header=True, isdefault_env=True, *args, **kwargs):
         if isdefault_env:
             g.default_env = self
@@ -3666,6 +3323,10 @@ class Environment(object):
             elif random_seed == '*':
                 random_seed = None
             random.seed(random_seed)
+
+        self._time_unit = _time_unit_lookup(time_unit)
+        self._time_unit_name = time_unit
+
         _set_name(name, Environment._nameserialize, self)
         self._buffered_trace = False
         self._suppress_trace_standby = True
@@ -3675,6 +3336,7 @@ class Environment(object):
             self.print_trace('', '', self.name() + ' initialize')
         self.env = self
         # just to allow main to be created; will be reset later
+        self._time_to_str_format = '{:10.3f}'
         self._nameserializeComponent = {}
         self._now = 0
         self._offset = 0
@@ -3683,13 +3345,12 @@ class Environment(object):
         self._main.frame = _get_caller_frame()
         self._current_component = self._main
         if self._trace:
-            self.print_trace('{:10.3f}'.format(0), 'main', 'current')
+            self.print_trace(self.time_to_str(0), 'main', 'current')
         self._nameserializeQueue = {}
         self._nameserializeComponent = {}
         self._nameserializeResource = {}
         self._nameserializeState = {}
         self._nameserializeMonitor = {}
-        self._nameserializeMonitorTimestamp = {}
         self._seq = 0
         self._event_list = []
         self._standbylist = []
@@ -3802,7 +3463,7 @@ class Environment(object):
         result = []
         result.append(objectclass_to_str(self) + ' ' + hex(id(self)))
         result.append('  name=' + self.name())
-        result.append('  now=' + time_to_string(self._now - self._offset))
+        result.append('  now=' + self.time_to_str(self._now - self._offset))
         result.append('  current_component=' + self._current_component.name())
         result.append('  trace=' + str(self._trace))
         return return_or_print(result, as_str, file)
@@ -3821,7 +3482,7 @@ class Environment(object):
                     c._scheduled_time = inf
                     self.env._current_component = c
                     if self._trace:
-                        self.print_trace('{:10.3f}'.format(self._now - self.env._offset), c.name(),
+                        self.print_trace(self.time_to_str(self._now - self.env._offset), c.name(),
                             'current (standby)', s0=c.lineno_txt(), _optional=self._suppress_trace_standby)
                     try:
                         next(c._process)
@@ -3855,7 +3516,7 @@ class Environment(object):
         c._status = current
         c._scheduled_time = inf
         if self._trace:
-            self.print_trace('{:10.3f}'.format(self._now - self._offset), c.name(),
+            self.print_trace(self.time_to_str(self._now - self._offset), c.name(),
               'current', s0=c.lineno_txt())
         if c == self._main:
             self.running = False
@@ -3902,7 +3563,7 @@ class Environment(object):
     def _print_event_list(self, s):
         print('eventlist ', s)
         for (t, seq, comp) in self._event_list:
-            print('{:10.3f} {}'.format(t, comp.name()))
+            print(self.time_to_str(t, comp.name()))
 
     def animation_parameters(self,
       animate=True, synced=None, speed=None, width=None, height=None,
@@ -4699,9 +4360,8 @@ class Environment(object):
         Internally, salabim still works with the 'old' time. Only in the interface
         from and to the user program, a correction will be applied.
 
-        The registered time in timestamped monitors will be always is the 'old' time.
-        This is only relevant when using the time value in MonitorTimestamp.xt() or
-        MonitorTimestamp.tx().
+        The registered time in monitors will be always is the 'old' time.
+        This is only relevant when using the time value in Monitor.xt() or Monitor.tx().
         '''
         offset_before = self._offset
         self._offset = self._now - new_now
@@ -5262,7 +4922,7 @@ class Environment(object):
         if self._show_time:
             if s != '':
                 s += ' '
-            s += 't={:.3f}'.format(t - self.env._offset)
+            s += 't=' + self.time_to_str(t - self.env._offset).lstrip()
         return s
 
     def tracetext(self, t):
@@ -5547,6 +5207,268 @@ class Environment(object):
         '''
         return self._sequence_number
 
+    def get_time_unit(self):
+        '''
+        gets time unit
+
+        Returns
+        -------
+        Current time unit dimension (default 'n/a') : str
+        '''
+        return self._time_unit_name
+
+    def years(self, t):
+        '''
+        convert the given time in years to the current time unit
+
+        Parameters
+        ----------
+        t : float
+            time in years
+
+        Returns
+        -------
+        time in years, converted to the current time_unit : float
+        '''
+        self._check_time_unit_na()
+        return t * 86400 * 365 * self._time_unit
+
+    def weeks(self, t):
+        '''
+        convert the given time in weeks to the current time unit
+
+        Parameters
+        ----------
+        t : float
+            time in weeks
+
+        Returns
+        -------
+        time in weeks, converted to the current time_unit : float
+        '''
+        self._check_time_unit_na()
+        return t * 86400 * 7 * self._time_unit
+
+    def days(self, t):
+        '''
+        convert the given time in days to the current time unit
+
+        Parameters
+        ----------
+        t : float
+            time in days
+
+        Returns
+        -------
+        time in days, converted to the current time_unit : float
+        '''
+        self._check_time_unit_na()
+        return t * 86400 * self._time_unit
+
+    def hours(self, t):
+        '''
+        convert the given time in hours to the current time unit
+
+        Parameters
+        ----------
+        t : float
+            time in hours
+
+        Returns
+        -------
+        time in hours, converted to the current time_unit : float
+        '''
+        self._check_time_unit_na()
+        return t * 3600 * self._time_unit
+
+    def minutes(self, t):
+        '''
+        convert the given time in minutes to the current time unit
+
+        Parameters
+        ----------
+        t : float
+            time in minutes
+
+        Returns
+        -------
+        time in minutes, converted to the current time_unit : float
+        '''
+        self._check_time_unit_na()
+        return t * 60 * self._time_unit
+
+    def seconds(self, t):
+        '''
+        convert the given time in seconds to the current time unit
+
+        Parameters
+        ----------
+        t : float
+            time in seconds
+
+        Returns
+        -------
+        time in secoonds, converted to the current time_unit : float
+        '''
+        self._check_time_unit_na()
+        return t * self._time_unit
+
+    def milliseconds(self, t):
+        '''
+        convert the given time in milliseconds to the current time unit
+
+        Parameters
+        ----------
+        t : float
+            time in milliseconds
+
+        Returns
+        -------
+        time in milliseconds, converted to the current time_unit : float
+        '''
+        self._check_time_unit_na()
+        return t * 1e-3 * self._time_unit
+
+    def microseconds(self, t):
+        '''
+        convert the given time in microseconds to the current time unit
+
+        Parameters
+        ----------
+        t : float
+            time in microseconds
+
+        Returns
+        -------
+        time in microseconds, converted to the current time_unit : float
+        '''
+        self._check_time_unit_na()
+        return t * 1e-6 * self._time_unit
+
+    def to_years(self, t):
+        '''
+        convert time t to years
+
+        Parameters
+        ----------
+        t : time
+
+        Returns
+        -------
+        Time t converted to years : float
+        '''
+        self._check_time_unit_na()
+        return t / (86400 * 365 * self._time_unit)
+
+    def to_weeks(self, t):
+        '''
+        convert time t to weeks
+
+        Parameters
+        ----------
+        t : time
+
+        Returns
+        -------
+        Time t converted to weeks : float
+        '''
+        self._check_time_unit_na()
+        return t / (86400 * 7 * self._time_unit)
+
+    def to_days(self, t):
+        '''
+        convert time t to days
+
+        Parameters
+        ----------
+        t : time
+
+        Returns
+        -------
+        Time t converted to days : float
+        '''
+        self._check_time_unit_na()
+        return t / (86400 * self._time_unit)
+
+    def to_hours(self, t):
+        '''
+        convert time t to hours
+
+        Parameters
+        ----------
+        t : time
+
+        Returns
+        -------
+        Time t converted to hours : float
+        '''
+        self._check_time_unit_na()
+        return t / (3600 * self._time_unit)
+
+    def to_minutes(self, t):
+        '''
+        convert time t to minutes
+
+        Parameters
+        ----------
+        t : time
+
+        Returns
+        -------
+        Time t converted to minutes : float
+        '''
+        self._check_time_unit_na()
+        return t / (60 * self._time_unit)
+
+    def to_seconds(self, t):
+        '''
+        convert time t to seconds
+
+        Parameters
+        ----------
+        t : time
+
+        Returns
+        -------
+        Time t converted to seconds : float
+        '''
+        self._check_time_unit_na()
+        return t / (self._time_unit)
+
+    def to_milliseconds(self, t):
+        '''
+        convert time t to milliseconds
+
+        Parameters
+        ----------
+        t : time in milliseconds
+
+        Returns
+        -------
+        Time t converted to milliseconds : float
+        '''
+        self._check_time_unit_na()
+        return t / (1e-3 * self._time_unit)
+
+    def to_microseconds(self, t):
+        '''
+        convert time t to microseconds
+
+        Parameters
+        ----------
+        t : time in microseconds
+
+        Returns
+        -------
+        Time t converted to microseconds : float
+        '''
+        self._check_time_unit_na()
+        return t / (1e-6 * self._time_unit)
+
+    def _check_time_unit_na(self):
+        if self._time_unit is None:
+            raise SalabimError('time_unit is not available')
+
     def print_trace_header(self):
         '''
         print a (two line) header line as a legend |n|
@@ -5645,6 +5567,30 @@ class Environment(object):
                         self._buffered_trace = False
                     print(line)
                     logging.debug(line)
+
+    def time_to_str_format(self, format=None):
+        '''
+        sets / gets the the format to display times in trace, animation, etc.
+
+        Parameters
+        ----------
+        format : str
+            specifies how the time should be displayed in trace, animation, etc. |n|
+            the format specifier should result in 10 characters. Examples: |n|
+            '{:10.3f}', '{:10.4f}', '{:10.0f}' and '{:8.1f} h' |n|
+            Make sure that the returned length is exactly 10 characters.
+
+        Returns
+        -------
+        current specifier (initialized to '{:10.3f}')
+        '''
+        if format is not None:
+            self._time_to_str_format = format
+        return self._time_to_str_format
+
+    def time_to_str(self, t):
+        s = self._time_to_str_format.format(t)
+        return rpad(s, 10)
 
     def beep(self):
         '''
@@ -9029,7 +8975,7 @@ class _AnimateVis(Animate):
         return _call(self.vis.layer, t, self.vis.arg)
 
 
-class _AosObject(object):  # for Monitor.animate and MonitorTimestamp.animate
+class _AosObject(object):  # for Monitor.animate
     def __init__(self):
         self.aos = []
 
@@ -9039,55 +8985,8 @@ class _AosObject(object):  # for Monitor.animate and MonitorTimestamp.animate
         self.aos = []
 
 
-class _Animate_index_x_Line(Animate):
-    def __init__(self, monitor, xll, yll, width, height, value_offsety, value_scale, index_scale,
-        linewidth, *args, **kwargs):
-        self.monitor = monitor
-        self.xll = xll
-        self.yll = yll
-        self.width = width
-        self.height = height
-        self.value_offsety = value_offsety
-        self.value_scale = value_scale
-        self.index_scale = index_scale
-        self._linewidth = linewidth
-        self.index_width = int(self.width / self.index_scale)
-        Animate.__init__(self, *args, **kwargs)
-
-    def index_to_x(self, index):
-        if len(self.monitor._x) > self.index_width:
-            index = index + self.index_width - len(self.monitor._x)
-            if index < 0:
-                self.done = True
-        x = (index + 0.5) * self.index_scale
-        return self.xll + max(self._linewidth / 2, min(self.width - self._linewidth / 2, x))
-
-    def value_to_y(self, value):
-        try:
-            value = float(value)
-        except ValueError:
-            value = 0
-        return self.yll + max(
-            self._linewidth / 2, min(self.height - self._linewidth / 2, value * self.value_scale + self.value_offsety))
-
-    def line(self, t):
-        p = []
-        self.done = False
-
-        for index, value in zip(reversed(range(len(self.monitor._x))), reversed(self.monitor._x)):
-            x = self.index_to_x(index)
-            if self.done:
-                break
-            y = self.value_to_y(value)
-
-            p.append(x)
-            p.append(y)
-        return p
-
-
 class _Animate_t_x_Line(Animate):
-    def __init__(self, monitor, width, height, value_offsety, value_scale, t_scale, linewidth,
-        as_level, *args, **kwargs):
+    def __init__(self, monitor, width, height, value_offsety, value_scale, t_scale, linewidth, *args, **kwargs):
         self.monitor = monitor
         self.width = width
         self.height = height
@@ -9095,7 +8994,7 @@ class _Animate_t_x_Line(Animate):
         self.value_scale = value_scale
         self.t_scale = t_scale
         self._linewidth = linewidth
-        self.as_level = as_level
+        self.as_level = self.monitor._level
         self.t_width = self.width / self.t_scale
         Animate.__init__(self, *args, **kwargs)
 
@@ -9118,19 +9017,23 @@ class _Animate_t_x_Line(Animate):
             except ValueError:
                 value = 0
         return max(
-          self._linewidth / 2, min(self.height - self._linewidth / 2, value * self.value_scale + self.value_offsety))
+            self._linewidth / 2, min(self.height - self._linewidth / 2,
+            value * self.value_scale + self.value_offsety))
 
     def line(self, t):
         self.tnow = t
-        self.t0 = self.monitor._t[0]
+        self.t0 = self.monitor.start
         l = []
-        value = self.monitor._xw[-1]
+        if len(self.monitor._x) != 0:
+            value = self.monitor._x[-1]
+        else:
+            value = 0
         lastt = t
         if self.as_level:
             l.append(self.t_to_x(lastt))
             l.append(self.value_to_y(value))
         self.done = False
-        for value, t in zip(reversed(self.monitor._xw), reversed(self.monitor._t)):
+        for value, t in zip(reversed(self.monitor._x), reversed(self.monitor._t)):
             if self.as_level:
                 l.append(self.t_to_x(lastt))
                 l.append(self.value_to_y(value))
@@ -9152,7 +9055,7 @@ class _Animate_t_Line(Animate):
         Animate.__init__(self, *args, **kwargs)
 
     def line(self, t):
-        t = t - self.monitor._t[0]
+        t = t - self.monitor.start
         if t > self.t_width:
             t = self.t_width
         x = t * self.t_scale
@@ -9456,15 +9359,15 @@ class Component(object):
         result.append('  suppress_pause_at_step=' + str(self._suppress_pause_at_step))
         result.append('  status=' + self._status())
         result.append('  mode=' + _modetxt(self._mode).strip())
-        result.append('  mode_time=' + time_to_string(self._mode_time))
-        result.append('  creation_time=' + time_to_string(self._creation_time))
+        result.append('  mode_time=' + self.env.time_to_str(self._mode_time))
+        result.append('  creation_time=' + self.env.time_to_str(self._creation_time))
         result.append('  scheduled_time=' +
-            time_to_string(self._scheduled_time))
+            self.env.time_to_str(self._scheduled_time))
         if len(self._qmembers) > 0:
             result.append('  member of queue(s):')
             for q in sorted(self._qmembers, key=lambda obj: obj.name().lower()):
                 result.append('    ' + pad(q.name(), 20) + ' enter_time=' +
-                    time_to_string(self._qmembers[q].enter_time - self.env._offset) +
+                    self.env.time_to_str(self._qmembers[q].enter_time - self.env._offset) +
                     ' priority=' + str(self._qmembers[q].priority))
         if len(self._requests) > 0:
             result.append('  requesting resource(s):')
@@ -9548,7 +9451,7 @@ class Component(object):
                 scheduled_time_str = 'ends on no events left  '
                 extra = ' '
             else:
-                scheduled_time_str = 'scheduled for {:10.3f}'.format(scheduled_time - self.env._offset)
+                scheduled_time_str = 'scheduled for ' + self.env.time_to_str(scheduled_time - self.env._offset)
             self.env.print_trace(
                 '', '', self.name() + ' ' + caller,
                 merge_blanks(
@@ -11191,6 +11094,11 @@ class Exponential(_Distribution):
         if omitted, the rate is used |n|
         must be >0
 
+    time_unit : str
+        specifies the time unit |n|
+        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        default : no conversion |n|
+
     rate : float
         rate of the distribution (lambda)|n|
         if omitted, the mean is used |n|
@@ -11202,12 +11110,16 @@ class Exponential(_Distribution):
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
 
+    env : Environment
+        environment where the distribution is defined |n|
+        if omitted, default_env will be used
+
     Note
     ----
     Either mean or rate has to be specified, not both
     '''
 
-    def __init__(self, mean=None, rate=None, randomstream=None):
+    def __init__(self, mean=None, time_unit=None, rate=None, randomstream=None, env=None):
         if mean is None:
             if rate is None:
                 raise SalabimError('neither mean nor rate are specified')
@@ -11222,6 +11134,8 @@ class Exponential(_Distribution):
                 self._mean = mean
             else:
                 raise SalabimError('both mean and rate are specified')
+
+        self._mean *= _time_unit_factor(time_unit, env)
 
         if randomstream is None:
             self.randomstream = random
@@ -11306,10 +11220,14 @@ class Normal(_Distribution):
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
+
+    env : Environment
+        environment where the distribution is defined |n|
+        if omitted, default_env will be used
     '''
 
-    def __init__(self, mean, standard_deviation=None, coefficient_of_variation=None,
-      use_gauss=False, randomstream=None):
+    def __init__(self, mean, standard_deviation=None, time_unit=None, coefficient_of_variation=None,
+      use_gauss=False, randomstream=None, env=None):
         self._use_gauss = use_gauss
         self._mean = mean
         if standard_deviation is None:
@@ -11331,6 +11249,8 @@ class Normal(_Distribution):
         else:
             _checkrandomstream(randomstream)
             self.randomstream = randomstream
+        self._mean *= _time_unit_factor(time_unit, env)
+        self._standard_deviation *= _time_unit_factor(time_unit, env)
 
     def __repr__(self):
         return 'Normal'
@@ -11498,14 +11418,23 @@ class Uniform(_Distribution):
         if omitted, lowerbound will be used |n|
         must be >= lowerbound
 
+    time_unit : str
+        specifies the time unit |n|
+        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        default : no conversion |n|
+
     randomstream: randomstream
         randomstream to be used |n|
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
+
+    env : Environment
+        environment where the distribution is defined |n|
+        if omitted, default_env will be used
     '''
 
-    def __init__(self, lowerbound, upperbound=None, randomstream=None):
+    def __init__(self, lowerbound, upperbound=None, time_unit=None, randomstream=None, env=None):
         self._lowerbound = lowerbound
         if upperbound is None:
             self._upperbound = lowerbound
@@ -11518,6 +11447,8 @@ class Uniform(_Distribution):
         else:
             _checkrandomstream(randomstream)
             self.randomstream = randomstream
+        self._lowerbound *= _time_unit_factor(time_unit, env)
+        self._upperbound *= _time_unit_factor(time_unit, env)
         self._mean = (self._lowerbound + self._upperbound) / 2
 
     def __repr__(self):
@@ -11584,14 +11515,23 @@ class Triangular(_Distribution):
         if omitted, the average of low and high will be used, thus a symmetric triangular distribution |n|
         mode must be between low and high
 
+    time_unit : str
+        specifies the time unit |n|
+        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        default : no conversion |n|
+
     randomstream: randomstream
         randomstream to be used |n|
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
+
+    env : Environment
+        environment where the distribution is defined |n|
+        if omitted, default_env will be used
     '''
 
-    def __init__(self, low, high=None, mode=None, randomstream=None):
+    def __init__(self, low, high=None, mode=None, time_unit=None, randomstream=None, env=None):
         self._low = low
         if high is None:
             self._high = low
@@ -11612,6 +11552,9 @@ class Triangular(_Distribution):
         else:
             _checkrandomstream(randomstream)
             self.randomstream = randomstream
+        self._low *= _time_unit_factor(time_unit, env)
+        self._high *= _time_unit_factor(time_unit, env)
+        self._mode *= _time_unit_factor(time_unit, env)
         self._mean = (self._low + self._mode + self._high) / 3
 
     def __repr__(self):
@@ -11669,6 +11612,11 @@ class Constant(_Distribution):
     value : float
         value to be returned in sample
 
+    time_unit : str
+        specifies the time unit |n|
+        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        default : no conversion |n|
+
     randomstream: randomstream
         randomstream to be used |n|
         if omitted, random will be used |n|
@@ -11676,9 +11624,12 @@ class Constant(_Distribution):
         it assigns a new stream with the specified seed |n|
         Note that this is only for compatibility with other distributions
 
+    env : Environment
+        environment where the distribution is defined |n|
+        if omitted, default_env will be used
     '''
 
-    def __init__(self, value, randomstream=None):
+    def __init__(self, value, time_unit=None, randomstream=None, env=None):
         self._value = value
         if randomstream is None:
             self.randomstream = random
@@ -11686,6 +11637,7 @@ class Constant(_Distribution):
             _checkrandomstream(randomstream)
             self.randomstream = randomstream
         self._mean = value
+        self._mean *= _time_unit_factor(time_unit, env)
 
     def __repr__(self):
         return 'Constant'
@@ -11786,7 +11738,7 @@ class Poisson(_Distribution):
         info (if as_str is True) : str
         '''
         result = []
-        result.append('Poissonl distribution ' + hex(id(self)))
+        result.append('Poisson distribution ' + hex(id(self)))
         result.append('  mean (lambda)' + str(self._lambda_))
         return return_or_print(result, as_str, file)
 
@@ -11833,14 +11785,23 @@ class Weibull(_Distribution):
         shape of the distribution (beta or lambda)|n|
         should be >0
 
+    time_unit : str
+        specifies the time unit |n|
+        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        default : no conversion |n|
+
     randomstream: randomstream
         randomstream to be used |n|
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
+
+    env : Environment
+        environment where the distribution is defined |n|
+        if omitted, default_env will be used
     '''
 
-    def __init__(self, scale, shape, randomstream=None):
+    def __init__(self, scale, shape, time_unit=None, randomstream=None, env=None):
         self._scale = scale
         if shape <= 0:
             raise SalabimError('shape<=0')
@@ -11851,7 +11812,7 @@ class Weibull(_Distribution):
         else:
             _checkrandomstream(randomstream)
             self.randomstream = randomstream
-
+        self._scale *= _time_unit_factor(time_unit, env)
         self._mean = self._scale * math.gamma((1 / self._shape) + 1)
 
     def __repr__(self):
@@ -11913,6 +11874,11 @@ class Gamma(_Distribution):
         scale of the distribution (teta) |n|
         should be >0
 
+    time_unit : str
+        specifies the time unit |n|
+        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        default : no conversion |n|
+
     rate : float
         rate of the distribution (beta) |n|
         should be >0
@@ -11923,12 +11889,17 @@ class Gamma(_Distribution):
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
 
+
+    env : Environment
+        environment where the distribution is defined |n|
+        if omitted, default_env will be used
+
     Note
     ----
     Either scale or rate has to be specified, not both.
     '''
 
-    def __init__(self, shape, scale=None, rate=None, randomstream=None):
+    def __init__(self, shape, scale=None, time_unit=None, rate=None, randomstream=None, env=None):
         if shape <= 0:
             raise SalabimError('shape<=0')
         self._shape = shape
@@ -11946,6 +11917,8 @@ class Gamma(_Distribution):
                 self._scale = 1 / rate
             else:
                 raise SalabimError('both scale and rate specified')
+
+        self._scale *= _time_unit_factor(time_unit, env)
 
         if randomstream is None:
             self.randomstream = random
@@ -12098,6 +12071,11 @@ class Erlang(_Distribution):
         if omitted, the scale is used |n|
         should be >0
 
+    time_unit : str
+        specifies the time unit |n|
+        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        default : no conversion |n|
+
     scale: float
         scale of the distribution (mu) |n|
         if omitted, the rate is used |n|
@@ -12109,12 +12087,16 @@ class Erlang(_Distribution):
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
 
+    env : Environment
+        environment where the distribution is defined |n|
+        if omitted, default_env will be used
+
     Note
     ----
     Either rate or scale has to be specified, not both.
     '''
 
-    def __init__(self, shape, rate=None, scale=None, randomstream=None):
+    def __init__(self, shape, rate=None, time_unit=None, scale=None, randomstream=None, env=None):
         if int(shape) != shape:
             raise SalabimError('shape not integer')
         if shape <= 0:
@@ -12134,6 +12116,8 @@ class Erlang(_Distribution):
                 self._rate = rate
             else:
                 raise SalabimError('both rate and scale specified')
+
+        self._rate /= _time_unit_factor(time_unit, env)
 
         if randomstream is None:
             self.randomstream = random
@@ -12207,14 +12191,22 @@ class Cdf(_Distribution):
             all cumulative densities are auto scaled according to cn,
             so no need to set cn to 1 or 100.
 
+    time_unit : str
+        specifies the time unit |n|
+        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        default : no conversion |n|
+
     randomstream: randomstream
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it defines a new stream with the specified seed
 
+    env : Environment
+        environment where the distribution is defined |n|
+        if omitted, default_env will be used
     '''
 
-    def __init__(self, spec, randomstream=None):
+    def __init__(self, spec, time_unit=None, randomstream=None, env=None):
         self._x = []
         self._cum = []
         if randomstream is None:
@@ -12231,7 +12223,7 @@ class Cdf(_Distribution):
         if spec[1] != 0:
             raise SalabimError('first cumulative value should be 0')
         while len(spec) > 0:
-            x = spec.pop(0)
+            x = spec.pop(0) * _time_unit_factor(time_unit, env)
             if not spec:
                 raise SalabimError('uneven number of parameters specified')
             if x < lastx:
@@ -12323,10 +12315,19 @@ class Pdf(_Distribution):
         alternatively, if a float is given (e.g. 1), all x-values
         have equal probability. The value is not important.
 
+    time_unit : str
+        specifies the time unit |n|
+        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        default : no conversion |n|
+
     randomstream : randomstream
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
+
+    env : Environment
+        environment where the distribution is defined |n|
+        if omitted, default_env will be used
 
     Note
     ----
@@ -12338,7 +12339,7 @@ class Pdf(_Distribution):
     but a sample will be returned when calling sample.
     '''
 
-    def __init__(self, spec, probabilities=None, randomstream=None):
+    def __init__(self, spec, probabilities=None, time_unit=None, randomstream=None, env=None):
         self._x = [0]  # just a place holder
         self._cum = [0]
         if randomstream is None:
@@ -12356,7 +12357,14 @@ class Pdf(_Distribution):
             if not spec:
                 raise SalabimError('no arguments specified')
             while len(spec) > 0:
-                x = spec.pop(0)
+                x = spec.pop(0) * _time_unit_factor(time_unit, env)
+                if time_unit is not None:
+                    if isinstance(x, _Distribution):
+                        raise SalabimError('time_unit can\'t be combined with distribution value')
+                    try:
+                        x = float(x) * _time_unit_factor(time_unit, env)
+                    except:
+                        raise SalabimError('time_unit can\'t be combined with non numeric value')
                 if not spec:
                     raise SalabimError(
                         'uneven number of parameters specified')
@@ -12382,6 +12390,14 @@ class Pdf(_Distribution):
 
             while len(spec) > 0:
                 x = spec.pop(0)
+                if time_unit is not None:
+                    if isinstance(x, _Distribution):
+                        raise SalabimError('time_unit can\'t be combined with distribution value')
+                    try:
+                        x = float(x) * _time_unit_factor(time_unit, env)
+                    except:
+                        raise SalabimError('time_unit can\'t be combined with non numeric value')
+
                 self._x.append(x)
                 p = probabilities.pop(0)
                 sump += p
@@ -12389,7 +12405,7 @@ class Pdf(_Distribution):
                 if isinstance(x, _Distribution):
                     x = x._mean
                 try:
-                    sumxp += float(x) * p
+                    sumxp += float(x) * p * _time_unit_factor(time_unit, env)
                 except:
                     hasmean = False
 
@@ -12472,10 +12488,19 @@ class CumPdf(_Distribution):
         the list (p0, p1, ...pn) contains the cumulative probabilities of the corresponding
         x-values from spec. |n|
 
+    time_unit : str
+        specifies the time unit |n|
+        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        default : no conversion |n|
+
     randomstream : randomstream
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
+
+    env : Environment
+        environment where the distribution is defined |n|
+        if omitted, default_env will be used
 
     Note
     ----
@@ -12487,7 +12512,7 @@ class CumPdf(_Distribution):
     but a sample will be returned when calling sample.
     '''
 
-    def __init__(self, spec, cumprobabilities=None, cum=False, randomstream=None):
+    def __init__(self, spec, cumprobabilities=None, time_unit=None, randomstream=None, env=None):
         self._x = [0]  # just a place holder
         self._cum = [0]
         if randomstream is None:
@@ -12506,6 +12531,13 @@ class CumPdf(_Distribution):
                 raise SalabimError('no arguments specified')
             while len(spec) > 0:
                 x = spec.pop(0)
+                if time_unit is not None:
+                    if isinstance(x, _Distribution):
+                        raise SalabimError('time_unit can\'t be combined with distribution value')
+                    try:
+                        x = float(x) * _time_unit_factor(time_unit, env)
+                    except:
+                        raise SalabimError('time_unit can\'t be combined with non numeric value')
                 if not spec:
                     raise SalabimError(
                         'uneven number of parameters specified')
@@ -12534,6 +12566,13 @@ class CumPdf(_Distribution):
 
             while len(spec) > 0:
                 x = spec.pop(0)
+                if time_unit is not None:
+                    if isinstance(x, _Distribution):
+                        raise SalabimError('time_unit can\'t be combined with distribution value')
+                    try:
+                        x = float(x) * _time_unit_factor(time_unit, env)
+                    except:
+                        raise SalabimError('time_unit can\'t be combined with non numeric value')
                 self._x.append(x)
                 p = cumprobabilities.pop(0)
                 p = p - sump
@@ -12811,8 +12850,8 @@ class State(object):
             monitor=monitor, env=self.env)
         self._waiters._isinternal = True
         self.env._trace = savetrace
-        self.value = MonitorTimestamp(
-            name='Value of ' + self.name(),
+        self.value = Monitor(
+            name='Value of ' + self.name(), level=True,
             initial_tally=value, monitor=monitor, type=type, env=self.env)
         if animation_objects is not None:
             self.animation_objects = animation_objects.__get__(self, State)
@@ -12881,7 +12920,7 @@ class State(object):
 
     def print_histograms(self, exclude=(), as_str=False, file=None):
         '''
-        print histograms of the waiters queue and the value timestamped monitor
+        print histograms of the waiters queue and the value monitor
 
         Parameters
         ----------
@@ -13060,7 +13099,7 @@ class State(object):
 
     def monitor(self, value=None):
         '''
-        enables/disables the state monitors and timestamped monitors
+        enables/disables the state monitors and value monitor
 
         Parameters
         ----------
@@ -13079,7 +13118,7 @@ class State(object):
 
     def reset_monitors(self, monitor=None):
         '''
-        resets the timestamped monitor for the state's value and the monitors of the waiters queue
+        resets the monitor for the state's value and the monitors of the waiters queue
 
         Parameters
         ----------
@@ -13235,17 +13274,17 @@ class Resource(object):
         self._claimed_quantity = 0
         self._anonymous = anonymous
         self._minq = inf
-        self.capacity = MonitorTimestamp(
-            'Capacity of ' + self.name(),
+        self.capacity = Monitor(
+            'Capacity of ' + self.name(), level=True,
             initial_tally=capacity, monitor=monitor, type='float', env=self.env)
-        self.claimed_quantity = MonitorTimestamp(
-            'Claimed quantity of ' + self.name(),
+        self.claimed_quantity = Monitor(
+            'Claimed quantity of ' + self.name(), level=True,
             initial_tally=0, monitor=monitor, type='float', env=self.env)
-        self.available_quantity = MonitorTimestamp(
-            'Available quantity of ' + self.name(),
+        self.available_quantity = Monitor(
+            'Available quantity of ' + self.name(), level=True,
             initial_tally=capacity, monitor=monitor, type='float', env=self.env)
-        self.occupancy = MonitorTimestamp(
-            'Occupancy of ' + self.name(),
+        self.occupancy = Monitor(
+            'Occupancy of ' + self.name(), level=True,
             initial_tally=0, monitor=monitor, type='float', env=self.env)
         if self.env._trace:
             self.env.print_trace(
@@ -13265,7 +13304,7 @@ class Resource(object):
 
     def reset_monitors(self, monitor=None):
         '''
-        resets the resource monitors  and timestamped monitors
+        resets the resource monitors
 
         Parameters
         ----------
@@ -13360,7 +13399,7 @@ class Resource(object):
 
     def monitor(self, value):
         '''
-        enables/disables the resource monitors  and timestamped monitors
+        enables/disables the resource monitors
 
         Parameters
         ----------
@@ -13614,7 +13653,7 @@ class _PeriodComponent(Component):
         for iperiod, duration in itertools.cycle(enumerate(self.pm.periods)):
             self.pm.perperiod[self.pm.iperiod].monitor(False)
             self.pm.iperiod = iperiod
-            if self.pm.m._timestamp:
+            if self.pm.m._level:
                 self.pm.perperiod[self.pm.iperiod].tally(self.pm.m())
             self.pm.perperiod[self.pm.iperiod].monitor(True)
             yield self.hold(duration)
@@ -13622,11 +13661,11 @@ class _PeriodComponent(Component):
 
 class PeriodMonitor(object):
     '''
-    defines a number of (timestamped) period monitors for a given monitor.
+    defines a number of period monitors for a given monitor.
 
     Parameters
     ----------
-    patent_monitor : Monitor.monitor or MonitorTimestamp.monitor
+    parent_monitor : Monitor
         parent_monitor to be divided into several period monitors for given time periods.
 
     periods : list or tuple of floats
@@ -13691,9 +13730,9 @@ class PeriodMonitor(object):
             self.m.period_monitors.append(self)
 
         self.iperiod = 0
-        if self.m._timestamp:
-            self.perperiod = [MonitorTimestamp(
-                name=period_monitor_name, monitor=False) for period_monitor_name in period_monitor_names]
+        if self.m._level:
+            self.perperiod = [Monitor(
+                name=period_monitor_name, level=True, monitor=False) for period_monitor_name in period_monitor_names]
         else:
             self.perperiod = [Monitor(
                 name=period_monitor_name, monitor=False) for period_monitor_name in period_monitor_names]
@@ -13775,6 +13814,35 @@ def spec_to_image(spec):
             return None  # will never be used!
     else:
         return spec
+
+
+def _time_unit_lookup(descr):
+
+    lookup = {
+        'years': 1 / (86400 * 365),
+        'weeks': 1 / (86400 * 7),
+        'days': 1 / 86400,
+        'hours': 1 / 3600,
+        'minutes': 1 / 60,
+        'seconds': 1,
+        'milliseconds': 1e3,
+        'microseconds': 1e6,
+        'n/a': None}
+
+    if descr not in lookup:
+        raise SalabimError('time_unit ' + descr + ' not supported')
+    return lookup[descr]
+
+
+def _time_unit_factor(time_unit, env):
+    if env is None:
+        env = g.default_env
+    if time_unit is None:
+        return 1
+    if env._time_unit is None:
+        raise SalabimError('time unit not set.')
+
+    return(env._time_unit / _time_unit_lookup(time_unit))
 
 
 def _i(p, v0, v1):
@@ -13906,7 +13974,7 @@ def _checkrandomstream(randomstream):
 
 def _checkismonitor(monitor):
     if not isinstance(monitor, Monitor):
-        raise SalabimError('Type Monitor or MonitorTimestamp expected, got ' + str(type(monitor)))
+        raise SalabimError('Type Monitor expected, got ' + str(type(monitor)))
 
 
 def _checkisqueue(queue):
@@ -13976,14 +14044,6 @@ def normalize(s):
         if (c.isalpha() or c.isdigit()):
             res = res + c
     return res
-
-
-def time_to_string(t):
-    if t == inf:
-        s = 'inf'
-    else:
-        s = '{:10.3f}'.format(t)
-    return rpad(s, 10)
 
 
 def _urgenttxt(urgent):

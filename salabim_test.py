@@ -13,29 +13,179 @@ Pythonista=(platform.system()=='Darwin')
 
 
 def test():
-    test92()
-    
+    test97()
+
+def test97():
+    env = sim.Environment(time_unit='seconds')
+    processingtime_dis = sim.Uniform(10, 20, 'minutes')
+    dryingtime_dis = sim.Normal(2, 0.1, 'hours')
+    processingtime_dis.print_info()
+    dryingtime_dis.print_info()
+
+
+def test96():
+    env=sim.Environment()
+    m = sim.Monitor(name='m')
+    ml = sim.Monitor(name='ml', level=True)
+    m.tally(10,7)
+    ml.tally(10)
+    env.run(1)
+    m.tally(11)
+    ml.tally(11)
+    env.run(2)
+    m.tally(5)
+    ml.tally(5)
+    env.run(8)
+    print(m[:1]. xt())
+    print('***')
+    m[0:0.1].print_histogram()
+    print(m.slice(0,3.1).xweight())
+    print(ml.xt())
+    print(ml.slice(0,0.5,1).xt())
+
+
+
+
+def test95():
+    env = sim.Environment(time_unit='hours')
+#    env = sim.Environment()
+    print(sim.Distribution("Uniform(1,2, 'days')").mean())
+    print(env.get_time_unit())
+    print(env.years(1))
+    print(env.weeks(1))
+    print(env.days(1))
+    print(env.hours(1))
+    print(env.minutes(1))
+    print(env.seconds(1))
+    print(env.milliseconds(1))
+    print(env.microseconds(1))
+    print()
+    print(env.to_years(1))
+    print(env.to_weeks(1))
+    print(env.to_days(1))
+    print(env.to_hours(1))
+    print(env.to_minutes(1))
+    print(env.to_seconds(1))
+    print(env.to_milliseconds(1))
+    print(env.to_microseconds(1))
+    print('samples')
+    d = sim.CumPdf((0,5,10),(60, 80, 100), time_unit='days')
+    print(d.mean())
+    d.print_info()
+    for i in range(10):
+        print(d())
+
+def test94():
+    class X(sim.Component):
+        def process(self):
+            while env.now() < 10:
+                yield self.hold(1)
+                env.speed(env.speed()+1)
+    env = sim.Environment(trace=True)
+#    env.animate(True)
+    X()
+    sim.AnimateRectangle((0,0,10, 10), x=lambda t: t, y=100, fillcolor='red')
+    env.time_to_str_format('{:7.5f}')
+    env.run(till=sim.inf)
+
+def test93():
+    env = sim.Environment()
+    m = sim.Monitor('m', weight_legend='gewicht')
+    ml = sim.Monitor('ml', level=True, initial_tally=5, weight_legend='minutes')
+#    ml = sim.MonitorTimestamp('ml', initial_tally=5)
+    m.print_histogram()
+    m.tally(1)
+    m.tally(2)
+    m.tally('h5')
+    m.print_histogram(values=True)
+    m.tally('h4',2)
+    m.print_histogram(values=True)
+    env.run(5)
+    ml.monitor(False)
+    env.run(5)
+    ml.monitor(True)
+    ml.print_histogram(values=True)
+    ml.tally('6a')
+    m.tally(100,0.5)
+    m.tally(100,0.5)
+    env.run(1.7)
+    ml.print_histogram(values=True)
+    print(ml.xt(add_now=True, force_numeric=False))
+    print(m.xt(ex0=True))
+    print(ml)
+    print(m)
+    mx = m.merge(m)
+    mlx = ml.merge(ml)
+    print(mlx.print_histogram(values=True))
+    print(mx.xweight())
+    mx.print_histogram()
+    print(ml())
+
+
+def weighted_percentile(a, percentile = None, weights=None):
+    """
+    O(nlgn) implementation for weighted_percentile.
+    """
+    import numpy as np
+    a=np.array(a)
+    percentile = np.array(percentile)/100.0
+    if weights is None:
+        weights = np.ones(len(a))
+    else:
+        weights = np.array(weights)
+    a_indsort = np.argsort(a)
+    a_sort = a[a_indsort]
+    weights_sort = weights[a_indsort]
+    ecdf = np.cumsum(weights_sort)
+
+    percentile_index_positions = percentile * (weights.sum()-1)+1
+    # need the 1 offset at the end due to ecdf not starting at 0
+    locations = np.searchsorted(ecdf, percentile_index_positions)
+
+    out_percentiles = np.zeros(len(percentile_index_positions))
+
+    for i, empiricalLocation in enumerate(locations):
+        # iterate across the requested percentiles
+        if ecdf[empiricalLocation-1] == np.floor(percentile_index_positions[i]):
+            # i.e. is the percentile in between 2 separate values
+            uppWeight = percentile_index_positions[i] - ecdf[empiricalLocation-1]
+            lowWeight = 1 - uppWeight
+
+            out_percentiles[i] = a_sort[empiricalLocation-1] * lowWeight + \
+                                 a_sort[empiricalLocation] * uppWeight
+        else:
+            # i.e. the percentile is entirely in one bin
+            out_percentiles[i] = a_sort[empiricalLocation]
+
+    return out_percentiles
+
 def test92():
     import numpy as np
 
 
     env = sim.Environment()
     monitor = sim.Monitor(weighted=True)
-    
-    for i in [1,3,7,9,1000,0,0] + (6 * [7]):
-        monitor.tally(i,1)
-    
-    for p in (50, 90, 95, 100):
+
+#    for i in [1,3,7,9,1000]:
+#        monitor.tally(i,1)
+    monitor.tally(1,1)
+    monitor.tally(5,60)
+    monitor.tally(7, 1)
+    monitor.tally(10,60)
+
+    for p in (0.1, 1, 2, 3, 50, 90, 95, 100):
         print(f'{p:5.1f}% percentile  {monitor.percentile(p):10.4f}  {np.percentile(monitor.x(), p):10.4f}')
-        
-        
+        r = weighted_percentile(monitor.xweight()[0], [p], monitor.xweight()[1])[0]
+        print(r)
+
+
 
 def test91():
     env = sim.Environment(trace=True)
     env.animation_parameters(animate=True, x0=-10, x1=10, y0=-10)
 #    sim.AnimateLine((0,0,5,5))
     print(env.scale())
-    print((env.screen_to_usercoordinates_x(0),env.screen_to_usercoordinates_y(0),env.screen_to_usercoordinates_x(1024),env.screen_to_usercoordinates_y(768)), env.screen_to_usercoordinates_size(1))    
+    print((env.screen_to_usercoordinates_x(0),env.screen_to_usercoordinates_y(0),env.screen_to_usercoordinates_x(1024),env.screen_to_usercoordinates_y(768)), env.screen_to_usercoordinates_size(1))
     sim.AnimateLine((env.screen_to_usercoordinates_x(0),env.screen_to_usercoordinates_y(0),env.screen_to_usercoordinates_x(1024),env.screen_to_usercoordinates_y(768)), linewidth=env.screen_to_usercoordinates_size(1))
     sim.AnimateLine((env.user_to_screencoordinates_x(10),env.user_to_screencoordinates_y(-10), env.user_to_screencoordinates_x(-10),env.user_to_screencoordinates_y(10)), linewidth=env.user_to_screencoordinates_size(env.screen_to_usercoordinates_size(1)), screen_coordinates=True)
     print('start')
@@ -150,7 +300,7 @@ def test88():
     class X(sim.Component):
         def process(self, d):
             env.print_trace('','entering',str(d))
-#            yield self.hold(1)
+            yield self.hold(1)
             return
             pass
         def p1(self):
@@ -461,7 +611,12 @@ def test78():
     d1.print_info(as_str=as_str,file=f)
     f.close()
 
+
 def test77():
+
+    def myy(self,t):
+        print(env.t, env.now())
+        return 600
 
     def y(self,t):
         if self == qa0:
@@ -490,7 +645,10 @@ def test77():
                 yield self.hold(sim.Uniform(0,2)())
                 self.leave(q)
 
+
+
     env = sim.Environment(trace=False)
+    sim.AnimateText('abcb', x=500, y=myy)
     q = sim.Queue('q')
     qa0 = sim.AnimateQueue(q, x=lambda t: 100+t*10, y=y, direction='e', reverse=False, id='blue')
     qa1 = sim.AnimateQueue(q, x=100, y=y, direction='e', reverse=False, max_length=6, id='red')
