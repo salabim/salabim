@@ -54,8 +54,8 @@
 
 
 \title{salabim Documentation}
-\date{Sep 24, 2018}
-\release{2.3.4.1}
+\date{Oct 07, 2018}
+\release{2.4.0}
 \author{Ruud van der Ham}
 \newcommand{\sphinxlogo}{\vbox{}}
 \renewcommand{\releasename}{Release}
@@ -70,7 +70,7 @@
 
 
 \chapter{Introduction}
-\label{\detokenize{Introduction::doc}}\label{\detokenize{Introduction:introduction}}\label{\detokenize{Introduction:documentation-for-salabim}}
+\label{\detokenize{Introduction:introduction}}\label{\detokenize{Introduction::doc}}\label{\detokenize{Introduction:documentation-for-salabim}}
 Salabim is a package for discrete event simulation in Python.
 It follows the methodology of process description as originally demonstrated in \sphinxstyleemphasis{Simula}
 and later in \sphinxstyleemphasis{Prosim}, \sphinxstyleemphasis{Must} and \sphinxstyleemphasis{Tomas}. 
@@ -241,7 +241,7 @@ A good way to start learning about Python is \sphinxurl{https://www.python.org/a
 
 
 \chapter{Modeling}
-\label{\detokenize{Modeling:modeling}}\label{\detokenize{Modeling::doc}}
+\label{\detokenize{Modeling::doc}}\label{\detokenize{Modeling:modeling}}
 
 \section{A simple model}
 \label{\detokenize{Modeling:a-simple-model}}
@@ -966,7 +966,7 @@ construction.
 
 
 \chapter{Component}
-\label{\detokenize{Component::doc}}\label{\detokenize{Component:component}}
+\label{\detokenize{Component:component}}\label{\detokenize{Component::doc}}
 Components are the key elements of salabim simulations.
 
 Components can be either data or active. An active component has one or more process descriptions and is activated
@@ -1815,7 +1815,7 @@ Queue 0x20e116153c8
 
 
 \chapter{Resource}
-\label{\detokenize{Resource:resource}}\label{\detokenize{Resource::doc}}
+\label{\detokenize{Resource::doc}}\label{\detokenize{Resource:resource}}
 Resources are a powerful way of process interaction.
 
 A resource has always a capacity (which can be zero and even negative). This capacity will be specified at time of creation, but
@@ -2017,7 +2017,7 @@ Note that these two methods do not return the same result.
 
 
 \chapter{State}
-\label{\detokenize{State:state}}\label{\detokenize{State::doc}}
+\label{\detokenize{State::doc}}\label{\detokenize{State:state}}
 States together with the Component.wait() method provide a powerful way of process interaction.
 
 A state will have a certain value at a given time. In its simplest form a component can then wait for
@@ -2202,18 +2202,35 @@ It is possible to mix scalar, evaluation and function testing. And it’s also p
 in any case.
 
 
-\chapter{Monitor and MonitorTimestamp}
-\label{\detokenize{Monitor and MonitorTimestamp::doc}}\label{\detokenize{Monitor and MonitorTimestamp:monitor-and-monitortimestamp}}
-Monitors and timestamped monitors are a way to collect data from the simulation. They are automatically collected
-for resources, queues and states. On top of that the user can define its own (timestamped) monitors.
+\chapter{Monitor}
+\label{\detokenize{Monitor:monitor}}\label{\detokenize{Monitor::doc}}
+Monitors are a way to collect data from the simulation. They are automatically collected
+for resources, queues and states. On top of that the user can define its own monitors.
 
 Monitors can be used to get statistics and as a feed for graphical tools, like matplotlib.
 
+There are two types of monitors:
+\begin{itemize}
+\item {} 
+level monitors
+Level monitors are useful to collect data about a variable that keeps its value over a certain length
+of time, like the length of a queue, the colour of a traffic light, etc.
 
-\section{Monitor}
-\label{\detokenize{Monitor and MonitorTimestamp:monitor}}
-The Monitor class collects values which do not have a direct relation with the current time,
-e.g. the processing time of a part.
+\item {} 
+non level monitors
+Non level monitors are useful to collect data about a values that occur just once. Examples, are the length of stay in a queue and
+the number of processing steps of a part.
+
+\end{itemize}
+
+For both types, the time is always collected, along with the value.
+
+Non level monitors can be weighted, if required.
+
+
+\section{Non level monitor}
+\label{\detokenize{Monitor:non-level-monitor}}
+Non level monitors collects values which do notrefelect a level, e.g. the processing time of a part.
 
 We define the monitor with \sphinxcode{processingtime=sim.Monitor('processingtime')} and then
 collect values by \sphinxcode{processingtime.tally(this\_duration)}
@@ -2369,9 +2386,7 @@ number of values, this is strongly advised.
 Note that if non numeric values are stored (only possible with the default setting (‘any’)),
 a tallied value is converted, if required, to a numeric value if possible, or 0 if not.
 
-It is possible to use monitors with weighted data. In that case, the monitor has to be defined
-with \sphinxcode{weighted=True}.
-For those weighted monitors, the tally method has an additional parameter weight which defaults to 0.
+It is possible to use monitors with weighted data. In that case, just add a second parameter to tally, which defaults to 1.
 All statistics will take the weights into account.
 
 There is set of statistical data available:
@@ -2544,10 +2559,16 @@ Ruud                    476(  4.8\PYGZpc{}) ***
 \end{sphinxVerbatim}
 
 
-\section{MonitorTimestamp}
-\label{\detokenize{Monitor and MonitorTimestamp:monitortimestamp}}
-The MonitorTimestamp class collects tallied values along with the current (simulation) time.
+\section{Level monitor}
+\label{\detokenize{Monitor:level-monitor}}
+Level monitors tally levels along with the current (simulation) time.
 e.g. the number of parts a machine is working on.
+
+A level monitor can be defined by specifying \sphinxcode{level=True} in the initialization of Monitor, e.g.
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{working\PYGZus{}on\PYGZus{}parts} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Monitor}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{working\PYGZus{}on\PYGZus{}parts}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{level}\PYG{o}{=}\PYG{k+kc}{True}\PYG{p}{,} \PYG{n}{initial\PYGZus{}tally}\PYG{o}{=}\PYG{l+m+mi}{0}\PYG{p}{)}
+\end{sphinxVerbatim}
 
 By default, the collected x-values are stored in a list. Alternatively, it is possible to store
 the x-values in an array of one of the following types:
@@ -2725,19 +2746,26 @@ Note that if non numeric x-values are stored (only possible with the default set
 a tallied values is converted, if required, to a numeric value if possible, or 0 if not.
 
 During the simulation run, it is possible to retrieve the last tallied value (which represents the ‘current’ value)
-by calling Monitor.tally() without arguments. 
-It’s even possible to directly call the timestamped monitor to get the current value, e.g.
+by calling Monitor.get(). 
+It’s also possible to directly call the level monitor to get the current value, e.g.
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
-\PYG{n}{level} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{MonitorTimestamp}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{level}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{mylevel} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Monitor}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{level}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{level}\PYG{o}{=}\PYG{k+kc}{True}\PYG{p}{,} \PYG{n}{initial\PYGZus{}tally}\PYG{o}{=}\PYG{l+m+mi}{0}\PYG{p}{)}
 \PYG{o}{.}\PYG{o}{.}\PYG{o}{.}
-\PYG{n}{level}\PYG{o}{.}\PYG{n}{tally}\PYG{p}{(}\PYG{l+m+mi}{10}\PYG{p}{)}
+\PYG{n}{mylevel}\PYG{o}{.}\PYG{n}{tally}\PYG{p}{(}\PYG{l+m+mi}{10}\PYG{p}{)}
 \PYG{o}{.}\PYG{o}{.}\PYG{o}{.}
-\PYG{n+nb}{print} \PYG{p}{(}\PYG{n}{level}\PYG{p}{(}\PYG{p}{)}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} will print 10}
+\PYG{n+nb}{print} \PYG{p}{(}\PYG{n}{mylevel}\PYG{p}{(}\PYG{p}{)}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} will print 10}
 \end{sphinxVerbatim}
 
 For the same reason, the standard length monitor of a queue can be used to get the current length of a queue: \sphinxcode{q.length()} although
 the more Pythonic \sphinxcode{len(q)} is prefered.
+
+When Monitor.get() is called with a time parameter or a direct call with a time parameter, the value at that time will be returned
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n+nb}{print} \PYG{p}{(}\PYG{n}{mylevel}\PYG{o}{.}\PYG{n}{get}\PYG{p}{(}\PYG{l+m+mi}{4}\PYG{p}{)}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} will print the value at time 4}
+\PYG{n+nb}{print} \PYG{p}{(}\PYG{n}{mylevel}\PYG{p}{(}\PYG{l+m+mi}{4}\PYG{p}{)}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} will print the value at time 4}
+\end{sphinxVerbatim}
 
 There is whole set of statistical data available, which are all weighted with their duration:
 \begin{itemize}
@@ -2746,12 +2774,6 @@ duration
 
 \item {} 
 duration\_zero (time that the value was zero)
-
-\item {} 
-number\_of\_entries
-
-\item {} 
-number\_of\_entries\_zero
 
 \item {} 
 mean
@@ -2801,23 +2823,23 @@ the x-arrays of xduration() are not necessarily the same as the x-arrays in xt()
 the reason why there’s no x() or t() method. 
 It is easy to get just the x-array with xduration(){[}0{]} or xt(){[}0{]}.
 
-With the monitor method, the timestamped monitor can be enbled or disabled.
+With the monitor method, a level monitor can be enbled or disabled.
 
 Also, the current status (enabled/disabled) can be retrieved.
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
-\PYG{n}{level}\PYG{o}{.}\PYG{n}{monitor}\PYG{p}{(}\PYG{n+nb+bp}{False}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} disable monitoring}
-\PYG{n}{level}\PYG{o}{.}\PYG{n}{monitor}\PYG{p}{(}\PYG{n+nb+bp}{True}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} enable monitoring}
-\PYG{k}{if} \PYG{n}{level}\PYG{o}{.}\PYG{n}{monitor}\PYG{p}{(}\PYG{p}{)}\PYG{p}{:}
+\PYG{n}{mylevel}\PYG{o}{.}\PYG{n}{monitor}\PYG{p}{(}\PYG{n+nb+bp}{False}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} disable monitoring}
+\PYG{n}{mylevel}\PYG{o}{.}\PYG{n}{monitor}\PYG{p}{(}\PYG{n+nb+bp}{True}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} enable monitoring}
+\PYG{k}{if} \PYG{n}{mylevel}\PYG{o}{.}\PYG{n}{monitor}\PYG{p}{(}\PYG{p}{)}\PYG{p}{:}
     \PYG{k}{print}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{level is enabled}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
 \end{sphinxVerbatim}
 
-It is strongly advised to keep tallying when monitoring is off, in order to be able to access the current value at any time. The values tallied when monitoring is off
+It is strongly advised to keep tallying even when monitoring is off, in order to be able to access the current value at any time. The values tallied when monitoring is off
 are not stored.
 
 Calling m.reset() will clear all tallied values and timestamps.
 
-The statistics of a timestamped monitor can be printed with \sphinxcode{print\_statistics()}.
+The statistics of a level monitor can be printed with \sphinxcode{print\_statistics()}.
 E.g: \sphinxcode{waitingline.length.print\_statistics()}:
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
@@ -2896,9 +2918,74 @@ Histograms can be printed with their values, instead of bins. This is particular
 numeric tallied values, like names.
 
 
-\section{PeriodMonitor}
-\label{\detokenize{Monitor and MonitorTimestamp:periodmonitor}}
-To be documented.
+\section{Merging of monitors}
+\label{\detokenize{Monitor:merging-of-monitors}}
+Monitors can be merged, to create a new monitor, nearly always to collect aggregated data.
+
+The method Monitor.mertge() is used for that, like
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{mc} \PYG{o}{=} \PYG{n}{m0}\PYG{o}{.}\PYG{n}{merge}\PYG{p}{(}\PYG{n}{m1}\PYG{p}{,} \PYG{n}{m2}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+Then we can just get the mean of the monitors m0, m1 and m2 combined.
+
+For non level monitors, all of the tallied x-values are copied from the to be merged monitors.
+For level monitors, the x-values are summed, for all the periods where all the monitors were on.
+Periods where one or more monitors were off, are excluded.
+Note that the merge only takes place at creation of the (timestamped) monitor and not dynamically later.
+
+Sample usage:
+Suppose we have three types of products, that each have a queue for processing, so
+a.processing, b.processing, c.processing.
+If we want to print the histogram of the combined (=summed) length of these queues
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{a}\PYG{o}{.}\PYG{n}{processing}\PYG{o}{.}\PYG{n}{length}\PYG{o}{.}\PYG{n}{merge}\PYG{p}{(}\PYG{n}{b}\PYG{o}{.}\PYG{n}{processing}\PYG{o}{.}\PYG{n}{length}\PYG{p}{,} \PYG{n}{c}\PYG{o}{.}\PYG{n}{processing}\PYG{o}{.}\PYG{n}{length}\PYG{p}{,} \PYG{n}{name}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{combined processing length}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}\PYG{p}{)}\PYG{o}{.}\PYG{n}{print\PYGZus{}histogram}\PYG{p}{(}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+and to print the histogram of the length\_of\_stay for all entries
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{a}\PYG{o}{.}\PYG{n}{processing}\PYG{o}{.}\PYG{n}{length}\PYG{o}{.}\PYG{n}{merge}\PYG{p}{(}\PYG{n}{b}\PYG{o}{.}\PYG{n}{processing}\PYG{o}{.}\PYG{n}{length}\PYG{p}{,} \PYG{n}{c}\PYG{o}{.}\PYG{n}{processing}\PYG{o}{.}\PYG{n}{length}\PYG{p}{,} \PYG{n}{name}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{combined processing length}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}\PYG{p}{)}\PYG{o}{.}\PYG{n}{print\PYGZus{}histogram}\PYG{p}{(}\PYG{p}{)}
+
+\PYG{n}{Monitor}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{combined processing length of stay}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,}
+    \PYG{n}{merge}\PYG{o}{=}\PYG{p}{(}\PYG{n}{a}\PYG{o}{.}\PYG{n}{processing}\PYG{o}{.}\PYG{n}{length\PYGZus{}of\PYGZus{}stay}\PYG{p}{,} \PYG{n}{b}\PYG{o}{.}\PYG{n}{processing}\PYG{o}{.}\PYG{n}{length\PYGZus{}of\PYGZus{}stay}\PYG{p}{,} \PYG{n}{c}\PYG{o}{.}\PYG{n}{processing}\PYG{o}{.}\PYG{n}{length\PYGZus{}of\PYGZus{}stay}\PYG{p}{)}\PYG{p}{)}\PYG{o}{.}\PYG{n}{print\PYGZus{}histogram}\PYG{p}{(}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+
+\section{Slicing of monitors}
+\label{\detokenize{Monitor:slicing-of-monitors}}
+It is possible to slice a monitor with Monitor.slice(), which has two applications:
+\begin{itemize}
+\item {} 
+to get statistics on a monitor with respect to a given time period, most likely a subrun
+
+\item {} 
+to get statistics on a monitor with respect to a recurring time period, like hour 0-1, hour 0-2, etc.
+
+\end{itemize}
+
+Examples
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{k}{for} \PYG{n}{i} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{l+m+mi}{10}\PYG{p}{)}\PYG{p}{:}
+    \PYG{n}{start} \PYG{o}{=} \PYG{n}{i} \PYG{o}{*} \PYG{l+m+mi}{1000}
+    \PYG{n}{stop} \PYG{o}{=} \PYG{p}{(}\PYG{n}{i}\PYG{o}{+}\PYG{l+m+mi}{1}\PYG{p}{)} \PYG{o}{*} \PYG{l+m+mi}{1000}
+    \PYG{n+nb}{print}\PYG{p}{(}\PYG{n}{f}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{mean length of q in [}\PYG{l+s+si}{\PYGZob{}start\PYGZcb{}}\PYG{l+s+s1}{,}\PYG{l+s+si}{\PYGZob{}stop\PYGZcb{}}\PYG{l+s+s1}{)=}\PYG{l+s+s1}{\PYGZob{}}\PYG{l+s+s1}{q.length.slice(start,stop).mean()\PYGZcb{}}\PYG{l+s+s1}{\PYGZsq{}}
+    \PYG{n+nb}{print}\PYG{p}{(}\PYG{n}{f}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{mean length of stay in [}\PYG{l+s+si}{\PYGZob{}start\PYGZcb{}}\PYG{l+s+s1}{,}\PYG{l+s+si}{\PYGZob{}stop\PYGZcb{}}\PYG{l+s+s1}{)=}\PYG{l+s+s1}{\PYGZob{}}\PYG{l+s+s1}{q.length\PYGZus{}of\PYGZus{}stay.slice(start,stop).mean()\PYGZcb{}}\PYG{l+s+s1}{\PYGZsq{}}
+
+\PYG{k}{for} \PYG{n}{i} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{l+m+mi}{24}\PYG{p}{)}\PYG{p}{:}
+    \PYG{n+nb}{print}\PYG{p}{(}\PYG{n}{f}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{mean length of q in hour }\PYG{l+s+si}{\PYGZob{}i\PYGZcb{}}\PYG{l+s+s1}{=}\PYG{l+s+s1}{\PYGZob{}}\PYG{l+s+s1}{q.length.slice(i, i+1, 24).mean()\PYGZcb{}}\PYG{l+s+s1}{\PYGZsq{}}
+    \PYG{n+nb}{print}\PYG{p}{(}\PYG{n}{f}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{mean length of stay of q in hour }\PYG{l+s+si}{\PYGZob{}i\PYGZcb{}}\PYG{l+s+s1}{=}\PYG{l+s+s1}{\PYGZob{}}\PYG{l+s+s1}{q.length\PYGZus{}of\PYGZus{}stay.slice(i, i+1, 24).mean()\PYGZcb{}}\PYG{l+s+s1}{\PYGZsq{}}
+\end{sphinxVerbatim}
+
+Instead of slice(), a monitor can be sliced as well with the standard slice operator {[}{]}, like
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{q}\PYG{o}{.}\PYG{n}{length}\PYG{p}{[}\PYG{l+m+mi}{1000}\PYG{p}{:}\PYG{l+m+mi}{2000}\PYG{p}{]}\PYG{o}{.}\PYG{n}{print\PYGZus{}histogram}\PYG{p}{(}\PYG{p}{)}
+\PYG{n}{q}\PYG{o}{.}\PYG{n}{length}\PYG{p}{[}\PYG{l+m+mi}{2}\PYG{p}{:}\PYG{l+m+mi}{3}\PYG{p}{:}\PYG{l+m+mi}{24}\PYG{p}{]}\PYG{o}{.}\PYG{n}{print\PYGZus{}histogram}\PYG{p}{(}\PYG{p}{)}
+\end{sphinxVerbatim}
 
 
 \chapter{Distributions}
@@ -3355,6 +3442,160 @@ or even
 \PYG{n}{U}\PYG{p}{(}\PYG{l+m+mi}{10}\PYG{p}{,}\PYG{l+m+mi}{15}\PYG{p}{)}
 \PYG{n}{T}\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{p}{,}\PYG{l+m+mi}{5}\PYG{p}{,}\PYG{l+m+mi}{2}\PYG{p}{)}
 \PYG{n}{I}\PYG{p}{(}\PYG{l+m+mi}{10}\PYG{p}{,}\PYG{l+m+mi}{20}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+
+\chapter{Miscellaneous}
+\label{\detokenize{Miscellaneous::doc}}\label{\detokenize{Miscellaneous:miscellaneous}}
+
+\section{Time units}
+\label{\detokenize{Miscellaneous:time-units}}
+By default, salabim time does not have a specific dimension, which means that is up to
+the modeller what time unit is used, be it seconds, hours, days or whatever.
+
+It can be useful to work in specific time unit, as this opens the possibility to specify times and durations in another unit.
+
+In order to use time unit, the environment has to be initialized with a time\_unit parameter, like
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{time\PYGZus{}unit}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{hours}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+From then on, the simulation runs in hours. Standard output is in then in hours and for instance
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{enter}\PYG{p}{(}\PYG{n}{q}\PYG{p}{)}
+\PYG{k}{yield} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{hold}\PYG{p}{(}\PYG{l+m+mi}{48}\PYG{p}{)}
+\PYG{n+nb}{print}\PYG{p}{(}\PYG{n}{env}\PYG{o}{.}\PYG{n}{now}\PYG{p}{(}\PYG{p}{)} \PYG{o}{\PYGZhy{}} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{queuetime}\PYG{p}{(}\PYG{p}{)}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+means hold for 48 (hours) and 48 will be printed.
+
+But, now we also specify a time in another time unit and get times in a specific time unit
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{enter}\PYG{p}{(}\PYG{n}{q}\PYG{p}{)}
+\PYG{k}{yield} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{hold}\PYG{p}{(}\PYG{n}{env}\PYG{o}{.}\PYG{n}{days}\PYG{p}{(}\PYG{l+m+mi}{2}\PYG{p}{)}\PYG{p}{)}
+\PYG{n+nb}{print}\PYG{p}{(}\PYG{n}{env}\PYG{o}{.}\PYG{n}{to\PYGZus{}minutes}\PYG{p}{(}\PYG{n}{env}\PYG{o}{.}\PYG{n}{now}\PYG{p}{(}\PYG{p}{)} \PYG{o}{\PYGZhy{}} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{queuetime}\PYG{p}{(}\PYG{p}{)}\PYG{p}{)}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+means hold for 2 days = 48 hours and 2880 (48 * 60) will be printed.
+
+The following time units are available:
+\begin{itemize}
+\item {} 
+‘years’
+
+\item {} 
+‘weeks’
+
+\item {} 
+‘days’
+
+\item {} 
+‘hours’
+
+\item {} 
+‘minutes’
+
+\item {} 
+‘seconds’
+
+\item {} 
+‘milliseconds’
+
+\item {} 
+‘microseconds’
+
+\item {} 
+‘n/a’ which means nothing is assigned and conversions are not supported
+
+\end{itemize}
+
+For conversion from a given time unit to the simulation time unit, the following calls are available:
+\begin{itemize}
+\item {} 
+years()
+
+\item {} 
+weeks()
+
+\item {} 
+days()
+
+\item {} 
+hours()
+
+\item {} 
+minutes()
+
+\item {} 
+seconds()
+
+\item {} 
+milliseconds()
+
+\item {} 
+microseconds()
+
+\end{itemize}
+
+For conversion from the simulation time unit to a given time unit, the following calls are available:
+\begin{itemize}
+\item {} 
+to\_years()
+
+\item {} 
+to\_weeks()
+
+\item {} 
+to\_days()
+
+\item {} 
+to\_hours()
+
+\item {} 
+to\_minutes()
+
+\item {} 
+to\_seconds()
+
+\item {} 
+to\_milliseconds()
+
+\item {} 
+to\_microseconds()
+
+\end{itemize}
+
+Distributions (apart from IntUniform, Poisson and Beta) can also specify the time unit, like
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{time\PYGZus{}unit}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{seconds}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{processingtime\PYGZus{}dis} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Uniform}\PYG{p}{(}\PYG{l+m+mi}{10}\PYG{p}{,} \PYG{l+m+mi}{20}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{minutes}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{dryingtime\PYGZus{}dis} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Normal}\PYG{p}{(}\PYG{l+m+mi}{2}\PYG{p}{,} \PYG{l+m+mf}{0.1}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{hours}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+Note that the conversion to the current time unit is made immediately and that all related output
+is therefore in the current simulation time unit, so
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{processingtime\PYGZus{}dis}\PYG{o}{.}\PYG{n}{print\PYGZus{}info}\PYG{p}{(}\PYG{p}{)}
+\PYG{n}{dryingtime\PYGZus{}dis}\PYG{o}{.}\PYG{n}{print\PYGZus{}info}\PYG{p}{(}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+will print
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{Uniform} \PYG{n}{distribution} \PYG{l+m+mh}{0x25783c11358}
+  \PYG{n}{lowerbound}\PYG{o}{=}\PYG{l+m+mf}{600.0}
+  \PYG{n}{upperbound}\PYG{o}{=}\PYG{l+m+mf}{1200.0}
+  \PYG{n}{randomstream}\PYG{o}{=}\PYG{l+m+mh}{0x25783b89818}
+\PYG{n}{Normal} \PYG{n}{distribution} \PYG{l+m+mh}{0x25783bff8d0}
+  \PYG{n}{mean}\PYG{o}{=}\PYG{l+m+mf}{7200.0}
+  \PYG{n}{standard\PYGZus{}deviation}\PYG{o}{=}\PYG{l+m+mf}{360.0}
+  \PYG{n}{coefficient\PYGZus{}of\PYGZus{}variation}\PYG{o}{=}\PYG{l+m+mf}{0.05}
+  \PYG{n}{randomstream}\PYG{o}{=}\PYG{l+m+mh}{0x25783b89818}
 \end{sphinxVerbatim}
 
 
@@ -5951,8 +6192,8 @@ All parameters, apart from queue and arg can be specified as:
 \index{AnimateMonitor (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.AnimateMonitor}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{AnimateMonitor}}{\emph{monitor}, \emph{linecolor='fg'}, \emph{linewidth=None}, \emph{fillcolor=''}, \emph{bordercolor='fg'}, \emph{borderlinewidth=1}, \emph{titlecolor='fg'}, \emph{nowcolor='red'}, \emph{titlefont=''}, \emph{titlefontsize=15}, \emph{as\_points=None}, \emph{as\_level=None}, \emph{title=None}, \emph{x=0}, \emph{y=0}, \emph{vertical\_offset=2}, \emph{parent=None}, \emph{vertical\_scale=5}, \emph{horizontal\_scale=None}, \emph{width=200}, \emph{height=75}, \emph{xy\_anchor='sw'}, \emph{layer=0}}{}
-animates a (timestamped) monitor in a panel
+\phantomsection\label{\detokenize{Reference:salabim.AnimateMonitor}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{AnimateMonitor}}{\emph{monitor}, \emph{linecolor='fg'}, \emph{linewidth=None}, \emph{fillcolor=''}, \emph{bordercolor='fg'}, \emph{borderlinewidth=1}, \emph{titlecolor='fg'}, \emph{nowcolor='red'}, \emph{titlefont=''}, \emph{titlefontsize=15}, \emph{title=None}, \emph{x=0}, \emph{y=0}, \emph{vertical\_offset=2}, \emph{parent=None}, \emph{vertical\_scale=5}, \emph{horizontal\_scale=None}, \emph{width=200}, \emph{height=75}, \emph{xy\_anchor='sw'}, \emph{layer=0}}{}
+animates a monitor in a panel
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
@@ -5981,14 +6222,6 @@ animates a (timestamped) monitor in a panel
 
 \item {} 
 \sphinxstyleliteralstrong{titlefontsize} (\sphinxstyleliteralemphasis{int}) \textendash{} size of the font of the title (default 15)
-
-\item {} 
-\sphinxstyleliteralstrong{as\_points} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default for timestamped monitors), lines will be drawn between the points 
-if True (default for non timestamped monitors),  only the points will be shown
-
-\item {} 
-\sphinxstyleliteralstrong{as\_level} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default for lines), the timestamped monitor is considered to be a level
-if False (default for points), just the tallied values will be shown, and connected (for lines)
 
 \item {} 
 \sphinxstyleliteralstrong{title} (\sphinxstyleliteralemphasis{str}) \textendash{} title to be shown above panel 
@@ -6816,7 +7049,7 @@ float
 \index{Cdf (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Cdf}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Cdf}}{\emph{spec}, \emph{randomstream=None}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Cdf}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Cdf}}{\emph{spec}, \emph{time\_unit=None}, \emph{randomstream=None}, \emph{env=None}}{}
 Cumulative distribution function
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -6837,9 +7070,18 @@ so no need to set cn to 1 or 100.
 
 
 \item {} 
+\sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
+must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+default : no conversion 
+
+\item {} 
 \sphinxstyleliteralstrong{randomstream} (\sphinxstyleliteralemphasis{randomstream}) \textendash{} if omitted, random will be used 
 if used as random.Random(12299)
 it defines a new stream with the specified seed
+
+\item {} 
+\sphinxstyleliteralstrong{env} ({\hyperref[\detokenize{Reference:salabim.Environment}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Environment}}}}) \textendash{} environment where the distribution is defined 
+if omitted, default\_env will be used
 
 \end{itemize}
 
@@ -6905,7 +7147,7 @@ float
 \index{Constant (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Constant}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Constant}}{\emph{value}, \emph{randomstream=None}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Constant}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Constant}}{\emph{value}, \emph{time\_unit=None}, \emph{randomstream=None}, \emph{env=None}}{}
 constant distribution
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -6913,11 +7155,20 @@ constant distribution
 \sphinxstyleliteralstrong{value} (\sphinxstyleliteralemphasis{float}) \textendash{} value to be returned in sample
 
 \item {} 
+\sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
+must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+default : no conversion 
+
+\item {} 
 \sphinxstyleliteralstrong{randomstream} (\sphinxstyleliteralemphasis{randomstream}) \textendash{} randomstream to be used 
 if omitted, random will be used 
 if used as random.Random(12299)
 it assigns a new stream with the specified seed 
 Note that this is only for compatibility with other distributions
+
+\item {} 
+\sphinxstyleliteralstrong{env} ({\hyperref[\detokenize{Reference:salabim.Environment}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Environment}}}}) \textendash{} environment where the distribution is defined 
+if omitted, default\_env will be used
 
 \end{itemize}
 
@@ -7098,7 +7349,7 @@ any (usually float)
 \index{Erlang (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Erlang}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Erlang}}{\emph{shape}, \emph{rate=None}, \emph{scale=None}, \emph{randomstream=None}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Erlang}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Erlang}}{\emph{shape}, \emph{rate=None}, \emph{time\_unit=None}, \emph{scale=None}, \emph{randomstream=None}, \emph{env=None}}{}
 erlang distribution
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -7112,6 +7363,11 @@ if omitted, the scale is used
 should be \textgreater{}0
 
 \item {} 
+\sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
+must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+default : no conversion 
+
+\item {} 
 \sphinxstyleliteralstrong{scale} (\sphinxstyleliteralemphasis{float}) \textendash{} scale of the distribution (mu) 
 if omitted, the rate is used 
 should be \textgreater{}0
@@ -7121,6 +7377,10 @@ should be \textgreater{}0
 if omitted, random will be used 
 if used as random.Random(12299)
 it assigns a new stream with the specified seed
+
+\item {} 
+\sphinxstyleliteralstrong{env} ({\hyperref[\detokenize{Reference:salabim.Environment}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Environment}}}}) \textendash{} environment where the distribution is defined 
+if omitted, default\_env will be used
 
 \end{itemize}
 
@@ -7190,7 +7450,7 @@ float
 \index{Exponential (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Exponential}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Exponential}}{\emph{mean=None}, \emph{rate=None}, \emph{randomstream=None}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Exponential}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Exponential}}{\emph{mean=None}, \emph{time\_unit=None}, \emph{rate=None}, \emph{randomstream=None}, \emph{env=None}}{}
 exponential distribution
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -7198,6 +7458,11 @@ exponential distribution
 \sphinxstyleliteralstrong{mean} (\sphinxstyleliteralemphasis{float}) \textendash{} mean of the distribtion (beta)\textbar{}n\textbar{}
 if omitted, the rate is used 
 must be \textgreater{}0
+
+\item {} 
+\sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
+must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+default : no conversion 
 
 \item {} 
 \sphinxstyleliteralstrong{rate} (\sphinxstyleliteralemphasis{float}) \textendash{} rate of the distribution (lambda)\textbar{}n\textbar{}
@@ -7209,6 +7474,10 @@ must be \textgreater{}0
 if omitted, random will be used 
 if used as random.Random(12299)
 it assigns a new stream with the specified seed
+
+\item {} 
+\sphinxstyleliteralstrong{env} ({\hyperref[\detokenize{Reference:salabim.Environment}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Environment}}}}) \textendash{} environment where the distribution is defined 
+if omitted, default\_env will be used
 
 \end{itemize}
 
@@ -7278,7 +7547,7 @@ float
 \index{Gamma (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Gamma}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Gamma}}{\emph{shape}, \emph{scale=None}, \emph{rate=None}, \emph{randomstream=None}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Gamma}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Gamma}}{\emph{shape}, \emph{scale=None}, \emph{time\_unit=None}, \emph{rate=None}, \emph{randomstream=None}, \emph{env=None}}{}
 gamma distribution
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -7289,6 +7558,11 @@ should be \textgreater{}0
 \item {} 
 \sphinxstyleliteralstrong{scale} (\sphinxstyleliteralemphasis{float}) \textendash{} scale of the distribution (teta) 
 should be \textgreater{}0
+
+\item {} 
+\sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
+must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+default : no conversion 
 
 \item {} 
 \sphinxstyleliteralstrong{rate} (\sphinxstyleliteralemphasis{float}) \textendash{} rate of the distribution (beta) 
@@ -7303,6 +7577,12 @@ it assigns a new stream with the specified seed
 \end{itemize}
 
 \end{description}\end{quote}
+\begin{description}
+\item[{env}] \leavevmode{[}Environment{]}
+environment where the distribution is defined 
+if omitted, default\_env will be used
+
+\end{description}
 
 \begin{sphinxadmonition}{note}{Note:}
 Either scale or rate has to be specified, not both.
@@ -7368,7 +7648,7 @@ float
 \index{Normal (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Normal}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Normal}}{\emph{mean}, \emph{standard\_deviation=None}, \emph{coefficient\_of\_variation=None}, \emph{use\_gauss=False}, \emph{randomstream=None}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Normal}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Normal}}{\emph{mean}, \emph{standard\_deviation=None}, \emph{time\_unit=None}, \emph{coefficient\_of\_variation=None}, \emph{use\_gauss=False}, \emph{randomstream=None}, \emph{env=None}}{}
 normal distribution
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -7398,6 +7678,10 @@ although that statement is doubtful.
 if omitted, random will be used 
 if used as random.Random(12299)
 it assigns a new stream with the specified seed
+
+\item {} 
+\sphinxstyleliteralstrong{env} ({\hyperref[\detokenize{Reference:salabim.Environment}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Environment}}}}) \textendash{} environment where the distribution is defined 
+if omitted, default\_env will be used
 
 \end{itemize}
 
@@ -7463,7 +7747,7 @@ float
 \index{Pdf (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Pdf}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Pdf}}{\emph{spec}, \emph{probabilities=None}, \emph{randomstream=None}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Pdf}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Pdf}}{\emph{spec}, \emph{probabilities=None}, \emph{time\_unit=None}, \emph{randomstream=None}, \emph{env=None}}{}
 Probability distribution function
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -7491,9 +7775,18 @@ alternatively, if a float is given (e.g. 1), all x-values
 have equal probability. The value is not important.
 
 \item {} 
+\sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
+must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+default : no conversion 
+
+\item {} 
 \sphinxstyleliteralstrong{randomstream} (\sphinxstyleliteralemphasis{randomstream}) \textendash{} if omitted, random will be used 
 if used as random.Random(12299)
 it assigns a new stream with the specified seed
+
+\item {} 
+\sphinxstyleliteralstrong{env} ({\hyperref[\detokenize{Reference:salabim.Environment}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Environment}}}}) \textendash{} environment where the distribution is defined 
+if omitted, default\_env will be used
 
 \end{itemize}
 
@@ -7651,7 +7944,7 @@ int
 \index{Triangular (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Triangular}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Triangular}}{\emph{low}, \emph{high=None}, \emph{mode=None}, \emph{randomstream=None}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Triangular}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Triangular}}{\emph{low}, \emph{high=None}, \emph{mode=None}, \emph{time\_unit=None}, \emph{randomstream=None}, \emph{env=None}}{}
 triangular distribution
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -7669,10 +7962,19 @@ if omitted, the average of low and high will be used, thus a symmetric triangula
 mode must be between low and high
 
 \item {} 
+\sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
+must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+default : no conversion 
+
+\item {} 
 \sphinxstyleliteralstrong{randomstream} (\sphinxstyleliteralemphasis{randomstream}) \textendash{} randomstream to be used 
 if omitted, random will be used 
 if used as random.Random(12299)
 it assigns a new stream with the specified seed
+
+\item {} 
+\sphinxstyleliteralstrong{env} ({\hyperref[\detokenize{Reference:salabim.Environment}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Environment}}}}) \textendash{} environment where the distribution is defined 
+if omitted, default\_env will be used
 
 \end{itemize}
 
@@ -7738,7 +8040,7 @@ float
 \index{Uniform (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Uniform}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Uniform}}{\emph{lowerbound}, \emph{upperbound=None}, \emph{randomstream=None}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Uniform}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Uniform}}{\emph{lowerbound}, \emph{upperbound=None}, \emph{time\_unit=None}, \emph{randomstream=None}, \emph{env=None}}{}
 uniform distribution
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -7751,10 +8053,19 @@ if omitted, lowerbound will be used
 must be \textgreater{}= lowerbound
 
 \item {} 
+\sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
+must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+default : no conversion 
+
+\item {} 
 \sphinxstyleliteralstrong{randomstream} (\sphinxstyleliteralemphasis{randomstream}) \textendash{} randomstream to be used 
 if omitted, random will be used 
 if used as random.Random(12299)
 it assigns a new stream with the specified seed
+
+\item {} 
+\sphinxstyleliteralstrong{env} ({\hyperref[\detokenize{Reference:salabim.Environment}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Environment}}}}) \textendash{} environment where the distribution is defined 
+if omitted, default\_env will be used
 
 \end{itemize}
 
@@ -7820,7 +8131,7 @@ float
 \index{Weibull (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Weibull}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Weibull}}{\emph{scale}, \emph{shape}, \emph{randomstream=None}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Weibull}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Weibull}}{\emph{scale}, \emph{shape}, \emph{time\_unit=None}, \emph{randomstream=None}, \emph{env=None}}{}
 weibull distribution
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -7832,10 +8143,19 @@ weibull distribution
 should be \textgreater{}0
 
 \item {} 
+\sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
+must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+default : no conversion 
+
+\item {} 
 \sphinxstyleliteralstrong{randomstream} (\sphinxstyleliteralemphasis{randomstream}) \textendash{} randomstream to be used 
 if omitted, random will be used 
 if used as random.Random(12299)
 it assigns a new stream with the specified seed
+
+\item {} 
+\sphinxstyleliteralstrong{env} ({\hyperref[\detokenize{Reference:salabim.Environment}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Environment}}}}) \textendash{} environment where the distribution is defined 
+if omitted, default\_env will be used
 
 \end{itemize}
 
@@ -9344,7 +9664,7 @@ s1 is at the tail of waiters, because of the set priority
 \label{\detokenize{Reference:environment}}\index{Environment (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Environment}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Environment}}{\emph{trace=False}, \emph{random\_seed=None}, \emph{name=None}, \emph{print\_trace\_header=True}, \emph{isdefault\_env=True}, \emph{*args}, \emph{**kwargs}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Environment}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Environment}}{\emph{trace=False}, \emph{random\_seed=None}, \emph{time\_unit='n/a'}, \emph{name=None}, \emph{print\_trace\_header=True}, \emph{isdefault\_env=True}, \emph{*args}, \emph{**kwargs}}{}
 environment object
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -9358,6 +9678,10 @@ if ‘*’, a purely random value (based on the current time) will be used
 (not reproducable) 
 if the null string (‘’), no action on random is taken 
 if None (the default), 1234567 will be used.
+
+\item {} 
+\sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} Supported time\_units: 
+‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’, ‘n/a’
 
 \item {} 
 \sphinxstyleliteralstrong{name} (\sphinxstyleliteralemphasis{str}) \textendash{} name of the environment 
@@ -9714,6 +10038,25 @@ translates a colorspec to a tuple
 
 \end{fulllineitems}
 
+\index{days() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.days}}\pysiglinewithargsret{\sphinxbfcode{days}}{\emph{t}}{}
+convert the given time in days to the current time unit
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{float}) \textendash{} time in days
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{time in days, converted to the current time\_unit}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
 \index{foreground\_color() (salabim.Environment method)}
 
 \begin{fulllineitems}
@@ -9752,6 +10095,22 @@ bool
 
 \end{fulllineitems}
 
+\index{get\_time\_unit() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.get_time_unit}}\pysiglinewithargsret{\sphinxbfcode{get\_time\_unit}}{}{}
+gets time unit
+\begin{quote}\begin{description}
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{Current time unit dimension (default ‘n/a’)}
+
+\item[{Return type}] \leavevmode
+str
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
 \index{height() (salabim.Environment method)}
 
 \begin{fulllineitems}
@@ -9767,6 +10126,25 @@ if not specified, no change
 
 \item[{Return type}] \leavevmode
 int
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{hours() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.hours}}\pysiglinewithargsret{\sphinxbfcode{hours}}{\emph{t}}{}
+convert the given time in hours to the current time unit
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{float}) \textendash{} time in hours
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{time in hours, converted to the current time\_unit}
+
+\item[{Return type}] \leavevmode
+float
 
 \end{description}\end{quote}
 
@@ -9800,6 +10178,63 @@ bool
 
 \item[{Return type}] \leavevmode
 {\hyperref[\detokenize{Reference:salabim.Component}]{\sphinxcrossref{Component}}}
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{microseconds() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.microseconds}}\pysiglinewithargsret{\sphinxbfcode{microseconds}}{\emph{t}}{}
+convert the given time in microseconds to the current time unit
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{float}) \textendash{} time in microseconds
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{time in microseconds, converted to the current time\_unit}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{milliseconds() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.milliseconds}}\pysiglinewithargsret{\sphinxbfcode{milliseconds}}{\emph{t}}{}
+convert the given time in milliseconds to the current time unit
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{float}) \textendash{} time in milliseconds
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{time in milliseconds, converted to the current time\_unit}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{minutes() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.minutes}}\pysiglinewithargsret{\sphinxbfcode{minutes}}{\emph{t}}{}
+convert the given time in minutes to the current time unit
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{float}) \textendash{} time in minutes
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{time in minutes, converted to the current time\_unit}
+
+\item[{Return type}] \leavevmode
+float
 
 \end{description}\end{quote}
 
@@ -9964,9 +10399,8 @@ default: 0
 Internally, salabim still works with the ‘old’ time. Only in the interface
 from and to the user program, a correction will be applied.
 
-The registered time in timestamped monitors will be always is the ‘old’ time.
-This is only relevant when using the time value in MonitorTimestamp.xt() or
-MonitorTimestamp.tx().
+The registered time in monitors will be always is the ‘old’ time.
+This is only relevant when using the time value in Monitor.xt() or Monitor.tx().
 \end{sphinxadmonition}
 
 \end{fulllineitems}
@@ -10077,6 +10511,25 @@ converts a screen x coordinate to a user x coordinate
 
 \item[{Returns}] \leavevmode
 \sphinxstylestrong{user y coordinate}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{seconds() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.seconds}}\pysiglinewithargsret{\sphinxbfcode{seconds}}{\emph{t}}{}
+convert the given time in seconds to the current time unit
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{float}) \textendash{} time in seconds
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{time in secoonds, converted to the current time\_unit}
 
 \item[{Return type}] \leavevmode
 float
@@ -10234,6 +10687,180 @@ if not specified, no change
 
 \item[{Return type}] \leavevmode
 bool
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{time\_to\_str\_format() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.time_to_str_format}}\pysiglinewithargsret{\sphinxbfcode{time\_to\_str\_format}}{\emph{format=None}}{}
+sets / gets the the format to display times in trace, animation, etc.
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{format} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies how the time should be displayed in trace, animation, etc. 
+the format specifier should result in 10 characters. Examples: 
+‘\{:10.3f\}’, ‘\{:10.4f\}’, ‘\{:10.0f\}’ and ‘\{:8.1f\} h’ 
+Make sure that the returned length is exactly 10 characters.
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{current specifier (initialized to ‘\{}
+
+\item[{Return type}] \leavevmode
+10.3f\}’)
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{to\_days() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.to_days}}\pysiglinewithargsret{\sphinxbfcode{to\_days}}{\emph{t}}{}
+convert time t to days
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{time}) \textendash{} 
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{Time t converted to days}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{to\_hours() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.to_hours}}\pysiglinewithargsret{\sphinxbfcode{to\_hours}}{\emph{t}}{}
+convert time t to hours
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{time}) \textendash{} 
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{Time t converted to hours}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{to\_microseconds() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.to_microseconds}}\pysiglinewithargsret{\sphinxbfcode{to\_microseconds}}{\emph{t}}{}
+convert time t to microseconds
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{time in microseconds}) \textendash{} 
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{Time t converted to microseconds}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{to\_milliseconds() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.to_milliseconds}}\pysiglinewithargsret{\sphinxbfcode{to\_milliseconds}}{\emph{t}}{}
+convert time t to milliseconds
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{time in milliseconds}) \textendash{} 
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{Time t converted to milliseconds}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{to\_minutes() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.to_minutes}}\pysiglinewithargsret{\sphinxbfcode{to\_minutes}}{\emph{t}}{}
+convert time t to minutes
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{time}) \textendash{} 
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{Time t converted to minutes}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{to\_seconds() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.to_seconds}}\pysiglinewithargsret{\sphinxbfcode{to\_seconds}}{\emph{t}}{}
+convert time t to seconds
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{time}) \textendash{} 
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{Time t converted to seconds}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{to\_weeks() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.to_weeks}}\pysiglinewithargsret{\sphinxbfcode{to\_weeks}}{\emph{t}}{}
+convert time t to weeks
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{time}) \textendash{} 
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{Time t converted to weeks}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{to\_years() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.to_years}}\pysiglinewithargsret{\sphinxbfcode{to\_years}}{\emph{t}}{}
+convert time t to years
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{time}) \textendash{} 
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{Time t converted to years}
+
+\item[{Return type}] \leavevmode
+float
 
 \end{description}\end{quote}
 
@@ -10406,6 +11033,25 @@ Applies only to gif animation.
 
 \end{fulllineitems}
 
+\index{weeks() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.weeks}}\pysiglinewithargsret{\sphinxbfcode{weeks}}{\emph{t}}{}
+convert the given time in weeks to the current time unit
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{float}) \textendash{} time in weeks
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{time in weeks, converted to the current time\_unit}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
 \index{width() (salabim.Environment method)}
 
 \begin{fulllineitems}
@@ -10502,6 +11148,25 @@ float
 \begin{sphinxadmonition}{note}{Note:}
 It is not possible to set this value explicitely.
 \end{sphinxadmonition}
+
+\end{fulllineitems}
+
+\index{years() (salabim.Environment method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Environment.years}}\pysiglinewithargsret{\sphinxbfcode{years}}{\emph{t}}{}
+convert the given time in years to the current time unit
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{float}) \textendash{} time in years
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{time in years, converted to the current time\_unit}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
 
 \end{fulllineitems}
 
@@ -10615,7 +11280,7 @@ if the end of file is reached, EOFError is raised
 \label{\detokenize{Reference:monitor}}\index{Monitor (class in salabim)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Monitor}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Monitor}}{\emph{name=None}, \emph{monitor=True}, \emph{type=None}, \emph{merge=None}, \emph{weighted=False}, \emph{weight\_legend='weight'}, \emph{env=None}, \emph{*args}, \emph{**kwargs}}{}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{Monitor}}{\emph{name=None}, \emph{monitor=True}, \emph{level=False}, \emph{initial\_tally=None}, \emph{type=None}, \emph{weight\_legend=None}, \emph{env=None}, \emph{*args}, \emph{**kwargs}}{}
 Monitor object
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
@@ -10633,6 +11298,16 @@ it is defined in (lowercased)
 if False, monitoring is disabled 
 it is possible to control monitoring later,
 with the monitor method
+
+\item {} 
+\sphinxstyleliteralstrong{level} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), individual values are tallied, optionally with weight 
+if True, the tallied vslues are interpreted as levels
+
+\item {} 
+\sphinxstyleliteralstrong{initial\_tally} (\sphinxstyleliteralemphasis{any}\sphinxstyleliteralemphasis{, }\sphinxstyleliteralemphasis{preferably int}\sphinxstyleliteralemphasis{, }\sphinxstyleliteralemphasis{float}\sphinxstyleliteralemphasis{ or }\sphinxstyleliteralemphasis{translatable into int}\sphinxstyleliteralemphasis{ or }\sphinxstyleliteralemphasis{float}) \textendash{} initial value for the a level monitor 
+it is important to set the value correctly.
+default: 0 
+not available for non level monitors
 
 \item {} 
 \sphinxstyleliteralstrong{type} (\sphinxstyleliteralemphasis{str}) \textendash{} \begin{description}
@@ -10680,19 +11355,8 @@ forced to a numeric value (0 if not possible)
 
 
 \item {} 
-\sphinxstyleliteralstrong{weighted} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True, tallied values may be given weight.
-if False (default), weights are not allowed
-
-\item {} 
-\sphinxstyleliteralstrong{weight\_legend} (\sphinxstyleliteralemphasis{str}) \textendash{} used in print\_statistics and print\_histogram to indicate the dimension of weight,
-e.g. duration or minutes. Default: weight.
-
-\item {} 
-\sphinxstyleliteralstrong{merge} (\sphinxstyleliteralemphasis{list}\sphinxstyleliteralemphasis{, }\sphinxstyleliteralemphasis{tuple}\sphinxstyleliteralemphasis{ or }{\hyperref[\detokenize{Reference:salabim.State.set}]{\sphinxcrossref{\sphinxstyleliteralemphasis{set}}}}) \textendash{} the monitor will be created by merging the monitors mentioned in the list 
-note that the types of all to be merged monitors should be the same and
-that either all to be merged monitors are weighted or all to be merged monitors
-are non weighted. 
-default: no merge
+\sphinxstyleliteralstrong{weight\_legend} (\sphinxstyleliteralemphasis{str}) \textendash{} used in print\_statistics and print\_histogram to indicate the dimension of weight or duration (for
+level monitors, e.g. minutes. Default: weight for non level monitors, duration for level monitors.
 
 \item {} 
 \sphinxstyleliteralstrong{env} ({\hyperref[\detokenize{Reference:salabim.Environment}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Environment}}}}) \textendash{} environment where the monitor is defined 
@@ -10734,14 +11398,6 @@ animates the monitor in a panel
 
 \item {} 
 \sphinxstyleliteralstrong{titlefontsize} (\sphinxstyleliteralemphasis{int}) \textendash{} size of the font of the title (default 15)
-
-\item {} 
-\sphinxstyleliteralstrong{as\_points} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False, lines will be drawn between the points 
-if True (default),  only the points will be shown
-
-\item {} 
-\sphinxstyleliteralstrong{as\_level} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default for lines), the timestamped monitor is considered to be a level
-if False (default for points), just the tallied values will be shown, and connected (for lines)
 
 \item {} 
 \sphinxstyleliteralstrong{title} (\sphinxstyleliteralemphasis{str}) \textendash{} title to be shown above panel 
@@ -10819,6 +11475,38 @@ str
 
 \end{fulllineitems}
 
+\index{bin\_duration() (salabim.Monitor method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.bin_duration}}\pysiglinewithargsret{\sphinxbfcode{bin\_duration}}{\emph{lowerbound}, \emph{upperbound}}{}
+total duration of tallied values in range (lowerbound,upperbound{]}
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{lowerbound} (\sphinxstyleliteralemphasis{float}) \textendash{} non inclusive lowerbound
+
+\item {} 
+\sphinxstyleliteralstrong{upperbound} (\sphinxstyleliteralemphasis{float}) \textendash{} inclusive upperbound
+
+\item {} 
+\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{total duration of values \textgreater{}lowerbound and \textless{}=upperbound}
+
+\item[{Return type}] \leavevmode
+int
+
+\end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+Not available for level monitors
+\end{sphinxadmonition}
+
+\end{fulllineitems}
+
 \index{bin\_number\_of\_entries() (salabim.Monitor method)}
 
 \begin{fulllineitems}
@@ -10844,6 +11532,10 @@ count of the number of tallied values in range (lowerbound,upperbound{]}
 int
 
 \end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+Not available for level monitors
+\end{sphinxadmonition}
 
 \end{fulllineitems}
 
@@ -10873,6 +11565,10 @@ int
 
 \end{description}\end{quote}
 
+\begin{sphinxadmonition}{note}{Note:}
+Not available for level monitors
+\end{sphinxadmonition}
+
 \end{fulllineitems}
 
 \index{deregister() (salabim.Monitor method)}
@@ -10891,6 +11587,78 @@ deregisters the monitor in the registry
 {\hyperref[\detokenize{Reference:salabim.Monitor}]{\sphinxcrossref{Monitor}}}
 
 \end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{duration() (salabim.Monitor method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.duration}}\pysiglinewithargsret{\sphinxbfcode{duration}}{\emph{ex0=False}}{}
+total duration
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{total duration}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+Not available for non level monitors
+\end{sphinxadmonition}
+
+\end{fulllineitems}
+
+\index{duration\_zero() (salabim.Monitor method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.duration_zero}}\pysiglinewithargsret{\sphinxbfcode{duration\_zero}}{}{}
+total duratiom of zero entries
+\begin{quote}\begin{description}
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{total duration of zero entries}
+
+\item[{Return type}] \leavevmode
+float
+
+\end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+Not available for non level monitors
+\end{sphinxadmonition}
+
+\end{fulllineitems}
+
+\index{get() (salabim.Monitor method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.get}}\pysiglinewithargsret{\sphinxbfcode{get}}{\emph{t=None}}{}~\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{t} (\sphinxstyleliteralemphasis{float}) \textendash{} time at which the value of the level is to be returned 
+default: now
+
+\item[{Returns}] \leavevmode
+
+\sphinxstylestrong{last tallied value} \textendash{} Instead of this method, the level monitor can also be called directly, like 
+
+level = sim.Monitor(‘level’, level=True) 
+… 
+print(level()) 
+print(level.get())  \# identical 
+
+
+\item[{Return type}] \leavevmode
+any, usually float
+
+\end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+If the value is not available, self.off will be returned.
+\end{sphinxadmonition}
 
 \end{fulllineitems}
 
@@ -10951,7 +11719,7 @@ float
 \end{description}\end{quote}
 
 \begin{sphinxadmonition}{note}{Note:}
-For weighted monitors, the weighted mean is returned
+For weighs are applied , the weighted mean is returned
 \end{sphinxadmonition}
 
 \end{fulllineitems}
@@ -10974,7 +11742,41 @@ float
 \end{description}\end{quote}
 
 \begin{sphinxadmonition}{note}{Note:}
-For weighted monitors, the weighted median is returned
+If weight are applied, the weighted median is returned
+\end{sphinxadmonition}
+
+\end{fulllineitems}
+
+\index{merge() (salabim.Monitor method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.merge}}\pysiglinewithargsret{\sphinxbfcode{merge}}{\emph{*monitors}, \emph{**kwargs}}{}
+merges this monitor with other monitors
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{monitors} (\sphinxstyleliteralemphasis{sequence}) \textendash{} zero of more monitors to be merged to this monitor
+
+\item {} 
+\sphinxstyleliteralstrong{name} (\sphinxstyleliteralemphasis{str}) \textendash{} name of the merged monitor 
+default: name of this monitor + ‘.merged’
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{merged monitor}
+
+\item[{Return type}] \leavevmode
+{\hyperref[\detokenize{Reference:salabim.Monitor}]{\sphinxcrossref{Monitor}}}
+
+\end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+Level monitors can only be merged with level monitors 
+Non level monitors can only be merged with non level monitors 
+Only monitors with the same type can be merged 
+If no monitors are specified, a copy is created. 
+For level monitors, merging means summing the available x-values\textbar{}n\textbar{}
 \end{sphinxadmonition}
 
 \end{fulllineitems}
@@ -11058,6 +11860,10 @@ int
 
 \end{description}\end{quote}
 
+\begin{sphinxadmonition}{note}{Note:}
+Not available for level monitors
+\end{sphinxadmonition}
+
 \end{fulllineitems}
 
 \index{number\_of\_entries\_zero() (salabim.Monitor method)}
@@ -11073,6 +11879,10 @@ count of the number of zero entries
 int
 
 \end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+Not available for level monitors
+\end{sphinxadmonition}
 
 \end{fulllineitems}
 
@@ -11103,7 +11913,7 @@ float
 \end{description}\end{quote}
 
 \begin{sphinxadmonition}{note}{Note:}
-For weighted monitors, the weighted percentile is returned
+If weights are applied, the weighted percentile is returned
 \end{sphinxadmonition}
 
 \end{fulllineitems}
@@ -11341,6 +12151,42 @@ only keyword arguments are passed
 
 \end{fulllineitems}
 
+\index{slice() (salabim.Monitor method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.slice}}\pysiglinewithargsret{\sphinxbfcode{slice}}{\emph{start=None}, \emph{stop=None}, \emph{modulo=None}, \emph{name=None}}{}
+slices this monitor (creates a subset)
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{start} (\sphinxstyleliteralemphasis{float}) \textendash{} if modulo is not given, the start of the slice 
+if modulo is given, this is indicates the slice period start (modulo modulo)
+
+\item {} 
+\sphinxstyleliteralstrong{stop} (\sphinxstyleliteralemphasis{float}) \textendash{} if modulo is not given, the end of the slice 
+if modulo is given, this is indicates the slice period end (modulo modulo) 
+note that stop is excluded from the slice (open at right hand side)
+
+\item {} 
+\sphinxstyleliteralstrong{modulo} (\sphinxstyleliteralemphasis{float}) \textendash{} specifies the distance between slice periods 
+if not specified, just one slice subset is used.
+
+\item {} 
+\sphinxstyleliteralstrong{name} (\sphinxstyleliteralemphasis{str}) \textendash{} name of the sliced monitor 
+default: name of this monitor + ‘.sliced’
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{sliced monitor}
+
+\item[{Return type}] \leavevmode
+{\hyperref[\detokenize{Reference:salabim.Monitor}]{\sphinxcrossref{Monitor}}}
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
 \index{std() (salabim.Monitor method)}
 
 \begin{fulllineitems}
@@ -11359,7 +12205,7 @@ float
 \end{description}\end{quote}
 
 \begin{sphinxadmonition}{note}{Note:}
-For weighted monitors, the weighted standard deviation is returned
+For weights are applied, the weighted standard deviation is returned
 \end{sphinxadmonition}
 
 \end{fulllineitems}
@@ -11367,11 +12213,82 @@ For weighted monitors, the weighted standard deviation is returned
 \index{tally() (salabim.Monitor method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Monitor.tally}}\pysiglinewithargsret{\sphinxbfcode{tally}}{\emph{x}, \emph{weight=1}}{}~\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.tally}}\pysiglinewithargsret{\sphinxbfcode{tally}}{\emph{value}, \emph{weight=1}}{}~\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
 \sphinxstyleliteralstrong{x} (\sphinxstyleliteralemphasis{any}\sphinxstyleliteralemphasis{, }\sphinxstyleliteralemphasis{preferably int}\sphinxstyleliteralemphasis{, }\sphinxstyleliteralemphasis{float}\sphinxstyleliteralemphasis{ or }\sphinxstyleliteralemphasis{translatable into int}\sphinxstyleliteralemphasis{ or }\sphinxstyleliteralemphasis{float}) \textendash{} value to be tallied
 
+\item {} 
+\sphinxstyleliteralstrong{weight} (\sphinxstyleliteralemphasis{float}) \textendash{} weight to be tallied 
+default : 1 
+
+\end{itemize}
+
 \end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{tx() (salabim.Monitor method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.tx}}\pysiglinewithargsret{\sphinxbfcode{tx}}{\emph{ex0=False}, \emph{exoff=False}, \emph{force\_numeric=False}, \emph{add\_now=True}}{}
+tuple of array with timestamps and array/list with x-values
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
+
+\item {} 
+\sphinxstyleliteralstrong{exoff} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include self.off. if True, exclude self.off’s 
+non level monitors will return all values, regardless of exoff
+
+\item {} 
+\sphinxstyleliteralstrong{force\_numeric} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 
+if False, do not interpret x-values, return as list if type is list
+
+\item {} 
+\sphinxstyleliteralstrong{add\_now} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default), the last tallied x-value and the current time is added to the result 
+if False, the result ends with the last tallied value and the time that was tallied 
+non level monitors will never add now
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{array with timestamps and array/list with x-values}
+
+\item[{Return type}] \leavevmode
+tuple
+
+\end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+The value self.off is stored when monitoring is turned off 
+The timestamps are not corrected for any reset\_now() adjustment.
+\end{sphinxadmonition}
+
+\end{fulllineitems}
+
+\index{value\_duration() (salabim.Monitor method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.value_duration}}\pysiglinewithargsret{\sphinxbfcode{value\_duration}}{\emph{value}}{}
+total duration of tallied values equal to value or in value
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{value} (\sphinxstyleliteralemphasis{any}) \textendash{} if list, tuple or set, check whether the tallied value is in value 
+otherwise, check whether the tallied value equals the given value
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{total of duration of tallied values in value or equal to value}
+
+\item[{Return type}] \leavevmode
+int
+
+\end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+Not available for non level monitors
+\end{sphinxadmonition}
 
 \end{fulllineitems}
 
@@ -11393,6 +12310,10 @@ int
 
 \end{description}\end{quote}
 
+\begin{sphinxadmonition}{note}{Note:}
+Not available for level monitors
+\end{sphinxadmonition}
+
 \end{fulllineitems}
 
 \index{value\_weight() (salabim.Monitor method)}
@@ -11413,6 +12334,10 @@ int
 
 \end{description}\end{quote}
 
+\begin{sphinxadmonition}{note}{Note:}
+Not available for level monitors
+\end{sphinxadmonition}
+
 \end{fulllineitems}
 
 \index{weight() (salabim.Monitor method)}
@@ -11432,6 +12357,10 @@ float
 
 \end{description}\end{quote}
 
+\begin{sphinxadmonition}{note}{Note:}
+Not available for level monitors
+\end{sphinxadmonition}
+
 \end{fulllineitems}
 
 \index{weight\_zero() (salabim.Monitor method)}
@@ -11447,6 +12376,10 @@ sum of weights of zero entries
 float
 
 \end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+Not available for level monitors
+\end{sphinxadmonition}
 
 \end{fulllineitems}
 
@@ -11474,6 +12407,80 @@ array/list
 
 \end{description}\end{quote}
 
+\begin{sphinxadmonition}{note}{Note:}
+Not available for level monitors. Use xduration(), xt() or tx() instead.
+\end{sphinxadmonition}
+
+\end{fulllineitems}
+
+\index{xduration() (salabim.Monitor method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.xduration}}\pysiglinewithargsret{\sphinxbfcode{xduration}}{\emph{ex0=False}, \emph{force\_numeric=True}}{}
+array/list of tallied values
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
+
+\item {} 
+\sphinxstyleliteralstrong{force\_numeric} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 
+if False, do not interpret x-values, return as list if type is list
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{all tallied values}
+
+\item[{Return type}] \leavevmode
+array/list
+
+\end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+not available for non level monitors
+\end{sphinxadmonition}
+
+\end{fulllineitems}
+
+\index{xt() (salabim.Monitor method)}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{Reference:salabim.Monitor.xt}}\pysiglinewithargsret{\sphinxbfcode{xt}}{\emph{ex0=False}, \emph{exoff=False}, \emph{force\_numeric=True}, \emph{add\_now=True}}{}
+tuple of array/list with x-values and array with timestamp
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
+
+\item {} 
+\sphinxstyleliteralstrong{exoff} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include self.off. if True, exclude self.off’s 
+non level monitors will return all values, regardless of exoff
+
+\item {} 
+\sphinxstyleliteralstrong{force\_numeric} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 
+if False, do not interpret x-values, return as list if type is list
+
+\item {} 
+\sphinxstyleliteralstrong{add\_now} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default), the last tallied x-value and the current time is added to the result 
+if False, the result ends with the last tallied value and the time that was tallied 
+non level monitors will never add now
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+\sphinxstylestrong{array/list with x-values and array with timestamps}
+
+\item[{Return type}] \leavevmode
+tuple
+
+\end{description}\end{quote}
+
+\begin{sphinxadmonition}{note}{Note:}
+The value self.off is stored when monitoring is turned off 
+The timestamps are not corrected for any reset\_now() adjustment.
+\end{sphinxadmonition}
+
 \end{fulllineitems}
 
 \index{xweight() (salabim.Monitor method)}
@@ -11500,964 +12507,9 @@ array/list
 
 \end{description}\end{quote}
 
-\end{fulllineitems}
-
-
-\end{fulllineitems}
-
-
-
-\section{MonitorTimestamp}
-\label{\detokenize{Reference:monitortimestamp}}\index{MonitorTimestamp (class in salabim)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{MonitorTimestamp}}{\emph{name=None}, \emph{initial\_tally=None}, \emph{monitor=True}, \emph{type=None}, \emph{merge=None}, \emph{env=None}, \emph{*args}, \emph{**kwargs}}{}
-monitortimestamp object
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{name} (\sphinxstyleliteralemphasis{str}) \textendash{} name of the timestamped monitor
-if the name ends with a period (.),
-auto serializing will be applied 
-if the name end with a comma,
-auto serializing starting at 1 will be applied 
-if omitted, the name will be derived from the class
-it is defined in (lowercased)
-
-\item {} 
-\sphinxstyleliteralstrong{initial\_tally} (\sphinxstyleliteralemphasis{any}\sphinxstyleliteralemphasis{, }\sphinxstyleliteralemphasis{usually float}) \textendash{} initial value to be tallied (default 0) 
-if it important to provide the value at time=now
-
-\item {} 
-\sphinxstyleliteralstrong{monitor} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default), monitoring will be on. 
-if False, monitoring is disabled 
-it is possible to control monitoring later,
-with the monitor method
-
-\item {} 
-\sphinxstyleliteralstrong{type} (\sphinxstyleliteralemphasis{str}) \textendash{} 
-specifies how tallied values are to be stored
-Using a int, uint of float type results in less memory usage and better
-performance. Note that the getter should never return the number not to use
-as this is used to indicate ‘off’
-\begin{itemize}
-\item {} \begin{description}
-\item[{’any’ (default) stores values in a list. This allows for}] \leavevmode
-non numeric values. In calculations the values are
-forced to a numeric value (0 if not possible) do not use -inf
-
-\end{description}
-
-\item {} 
-’bool’ bool (False, True). Actually integer \textgreater{}= 0 \textless{}= 254 1 byte do not use 255
-
-\item {} 
-’int8’ integer \textgreater{}= -127 \textless{}= 127 1 byte do not use -128
-
-\item {} 
-’uint8’ integer \textgreater{}= 0 \textless{}= 254 1 byte do not use 255
-
-\item {} 
-’int16’ integer \textgreater{}= -32767 \textless{}= 32767 2 bytes do not use -32768
-
-\item {} 
-’uint16’ integer \textgreater{}= 0 \textless{}= 65534 2 bytes do not use 65535
-
-\item {} 
-’int32’ integer \textgreater{}= -2147483647 \textless{}= 2147483647 4 bytes do not use -2147483648
-
-\item {} 
-’uint32’ integer \textgreater{}= 0 \textless{}= 4294967294 4 bytes do not use 4294967295
-
-\item {} 
-’int64’ integer \textgreater{}= -9223372036854775807 \textless{}= 9223372036854775807 8 bytes do not use -9223372036854775808
-
-\item {} 
-’uint64’ integer \textgreater{}= 0 \textless{}= 18446744073709551614 8 bytes do not use 18446744073709551615
-
-\item {} 
-’float’ float 8 bytes do not use -inf
-
-\end{itemize}
-
-
-\item {} 
-\sphinxstyleliteralstrong{merge} (\sphinxstyleliteralemphasis{list}\sphinxstyleliteralemphasis{, }\sphinxstyleliteralemphasis{tuple}\sphinxstyleliteralemphasis{ or }{\hyperref[\detokenize{Reference:salabim.State.set}]{\sphinxcrossref{\sphinxstyleliteralemphasis{set}}}}) \textendash{} the monitor will be created by merging the monitors mentioned in the list 
-merging means summing the available x-values\textbar{}n\textbar{}
-note that the types of all to be merged monitors should be the same. 
-initial\_tally may not be specified when merge is specified. 
-default: no merge
-
-\item {} 
-\sphinxstyleliteralstrong{env} ({\hyperref[\detokenize{Reference:salabim.Environment}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Environment}}}}) \textendash{} environment where the monitor is defined 
-if omitted, default\_env will be used
-
-\end{itemize}
-
-\end{description}\end{quote}
-
 \begin{sphinxadmonition}{note}{Note:}
-A MonitorTimestamp collects both the value and the time.
-All statistics are based on the durations as weights.
+not available for level monitors
 \end{sphinxadmonition}
-\paragraph{Example}
-
-Tallied at time   0: 10 (xnow in definition of monitortimestamp) 
-Tallied at time  50: 11 
-Tallied at time  70: 12 
-Tallied at time  80: 10 
-Now = 100
-
-This results in:  
-x=  10 duration 50 
-x=  11 duration 20 
-x=  12 duration 10 
-x=  10 duration 20
-
-And thus a mean of (10*50+11*20+12*10+10*20)/(50+20+10+20)
-\index{animate() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.animate}}\pysiglinewithargsret{\sphinxbfcode{animate}}{\emph{*args}, \emph{**kwargs}}{}
-animates the timestamed monitor in a panel
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{linecolor} (\sphinxstyleliteralemphasis{colorspec}) \textendash{} color of the line or points (default foreground color)
-
-\item {} 
-\sphinxstyleliteralstrong{linewidth} (\sphinxstyleliteralemphasis{int}) \textendash{} width of the line or points (default 1 for line, 3 for points)
-
-\item {} 
-\sphinxstyleliteralstrong{fillcolor} (\sphinxstyleliteralemphasis{colorspec}) \textendash{} color of the panel (default transparent)
-
-\item {} 
-\sphinxstyleliteralstrong{bordercolor} (\sphinxstyleliteralemphasis{colorspec}) \textendash{} color of the border (default foreground color)
-
-\item {} 
-\sphinxstyleliteralstrong{borderlinewidth} (\sphinxstyleliteralemphasis{int}) \textendash{} width of the line around the panel (default 1)
-
-\item {} 
-\sphinxstyleliteralstrong{nowcolor} (\sphinxstyleliteralemphasis{colorspec}) \textendash{} color of the line indicating now (default red)
-
-\item {} 
-\sphinxstyleliteralstrong{titlecolor} (\sphinxstyleliteralemphasis{colorspec}) \textendash{} color of the title (default foreground color)
-
-\item {} 
-\sphinxstyleliteralstrong{titlefont} ({\hyperref[\detokenize{Reference:salabim.Animate.font}]{\sphinxcrossref{\sphinxstyleliteralemphasis{font}}}}) \textendash{} font of the title (default ‘’)
-
-\item {} 
-\sphinxstyleliteralstrong{titlefontsize} (\sphinxstyleliteralemphasis{int}) \textendash{} size of the font of the title (default 15)
-
-\item {} 
-\sphinxstyleliteralstrong{as\_points} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), lines will be drawn between the points 
-if True,  only the points will be shown
-
-\item {} 
-\sphinxstyleliteralstrong{title} (\sphinxstyleliteralemphasis{str}) \textendash{} title to be shown above panel 
-default: name of the monitor
-
-\item {} 
-\sphinxstyleliteralstrong{x} (\sphinxstyleliteralemphasis{int}) \textendash{} x-coordinate of panel, relative to xy\_anchor, default 0
-
-\item {} 
-\sphinxstyleliteralstrong{y} (\sphinxstyleliteralemphasis{int}) \textendash{} y-coordinate of panel, relative to xy\_anchor. default 0
-
-\item {} 
-\sphinxstyleliteralstrong{xy\_anchor} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies where x and y are relative to 
-possible values are (default: sw): 
-\sphinxcode{nw    n    ne} 
-\sphinxcode{w     c     e} 
-\sphinxcode{sw    s    se}
-
-\item {} 
-\sphinxstyleliteralstrong{vertical\_offset} (\sphinxstyleliteralemphasis{float}) \textendash{} \begin{description}
-\item[{the vertical position of x within the panel is}] \leavevmode
-vertical\_offset + x * vertical\_scale (default 0)
-
-\end{description}
-
-
-\item {} 
-\sphinxstyleliteralstrong{vertical\_scale} (\sphinxstyleliteralemphasis{float}) \textendash{} the vertical position of x within the panel is
-vertical\_offset + x * vertical\_scale (default 5)
-
-\item {} 
-\sphinxstyleliteralstrong{horizontal\_scale} (\sphinxstyleliteralemphasis{float}) \textendash{} for timescaled monitors the relative horizontal position of time t within the panel is on
-t * horizontal\_scale, possibly shifted (default 1)\textbar{}n\textbar{}
-for non timescaled monitors, the relative horizontal position of index i within the panel is on
-i * horizontal\_scale, possibly shifted (default 5)\textbar{}n\textbar{}
-
-\item {} 
-\sphinxstyleliteralstrong{width} (\sphinxstyleliteralemphasis{int}) \textendash{} width of the panel (default 200)
-
-\item {} 
-\sphinxstyleliteralstrong{height} (\sphinxstyleliteralemphasis{int}) \textendash{} height of the panel (default 75)
-
-\item {} 
-\sphinxstyleliteralstrong{layer} (\sphinxstyleliteralemphasis{int}) \textendash{} layer (default 0)
-
-\end{itemize}
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{reference to AnimateMonitor object}
-
-\item[{Return type}] \leavevmode
-{\hyperref[\detokenize{Reference:salabim.AnimateMonitor}]{\sphinxcrossref{AnimateMonitor}}}
-
-\end{description}\end{quote}
-
-\begin{sphinxadmonition}{note}{Note:}
-It is recommended to use sim.AnimateMonitor instead 
-
-All measures are in screen coordinates 
-\end{sphinxadmonition}
-
-\end{fulllineitems}
-
-\index{base\_name() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.base_name}}\pysiglinewithargsret{\sphinxbfcode{base\_name}}{}{}~\begin{quote}\begin{description}
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{base name of the monitortimestamp (the name used at initialization)}
-
-\item[{Return type}] \leavevmode
-str
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{bin\_duration() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.bin_duration}}\pysiglinewithargsret{\sphinxbfcode{bin\_duration}}{\emph{*args}, \emph{**kwargs}}{}
-duration of tallied values with the value in range (lowerbound,upperbound{]}
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{lowerbound} (\sphinxstyleliteralemphasis{float}) \textendash{} non inclusive lowerbound
-
-\item {} 
-\sphinxstyleliteralstrong{upperbound} (\sphinxstyleliteralemphasis{float}) \textendash{} inclusive upperbound
-
-\item {} 
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
-
-\end{itemize}
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{duration of values \textgreater{}lowerbound and \textless{}=upperbound}
-
-\item[{Return type}] \leavevmode
-float
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{deregister() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.deregister}}\pysiglinewithargsret{\sphinxbfcode{deregister}}{\emph{*args}, \emph{**kwargs}}{}
-deregisters the timestamped monitor in the registry
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{registry} (\sphinxstyleliteralemphasis{list}) \textendash{} list of registered objects
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{timestamped monitor (self)}
-
-\item[{Return type}] \leavevmode
-MonitorTimestamped
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{duration() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.duration}}\pysiglinewithargsret{\sphinxbfcode{duration}}{\emph{*args}, \emph{**kwargs}}{}
-total duration
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include samples with value 0. if True, exclude zero samples.
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{total duration}
-
-\item[{Return type}] \leavevmode
-float
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{duration\_zero() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.duration_zero}}\pysiglinewithargsret{\sphinxbfcode{duration\_zero}}{\emph{*args}, \emph{**kwargs}}{}
-total duration of samples with value 0
-\begin{quote}\begin{description}
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{total duration of zero samples}
-
-\item[{Return type}] \leavevmode
-float
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{get() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.get}}\pysiglinewithargsret{\sphinxbfcode{get}}{}{}~\begin{quote}\begin{description}
-\item[{Returns}] \leavevmode
-
-\sphinxstylestrong{last tallied value} \textendash{} Instead of this method, the timestamped monitor can also be called directly, like 
-
-level = sim.MonitorTimestamp(‘level’) 
-… 
-print(level()) 
-print(level.get())  \# identical 
-
-
-\item[{Return type}] \leavevmode
-any, usually float
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{maximum() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.maximum}}\pysiglinewithargsret{\sphinxbfcode{maximum}}{\emph{*args}, \emph{**kwargs}}{}
-maximum of tallied values
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{maximum}
-
-\item[{Return type}] \leavevmode
-float
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{mean() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.mean}}\pysiglinewithargsret{\sphinxbfcode{mean}}{\emph{*args}, \emph{**kwargs}}{}
-mean of tallied values, weighted with their durations
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{mean}
-
-\item[{Return type}] \leavevmode
-float
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{median() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.median}}\pysiglinewithargsret{\sphinxbfcode{median}}{\emph{*args}, \emph{**kwargs}}{}
-median of tallied values weighted with their durations
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{median}
-
-\item[{Return type}] \leavevmode
-float
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{minimum() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.minimum}}\pysiglinewithargsret{\sphinxbfcode{minimum}}{\emph{*args}, \emph{**kwargs}}{}
-minimum of tallied values
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{minimum}
-
-\item[{Return type}] \leavevmode
-float
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{monitor() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.monitor}}\pysiglinewithargsret{\sphinxbfcode{monitor}}{\emph{value=None}}{}
-enables/disabled timestamped monitor
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{value} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True, monitoring will be on. 
-if False, monitoring is disabled 
-if omitted, no change
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{True, if monitoring enabled. False, if not}
-
-\item[{Return type}] \leavevmode
-bool
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{name() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.name}}\pysiglinewithargsret{\sphinxbfcode{name}}{\emph{value=None}}{}~\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{value} (\sphinxstyleliteralemphasis{str}) \textendash{} new name of the monitor
-if omitted, no change
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{Name of the monitor}
-
-\item[{Return type}] \leavevmode
-str
-
-\end{description}\end{quote}
-
-\begin{sphinxadmonition}{note}{Note:}
-base\_name and sequence\_number are not affected if the name is changed
-\end{sphinxadmonition}
-
-\end{fulllineitems}
-
-\index{number\_of\_entries() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.number_of_entries}}\pysiglinewithargsret{\sphinxbfcode{number\_of\_entries}}{\emph{*args}, \emph{**kwargs}}{}
-count of the number of entries (duration type)
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{number of entries}
-
-\item[{Return type}] \leavevmode
-int
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{number\_of\_entries\_zero() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.number_of_entries_zero}}\pysiglinewithargsret{\sphinxbfcode{number\_of\_entries\_zero}}{\emph{*args}, \emph{**kwargs}}{}
-count of the number of zero entries (duration type)
-\begin{quote}\begin{description}
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{number of zero entries}
-
-\item[{Return type}] \leavevmode
-int
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{percentile() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.percentile}}\pysiglinewithargsret{\sphinxbfcode{percentile}}{\emph{*args}, \emph{**kwargs}}{}
-q-th percentile of tallied values, weighted with their durations
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{q} (\sphinxstyleliteralemphasis{float}) \textendash{} percentage of the distribution 
-values \textless{}0 are treated a 0 
-values \textgreater{}100 are treated as 100
-
-\item {} 
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
-
-\end{itemize}
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{q-th percentile} \textendash{} 0 returns the minimum, 50 the median and 100 the maximum
-
-\item[{Return type}] \leavevmode
-float
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{print\_histogram() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.print_histogram}}\pysiglinewithargsret{\sphinxbfcode{print\_histogram}}{\emph{number\_of\_bins=None}, \emph{lowerbound=None}, \emph{bin\_width=None}, \emph{values=False}, \emph{ex0=False}, \emph{as\_str=False}, \emph{file=None}}{}
-print timestamped monitor statistics and histogram
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{number\_of\_bins} (\sphinxstyleliteralemphasis{int}) \textendash{} number of bins 
-default: 30 
-if \textless{}0, also the header of the histogram will be surpressed
-
-\item {} 
-\sphinxstyleliteralstrong{lowerbound} (\sphinxstyleliteralemphasis{float}) \textendash{} first bin 
-default: 0
-
-\item {} 
-\sphinxstyleliteralstrong{bin\_width} (\sphinxstyleliteralemphasis{float}) \textendash{} width of the bins 
-default: 1
-
-\item {} 
-\sphinxstyleliteralstrong{values} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), bins will be used 
-if True, the individual values will be shown (in the right order).
-in that case, nu cumulative values will be given 
-
-\item {} 
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
-
-\item {} 
-\sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the histogram
-if True, return a string containing the histogram
-
-\item {} 
-\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
-otherwise, the output is directed to the file
-
-\end{itemize}
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{histogram (if as\_str is True)}
-
-\item[{Return type}] \leavevmode
-str
-
-\end{description}\end{quote}
-
-\begin{sphinxadmonition}{note}{Note:}
-If number\_of\_bins, lowerbound and bin\_width are omitted, the histogram will be autoscaled,
-with a maximum of 30 classes.
-\end{sphinxadmonition}
-
-\end{fulllineitems}
-
-\index{print\_histograms() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.print_histograms}}\pysiglinewithargsret{\sphinxbfcode{print\_histograms}}{\emph{number\_of\_bins=None}, \emph{lowerbound=None}, \emph{bin\_width=None}, \emph{values=False}, \emph{ex0=False}, \emph{as\_str=False}, \emph{file=None}}{}
-print timedstamped monitor statistics and histogram
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{number\_of\_bins} (\sphinxstyleliteralemphasis{int}) \textendash{} number of bins 
-default: 30 
-if \textless{}0, also the header of the histogram will be surpressed
-
-\item {} 
-\sphinxstyleliteralstrong{lowerbound} (\sphinxstyleliteralemphasis{float}) \textendash{} first bin 
-default: 0
-
-\item {} 
-\sphinxstyleliteralstrong{bin\_width} (\sphinxstyleliteralemphasis{float}) \textendash{} width of the bins 
-default: 1
-
-\item {} 
-\sphinxstyleliteralstrong{values} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), bins will be used 
-if True, the individual values will be shown (in the right order).
-in that case, no cumulative values will be given 
-
-\item {} 
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
-
-\end{itemize}
-
-\end{description}\end{quote}
-\begin{description}
-\item[{as\_str: bool}] \leavevmode
-if False (default), print the histogram
-if True, return a string containing the histogram
-
-\item[{file: file}] \leavevmode
-if None(default), all output is directed to stdout 
-otherwise, the output is directed to the file
-
-\end{description}
-\begin{quote}\begin{description}
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{histogram (if as\_str is True)}
-
-\item[{Return type}] \leavevmode
-str
-
-\end{description}\end{quote}
-
-\begin{sphinxadmonition}{note}{Note:}
-If number\_of\_bins, lowerbound and bin\_width are omitted, the histogram will be autoscaled,
-with a maximum of 30 classes. 
-Exactly same functionality as MonitorTimestamped.print\_histogram()
-\end{sphinxadmonition}
-
-\end{fulllineitems}
-
-\index{print\_statistics() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.print_statistics}}\pysiglinewithargsret{\sphinxbfcode{print\_statistics}}{\emph{show\_header=True}, \emph{show\_legend=True}, \emph{do\_indent=False}, \emph{as\_str=False}, \emph{file=None}}{}
-print timestamped monitor statistics
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{show\_header} (\sphinxstyleliteralemphasis{bool}) \textendash{} primarily for internal use
-
-\item {} 
-\sphinxstyleliteralstrong{show\_legend} (\sphinxstyleliteralemphasis{bool}) \textendash{} primarily for internal use
-
-\item {} 
-\sphinxstyleliteralstrong{do\_indent} (\sphinxstyleliteralemphasis{bool}) \textendash{} primarily for internal use
-
-\item {} 
-\sphinxstyleliteralstrong{as\_str} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), print the statistics
-if True, return a string containing the statistics
-
-\item {} 
-\sphinxstyleliteralstrong{file} (\sphinxstyleliteralemphasis{file}) \textendash{} if None(default), all output is directed to stdout 
-otherwise, the output is directed to the file
-
-\end{itemize}
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{statistics (if as\_str is True)}
-
-\item[{Return type}] \leavevmode
-str
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{register() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.register}}\pysiglinewithargsret{\sphinxbfcode{register}}{\emph{*args}, \emph{**kwargs}}{}
-registers the timestamped monitor in the registry
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{registry} (\sphinxstyleliteralemphasis{list}) \textendash{} list of (to be) registered objects
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{timestamped monitor (self)}
-
-\item[{Return type}] \leavevmode
-MonitorTimestamped
-
-\end{description}\end{quote}
-
-\begin{sphinxadmonition}{note}{Note:}
-Use MonitorTimestamped.deregister if timestamped monitor does not longer need to be registered.
-\end{sphinxadmonition}
-
-\end{fulllineitems}
-
-\index{reset() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.reset}}\pysiglinewithargsret{\sphinxbfcode{reset}}{\emph{monitor=None}}{}
-resets timestamped monitor
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{monitor} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default), monitoring will be on. 
-if False, monitoring is disabled 
-if omitted, the monitor state remains unchanged
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{reset\_monitors() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.reset_monitors}}\pysiglinewithargsret{\sphinxbfcode{reset\_monitors}}{\emph{monitor=None}}{}
-resets timestamped monitor
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{monitor} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default), monitoring will be on. 
-if False, monitoring is disabled 
-if omitted, the monitor state remains unchanged
-
-\end{description}\end{quote}
-
-\begin{sphinxadmonition}{note}{Note:}
-Exactly same functionality as MonitorTimestamped.reset()
-\end{sphinxadmonition}
-
-\end{fulllineitems}
-
-\index{sequence\_number() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.sequence_number}}\pysiglinewithargsret{\sphinxbfcode{sequence\_number}}{}{}~\begin{quote}\begin{description}
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{sequence\_number of the monitortimestamp} \textendash{} (the sequence number at initialization) 
-normally this will be the integer value of a serialized name,
-but also non serialized names (without a dot or a comma at the end)
-will be numbered)
-
-\item[{Return type}] \leavevmode
-int
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{setup() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.setup}}\pysiglinewithargsret{\sphinxbfcode{setup}}{}{}
-called immediately after initialization of a monitortimestamp.
-
-by default this is a dummy method, but it can be overridden.
-
-only keyword arguments are passed
-
-\end{fulllineitems}
-
-\index{std() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.std}}\pysiglinewithargsret{\sphinxbfcode{std}}{\emph{*args}, \emph{**kwargs}}{}
-standard deviation of tallied values, weighted with their durations
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{standard deviation}
-
-\item[{Return type}] \leavevmode
-float
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{tally() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.tally}}\pysiglinewithargsret{\sphinxbfcode{tally}}{\emph{value}}{}
-tally value
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{value} (\sphinxstyleliteralemphasis{any}\sphinxstyleliteralemphasis{, }\sphinxstyleliteralemphasis{usually float}) \textendash{} 
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{tx() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.tx}}\pysiglinewithargsret{\sphinxbfcode{tx}}{\emph{ex0=False}, \emph{exoff=False}, \emph{force\_numeric=False}, \emph{add\_now=True}}{}
-tuple of array with timestamps and array/list with x-values
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
-
-\item {} 
-\sphinxstyleliteralstrong{exoff} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include self.off. if True, exclude self.off’s
-
-\item {} 
-\sphinxstyleliteralstrong{force\_numeric} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 
-if False, do not interpret x-values, return as list if type is list
-
-\item {} 
-\sphinxstyleliteralstrong{add\_now} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default), the current time and the last tallied x-value added to the result 
-if False, the result ends with the time of the last tally and the last tallied x-value
-
-\end{itemize}
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{array with timestamps and array/list with x-values}
-
-\item[{Return type}] \leavevmode
-tuple
-
-\end{description}\end{quote}
-
-\begin{sphinxadmonition}{note}{Note:}
-The value self.off is stored when monitoring is turned off 
-The timestamps are not corrected for any reset\_now() adjustment.
-\end{sphinxadmonition}
-
-\end{fulllineitems}
-
-\index{value\_duration() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.value_duration}}\pysiglinewithargsret{\sphinxbfcode{value\_duration}}{\emph{*args}, \emph{**kwargs}}{}
-duration of tallied values equal to value or in value
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{value} (\sphinxstyleliteralemphasis{any}) \textendash{} if list, tuple or set, check whether the tallied value is in value 
-otherwise, check whether the tallied value equals the given value
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{duration of tallied values in value or equal to value}
-
-\item[{Return type}] \leavevmode
-float
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{value\_number\_of\_entries() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.value_number_of_entries}}\pysiglinewithargsret{\sphinxbfcode{value\_number\_of\_entries}}{\emph{*args}, \emph{**kwargs}}{}
-count of tallied values equal to value or in value
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{value} (\sphinxstyleliteralemphasis{any}) \textendash{} if list, tuple or set, check whether the tallied value is in value 
-otherwise, check whether the tallied value equals the given value
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{count of tallied values in value or equal to value}
-
-\item[{Return type}] \leavevmode
-float
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{xduration() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.xduration}}\pysiglinewithargsret{\sphinxbfcode{xduration}}{\emph{*args}, \emph{**kwargs}}{}
-tuple of array with x-values and array with durations
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
-
-\item {} 
-\sphinxstyleliteralstrong{force\_numeric} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 
-if False, do not interpret x-values, return as list if type is list
-
-\end{itemize}
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{array/list with x-values and array with durations}
-
-\item[{Return type}] \leavevmode
-tuple
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{xt() (salabim.MonitorTimestamp method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.MonitorTimestamp.xt}}\pysiglinewithargsret{\sphinxbfcode{xt}}{\emph{ex0=False}, \emph{exoff=False}, \emph{force\_numeric=True}, \emph{add\_now=True}}{}
-tuple of array/list with x-values and array with timestamp
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{ex0} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include zeroes. if True, exclude zeroes
-
-\item {} 
-\sphinxstyleliteralstrong{exoff} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), include self.off. if True, exclude self.off’s
-
-\item {} 
-\sphinxstyleliteralstrong{force\_numeric} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0 
-if False, do not interpret x-values, return as list if type is list
-
-\item {} 
-\sphinxstyleliteralstrong{add\_now} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default), the last tallied x-value and the current time is added to the result 
-if False, the result ends with the last tallied value and the time that was tallied
-
-\end{itemize}
-
-\item[{Returns}] \leavevmode
-\sphinxstylestrong{array/list with x-values and array with timestamps}
-
-\item[{Return type}] \leavevmode
-tuple
-
-\end{description}\end{quote}
-
-\begin{sphinxadmonition}{note}{Note:}
-The value self.off is stored when monitoring is turned off 
-The timestamps are not corrected for any reset\_now() adjustment.
-\end{sphinxadmonition}
-
-\end{fulllineitems}
-
-
-\end{fulllineitems}
-
-
-
-\section{PeriodMonitor}
-\label{\detokenize{Reference:periodmonitor}}\index{PeriodMonitor (class in salabim)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.PeriodMonitor}}\pysiglinewithargsret{\sphinxbfcode{class }\sphinxcode{salabim.}\sphinxbfcode{PeriodMonitor}}{\emph{parent\_monitor}, \emph{periods=None}, \emph{period\_monitor\_names=None}}{}
-defines a number of (timestamped) period monitors for a given monitor.
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{patent\_monitor} ({\hyperref[\detokenize{Reference:salabim.Monitor.monitor}]{\sphinxcrossref{\sphinxstyleliteralemphasis{Monitor.monitor}}}}\sphinxstyleliteralemphasis{ or }{\hyperref[\detokenize{Reference:salabim.MonitorTimestamp.monitor}]{\sphinxcrossref{\sphinxstyleliteralemphasis{MonitorTimestamp.monitor}}}}) \textendash{} parent\_monitor to be divided into several period monitors for given time periods.
-
-\item {} 
-\sphinxstyleliteralstrong{periods} (\sphinxstyleliteralemphasis{list}\sphinxstyleliteralemphasis{ or }\sphinxstyleliteralemphasis{tuple of floats}) \textendash{} specifies the length of the period intervals. 
-default: 24 * {[}1{]}, meaning periods 0-1, 1-2, …, 23-24 
-the periods do not have to be all the same.
-
-\item {} 
-\sphinxstyleliteralstrong{period\_monitor\_names} (\sphinxstyleliteralemphasis{list}\sphinxstyleliteralemphasis{ or }\sphinxstyleliteralemphasis{tuple of string}) \textendash{} specifies the names of the period monitors.
-It is required that the length of period equals the length of period\_monitor\_names.
-By default the names are composed of the name of the parent monitor
-
-\end{itemize}
-
-\end{description}\end{quote}
-
-\begin{sphinxadmonition}{note}{Note:}
-The period monitors can be accessed by indexing the instance of PeriodMonitor.
-\end{sphinxadmonition}
-\index{remove() (salabim.PeriodMonitor method)}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.PeriodMonitor.remove}}\pysiglinewithargsret{\sphinxbfcode{remove}}{}{}
-removes the period monitor
 
 \end{fulllineitems}
 
@@ -13090,7 +13142,7 @@ Component
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{Reference:salabim.Queue.print_histograms}}\pysiglinewithargsret{\sphinxbfcode{print\_histograms}}{\emph{exclude=()}, \emph{as\_str=False}, \emph{file=None}}{}
-prints the histograms of the length timestamped and length\_of\_stay monitor of the queue
+prints the histograms of the length and length\_of\_stay monitor of the queue
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
@@ -13216,7 +13268,7 @@ component must be member of the queue
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{Reference:salabim.Queue.reset_monitors}}\pysiglinewithargsret{\sphinxbfcode{reset\_monitors}}{\emph{monitor=None}}{}
-resets queue monitor length\_of\_stay and timestamped monitor length
+resets queue monitor length\_of\_stay and length
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode
 \sphinxstyleliteralstrong{monitor} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True, monitoring will be on. 
@@ -13465,7 +13517,7 @@ deregisters the resource in the registry
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{Reference:salabim.Resource.monitor}}\pysiglinewithargsret{\sphinxbfcode{monitor}}{\emph{value}}{}
-enables/disables the resource monitors  and timestamped monitors
+enables/disables the resource monitors
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode
 \sphinxstyleliteralstrong{value} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True, monitoring is enabled 
@@ -13651,7 +13703,7 @@ quantity may not be specified for a non-anomymous resoure
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{Reference:salabim.Resource.reset_monitors}}\pysiglinewithargsret{\sphinxbfcode{reset\_monitors}}{\emph{monitor=None}}{}
-resets the resource monitors  and timestamped monitors
+resets the resource monitors
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode
 \sphinxstyleliteralstrong{monitor} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True, monitoring will be on. 
@@ -13865,7 +13917,7 @@ any
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{Reference:salabim.State.monitor}}\pysiglinewithargsret{\sphinxbfcode{monitor}}{\emph{value=None}}{}
-enables/disables the state monitors and timestamped monitors
+enables/disables the state monitors and value monitor
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode
 \sphinxstyleliteralstrong{value} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True, monitoring will be on. 
@@ -13910,7 +13962,7 @@ All derived named are updated as well.
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{Reference:salabim.State.print_histograms}}\pysiglinewithargsret{\sphinxbfcode{print\_histograms}}{\emph{exclude=()}, \emph{as\_str=False}, \emph{file=None}}{}
-print histograms of the waiters queue and the value timestamped monitor
+print histograms of the waiters queue and the value monitor
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
@@ -14037,7 +14089,7 @@ This method is identical to set, except the default value is False.
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{Reference:salabim.State.reset_monitors}}\pysiglinewithargsret{\sphinxbfcode{reset\_monitors}}{\emph{monitor=None}}{}
-resets the timestamped monitor for the state’s value and the monitors of the waiters queue
+resets the monitor for the state’s value and the monitors of the waiters queue
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode
 \sphinxstyleliteralstrong{monitor} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True, monitoring will be on. 
