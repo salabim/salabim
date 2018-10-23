@@ -1,8 +1,8 @@
-'''          _         _      _               ____      _  _        ___
- ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \    | || |      / _ \
-/ __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |   | || |_    | | | |
-\__ \| (_| || || (_| || |_) || || | | | | |   / __/  _ |__   _| _ | |_| |
-|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|(_)   |_|  (_) \___/
+'''          _         _      _               ____      _  _       _
+ ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \    | || |     / |
+/ __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |   | || |_    | |
+\__ \| (_| || || (_| || |_) || || | | | | |   / __/  _ |__   _| _ | |
+|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|(_)   |_|  (_)|_|
 Discrete event simulation in Python
 
 see www.salabim.org for more information, the documentation and license information
@@ -11,7 +11,7 @@ see www.salabim.org for more information, the documentation and license informat
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.4.0'
+__version__ = '2.4.1'
 
 import heapq
 import random
@@ -30,13 +30,10 @@ import pickle
 import logging
 import types
 import bisect
+import operator
 
 Pythonista = (sys.platform == 'ios')
 Windows = (sys.platform.startswith('win'))
-
-
-class SalabimError(Exception):
-    pass
 
 
 class g():
@@ -146,7 +143,7 @@ class ItemFile(object):
         try:
             if float(result) == 0:
                 return False
-        except:
+        except (ValueError, TypeError):
             pass
         if result == '':
             return False
@@ -285,7 +282,7 @@ class Monitor(object):
                 self._tally = initial_tally
         else:
             if initial_tally is not None:
-                raise SalabimError('initial_tally not available for non level monitors')
+                raise TypeError('initial_tally not available for non level monitors')
             if weight_legend is None:
                 self.weight_legend = 'weight'
             else:
@@ -296,11 +293,23 @@ class Monitor(object):
         try:
             self.xtypecode, self.off = type_to_typecode_off(type)
         except KeyError:
-            raise SalabimError('type (' + type + ') not recognized')
+            raise ValueError('type \'' + type + '\' not recognized')
         self.xtype = type
         self.reset(monitor)
         self.setup(*args, **kwargs)
 
+    def __add__(self, other):
+        if other == 0:  # to be able to use sum
+            return self
+        else:
+            return self.merge(other)
+
+    def __radd__(self, other):
+        if other == 0:  # to be able to use sum
+            return self
+        else:
+            return self.merge(other)
+            
     def merge(self, *monitors, **kwargs):
         '''
         merges this monitor with other monitors
@@ -332,15 +341,21 @@ class Monitor(object):
 
         for m in monitors:
             if not isinstance(m, Monitor):
-                raise SalabimError('non Monitor item found in merge list')
+                raise TypeError('not possible to merge monitor with ' + object_to_str(m, True) + ' type')
             if self._level != m._level:
-                raise SalabimError('not possible to mix level monitor with non level monitor')
+                raise TypeError('not possible to mix level monitor with non level monitor')
             if self.xtype != m.xtype:
-                raise SalabimError('not possible to mix types')
+                raise TypeError(
+                    'not possible to mix type \'' + self.xtype + '\' with type \'' + m.xtype + '\'')
         if name is None:
-            name = self.name() + '.merged'
+            if self.name().endswith('.merged'):
+                # this to avoid multiple .merged (particularly when merging with the + operator)
+                name = self.name()
+            else:
+                name = self.name() + '.merged'
 
         new = Monitor(name=name, type=self.xtype, level=self._level)
+        
 
         merge = [self] + list(monitors)
 
@@ -359,7 +374,7 @@ class Monitor(object):
                 else:
                     try:
                         curx[index] = float(x)
-                    except:
+                    except (ValueError, TypeError):
                         curx[index] = 0
 
                 sum = 0
@@ -369,7 +384,7 @@ class Monitor(object):
                         break
                     sum += xi
 
-                if self._t and (t == self._t[-1]):
+                if new._t and (t == new._t[-1]):
                     new._x[-1] = sum
                 else:
                     new._t.append(t)
@@ -390,6 +405,7 @@ class Monitor(object):
                 new._t.append(t)
                 new._x.append(x)
         new.monitor(False)
+        new.isgenerated = True
         return new
 
     def __getitem__(self, key):
@@ -445,16 +461,16 @@ class Monitor(object):
             actions.append((stop, 'b', 0, 0))  # non inclusive
         else:
             if start is None:
-                raise SalabimError('No start specified')
+                raise TypeError('Modulo specified, but no start specified. ')
             if stop is None:
-                raise SalabimError('No stop specified')
+                raise TypeError('Module specified, but no stop specified')
             if stop <= start:
-                raise SalabimError('stop must be > start')
+                raise ValueError('stop must be > start')
             if stop - start >= modulo:
-                raise SalabimError('stop must be < start + modulo')
+                raise ValueError('stop must be < start + modulo')
             start = start % modulo
             stop = stop % modulo
-            start1 = self.start - (self.start % modulo) + start
+            start1 = self._t[0] - (self._t[0] % modulo) + start
             len1 = (stop - start) % modulo
             while start1 < self.env._now:
                 actions.append((start1, 'a', 0, 0))
@@ -526,6 +542,7 @@ class Monitor(object):
                         new._t.append(t)
                         new._x.append(x)
         new.monitor(False)
+        new.isgenerated = True
         return new
 
     def setup(self):
@@ -556,9 +573,9 @@ class Monitor(object):
         Use Monitor.deregister if monitor does not longer need to be registered.
         '''
         if not isinstance(registry, list):
-            raise SalabimError('registry not list')
+            raise TypeError('registry not list')
         if self in registry:
-            raise SalabimError(self.name() + ' already in registry')
+            raise ValueError(self.name() + ' already in registry')
         registry.append(self)
         return self
 
@@ -576,18 +593,18 @@ class Monitor(object):
         monitor (self) : Monitor
         '''
         if not isinstance(registry, list):
-            raise SalabimError('registry not list')
+            raise TypeError('registry not list')
         if self not in registry:
-            raise SalabimError(self.name() + ' not in registry')
+            raise ValueError(self.name() + ' not in registry')
         registry.remove(self)
         return self
 
     def __repr__(self):
-        return objectclass_to_str(self) + ('[level]'if self._level else '') + ' (' + self.name() + ')'
+        return object_to_str(self) + ('[level]'if self._level else '') + ' (' + self.name() + ')'
 
     def __call__(self, t=None):  # direct moneypatching __call__ doesn't work
         if not self._level:
-            raise SalabimError('get not available for non level monitors')
+            raise TypeError('get not available for non level monitors')
         if t is None:
             return self._tally
         if t < self._t[0] or t > self.env._now:
@@ -669,6 +686,7 @@ class Monitor(object):
         else:
             self._weight = False  # weights are only stored if there is a non 1 weight
         self.start = self.env.now()
+        self.isgenerated = False
         self.monitor(monitor)
         Monitor.cached_xweight = {(ex0, force_numeric): (0, 0)
             for ex0 in (False, True) for force_numeric in (False, True)}  # invalidate the cache
@@ -689,6 +707,8 @@ class Monitor(object):
         True, if monitoring enabled. False, if not : bool
         '''
         if value is not None:
+            if value and self.isgenerated:
+                raise TypeError('merged or sliced monitors cannot not be turned on')
             self._monitor = value
             if self._level:
                 if self._monitor:
@@ -711,7 +731,9 @@ class Monitor(object):
         if self._level:
             if weight != 1:
                 if self._level:
-                    raise SalabimError('incorrect weight for level monitor')
+                    raise ValueError('level monitor supports only weight=1, not: ' + str(weight))
+            if value == self.off:
+                raise ValueError('not allowed to tally ' + str(self.off) + ' (off)')
             self._tally = value
             if self._monitor:
                 t = self.env._now
@@ -963,7 +985,7 @@ class Monitor(object):
         Not available for level monitors
         '''
         if self._level:
-            raise SalabimError('bin_number_of_entries not available for level monitors')
+            raise TypeError('bin_number_of_entries not available for level monitors')
         x = self._xweight(ex0=ex0)[0]
         return sum(1 for vx in x if (vx > lowerbound) and (vx <= upperbound))
 
@@ -991,7 +1013,7 @@ class Monitor(object):
         Not available for level monitors
         '''
         if self._level:
-            raise SalabimError('bin_weight not available for level monitors')
+            raise TypeError('bin_weight not available for level monitors')
         return self.sys_bin_weight(lowerbound, upperbound)
 
     def bin_duration(self, lowerbound, upperbound):
@@ -1018,7 +1040,7 @@ class Monitor(object):
         Not available for level monitors
         '''
         if not self._level:
-            raise SalabimError('bin_duration not available for non level monitors')
+            raise TypeError('bin_duration not available for non level monitors')
         return self.sys_bin_weight(lowerbound, upperbound)
 
     def sys_bin_weight(self, lowerbound, upperbound):
@@ -1044,7 +1066,7 @@ class Monitor(object):
         Not available for level monitors
         '''
         if self._level:
-            raise SalabimError('value_number_of_entries not available for level monitors')
+            raise TypeError('value_number_of_entries not available for level monitors')
         if isinstance(value, (list, tuple, set)):
             value = [str(v) for v in value]
         else:
@@ -1072,7 +1094,7 @@ class Monitor(object):
         Not available for level monitors
         '''
         if self._level:
-            raise SalabimError('value_weight not supported for level monitors')
+            raise TypeError('value_weight not supported for level monitors')
         return self.sys_value_weight(value)
 
     def value_duration(self, value):
@@ -1094,7 +1116,7 @@ class Monitor(object):
         Not available for non level monitors
         '''
         if not self._level:
-            raise SalabimError('value_weight not available for non level monitors')
+            raise TypeError('value_weight not available for non level monitors')
         return self.sys_value_weight(value)
 
     def sys_value_weight(self, value):
@@ -1125,7 +1147,7 @@ class Monitor(object):
         Not available for level monitors
         '''
         if self._level:
-            raise SalabimError('number_of_entries not available for level monitors')
+            raise TypeError('number_of_entries not available for level monitors')
         x = self._xweight(ex0=ex0)[0]
         return len(x)
 
@@ -1142,7 +1164,7 @@ class Monitor(object):
         Not available for level monitors
         '''
         if self._level:
-            raise SalabimError('number_of_entries_zero not available for level monitors')
+            raise TypeError('number_of_entries_zero not available for level monitors')
         return self.number_of_entries() - self.number_of_entries(ex0=True)
 
     def weight(self, ex0=False):
@@ -1163,7 +1185,7 @@ class Monitor(object):
         Not available for level monitors
         '''
         if self._level:
-            raise SalabimError('weight not available for level monitors')
+            raise TypeError('weight not available for level monitors')
         return self.sys_weight(ex0)
 
     def duration(self, ex0=False):
@@ -1184,7 +1206,7 @@ class Monitor(object):
         Not available for non level monitors
         '''
         if not self._level:
-            raise SalabimError('duration not available for non level monitors')
+            raise TypeError('duration not available for non level monitors')
         return self.sys_weight(ex0)
 
     def sys_weight(self, ex0=False):
@@ -1204,7 +1226,7 @@ class Monitor(object):
         Not available for level monitors
         '''
         if self._level:
-            raise SalabimError('weight_zero not available for level monitors')
+            raise TypeError('weight_zero not available for level monitors')
         return self.sys_weight_zero()
 
     def duration_zero(self):
@@ -1220,7 +1242,7 @@ class Monitor(object):
         Not available for non level monitors
         '''
         if not self._level:
-            raise SalabimError('duration_zero not available for non level monitors')
+            raise TypeError('duration_zero not available for non level monitors')
         return self.sys_weight_zero()
 
     def sys_weight_zero(self):
@@ -1255,10 +1277,10 @@ class Monitor(object):
         '''
         result = []
         if do_indent:
-            l = 45
+            ll = 45
         else:
-            l = 0
-        indent = pad('', l)
+            ll = 0
+        indent = pad('', ll)
 
         if show_header:
             result.append(
@@ -1268,17 +1290,17 @@ class Monitor(object):
             result.append(
                 indent + '                        all    excl.zero         zero')
             result.append(
-                pad('-' * (l - 1) + ' ', l) + '-------------- ------------ ------------ ------------')
+                pad('-' * (ll - 1) + ' ', ll) + '-------------- ------------ ------------ ------------')
 
         if self.sys_weight() == 0:
-            result.append(pad(self.name(), l) + 'no data')
+            result.append(pad(self.name(), ll) + 'no data')
             return return_or_print(result, as_str, file)
         if self._weight:
-            result.append(pad(self.name(), l) + pad(self.weight_legend, 14) +
+            result.append(pad(self.name(), ll) + pad(self.weight_legend, 14) +
               '{}{}{}'.format(fn(self.sys_weight(), 13, 3),
               fn(self.sys_weight(ex0=True), 13, 3), fn(self.sys_weight_zero(), 13, 3)))
         else:
-            result.append(pad(self.name(), l) + pad('entries', 14) +
+            result.append(pad(self.name(), ll) + pad('entries', 14) +
               '{}{}{}'.format(fn(self.number_of_entries(), 13, 3),
                 fn(self.number_of_entries(ex0=True), 13, 3), fn(self.number_of_entries_zero(), 13, 3)))
 
@@ -1526,7 +1548,7 @@ class Monitor(object):
         try:
             x1 = float(x)
             x2 = ''
-        except:
+        except ValueError:
             x1 = math.inf
             x2 = x
         return(x1, x2)
@@ -1639,7 +1661,7 @@ class Monitor(object):
         Not available for level monitors. Use xduration(), xt() or tx() instead.
         '''
         if self._level:
-            raise SalabimError('x not available for level monitors')
+            raise TypeError('x not available for level monitors')
         return self._xweight(ex0=ex0, force_numeric=force_numeric)[0]
 
     def xweight(self, ex0=False, force_numeric=True):
@@ -1664,7 +1686,7 @@ class Monitor(object):
         not available for level monitors
         '''
         if self._level:
-            raise SalabimError('xweight not available for level monitors')
+            raise TypeError('xweight not available for level monitors')
         return self._xweight(ex0, force_numeric)
 
     def xduration(self, ex0=False, force_numeric=True):
@@ -1689,7 +1711,7 @@ class Monitor(object):
         not available for non level monitors
         '''
         if not self._level:
-            raise SalabimError('xduration not available for non level monitors')
+            raise TypeError('xduration not available for non level monitors')
         return self._xweight(ex0, force_numeric)
 
     def xt(self, ex0=False, exoff=False, force_numeric=True, add_now=True):
@@ -1905,10 +1927,8 @@ class AnimateMonitor(object):
         vertical_offset + x * vertical_scale (default 5)
 
     horizontal_scale : float
-        for timescaled monitors the relative horizontal position of time t within the panel is on
+        the relative horizontal position of time t within the panel is on
         t * horizontal_scale, possibly shifted (default 1)|n|
-        for non timescaled monitors, the relative horizontal position of index i within the panel is on
-        i * horizontal_scale, possibly shifted (default 5)|n|
 
     width : int
         width of the panel (default 200)
@@ -2071,7 +2091,7 @@ if Pythonista:
                     uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True)
 
                     if uio.type == 'entry':
-                        raise SalabimError('AnimateEntry not supported on Pythonista')
+                        raise NotImplementedError('AnimateEntry not supported on Pythonista')
                     if uio.type == 'button':
                         linewidth = uio.linewidth
 
@@ -2361,9 +2381,9 @@ class Queue(object):
         Use Queue.deregister if queue does not longer need to be registered.
         '''
         if not isinstance(registry, list):
-            raise SalabimError('registry not list')
+            raise TypeError('registry not list')
         if self in registry:
-            raise SalabimError(self.name() + ' already in registry')
+            raise ValueError(self.name() + ' already in registry')
         registry.append(self)
         return self
 
@@ -2381,14 +2401,14 @@ class Queue(object):
         queue (self) : Queue
         '''
         if not isinstance(registry, list):
-            raise SalabimError('registry not list')
+            raise TypeError('registry not list')
         if self not in registry:
-            raise SalabimError(self.name() + ' not in registry')
+            raise ValueError(self.name() + ' not in registry')
         registry.remove(self)
         return self
 
     def __repr__(self):
-        return objectclass_to_str(self) + ' (' + self.name() + ')'
+        return object_to_str(self) + ' (' + self.name() + ')'
 
     def print_info(self, as_str=False, file=None):
         '''
@@ -2409,7 +2429,7 @@ class Queue(object):
         info (if as_str is True) : str
         '''
         result = []
-        result.append(objectclass_to_str(self) + ' ' + hex(id(self)))
+        result.append(object_to_str(self) + ' ' + hex(id(self)))
         result.append('  name=' + self.name())
         if self._length:
             result.append('  component(s):')
@@ -2618,9 +2638,9 @@ class Queue(object):
         or 0 if the queue is empty
         '''
         if index < 0:
-            raise SalabimError('index <0')
+            raise IndexError('index < 0')
         if index > self._length:
-            raise SalabimError('index > lengh of queue')
+            raise IndexError('index > lengh of queue')
         component._checknotinqueue(self)
         mx = self._head.successor
         count = 0
@@ -2780,7 +2800,7 @@ class Queue(object):
             # Get the start, stop, and step from the slice
             startval, endval, incval = key.indices(self._length)
             if incval > 0:
-                l = []
+                result = []
                 targetval = startval
                 mx = self._head.successor
                 count = 0
@@ -2788,12 +2808,12 @@ class Queue(object):
                     if targetval >= endval:
                         break
                     if targetval == count:
-                        l.append(mx.component)
+                        result.append(mx.component)
                         targetval += incval
                     count += 1
                     mx = mx.successor
             else:
-                l = []
+                result = []
                 targetval = startval
                 mx = self._tail.predecessor
                 count = self._length - 1
@@ -2801,12 +2821,12 @@ class Queue(object):
                     if targetval <= endval:
                         break
                     if targetval == count:
-                        l.append(mx.component)
+                        result.append(mx.component)
                         targetval += incval  # incval is negative here!
                     count -= 1
                     mx = mx.predecessor
 
-            return list(l)
+            return list(result)
 
         elif isinstance(key, int):
             if key < 0:  # Handle negative indices
@@ -2824,7 +2844,7 @@ class Queue(object):
             return None  # just for safety
 
         else:
-            raise TypeError('Invalid argument type.')
+            raise TypeError('Invalid argument type: ' + object_to_str(key))
 
     def __delitem__(self, key):
         if isinstance(key, slice):
@@ -2833,7 +2853,7 @@ class Queue(object):
         elif isinstance(key, int):
             self.remove(self[key])
         else:
-            raise SalabimError('Invalid argument type')
+            raise TypeError('Invalid argument type:' + object_to_str(key))
 
     def __len__(self):
         return self._length
@@ -3412,7 +3432,7 @@ class Environment(object):
         return self.serial
 
     def __repr__(self):
-        return objectclass_to_str(self) + ' (' + self.name() + ')'
+        return object_to_str(self) + ' (' + self.name() + ')'
 
     def animation_pre_tick(self, t):
         '''
@@ -3461,7 +3481,7 @@ class Environment(object):
         info (if as_str is True) : str
         '''
         result = []
-        result.append(objectclass_to_str(self) + ' ' + hex(id(self)))
+        result.append(object_to_str(self) + ' ' + hex(id(self)))
         result.append('  name=' + self.name())
         result.append('  now=' + self.time_to_str(self._now - self._offset))
         result.append('  current_component=' + self._current_component.name())
@@ -3725,7 +3745,7 @@ class Environment(object):
 
         if background_color is not None:
             if background_color in ('fg', 'bg'):
-                raise SalabimError(background_color + 'not allowed for background_color')
+                raise ValueError(background_color + 'not allowed for background_color')
             if self._background_color != background_color:
                 self._background_color = background_color
                 frame_changed = True
@@ -3734,7 +3754,7 @@ class Environment(object):
 
         if foreground_color is not None:
             if foreground_color in ('fg', 'bg'):
-                raise SalabimError(foreground_color + 'not allowed for foreground_color')
+                raise ValueError(foreground_color + 'not allowed for foreground_color')
             self._foreground_color = foreground_color
 
         if modelname is not None:
@@ -3794,11 +3814,11 @@ class Environment(object):
 
         if self._video and (not video_opened):
             if width_changed:
-                raise SalabimError('width changed while recording video.')
+                raise ValueError('width changed while recording video.')
             if height_changed:
-                raise SalabimError('height changed while recording video.')
+                raise ValueError('height changed while recording video.')
             if fps_changed and self._video_out != 'gif':
-                raise SalabimError('fps changed while recording video.')
+                raise ValueError('fps changed while recording video.')
 
         if self._video:
             self.video_t = self.t
@@ -4477,7 +4497,7 @@ class Environment(object):
             if duration is None:
                 scheduled_time = till + self.env._offset
             else:
-                raise SalabimError('both duration and till specified')
+                raise ValueError('both duration and till specified')
 
         self._main.frame = _get_caller_frame()
         self._main._reschedule(scheduled_time, urgent, 'run', extra=extra)
@@ -4646,7 +4666,7 @@ class Environment(object):
         elif extension == '.jpg':
             mode = 'RGB'
         else:
-            raise SalabimError('extension ' + extension + '  not supported')
+            raise ValueError('extension ' + extension + '  not supported')
         capture_image = Image.new(
             mode, (self._width, self._height), self.colorspec_to_tuple('bg'))
         self.an_objects.sort(
@@ -4964,7 +4984,7 @@ class Environment(object):
             else:
                 return self._x1
 
-        raise SalabimError('incorrect xy_anchor', xy_anchor)
+        raise ValueError('incorrect xy_anchor', xy_anchor)
 
     def xy_anchor_to_y(self, xy_anchor, screen_coordinates):
         if xy_anchor in ('nw', 'n', 'ne'):
@@ -4985,7 +5005,7 @@ class Environment(object):
             else:
                 return self._y0
 
-        raise SalabimError('incorrect xy_anchor', xy_anchor)
+        raise ValueError('incorrect xy_anchor', xy_anchor)
 
     def salabim_logo(self):
         if self.is_dark('bg'):
@@ -5047,10 +5067,10 @@ class Environment(object):
                     if len(colorhex) == 7:
                         colorhex = colorhex + alpha
                     return self.colorspec_to_tuple(colorhex)
-                except:
+                except KeyError:
                     pass
 
-        raise SalabimError('wrong color specification: ' + str(colorspec))
+        raise ValueError('wrong color specification: ' + str(colorspec))
 
     def colorinterpolate(self, t, t0, t1, v0, v1):
         '''
@@ -5467,7 +5487,7 @@ class Environment(object):
 
     def _check_time_unit_na(self):
         if self._time_unit is None:
-            raise SalabimError('time_unit is not available')
+            raise AttributeError('time_unit is not available')
 
     def print_trace_header(self):
         '''
@@ -5603,7 +5623,7 @@ class Environment(object):
                 import winsound
                 winsound.PlaySound(
                     os.environ['WINDIR'] + r'\media\Windows Ding.wav', winsound.SND_FILENAME | winsound.SND_ASYNC)
-            except:
+            except:  # NOQA
                 pass
 
         elif Pythonista:
@@ -5611,7 +5631,7 @@ class Environment(object):
                 import sound
                 sound.stop_all_effects()
                 sound.play_effect('game:Beep', pitch=0.3)
-            except:
+            except:  # NOQA
                 pass
 
 
@@ -5879,10 +5899,10 @@ class Animate(object):
         self.type = self.settype(
             circle0, line0, polygon0, rectangle0, points0, image, text)
         if self.type == '':
-            raise SalabimError('no object specified')
+            raise ValueError('no object specified')
         type1 = self.settype(circle1, line1, polygon1, rectangle1, points1, None, None)
         if (type1 != '') and (type1 != self.type):
-            raise SalabimError('incompatible types: ' +
+            raise TypeError('incompatible types: ' +
                 self.type + ' and ' + type1)
 
         self.layer0 = layer
@@ -6159,11 +6179,11 @@ class Animate(object):
         t = self.env._now
         type0 = self.settype(circle0, line0, polygon0, rectangle0, points0, image, text)
         if (type0 != '') and (type0 != self.type):
-            raise SalabimError('incorrect type ' +
+            raise TypeError('incorrect type ' +
                 type0 + ' (should be ' + self.type)
         type1 = self.settype(circle1, line1, polygon1, rectangle1, points1, None, None)
         if (type1 != '') and (type1 != self.type):
-            raise SalabimError('incompatible types: ' +
+            raise TypeError('incompatible types: ' +
                 self.type + ' and ' + type1)
 
         if layer is not None:
@@ -6731,7 +6751,7 @@ class Animate(object):
             t = 'text'
             n += 1
         if n >= 2:
-            raise SalabimError('more than one object given')
+            raise ValueError('more than one object given')
         return t
 
     def make_pil_image(self, t):
@@ -9014,7 +9034,7 @@ class _Animate_t_x_Line(Animate):
         else:
             try:
                 value = float(value)
-            except ValueError:
+            except (ValueError, TypeError):
                 value = 0
         return max(
             self._linewidth / 2, min(self.height - self._linewidth / 2,
@@ -9023,26 +9043,26 @@ class _Animate_t_x_Line(Animate):
     def line(self, t):
         self.tnow = t
         self.t0 = self.monitor.start
-        l = []
+        result = []
         if len(self.monitor._x) != 0:
             value = self.monitor._x[-1]
         else:
             value = 0
         lastt = t
         if self.as_level:
-            l.append(self.t_to_x(lastt))
-            l.append(self.value_to_y(value))
+            result.append(self.t_to_x(lastt))
+            result.append(self.value_to_y(value))
         self.done = False
         for value, t in zip(reversed(self.monitor._x), reversed(self.monitor._t)):
             if self.as_level:
-                l.append(self.t_to_x(lastt))
-                l.append(self.value_to_y(value))
-            l.append(self.t_to_x(t))
-            l.append(self.value_to_y(value))
+                result.append(self.t_to_x(lastt))
+                result.append(self.value_to_y(value))
+            result.append(self.t_to_x(t))
+            result.append(self.value_to_y(value))
             if self.done:
                 break
             lastt = t
-        return l
+        return result
 
 
 class _Animate_t_Line(Animate):
@@ -9177,14 +9197,14 @@ class Component(object):
                     p = getattr(self, process)
                     process_name = process
                 except AttributeError:
-                    raise SalabimError('self.' + process + ' does not exist')
+                    raise AttributeError('self.' + process + ' does not exist')
         if p is None:
             if at is not None:
-                raise SalabimError('at is not allowed for a data component')
+                raise TypeError('at is not allowed for a data component')
             if delay is not None:
-                raise SalabimError('delay is not allowed for a data component')
+                raise TypeError('delay is not allowed for a data component')
             if urgent is not None:
-                raise SalabimError('urgent is not allowed for a data component')
+                raise TypeError('urgent is not allowed for a data component')
             if self.env._trace:
                 if self._name == 'main':
                     self.env.print_trace('', '', self.name() +
@@ -9287,7 +9307,7 @@ class Component(object):
         pass
 
     def __repr__(self):
-        return objectclass_to_str(self) + ' (' + self.name() + ')'
+        return object_to_str(self) + ' (' + self.name() + ')'
 
     def register(self, registry):
         '''
@@ -9307,9 +9327,9 @@ class Component(object):
         Use Component.deregister if component does not longer need to be registered.
         '''
         if not isinstance(registry, list):
-            raise SalabimError('registry not list')
+            raise TypeError('registry not list')
         if self in registry:
-            raise SalabimError(self.name() + ' already in registry')
+            raise ValueError(self.name() + ' already in registry')
         registry.append(self)
         return self
 
@@ -9327,9 +9347,9 @@ class Component(object):
         component (self) : Component
         '''
         if not isinstance(registry, list):
-            raise SalabimError('registry not list')
+            raise TypeError('registry not list')
         if self not in registry:
-            raise SalabimError(self.name() + ' not in registry')
+            raise ValueError(self.name() + ' not in registry')
         registry.remove(self)
         return self
 
@@ -9352,7 +9372,7 @@ class Component(object):
         info (if as_str is True) : str
         '''
         result = []
-        result.append(objectclass_to_str(self) + ' ' + hex(id(self)))
+        result.append(object_to_str(self) + ' ' + hex(id(self)))
         result.append('  name=' + self.name())
         result.append('  class=' + str(type(self)).split('.')[-1].split("'")[0])
         result.append('  suppress_trace=' + str(self._suppress_trace))
@@ -9410,7 +9430,7 @@ class Component(object):
                     heapq.heapify(self.env._event_list)
                     self._on_event_list = False
                     return
-            raise SalabimError('remove error', self.name())
+            raise Exception('remove error', self.name())
         if self.status == standby:
             if self in self.env._standby_list:
                 self.env._standby_list(self)
@@ -9439,7 +9459,7 @@ class Component(object):
 
     def _reschedule(self, scheduled_time, urgent, caller, extra='', s0=None):
         if scheduled_time < self.env._now:
-            raise SalabimError(
+            raise ValueError(
                 'scheduled time ({:0.3f}) before now ({:0.3f})'.
                 format(scheduled_time, self.env._now))
         self._scheduled_time = scheduled_time
@@ -9523,13 +9543,13 @@ class Component(object):
                     p = self.process
                     process_name = 'process'
                 else:
-                    raise SalabimError('no process for data component')
+                    raise AttributeError('no process for data component')
         else:
             try:
                 p = getattr(self, process)
                 process_name = process
             except AttributeError:
-                raise SalabimError('self.' + process + ' does not exist')
+                raise AttributeError('self.' + process + ' does not exist')
 
         if p is None:
             extra = ''
@@ -9629,7 +9649,7 @@ class Component(object):
             if duration is None:
                 scheduled_time = till + self.env._offset
             else:
-                raise SalabimError('both duration and till specified')
+                raise ValueError('both duration and till specified')
         self._reschedule(scheduled_time, urgent, 'hold')
 
     def passivate(self, mode=None):
@@ -9681,7 +9701,7 @@ class Component(object):
         Use resume() to resume
         '''
         if self._status == current:
-            raise SalabimError(self.name() + ' current component cannot be interrupted')
+            raise ValueError(self.name() + ' current component cannot be interrupted')
         else:
             if mode is not None:
                 self._mode = mode
@@ -9761,9 +9781,9 @@ class Component(object):
                         reason = 'hold'
                     self._reschedule(self.env._now + self._remaining_duration, urgent, reason)
                 else:
-                    raise SalabimError(self.name() + ' unexpected interrupted_status', self._status())
+                    raise Exception(self.name() + ' unexpected interrupted_status', self._status())
         else:
-            raise SalabimError(self.name() + ' not interrupted')
+            raise ValueError(self.name() + ' not interrupted')
 
     def cancel(self, mode=None):
         '''
@@ -9919,7 +9939,7 @@ class Component(object):
             if fail_delay is None:
                 scheduled_time = fail_at + self.env._offset
             else:
-                raise SalabimError('both fail_at and fail_delay specified')
+                raise ValueError('both fail_at and fail_delay specified')
 
         if mode is not None:
             self._mode = mode
@@ -9939,10 +9959,10 @@ class Component(object):
                 if len(arg) >= 3:
                     priority = arg[2]
             else:
-                raise SalabimError('incorrect specifier', arg)
+                raise TypeError('incorrect specifier', arg)
 
             if q <= 0:
-                raise SalabimError('quantity ' + str(q) + ' <=0')
+                raise ValueError('quantity ' + str(q) + ' <=0')
             self._requests[r] += q  # is same resource is specified several times, just add them up
             addstring = ''
             if priority is None:
@@ -9995,7 +10015,7 @@ class Component(object):
 
     def _release(self, r, q=None, s0=None):
         if r not in self._claims:
-            raise SalabimError(self.name() +
+            raise ValueError(self.name() +
                 ' not claiming from resource ' + r.name())
         if q is None:
             q = self._claims[r]
@@ -10057,9 +10077,9 @@ class Component(object):
                     if len(arg) >= 2:
                         q = arg[1]
                 else:
-                    raise SalabimError('incorrect specifier' + arg)
+                    raise TypeError('incorrect specifier' + arg)
                 if r._anonymous:
-                    raise SalabimError(
+                    raise ValueError(
                         'not possible to release anonymous resources ' + r.name())
                 self._release(r, q)
         else:
@@ -10176,7 +10196,7 @@ class Component(object):
             if fail_delay is None:
                 scheduled_time = fail_at + self.env._offset
             else:
-                raise SalabimError('both fail_at and fail_delay specified')
+                raise ValueError('both fail_at and fail_delay specified')
 
         if mode is not None:
             self._mode = mode
@@ -10194,7 +10214,7 @@ class Component(object):
                 if len(arg) >= 3:
                     priority = arg[2]
             else:
-                raise SalabimError('incorrect specifier', args)
+                raise TypeError('incorrect specifier', args)
 
             for (statex, _, _) in self._waits:
                 if statex == state:
@@ -10212,7 +10232,7 @@ class Component(object):
                 self._waits.append((state, value, 0))
 
         if not self._waits:
-            raise SalabimError('no states specified')
+            raise TypeError('no states specified')
         self._trywait()
 
         if self._waits:
@@ -10883,10 +10903,10 @@ class Component(object):
             if self._status in (passive, interrupted):
                 self._remaining_duration = value
             elif self._status == current:
-                raise SalabimError(
+                raise ValueError(
                     'setting remaining_duration not allowed for current component (' + self.name() + ')')
             elif self._status == standby:
-                raise SalabimError(
+                raise ValueError(
                     'setting remaining_duration not allowed for standby component (' + self.name() + ')')
             else:
                 self._remove()
@@ -10942,7 +10962,7 @@ class Component(object):
             - standby
         '''
         if self._status != interrupted:
-            raise SalabimError(self.name() + 'not interrupted')
+            raise ValueError(self.name() + 'not interrupted')
         if len(self._requests) > 0:
             return requesting
         if len(self._waits) > 0:
@@ -10967,23 +10987,23 @@ class Component(object):
         if mx is None:
             pass
         else:
-            raise SalabimError(
+            raise ValueError(
                 self.name() + ' is already member of ' + q.name())
 
     def _checkinqueue(self, q):
         mx = self._member(q)
         if mx is None:
-            raise SalabimError(self.name() + ' is not member of ' + q.name())
+            raise ValueError(self.name() + ' is not member of ' + q.name())
         else:
             return mx
 
     def _checkisnotdata(self):
         if self._status == data:
-            raise SalabimError(self.name() + ' data component not allowed')
+            raise ValueError(self.name() + ' data component not allowed')
 
     def _checkisnotmain(self):
         if self == self.env._main:
-            raise SalabimError(self.name() + ' main component not allowed')
+            raise ValueError(self.name() + ' main component not allowed')
 
     def lineno_txt(self):
         plus = '+'
@@ -11016,7 +11036,8 @@ class Random(random.Random):
 
 class _Distribution():
 
-    def bounded_sample(self, lowerbound=-inf, upperbound=inf, fail_value=None, number_of_retries=100):
+    def bounded_sample(self, lowerbound=None, upperbound=None, fail_value=None, number_of_retries=None,
+        include_lowerbound=True, include_upperbound=True):
         '''
         Parameters
         ----------
@@ -11036,6 +11057,14 @@ class _Distribution():
             number of tries before fail_value is returned |n|
             default: 100
 
+        include_lowerbound : bool
+            if True (default), the lowerbound may be included.
+            if False, the lowerbound will be excluded.
+
+        include_upperbound : bool
+            if True (default), the upperbound may be included.
+            if False, the upperbound will be excluded.
+
         Returns
         -------
         Bounded sample of a distribution : depending on distribution type (usually float)
@@ -11047,40 +11076,268 @@ class _Distribution():
         Samples that cannot be converted (only possible with Pdf and CumPdf) to float
         are assumed to be within the bounds.
         '''
-        if (lowerbound == -inf) and (upperbound == inf):
-            return self.sample()
-
-        if lowerbound is None:
-            lowerbound = -inf
-        if upperbound is None:
-            upperbound = inf
-
-        if lowerbound > upperbound:
-            raise SalabimError('lowerbound > upperbound')
-
-        if number_of_retries <= 0:
-            raise SalabimError('number_of_tries <= 0')
-
-        if fail_value is None:
-            if lowerbound == -inf:
-                fail_value = upperbound
-            else:
-                fail_value = lowerbound
-
-        for _ in range(number_of_retries):
-            sample = self.sample()
-            try:
-                samplefloat = float(sample)
-            except ValueError:
-                return sample  # a value that cannot be converted to a float is sampled is assumed to be correct
-
-            if (samplefloat >= lowerbound) and (samplefloat <= upperbound):
-                return sample
-
-        return fail_value
+        return Bounded(self, lowerbound, upperbound, fail_value, number_of_retries,
+            include_lowerbound, include_upperbound).sample()
 
     def __call__(self, *args):
         return self.sample(*args)
+
+    def __pos__(self):
+        return _Expression(self, 0, operator.add)
+
+    def __neg__(self):
+        return _Expression(0, self, operator.sub)
+
+    def __add__(self, other):
+        return _Expression(self, other, operator.add)
+
+    def __radd__(self, other):
+        return _Expression(other, self, operator.add)
+
+    def __sub__(self, other):
+        return _Expression(self, other, operator.sub)
+
+    def __rsub__(self, other):
+        return _Expression(other, self, operator.sub)
+
+    def __mul__(self, other):
+        return _Expression(self, other, operator.mul)
+
+    def __rmul__(self, other):
+        return _Expression(other, self, operator.mul)
+
+    def __truediv__(self, other):
+        return _Expression(self, other, operator.truediv)
+
+    def __rtruediv__(self, other):
+        return _Expression(other, self, operator.truediv)
+
+    def __floordiv__(self, other):
+        return _Expression(self, other, operator.floordiv)
+
+    def __rfloordiv__(self, other):
+        return _Expression(other, self, operator.floordiv)
+
+    def __pow__(self, other):
+        return _Expression(self, other, operator.pow)
+
+    def __rpow__(self, other):
+        return _Expression(other, self, operator.pow)
+
+
+class _Expression(_Distribution):
+    '''
+    expression distribution
+
+    This class is only created when using an expression with one ore more distributions.
+
+    Note
+    ----
+    The randomstream of the distribution(s) in the expression are used.
+    '''
+    def __init__(self, dis0, dis1, op):
+        if isinstance(dis0, Constant):
+            self.dis0 = dis0._mean
+        else:
+            self.dis0 = dis0
+        if isinstance(dis1, Constant):
+            self.dis1 = dis1._mean
+        else:
+            self.dis1 = dis1
+        self.op = op
+
+    def sample(self):
+        '''
+        Returns
+        -------
+        Sample of the expression of distribution(s) : float
+        '''
+        if isinstance(self.dis0, _Distribution):
+            v0 = self.dis0.sample()
+        else:
+            v0 = self.dis0
+        if isinstance(self.dis1, _Distribution):
+            v1 = self.dis1.sample()
+        else:
+            v1 = self.dis1
+        return self.op(v0, v1)
+
+    def mean(self):
+        '''
+        Returns
+        -------
+        Mean of the expression of distribution(s) : float
+            returns nan if mean can't be calculated
+        '''
+        if isinstance(self. dis0, _Distribution):
+            m0 = self.dis0.mean()
+        else:
+            m0 = self.dis0
+        if isinstance(self. dis1, _Distribution):
+            m1 = self.dis1.mean()
+        else:
+            m1 = self.dis1
+
+        if self.op == operator.add:
+            return m0 + m1
+
+        if self.op == operator.sub:
+            return m0 - m1
+
+        if self.op == operator.mul:
+            if isinstance(self.dis0, _Distribution) and isinstance(self.dis1, _Distribution):
+                return nan
+            else:
+                return m0 * m1
+
+        if self.op == operator.truediv:
+            if isinstance(self.dis1, _Distribution):
+                return nan
+            else:
+                return m0 / m1
+
+        if self.op == operator.floordiv:
+            return nan
+
+        if self.op == operator.pow:
+            return nan
+
+    def __repr__(self):
+        return('_Expression')
+
+    def print_info(self, as_str=False, file=None):
+        '''
+        prints information about the expression of distribution(s)
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        file: file
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
+        Returns
+        -------
+        info (if as_str is True) : str
+        '''
+        result = []
+        result.append('_Expression ' + hex(id(self)))
+        result.append('  mean=' + str(self.mean()))
+        return return_or_print(result, as_str, file)
+
+
+class Bounded(_Distribution):
+    '''
+    Parameters
+    ----------
+    dis : distribution
+        distribution to be bounded
+
+    lowerbound : float
+        sample values < lowerbound will be rejected (at most 100 retries) |n|
+        if omitted, no lowerbound check
+
+    upperbound : float
+        sample values > upperbound will be rejected (at most 100 retries) |n|
+        if omitted, no upperbound check
+
+    fail_value : float
+        value to be used if. after number_of_tries retries, sample is still not within bounds |n|
+        default: lowerbound, if specified, otherwise upperbound
+
+    number_of_tries : int
+        number of tries before fail_value is returned |n|
+        default: 100
+
+    include_lowerbound : bool
+        if True (default), the lowerbound may be included.
+        if False, the lowerbound will be excluded.
+
+    include_upperbound : bool
+        if True (default), the upperbound may be included.
+        if False, the upperbound will be excluded.
+
+    Note
+    ----
+    If, after number_of_tries retries, the sampled value is still not within the given bounds,
+    fail_value  will be returned |n|
+    Samples that cannot be converted to float (only possible with Pdf and CumPdf)
+    are assumed to be within the bounds.
+    '''
+
+    def __init__(self, dis, lowerbound=None, upperbound=None, fail_value=None, number_of_retries=None,
+        include_lowerbound=None, include_upperbound=None):
+
+        self.lowerbound = -inf if lowerbound is None else lowerbound
+        self.upperbound = inf if upperbound is None else upperbound
+
+        if self.lowerbound > self.upperbound:
+            raise ValueError('lowerbound > upperbound')
+
+        if fail_value is None:
+            self.fail_value = self.upperbound if self.lowerbound == -inf else self.lowerbound
+        else:
+            self.fail_value = fail_value
+
+        self.dis = dis
+        self.lowerbound_op = operator.ge if include_lowerbound else operator.gt
+        self.upperbound_op = operator.le if include_upperbound else operator.lt
+        self.number_of_retries = 100 if number_of_retries is None else number_of_retries
+
+    def sample(self):
+        if (self.lowerbound == -inf) and (self.upperbound == inf):
+            return self.dis.sample()
+        for _ in range(self.number_of_retries):
+            sample = self.dis.sample()
+            try:
+                samplefloat = float(sample)
+            except (ValueError, TypeError):
+                return sample  # a value that cannot be converted to a float is sampled is assumed to be correct
+
+            if self.lowerbound_op(samplefloat, self.lowerbound) and self.upperbound_op(samplefloat, self.upperbound):
+                return sample
+
+        return self.fail_value
+
+    def mean(self):
+        '''
+        Returns
+        -------
+        Mean of the expression of bounded distribution : float
+            unless no bounds are specified, returns nan
+        '''
+        if (self.lowerbound == -inf) and (self.upperbound == inf):
+            return self.dis.mean()
+        return nan
+
+    def __repr__(self):
+        return('Bounded ' + self.dis.__repr__())
+
+    def print_info(self, as_str=False, file=None):
+        '''
+        prints information about the expression of distribution(s)
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        file: file
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
+        Returns
+        -------
+        info (if as_str is True) : str
+        '''
+        result = []
+        result.append('Bounded ' + self.dis.__repr__() + ' ' + hex(id(self)))
+        result.append('  mean=' + str(self.mean()))
+        return return_or_print(result, as_str, file)
 
 
 class Exponential(_Distribution):
@@ -11122,18 +11379,18 @@ class Exponential(_Distribution):
     def __init__(self, mean=None, time_unit=None, rate=None, randomstream=None, env=None):
         if mean is None:
             if rate is None:
-                raise SalabimError('neither mean nor rate are specified')
+                raise TypeError('neither mean nor rate are specified')
             else:
                 if rate <= 0:
-                    raise SalabimError('rate<=0')
+                    raise ValueError('rate<=0')
                 self._mean = 1 / rate
         else:
             if rate is None:
                 if mean <= 0:
-                    raise SalabimError('mean<=0')
+                    raise ValueError('mean<=0')
                 self._mean = mean
             else:
-                raise SalabimError('both mean and rate are specified')
+                raise TypeError('both mean and rate are specified')
 
         self._mean *= _time_unit_factor(time_unit, env)
 
@@ -11235,15 +11492,15 @@ class Normal(_Distribution):
                 self._standard_deviation = 0
             else:
                 if mean == 0:
-                    raise SalabimError('coefficient_of_variation not allowed with mean = 0')
+                    raise ValueError('coefficient_of_variation not allowed with mean = 0')
                 self._standard_deviation = coefficient_of_variation * mean
         else:
             if coefficient_of_variation is None:
                 self._standard_deviation = standard_deviation
             else:
-                raise SalabimError('both standard_deviation and coefficient_of_variation specified')
+                raise TypeError('both standard_deviation and coefficient_of_variation specified')
         if self._standard_deviation < 0:
-            raise SalabimError('standard_deviation < 0')
+            raise ValueError('standard_deviation < 0')
         if randomstream is None:
             self.randomstream = random
         else:
@@ -11346,11 +11603,11 @@ class IntUniform(_Distribution):
         else:
             self._upperbound = upperbound
         if self._lowerbound > self._upperbound:
-            raise SalabimError('lowerbound>upperbound')
+            raise ValueError('lowerbound>upperbound')
         if self._lowerbound != int(self._lowerbound):
-            raise SalabimError('lowerbound not integer')
+            raise TypeError('lowerbound not integer')
         if self._upperbound != int(self._upperbound):
-            raise SalabimError('upperbound not integer')
+            raise TypeError('upperbound not integer')
 
         if randomstream is None:
             self.randomstream = random
@@ -11441,7 +11698,7 @@ class Uniform(_Distribution):
         else:
             self._upperbound = upperbound
         if self._lowerbound > self._upperbound:
-            raise SalabimError('lowerbound>upperbound')
+            raise ValueError('lowerbound>upperbound')
         if randomstream is None:
             self.randomstream = random
         else:
@@ -11542,11 +11799,11 @@ class Triangular(_Distribution):
         else:
             self._mode = mode
         if self._low > self._high:
-            raise SalabimError('low>high')
+            raise ValueError('low>high')
         if self._low > self._mode:
-            raise SalabimError('low>mode')
+            raise ValueError('low>mode')
         if self._high < self._mode:
-            raise SalabimError('high<mode')
+            raise ValueError('high<mode')
         if randomstream is None:
             self.randomstream = random
         else:
@@ -11706,7 +11963,7 @@ class Poisson(_Distribution):
 
     def __init__(self, mean, randomstream=None):
         if mean <= 0:
-            raise SalabimError('mean (lambda) <=0')
+            raise ValueError('mean (lambda) <=0')
 
         self._mean = mean
 
@@ -11804,7 +12061,7 @@ class Weibull(_Distribution):
     def __init__(self, scale, shape, time_unit=None, randomstream=None, env=None):
         self._scale = scale
         if shape <= 0:
-            raise SalabimError('shape<=0')
+            raise ValueError('shape<=0')
 
         self._shape = shape
         if randomstream is None:
@@ -11901,22 +12158,22 @@ class Gamma(_Distribution):
 
     def __init__(self, shape, scale=None, time_unit=None, rate=None, randomstream=None, env=None):
         if shape <= 0:
-            raise SalabimError('shape<=0')
+            raise ValueError('shape<=0')
         self._shape = shape
         if rate is None:
             if scale is None:
-                raise SalabimError('neither scale nor rate specified')
+                raise TypeError('neither scale nor rate specified')
             else:
                 if scale <= 0:
-                    raise SalabimError('scale<=0')
+                    raise ValueError('scale<=0')
                 self._scale = scale
         else:
             if scale is None:
                 if rate <= 0:
-                    raise SalabimError('rate<=0')
+                    raise ValueError('rate<=0')
                 self._scale = 1 / rate
             else:
-                raise SalabimError('both scale and rate specified')
+                raise TypeError('both scale and rate specified')
 
         self._scale *= _time_unit_factor(time_unit, env)
 
@@ -11997,10 +12254,10 @@ class Beta(_Distribution):
 
     def __init__(self, alpha, beta, randomstream=None):
         if alpha <= 0:
-            raise SalabimError('alpha<=0')
+            raise ValueError('alpha<=0')
         self._alpha = alpha
         if beta <= 0:
-            raise SalabimError('beta<>=0')
+            raise ValueError('beta<>=0')
         self._beta = beta
 
         if randomstream is None:
@@ -12098,24 +12355,24 @@ class Erlang(_Distribution):
 
     def __init__(self, shape, rate=None, time_unit=None, scale=None, randomstream=None, env=None):
         if int(shape) != shape:
-            raise SalabimError('shape not integer')
+            raise TypeError('shape not integer')
         if shape <= 0:
-            raise SalabimError('shape <=0')
+            raise ValueError('shape <=0')
         self._shape = shape
         if rate is None:
             if scale is None:
-                raise SalabimError('neither rate nor scale specified')
+                raise TypeError('neither rate nor scale specified')
             else:
                 if scale <= 0:
-                    raise SalabimError('scale<=0')
+                    raise ValueError('scale<=0')
                 self._rate = 1 / scale
         else:
             if scale is None:
                 if rate <= 0:
-                    raise SalabimError('rate<=0')
+                    raise ValueError('rate<=0')
                 self._rate = rate
             else:
-                raise SalabimError('both rate and scale specified')
+                raise ValueError('both rate and scale specified')
 
         self._rate /= _time_unit_factor(time_unit, env)
 
@@ -12219,26 +12476,26 @@ class Cdf(_Distribution):
         lastx = -inf
         spec = list(spec)
         if not spec:
-            raise SalabimError('no arguments specified')
+            raise TypeError('no arguments specified')
         if spec[1] != 0:
-            raise SalabimError('first cumulative value should be 0')
+            raise ValueError('first cumulative value should be 0')
         while len(spec) > 0:
             x = spec.pop(0) * _time_unit_factor(time_unit, env)
             if not spec:
-                raise SalabimError('uneven number of parameters specified')
+                raise ValueError('uneven number of parameters specified')
             if x < lastx:
-                raise SalabimError(
+                raise ValueError(
                     'x value {} is smaller than previous value {}'.format(x, lastx))
             cum = spec.pop(0)
             if cum < lastcum:
-                raise SalabimError('cumulative value {} is smaller than previous value {}'
+                raise ValueError('cumulative value {} is smaller than previous value {}'
                     .format(cum, lastcum))
             self._x.append(x)
             self._cum.append(cum)
             lastx = x
             lastcum = cum
         if lastcum == 0:
-            raise SalabimError('last cumulative value should be > 0')
+            raise ValueError('last cumulative value should be > 0')
         self._cum = [x / lastcum for x in self._cum]
         self._mean = 0
         for i in range(len(self._cum) - 1):
@@ -12355,18 +12612,18 @@ class Pdf(_Distribution):
             spec = list(spec)
 
             if not spec:
-                raise SalabimError('no arguments specified')
+                raise TypeError('no arguments specified')
             while len(spec) > 0:
                 x = spec.pop(0) * _time_unit_factor(time_unit, env)
                 if time_unit is not None:
                     if isinstance(x, _Distribution):
-                        raise SalabimError('time_unit can\'t be combined with distribution value')
+                        raise TypeError('time_unit can\'t be combined with distribution value')
                     try:
                         x = float(x) * _time_unit_factor(time_unit, env)
-                    except:
-                        raise SalabimError('time_unit can\'t be combined with non numeric value')
+                    except (ValueError, TypeError):
+                        raise TypeError('time_unit can\'t be combined with non numeric value')
                 if not spec:
-                    raise SalabimError(
+                    raise ValueError(
                         'uneven number of parameters specified')
                 self._x.append(x)
                 p = spec.pop(0)
@@ -12376,7 +12633,7 @@ class Pdf(_Distribution):
                     x = x._mean
                 try:
                     sumxp += float(x) * p
-                except:
+                except (ValueError, TypeError):
                     hasmean = False
         else:
             spec = list(spec)
@@ -12385,18 +12642,18 @@ class Pdf(_Distribution):
             else:
                 probabilities = len(spec) * [1]
             if len(spec) != len(probabilities):
-                raise SalabimError(
+                raise ValueError(
                     'length of x-values does not match length of probabilities')
 
             while len(spec) > 0:
                 x = spec.pop(0)
                 if time_unit is not None:
                     if isinstance(x, _Distribution):
-                        raise SalabimError('time_unit can\'t be combined with distribution value')
+                        raise TypeError('time_unit can\'t be combined with distribution value')
                     try:
                         x = float(x) * _time_unit_factor(time_unit, env)
-                    except:
-                        raise SalabimError('time_unit can\'t be combined with non numeric value')
+                    except (ValueError, TypeError):
+                        raise TypeError('time_unit can\'t be combined with non numeric value')
 
                 self._x.append(x)
                 p = probabilities.pop(0)
@@ -12406,11 +12663,11 @@ class Pdf(_Distribution):
                     x = x._mean
                 try:
                     sumxp += float(x) * p * _time_unit_factor(time_unit, env)
-                except:
+                except (ValueError, TypeError):
                     hasmean = False
 
         if sump == 0:
-            raise SalabimError('at least one probability should be >0')
+            raise ValueError('at least one probability should be >0')
 
         self._cum = [x / sump for x in self._cum]
         if hasmean:
@@ -12528,67 +12785,67 @@ class CumPdf(_Distribution):
             spec = list(spec)
 
             if not spec:
-                raise SalabimError('no arguments specified')
+                raise TypeError('no arguments specified')
             while len(spec) > 0:
                 x = spec.pop(0)
                 if time_unit is not None:
                     if isinstance(x, _Distribution):
-                        raise SalabimError('time_unit can\'t be combined with distribution value')
+                        raise TypeError('time_unit can\'t be combined with distribution value')
                     try:
                         x = float(x) * _time_unit_factor(time_unit, env)
-                    except:
-                        raise SalabimError('time_unit can\'t be combined with non numeric value')
+                    except (ValueError, TypeError):
+                        raise TypeError('time_unit can\'t be combined with non numeric value')
                 if not spec:
-                    raise SalabimError(
+                    raise ValueError(
                         'uneven number of parameters specified')
                 self._x.append(x)
                 p = spec.pop(0)
                 p = p - sump
                 if p < 0:
-                    raise SalabimError('non increasing cumulative probabilities')
+                    raise ValueError('non increasing cumulative probabilities')
                 sump += p
                 self._cum.append(sump)
                 if isinstance(x, _Distribution):
                     x = x._mean
                 try:
                     sumxp += float(x) * p
-                except:
+                except (ValueError, TypeError):
                     hasmean = False
         else:
             spec = list(spec)
             if isinstance(cumprobabilities, (list, tuple)):
                 cumprobabilities = list(cumprobabilities)
             else:
-                raise SalabimError('wrong type for cumulative probabilities')
+                raise TypeError('wrong type for cumulative probabilities')
             if len(spec) != len(cumprobabilities):
-                raise SalabimError(
+                raise ValueError(
                     'length of x-values does not match length of cumulative probabilities')
 
             while len(spec) > 0:
                 x = spec.pop(0)
                 if time_unit is not None:
                     if isinstance(x, _Distribution):
-                        raise SalabimError('time_unit can\'t be combined with distribution value')
+                        raise TypeError('time_unit can\'t be combined with distribution value')
                     try:
                         x = float(x) * _time_unit_factor(time_unit, env)
-                    except:
-                        raise SalabimError('time_unit can\'t be combined with non numeric value')
+                    except (ValueError, TypeError):
+                        raise TypeError('time_unit can\'t be combined with non numeric value')
                 self._x.append(x)
                 p = cumprobabilities.pop(0)
                 p = p - sump
                 if p < 0:
-                    raise SalabimError('non increasing cumulative probabilities')
+                    raise ValueError('non increasing cumulative probabilities')
                 sump += p
                 self._cum.append(sump)
                 if isinstance(x, _Distribution):
                     x = x._mean
                 try:
                     sumxp += float(x) * p
-                except:
+                except (ValueError, TypeError):
                     hasmean = False
 
         if sump == 0:
-            raise SalabimError('last cumulative probability should be >0')
+            raise ValueError('last cumulative probability should be >0')
 
         self._cum = [x / sump for x in self._cum]
         if hasmean:
@@ -12715,7 +12972,7 @@ class Distribution(_Distribution):
                 c3 = sp[2]
                 spec = 'Triangular({},{},{})'.format(c1, c2, c3)
             else:
-                raise SalabimError('incorrect specifier', spec_orig)
+                raise ValueError('incorrect specifier', spec_orig)
 
         else:
             for distype in ('Uniform', 'Constant', 'Triangular', 'Exponential', 'Normal',
@@ -12889,9 +13146,9 @@ class State(object):
         Use State.deregister if state does not longer need to be registered.
         '''
         if not isinstance(registry, list):
-            raise SalabimError('registry not list')
+            raise TypeError('registry not list')
         if self in registry:
-            raise SalabimError(self.name() + ' already in registry')
+            raise ValueError(self.name() + ' already in registry')
         registry.append(self)
         return self
 
@@ -12909,14 +13166,14 @@ class State(object):
         state (self) : State
         '''
         if not isinstance(registry, list):
-            raise SalabimError('registry not list')
+            raise TypeError('registry not list')
         if self not in registry:
-            raise SalabimError(self.name() + ' not in registry')
+            raise ValueError(self.name() + ' not in registry')
         registry.remove(self)
         return self
 
     def __repr__(self):
-        return objectclass_to_str(self) + ' (' + self.name() + ')'
+        return object_to_str(self) + ' (' + self.name() + ')'
 
     def print_histograms(self, exclude=(), as_str=False, file=None):
         '''
@@ -12966,7 +13223,7 @@ class State(object):
         info (if as_str is True) : str
         '''
         result = []
-        result.append(objectclass_to_str(self) + ' ' + hex(id(self)))
+        result.append(object_to_str(self) + ' ' + hex(id(self)))
         result.append('  name=' + self.name())
         result.append('  value=' + str(self._value))
         if self._waiters:
@@ -13392,7 +13649,7 @@ class Resource(object):
         for q in (self.requesters(), self.claimers()):
             if q not in exclude:
                 result.append(q.print_histograms(exclude=exclude, as_str=True))
-        for m in (self.capacity, self.available_quantity, self.claimed_quantity):
+        for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
             if m not in exclude:
                 result.append(m.print_histogram(as_str=True))
         return return_or_print(result, as_str, file)
@@ -13436,9 +13693,9 @@ class Resource(object):
         Use Resource.deregister if resource does not longer need to be registered.
         '''
         if not isinstance(registry, list):
-            raise SalabimError('registry not list')
+            raise TypeError('registry not list')
         if self in registry:
-            raise SalabimError(self.name() + ' already in registry')
+            raise ValueError(self.name() + ' already in registry')
         registry.append(self)
         return self
 
@@ -13456,14 +13713,14 @@ class Resource(object):
         resource (self) : Resource
         '''
         if not isinstance(registry, list):
-            raise SalabimError('registry not list')
+            raise TypeError('registry not list')
         if self not in registry:
-            raise SalabimError(self.name() + ' not in registry')
+            raise ValueError(self.name() + ' not in registry')
         registry.remove(self)
         return self
 
     def __repr__(self):
-        return objectclass_to_str(self) + ' (' + self.name() + ')'
+        return object_to_str(self) + ' (' + self.name() + ')'
 
     def print_info(self, as_str=False, file=None):
         '''
@@ -13484,7 +13741,7 @@ class Resource(object):
         info (if as_str is True) : str
         '''
         result = []
-        result.append(objectclass_to_str(self) + ' ' + hex(id(self)))
+        result.append(object_to_str(self) + ' ' + hex(id(self)))
         result.append('  name=' + self.name())
         result.append('  capacity=' + str(self._capacity))
         if self._requesters:
@@ -13555,7 +13812,7 @@ class Resource(object):
 
         else:
             if quantity is not None:
-                raise SalabimError(
+                raise ValueError(
                     'no quantity allowed for non-anonymous resource')
 
             mx = self._claimers._head.successor
@@ -13784,7 +14041,7 @@ def hex_to_rgb(v):
         return int(v[:2], 16), int(v[2:4], 16), int(v[4:6], 16)
     if len(v) == 8:
         return int(v[:2], 16), int(v[2:4], 16), int(v[4:6], 16), int(v[6:8], 16)
-    raise SalabimError('Incorrect value' + str(v))
+    raise ValueError('Incorrect value' + str(v))
 
 
 def spec_to_image(spec):
@@ -13830,7 +14087,7 @@ def _time_unit_lookup(descr):
         'n/a': None}
 
     if descr not in lookup:
-        raise SalabimError('time_unit ' + descr + ' not supported')
+        raise ValueError('time_unit ' + descr + ' not supported')
     return lookup[descr]
 
 
@@ -13840,7 +14097,7 @@ def _time_unit_factor(time_unit, env):
     if time_unit is None:
         return 1
     if env._time_unit is None:
-        raise SalabimError('time unit not set.')
+        raise AttributeError('time unit not set.')
 
     return(env._time_unit / _time_unit_lookup(time_unit))
 
@@ -13907,14 +14164,14 @@ def interpolate(t, t0, t1, v0, v1):
 
 def _set_name(name, _nameserialize, object):
     if name is None:
-        name = objectclass_to_str(object).lower() + '.'
+        name = object_to_str(object).lower() + '.'
     elif len(name) <= 1:
         if name == '':
-            name = objectclass_to_str(object).lower()
+            name = object_to_str(object).lower()
         elif name == '.':
-            name = objectclass_to_str(object).lower() + '.'
+            name = object_to_str(object).lower() + '.'
         elif name == ',':
-            name = objectclass_to_str(object).lower() + ','
+            name = object_to_str(object).lower() + ','
 
     object._base_name = name
 
@@ -13969,17 +14226,17 @@ def fn(x, l, d):
 
 def _checkrandomstream(randomstream):
     if not isinstance(randomstream, random.Random):
-        raise SalabimError('Type randomstream or random.Random expected, got ' + str(type(randomstream)))
+        raise TypeError('Type randomstream or random.Random expected, got ' + str(type(randomstream)))
 
 
 def _checkismonitor(monitor):
     if not isinstance(monitor, Monitor):
-        raise SalabimError('Type Monitor expected, got ' + str(type(monitor)))
+        raise TypeError('Type Monitor expected, got ' + str(type(monitor)))
 
 
 def _checkisqueue(queue):
     if not isinstance(queue, Queue):
-        raise SalabimError('Type Queue expected, got ' + str(type(queue)))
+        raise TypeError('Type Queue expected, got ' + str(type(queue)))
 
 
 def type_to_typecode_off(type):
@@ -14005,7 +14262,7 @@ def list_to_array(l):
     for v in l:
         try:
             vfloat = float(v)
-        except:
+        except (ValueError, TypeError):
             vfloat = 0
         float_result.append(vfloat)
 
@@ -14060,8 +14317,9 @@ def _modetxt(mode):
         return 'mode=' + str(mode)
 
 
-def objectclass_to_str(object):
-    return str(type(object)).split('.')[-1].split("'")[0]
+def object_to_str(object, quoted=False):
+    add = '\'' if quoted else ''
+    return add + type(object).__name__ + add
 
 
 def _get_caller_frame():
@@ -14185,7 +14443,7 @@ def fonts():
                 try:
                     ImageFont.truetype(family)
                     fonts.font_list.append(((family,), family))
-                except:
+                except:  # NOQA
                     pass
 
                 for name in UIFont.fontNamesForFamilyName_(family):
@@ -14254,7 +14512,7 @@ def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
         try:
             result = ImageFont.truetype(font=ifont, size=int(fontsize))
             break
-        except:
+        except:  # NOQA
             pass
 
         filename = ''
@@ -14269,7 +14527,7 @@ def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
             try:
                 result = ImageFont.truetype(font=filename, size=int(fontsize))
                 break
-            except:
+            except:  # NOQA
                 pass
 
     if result is None:
@@ -14354,7 +14612,7 @@ def regular_polygon(radius=1, number_of_sides=3, initial_angle=0):
     '''
     number_of_sides = int(number_of_sides)
     if number_of_sides < 3:
-        raise SalabimError('number of sides < 3')
+        raise ValueError('number of sides < 3')
     tangle = 2 * math.pi / number_of_sides
     sint = math.sin(tangle)
     cost = math.cos(tangle)
@@ -14401,7 +14659,7 @@ def can_animate(try_only=True):
     except ImportError:
         if try_only:
             return False
-        raise SalabimError('PIL is required for animation. Install with pip install Pillow or see salabim manual')
+        raise ImportError('PIL is required for animation. Install with pip install Pillow or see salabim manual')
 
     if not Pythonista:
         try:
@@ -14412,7 +14670,7 @@ def can_animate(try_only=True):
             except ImportError:
                 if try_only:
                     return False
-                raise SalabimError('tkinter is required for animation')
+                raise ImportError('tkinter is required for animation')
     return True
 
 
@@ -14435,7 +14693,7 @@ def can_video(try_only=True):
     if Pythonista:
         if try_only:
             return False
-        raise SalabimError('video production not supported on Pythonista')
+        raise NotImplementedError('video production not supported on Pythonista')
     else:
         try:
             import cv2
@@ -14444,9 +14702,9 @@ def can_video(try_only=True):
             if try_only:
                 return False
             if platform.python_implementation == 'PyPy':
-                raise SalabimError('video production is not supported under PyPy.')
+                raise NotImplementedError('video production is not supported under PyPy.')
             else:
-                raise SalabimError('cv2 required for video production. Install with pip install opencv-python')
+                raise ImportError('cv2 required for video production. Install with pip install opencv-python')
     return True
 
 
@@ -14469,7 +14727,7 @@ def reset():
     '''
     try:
         g.default_env.video_close()
-    except:
+    except:  # NOQA
         pass
 
     g.default_env = None
@@ -14483,8 +14741,8 @@ reset()
 if __name__ == '__main__':
     try:
         import salabim_test
-    except ModuleNotFoundError:
-        print('salabim_test.py not found')
+    except Exception:
+        print('salabim_test.py not found or ?')
         quit()
 
     try:

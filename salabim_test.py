@@ -13,25 +13,85 @@ Pythonista=(platform.system()=='Darwin')
 
 
 def test():
-    test97()
+    test96()
+
+
+def test98():
+    global d0, d1
+    def test(s):
+        print(s)
+        d = eval(s)
+        sum = 0
+        for _ in range(1000):
+            v = d.sample()
+            sum += v
+        print(sum / 1000, d.mean())
+#        d.print_info()
+
+    env = sim.Environment()
+
+    d0 = sim.Uniform(0, 10)
+    d1 = sim.Uniform(0, 10)
+
+    test('2 + d1')
+    test('d1 + 2')
+    test('d1 - 2')
+    test('2 - d1')
+    test('2 * d1')
+    test('d1 * 2')
+    test('2 / d1')
+    test('d1 / 2')
+    test('2 // d1')
+    test('d1 // 2')
+    test('+d1')
+    test('-d1')
+
+    test('d0 + d1')
+    test('d1 + d0')
+    test('d1 - d0')
+    test('d0 - d1')
+    test('d0 * d1')
+    test('d1 * d0')
+    test('d0 / d1')
+    test('d1 / d0')
+    test('d0 // d1')
+    test('d1 // d0')
 
 def test97():
-    env = sim.Environment(time_unit='seconds')
+    env = sim.Environment(time_unit='days')
     processingtime_dis = sim.Uniform(10, 20, 'minutes')
     dryingtime_dis = sim.Normal(2, 0.1, 'hours')
     processingtime_dis.print_info()
     dryingtime_dis.print_info()
+    d2 = sim.Pdf((0, 1, 2, 3, 4, 5, 6), (18, 18, 18, 18, 18, 8,2), 'days') + sim.Cdf((0,0, 8,10, 17, 90, 24, 100), 'hours')
+    for i in range(0):
+        print(d2())
+    a = sim.Bounded(sim.Uniform(0,10),upperbound=0.1, fail_value='fail', number_of_retries=30)
+    a.print_info()
+    for _ in range(10):
+        print(a())
 
+    a = sim.Bounded(sim.Pdf((0,1,2,3,4,sim.Uniform(1,4), 'ab'), 1),lowerbound=1, include_lowerbound=False, upperbound=4, include_upperbound=True, fail_value='fail', number_of_retries=10)
+    a.print_info()
+    sim.random_seed(1)
+    for _ in range(10):
+        print(a())
+        
+    sim.random_seed(1)
+    for _ in range(10):
+        print(sim.Pdf((0,1,2,3,4,sim.Uniform(1,4), 'ab'), 1).bounded_sample(lowerbound=1, include_lowerbound=False, upperbound=4, include_upperbound=True, fail_value='fail', number_of_retries=10))
 
 def test96():
     env=sim.Environment()
     m = sim.Monitor(name='m')
+    
     ml = sim.Monitor(name='ml', level=True)
+    ml.tally(5)
     m.tally(10,7)
     ml.tally(10)
     env.run(1)
     m.tally(11)
-    ml.tally(11)
+#    ml.tally(ml.off)
     env.run(2)
     m.tally(5)
     ml.tally(5)
@@ -42,6 +102,11 @@ def test96():
     print(m.slice(0,3.1).xweight())
     print(ml.xt())
     print(ml.slice(0,0.5,1).xt())
+    print(ml.mean())
+    (0+ml+ml+ml+ml+0).print_statistics()
+    sum((ml, ml, ml, ml)).print_statistics()
+    print('ml',ml.xt(exoff=True))
+    print('ml+ml', (ml+ml).xt(exoff=True))
 
 
 
@@ -78,7 +143,7 @@ def test95():
 def test94():
     class X(sim.Component):
         def process(self):
-            while env.now() < 10:
+            while env.now() < 1000:
                 yield self.hold(1)
                 env.speed(env.speed()+1)
     env = sim.Environment(trace=True)
@@ -987,12 +1052,12 @@ def test65():
                 mt.tally('idle')
                 yield self.hold(10)
                 for i in range(6):
-                    st = sim.Pdf(('produce A', 'produce B', 'produce C', 'produce D', 'transport', 'store'),1)()
+                    st = sim.Pdf(('prepare', 'stage A', 'stage B', 'stage C', 'stage D', 'package' ),1)()
                     mt.tally(st)
                     yield self.hold(sim.Uniform(6,6)())
 
     env = sim.Environment(trace=False)
-    mt = sim.MonitorTimestamp('Status')
+    mt = sim.Monitor('Status', level=True)
 
     X()
     env.run(300)
