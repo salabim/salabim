@@ -15,3 +15,4 @@ See www.salabim.org for details.
 See www.salabim.org/manual for the documentation.
 
 [![DOI](http://joss.theoj.org/papers/10.21105/joss.00767/status.svg)](https://doi.org/10.21105/joss.00767)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
