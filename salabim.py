@@ -1,17 +1,17 @@
-'''          _         _      _               ____      _  _       _
- ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \    | || |     / |
-/ __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |   | || |_    | |
-\__ \| (_| || || (_| || |_) || || | | | | |   / __/  _ |__   _| _ | |
-|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|(_)   |_|  (_)|_|
+"""          _         _      _               ____      _  _       ____
+ ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \    | || |     |___ \
+/ __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |   | || |_      __) |
+\__ \| (_| || || (_| || |_) || || | | | | |   / __/  _ |__   _| _  / __/
+|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|(_)   |_|  (_)|_____|
 Discrete event simulation in Python
 
 see www.salabim.org for more information, the documentation and license information
-'''
+"""
 
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = '2.4.1'
+__version__ = "2.4.2"
 
 import heapq
 import random
@@ -32,11 +32,11 @@ import types
 import bisect
 import operator
 
-Pythonista = (sys.platform == 'ios')
-Windows = (sys.platform.startswith('win'))
+Pythonista = sys.platform == "ios"
+Windows = sys.platform.startswith("win")
 
 
-class g():
+class g:
     pass
 
 
@@ -45,12 +45,12 @@ if Pythonista:
     import ui
     import objc_util
 
-inf = float('inf')
-nan = float('nan')
+inf = float("inf")
+nan = float("nan")
 
 
 class ItemFile(object):
-    '''
+    """
     define an item file to be used with read_item, read_item_int, read_item_float and read_item_bool
 
     Parameters
@@ -65,13 +65,13 @@ class ItemFile(object):
     ----
     It is advised to use ItemFile with a context manager, like ::
 
-        with sim.ItemFile('experiment0.txt') as f:
+        with sim.ItemFile("experiment0.txt") as f:
             run_length = f.read_item_float() |n|
             run_name = f.read_item() |n|
 
     Alternatively, the file can be opened and closed explicitely, like ::
 
-        f = sim.ItemFile('experiment0.txt')
+        f = sim.ItemFile("experiment0.txt")
         run_length = f.read_item_float()
         run_name = f.read_item()
         f.close()
@@ -85,20 +85,20 @@ class ItemFile(object):
     Example ::
 
         Item1
-        'Item 2'
+        "Item 2"
             Item3 Item4 # comment
         Item5 {five} Item6 {six}
         'Double quote" in item'
         "Single quote' in item"
         True
-    '''
+    """
 
     def __init__(self, filename):
         self.iter = self._nextread()
-        if '\n' in filename:
+        if "\n" in filename:
             self.open_file = io.StringIO(filename)
         else:
-            self.open_file = open(filename, 'r')
+            self.open_file = open(filename, "r")
 
     def __enter__(self):
         return self
@@ -110,24 +110,24 @@ class ItemFile(object):
         self.open_file.close()
 
     def read_item_int(self):
-        '''
+        """
         read next field from the ItemFile as int.
 
         if the end of file is reached, EOFError is raised
-        '''
-        return int(self.read_item().replace(',', '.'))
+        """
+        return int(self.read_item().replace(",", "."))
 
     def read_item_float(self):
-        '''
+        """
         read next item from the ItemFile as float
 
         if the end of file is reached, EOFError is raised
-        '''
+        """
 
-        return float(self.read_item().replace(',', '.'))
+        return float(self.read_item().replace(",", "."))
 
     def read_item_bool(self):
-        '''
+        """
         read next item from the ItemFile as bool
 
         A value of False (not case sensitive) will return False |n|
@@ -136,67 +136,67 @@ class ItemFile(object):
         Any other value will return True
 
         if the end of file is reached, EOFError is raised
-        '''
+        """
         result = self.read_item().strip().lower()
-        if result == 'false':
+        if result == "false":
             return False
         try:
             if float(result) == 0:
                 return False
         except (ValueError, TypeError):
             pass
-        if result == '':
+        if result == "":
             return False
         return True
 
     def read_item(self):
-        '''
+        """
         read next item from the ItemFile
 
         if the end of file is reached, EOFError is raised
-        '''
+        """
         try:
             return next(self.iter)
         except StopIteration:
             raise EOFError
 
     def _nextread(self):
-        remove = '\r\n'
-        quotes = '\'"'
+        remove = "\r\n"
+        quotes = "'\""
 
         for line in self.open_file:
-            mode = '.'
-            result = ''
+            mode = "."
+            result = ""
             for c in line:
                 if c not in remove:
                     if mode in quotes:
                         if c == mode:
-                            mode = '.'
+                            mode = "."
                             yield result  # even return the null string
-                            result = ''
+                            result = ""
                         else:
                             result += c
-                    elif mode == '{':
-                        if c == '}':
-                            mode = '.'
+                    elif mode == "{":
+                        if c == "}":
+                            mode = "."
                     else:
-                        if c == '#':
+                        if c == "#":
                             break
                         if c in quotes:
                             if result:
                                 yield result
-                            result = ''
+                            result = ""
                             mode = c
-                        elif c == '{':
+                        elif c == "{":
                             if result:
                                 yield result
-                            result = ''
+                            result = ""
                             mode = c
 
-                        elif c in (' ', '\t'):
+                        elif c in (" ", "\t"):
                             if result:
                                 yield result
-                            result = ''
+                            result = ""
                         else:
                             result += c
             if result:
@@ -204,7 +204,7 @@ class ItemFile(object):
 
 
 class Monitor(object):
-    '''
+    """
     Monitor object
 
     Parameters
@@ -236,19 +236,19 @@ class Monitor(object):
 
     type : str
         specifies how tallied values are to be stored
-            - 'any' (default) stores values in a list. This allows
+            - "any" (default) stores values in a list. This allows
                non numeric values. In calculations the values are
                forced to a numeric value (0 if not possible)
-            - 'bool' (True, False) Actually integer >= 0 <= 255 1 byte
-            - 'int8' integer >= -128 <= 127 1 byte
-            - 'uint8' integer >= 0 <= 255 1 byte
-            - 'int16' integer >= -32768 <= 32767 2 bytes
-            - 'uint16' integer >= 0 <= 65535 2 bytes
-            - 'int32' integer >= -2147483648<= 2147483647 4 bytes
-            - 'uint32' integer >= 0 <= 4294967295 4 bytes
-            - 'int64' integer >= -9223372036854775808 <= 9223372036854775807 8 bytes
-            - 'uint64' integer >= 0 <= 18446744073709551615 8 bytes
-            - 'float' float 8 bytes
+            - "bool" (True, False) Actually integer >= 0 <= 255 1 byte
+            - "int8" integer >= -128 <= 127 1 byte
+            - "uint8" integer >= 0 <= 255 1 byte
+            - "int16" integer >= -32768 <= 32767 2 bytes
+            - "uint16" integer >= 0 <= 65535 2 bytes
+            - "int32" integer >= -2147483648<= 2147483647 4 bytes
+            - "uint32" integer >= 0 <= 4294967295 4 bytes
+            - "int64" integer >= -9223372036854775808 <= 9223372036854775807 8 bytes
+            - "uint64" integer >= 0 <= 18446744073709551615 8 bytes
+            - "float" float 8 bytes
 
     weight_legend : str
         used in print_statistics and print_histogram to indicate the dimension of weight or duration (for
@@ -257,23 +257,32 @@ class Monitor(object):
     env : Environment
         environment where the monitor is defined |n|
         if omitted, default_env will be used
-    '''
+    """
 
     cached_xweight = {(ex0, force_numeric): (0, 0) for ex0 in (False, True) for force_numeric in (False, True)}
 
-    def __init__(self, name=None, monitor=True, level=False, initial_tally=None,
-        type=None, weight_legend=None,
-        env=None, *args, **kwargs):
+    def __init__(
+        self,
+        name=None,
+        monitor=True,
+        level=False,
+        initial_tally=None,
+        type=None,
+        weight_legend=None,
+        env=None,
+        *args,
+        **kwargs
+    ):
         if env is None:
             self.env = g.default_env
         else:
             self.env = env
         _set_name(name, self.env._nameserializeMonitor, self)
         self._level = level
-        self._weight_legend = ('duration' if self._level else 'weight') if weight_legend is None else weight_legend
+        self._weight_legend = ("duration" if self._level else "weight") if weight_legend is None else weight_legend
         if self._level:
             if weight_legend is None:
-                self.weight_legend = 'duration'
+                self.weight_legend = "duration"
             else:
                 self.weight_legend = weight_legend
             if initial_tally is None:
@@ -282,18 +291,18 @@ class Monitor(object):
                 self._tally = initial_tally
         else:
             if initial_tally is not None:
-                raise TypeError('initial_tally not available for non level monitors')
+                raise TypeError("initial_tally not available for non level monitors")
             if weight_legend is None:
-                self.weight_legend = 'weight'
+                self.weight_legend = "weight"
             else:
                 self.weight_legend = weight_legend
 
         if type is None:
-            type = 'any'
+            type = "any"
         try:
             self.xtypecode, self.off = type_to_typecode_off(type)
         except KeyError:
-            raise ValueError('type \'' + type + '\' not recognized')
+            raise ValueError("type '" + type + "' not recognized")
         self.xtype = type
         self.reset(monitor)
         self.setup(*args, **kwargs)
@@ -309,9 +318,9 @@ class Monitor(object):
             return self
         else:
             return self.merge(other)
-            
+
     def merge(self, *monitors, **kwargs):
-        '''
+        """
         merges this monitor with other monitors
 
         Parameters
@@ -321,7 +330,7 @@ class Monitor(object):
 
         name : str
             name of the merged monitor |n|
-            default: name of this monitor + '.merged'
+            default: name of this monitor + ".merged"
 
         Returns
         -------
@@ -334,28 +343,26 @@ class Monitor(object):
         Only monitors with the same type can be merged |n|
         If no monitors are specified, a copy is created. |n|
         For level monitors, merging means summing the available x-values|n|
-        '''
-        name = kwargs.pop('name', None)
+        """
+        name = kwargs.pop("name", None)
         if kwargs:
             raise TypeError("merge() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
         for m in monitors:
             if not isinstance(m, Monitor):
-                raise TypeError('not possible to merge monitor with ' + object_to_str(m, True) + ' type')
+                raise TypeError("not possible to merge monitor with " + object_to_str(m, True) + " type")
             if self._level != m._level:
-                raise TypeError('not possible to mix level monitor with non level monitor')
+                raise TypeError("not possible to mix level monitor with non level monitor")
             if self.xtype != m.xtype:
-                raise TypeError(
-                    'not possible to mix type \'' + self.xtype + '\' with type \'' + m.xtype + '\'')
+                raise TypeError("not possible to mix type '" + self.xtype + "' with type '" + m.xtype + "'")
         if name is None:
-            if self.name().endswith('.merged'):
+            if self.name().endswith(".merged"):
                 # this to avoid multiple .merged (particularly when merging with the + operator)
                 name = self.name()
             else:
-                name = self.name() + '.merged'
+                name = self.name() + ".merged"
 
         new = Monitor(name=name, type=self.xtype, level=self._level)
-        
 
         merge = [self] + list(monitors)
 
@@ -366,9 +373,10 @@ class Monitor(object):
                 new._x = []
 
             curx = [new.off] * len(merge)
-            new._t = array.array('d')
+            new._t = array.array("d")
             for t, index, x in heapq.merge(
-                *[zip(merge[index]._t, itertools.repeat(index), merge[index]._x) for index in range(len(merge))]):
+                *[zip(merge[index]._t, itertools.repeat(index), merge[index]._x) for index in range(len(merge))]
+            ):
                 if new.xtypecode:
                     curx[index] = x
                 else:
@@ -379,7 +387,7 @@ class Monitor(object):
 
                 sum = 0
                 for xi in curx:
-                    if xi is new.off:
+                    if xi == new.off:
                         sum = new.off
                         break
                     sum += xi
@@ -392,15 +400,22 @@ class Monitor(object):
 
         else:
             for t, _, x, weight in heapq.merge(
-                *[zip(merge[index]._t, itertools.repeat(index), merge[index]._x,
-                merge[index]._weight if merge[index]._weight else (1,) * len(merge[index]._x))
-                for index in range(len(merge))]):
+                *[
+                    zip(
+                        merge[index]._t,
+                        itertools.repeat(index),
+                        merge[index]._x,
+                        merge[index]._weight if merge[index]._weight else (1,) * len(merge[index]._x),
+                    )
+                    for index in range(len(merge))
+                ]
+            ):
                 if weight == 1:
                     if new._weight:
                         new._weight.append(weight)
                 else:
                     if not new._weight:
-                        new._weight = array.array('d', (1,) * len(new._x))
+                        new._weight = array.array("d", (1,) * len(new._x))
                     new._weight.append(weight)
                 new._t.append(t)
                 new._x.append(x)
@@ -415,7 +430,7 @@ class Monitor(object):
             return self.slice(key)
 
     def slice(self, start=None, stop=None, modulo=None, name=None):
-        '''
+        """
         slices this monitor (creates a subset)
 
         Parameters
@@ -435,15 +450,15 @@ class Monitor(object):
 
         name : str
             name of the sliced monitor |n|
-            default: name of this monitor + '.sliced'
+            default: name of this monitor + ".sliced"
 
         Returns
         -------
         sliced monitor : Monitor
-        '''
-        new = Monitor(name='slice', type=self.xtype, level=self._level)
+        """
+        new = Monitor(name="slice", type=self.xtype, level=self._level)
         if name is None:
-            name = self.name() + '.sliced'
+            name = self.name() + ".sliced"
         new = Monitor(level=self._level, type=self.xtype, name=name)
         actions = []
         if modulo is None:
@@ -457,24 +472,24 @@ class Monitor(object):
             else:
                 stop += self.env._offset
             stop = min(stop, self.env.now())
-            actions.append((start, 'a', 0, 0))
-            actions.append((stop, 'b', 0, 0))  # non inclusive
+            actions.append((start, "a", 0, 0))
+            actions.append((stop, "b", 0, 0))  # non inclusive
         else:
             if start is None:
-                raise TypeError('Modulo specified, but no start specified. ')
+                raise TypeError("Modulo specified, but no start specified. ")
             if stop is None:
-                raise TypeError('Module specified, but no stop specified')
+                raise TypeError("Module specified, but no stop specified")
             if stop <= start:
-                raise ValueError('stop must be > start')
+                raise ValueError("stop must be > start")
             if stop - start >= modulo:
-                raise ValueError('stop must be < start + modulo')
+                raise ValueError("stop must be < start + modulo")
             start = start % modulo
             stop = stop % modulo
             start1 = self._t[0] - (self._t[0] % modulo) + start
             len1 = (stop - start) % modulo
             while start1 < self.env._now:
-                actions.append((start1, 'a', 0, 0))
-                actions.append((start1 + len1, 'b', 0, 0))  # non inclusive
+                actions.append((start1, "a", 0, 0))
+                actions.append((start1 + len1, "b", 0, 0))  # non inclusive
                 start1 += modulo
 
         if new._level:
@@ -482,7 +497,7 @@ class Monitor(object):
                 new._x = array.array(self.xtypecode)
             else:
                 new._x = []
-            new._t = array.array('d')
+            new._t = array.array("d")
             curx = new.off
             new._t.append(self.start)
             new._x.append(curx)
@@ -490,10 +505,15 @@ class Monitor(object):
         enabled = False
         for (t, type, x, weight) in heapq.merge(
             actions,
-            zip(self._t, itertools.repeat('c'), self._x,
-            self._weight if (self._weight and not self._level) else (1,) * len(self._x))):
+            zip(
+                self._t,
+                itertools.repeat("c"),
+                self._x,
+                self._weight if (self._weight and not self._level) else (1,) * len(self._x),
+            ),
+        ):
             if new._level:
-                if type == 'a':
+                if type == "a":
                     enabled = True
                     if new._t[-1] == t:
                         new._x[-1] = curx
@@ -503,7 +523,7 @@ class Monitor(object):
                         else:
                             new._t.append(t)
                             new._x.append(curx)
-                elif type == 'b':
+                elif type == "b":
                     enabled = False
                     if new._t[-1] == t:
                         new._x[-1] = self.off
@@ -526,9 +546,9 @@ class Monitor(object):
                                     new._x.append(x)
                     curx = x
             else:
-                if type == 'a':
+                if type == "a":
                     enabled = True
-                elif type == 'b':
+                elif type == "b":
                     enabled = False
                 else:
                     if enabled:
@@ -537,7 +557,7 @@ class Monitor(object):
                                 new._weight.append(weight)
                         else:
                             if not new._weight:
-                                new._weight = array.array('d', (1,) * len(new._x))
+                                new._weight = array.array("d", (1,) * len(new._x))
                             new._weight.append(weight)
                         new._t.append(t)
                         new._x.append(x)
@@ -546,17 +566,17 @@ class Monitor(object):
         return new
 
     def setup(self):
-        '''
+        """
         called immediately after initialization of a monitor.
 
         by default this is a dummy method, but it can be overridden.
 
         only keyword arguments are passed
-        '''
+        """
         pass
 
     def register(self, registry):
-        '''
+        """
         registers the monitor in the registry
 
         Parameters
@@ -571,16 +591,16 @@ class Monitor(object):
         Note
         ----
         Use Monitor.deregister if monitor does not longer need to be registered.
-        '''
+        """
         if not isinstance(registry, list):
-            raise TypeError('registry not list')
+            raise TypeError("registry not list")
         if self in registry:
-            raise ValueError(self.name() + ' already in registry')
+            raise ValueError(self.name() + " already in registry")
         registry.append(self)
         return self
 
     def deregister(self, registry):
-        '''
+        """
         deregisters the monitor in the registry
 
         Parameters
@@ -591,31 +611,31 @@ class Monitor(object):
         Returns
         -------
         monitor (self) : Monitor
-        '''
+        """
         if not isinstance(registry, list):
-            raise TypeError('registry not list')
+            raise TypeError("registry not list")
         if self not in registry:
-            raise ValueError(self.name() + ' not in registry')
+            raise ValueError(self.name() + " not in registry")
         registry.remove(self)
         return self
 
     def __repr__(self):
-        return object_to_str(self) + ('[level]'if self._level else '') + ' (' + self.name() + ')'
+        return object_to_str(self) + ("[level]" if self._level else "") + " (" + self.name() + ")"
 
     def __call__(self, t=None):  # direct moneypatching __call__ doesn't work
         if not self._level:
-            raise TypeError('get not available for non level monitors')
+            raise TypeError("get not available for non level monitors")
         if t is None:
             return self._tally
         if t < self._t[0] or t > self.env._now:
             return self.off
         if t == self.env._now:
             return self._tally  # even if monitor is off, the current value is valid
-        i = bisect.bisect_left(list(zip(self._t, itertools.count())), (t, float('inf')))
+        i = bisect.bisect_left(list(zip(self._t, itertools.count())), (t, float("inf")))
         return self._x[i - 1]
 
     def get(self, t=None):
-        '''
+        """
         Parameters
         ----------
         t : float
@@ -628,7 +648,7 @@ class Monitor(object):
 
             Instead of this method, the level monitor can also be called directly, like |n|
 
-            level = sim.Monitor('level', level=True) |n|
+            level = sim.Monitor("level", level=True) |n|
             ... |n|
             print(level()) |n|
             print(level.get())  # identical |n|
@@ -636,11 +656,11 @@ class Monitor(object):
         Note
         ----
         If the value is not available, self.off will be returned.
-        '''
+        """
         self.__call__(t)
 
     def reset_monitors(self, monitor=None):
-        '''
+        """
         resets monitor
 
         Parameters
@@ -653,11 +673,11 @@ class Monitor(object):
         Note
         ----
         Exactly same functionality as Monitor.reset()
-        '''
+        """
         self.reset(monitor)
 
     def reset(self, monitor=None):
-        '''
+        """
         resets monitor
 
         Parameters
@@ -666,7 +686,7 @@ class Monitor(object):
             if True, monitoring will be on. |n|
             if False, monitoring is disabled
             if omitted, no change of monitoring state
-        '''
+        """
         if monitor is not None:
             self._monitor = monitor
 
@@ -675,7 +695,7 @@ class Monitor(object):
         else:
             self._x = []
         self._weight = False
-        self._t = array.array('d')
+        self._t = array.array("d")
         if self._level:
             self._weight = True  # signal for statistics that weights are present (although not stored in _weight)
             if self._monitor:
@@ -688,11 +708,12 @@ class Monitor(object):
         self.start = self.env.now()
         self.isgenerated = False
         self.monitor(monitor)
-        Monitor.cached_xweight = {(ex0, force_numeric): (0, 0)
-            for ex0 in (False, True) for force_numeric in (False, True)}  # invalidate the cache
+        Monitor.cached_xweight = {
+            (ex0, force_numeric): (0, 0) for ex0 in (False, True) for force_numeric in (False, True)
+        }  # invalidate the cache
 
     def monitor(self, value=None):
-        '''
+        """
         enables/disables monitor
 
         Parameters
@@ -705,10 +726,10 @@ class Monitor(object):
         Returns
         -------
         True, if monitoring enabled. False, if not : bool
-        '''
+        """
         if value is not None:
             if value and self.isgenerated:
-                raise TypeError('merged or sliced monitors cannot not be turned on')
+                raise TypeError("merged or sliced monitors cannot not be turned on")
             self._monitor = value
             if self._level:
                 if self._monitor:
@@ -718,7 +739,7 @@ class Monitor(object):
         return self.monitor
 
     def tally(self, value, weight=1):
-        '''
+        """
         Parameters
         ----------
         x : any, preferably int, float or translatable into int or float
@@ -727,13 +748,13 @@ class Monitor(object):
         weight: float
             weight to be tallied |n|
             default : 1 |n|
-        '''
+        """
         if self._level:
             if weight != 1:
                 if self._level:
-                    raise ValueError('level monitor supports only weight=1, not: ' + str(weight))
+                    raise ValueError("level monitor supports only weight=1, not: " + str(weight))
             if value == self.off:
-                raise ValueError('not allowed to tally ' + str(self.off) + ' (off)')
+                raise ValueError("not allowed to tally " + str(self.off) + " (off)")
             self._tally = value
             if self._monitor:
                 t = self.env._now
@@ -749,7 +770,7 @@ class Monitor(object):
                         self._weight.append(weight)
                 else:
                     if not self._weight:
-                        self._weight = array.array('d', (1,) * len(self._x))
+                        self._weight = array.array("d", (1,) * len(self._x))
                     self._weight.append(weight)
                 self._x.append(value)
                 self._t.append(self.env._now)
@@ -763,7 +784,7 @@ class Monitor(object):
             self._t.append(t)
 
     def name(self, value=None):
-        '''
+        """
         Parameters
         ----------
         value : str
@@ -777,21 +798,21 @@ class Monitor(object):
         Note
         ----
         base_name and sequence_number are not affected if the name is changed
-        '''
+        """
         if value is not None:
             self._name = value
         return self._name
 
     def base_name(self):
-        '''
+        """
         Returns
         -------
         base name of the monitor (the name used at initialization): str
-        '''
+        """
         return self._base_name
 
     def sequence_number(self):
-        '''
+        """
         Returns
         -------
         sequence_number of the monitor : int
@@ -799,11 +820,11 @@ class Monitor(object):
             normally this will be the integer value of a serialized name,
             but also non serialized names (without a dot or a comma at the end)
             will be numbered)
-        '''
+        """
         return self._sequence_number
 
     def mean(self, ex0=False):
-        '''
+        """
         mean of tallied values
 
         Parameters
@@ -818,7 +839,7 @@ class Monitor(object):
         Note
         ----
         For weighs are applied , the weighted mean is returned
-        '''
+        """
         x, weight = self._xweight(ex0=ex0)
         sumweight = sum(weight)
         if sumweight:
@@ -827,7 +848,7 @@ class Monitor(object):
             return nan
 
     def std(self, ex0=False):
-        '''
+        """
         standard deviation of tallied values
 
         Parameters
@@ -842,18 +863,18 @@ class Monitor(object):
         Note
         ----
         For weights are applied, the weighted standard deviation is returned
-        '''
+        """
         x, weight = self._xweight(ex0=ex0)
         sumweight = sum(weight)
         if sumweight:
             wmean = self.mean(ex0=ex0)
-            wvar = sum((vweight * (vx - wmean)**2) for vx, vweight in zip(x, weight)) / sumweight
+            wvar = sum((vweight * (vx - wmean) ** 2) for vx, vweight in zip(x, weight)) / sumweight
             return math.sqrt(wvar)
         else:
             return nan
 
     def minimum(self, ex0=False):
-        '''
+        """
         minimum of tallied values
 
         Parameters
@@ -864,7 +885,7 @@ class Monitor(object):
         Returns
         -------
         minimum : float
-        '''
+        """
         x = self._xweight(ex0=ex0)[0]
         if x:
             return min(x)
@@ -872,7 +893,7 @@ class Monitor(object):
             return nan
 
     def maximum(self, ex0=False):
-        '''
+        """
         maximum of tallied values
 
         Parameters
@@ -883,7 +904,7 @@ class Monitor(object):
         Returns
         -------
         maximum : float
-        '''
+        """
 
         x = self._xweight(ex0=ex0)[0]
         if x:
@@ -892,7 +913,7 @@ class Monitor(object):
             return nan
 
     def median(self, ex0=False):
-        '''
+        """
         median of tallied values
 
         Parameters
@@ -907,11 +928,11 @@ class Monitor(object):
         Note
         ----
         If weight are applied, the weighted median is returned
-        '''
+        """
         return self.percentile(50, ex0=ex0)
 
     def percentile(self, q, ex0=False):
-        '''
+        """
         q-th percentile of tallied values
 
         Parameters
@@ -933,7 +954,7 @@ class Monitor(object):
         Note
         ----
         If weights are applied, the weighted percentile is returned
-        '''
+        """
         # algorithm based on
         # https://stats.stackexchange.com/questions/13169/defining-quantiles-over-a-weighted-sample
         q = max(0, min(q, 100))
@@ -962,7 +983,7 @@ class Monitor(object):
         return x_sorted[k] + (x_sorted[k + 1] - x_sorted[k]) * (q / 100 * s[n - 1] - s[k]) / (s[k + 1] - s[k])
 
     def bin_number_of_entries(self, lowerbound, upperbound, ex0=False):
-        '''
+        """
         count of the number of tallied values in range (lowerbound,upperbound]
 
         Parameters
@@ -983,14 +1004,14 @@ class Monitor(object):
         Note
         ----
         Not available for level monitors
-        '''
+        """
         if self._level:
-            raise TypeError('bin_number_of_entries not available for level monitors')
+            raise TypeError("bin_number_of_entries not available for level monitors")
         x = self._xweight(ex0=ex0)[0]
         return sum(1 for vx in x if (vx > lowerbound) and (vx <= upperbound))
 
     def bin_weight(self, lowerbound, upperbound):
-        '''
+        """
         total weight of tallied values in range (lowerbound,upperbound]
 
         Parameters
@@ -1011,13 +1032,13 @@ class Monitor(object):
         Note
         ----
         Not available for level monitors
-        '''
+        """
         if self._level:
-            raise TypeError('bin_weight not available for level monitors')
+            raise TypeError("bin_weight not available for level monitors")
         return self.sys_bin_weight(lowerbound, upperbound)
 
     def bin_duration(self, lowerbound, upperbound):
-        '''
+        """
         total duration of tallied values in range (lowerbound,upperbound]
 
         Parameters
@@ -1038,9 +1059,9 @@ class Monitor(object):
         Note
         ----
         Not available for level monitors
-        '''
+        """
         if not self._level:
-            raise TypeError('bin_duration not available for non level monitors')
+            raise TypeError("bin_duration not available for non level monitors")
         return self.sys_bin_weight(lowerbound, upperbound)
 
     def sys_bin_weight(self, lowerbound, upperbound):
@@ -1048,7 +1069,7 @@ class Monitor(object):
         return sum((vweight for vx, vweight in zip(x, weight) if (vx > lowerbound) and (vx <= upperbound)))
 
     def value_number_of_entries(self, value):
-        '''
+        """
         count of the number of tallied values equal to value or in value
 
         Parameters
@@ -1064,9 +1085,9 @@ class Monitor(object):
         Note
         ----
         Not available for level monitors
-        '''
+        """
         if self._level:
-            raise TypeError('value_number_of_entries not available for level monitors')
+            raise TypeError("value_number_of_entries not available for level monitors")
         if isinstance(value, (list, tuple, set)):
             value = [str(v) for v in value]
         else:
@@ -1076,7 +1097,7 @@ class Monitor(object):
         return sum(1 for vx in x if (str(vx).strip() in value))
 
     def value_weight(self, value):
-        '''
+        """
         total weight of tallied values equal to value or in value
 
         Parameters
@@ -1092,13 +1113,13 @@ class Monitor(object):
         Note
         ----
         Not available for level monitors
-        '''
+        """
         if self._level:
-            raise TypeError('value_weight not supported for level monitors')
+            raise TypeError("value_weight not supported for level monitors")
         return self.sys_value_weight(value)
 
     def value_duration(self, value):
-        '''
+        """
         total duration of tallied values equal to value or in value
 
         Parameters
@@ -1114,9 +1135,9 @@ class Monitor(object):
         Note
         ----
         Not available for non level monitors
-        '''
+        """
         if not self._level:
-            raise TypeError('value_weight not available for non level monitors')
+            raise TypeError("value_weight not available for non level monitors")
         return self.sys_value_weight(value)
 
     def sys_value_weight(self, value):
@@ -1130,7 +1151,7 @@ class Monitor(object):
         return sum(vweight for (vx, vweight) in zip(x, weight) if (str(vx).strip() in value))
 
     def number_of_entries(self, ex0=False):
-        '''
+        """
         count of the number of entries
 
         Parameters
@@ -1145,14 +1166,14 @@ class Monitor(object):
         Note
         ----
         Not available for level monitors
-        '''
+        """
         if self._level:
-            raise TypeError('number_of_entries not available for level monitors')
+            raise TypeError("number_of_entries not available for level monitors")
         x = self._xweight(ex0=ex0)[0]
         return len(x)
 
     def number_of_entries_zero(self):
-        '''
+        """
         count of the number of zero entries
 
         Returns
@@ -1162,13 +1183,13 @@ class Monitor(object):
         Note
         ----
         Not available for level monitors
-        '''
+        """
         if self._level:
-            raise TypeError('number_of_entries_zero not available for level monitors')
+            raise TypeError("number_of_entries_zero not available for level monitors")
         return self.number_of_entries() - self.number_of_entries(ex0=True)
 
     def weight(self, ex0=False):
-        '''
+        """
         sum of weights
 
         Parameters
@@ -1183,13 +1204,13 @@ class Monitor(object):
         Note
         ----
         Not available for level monitors
-        '''
+        """
         if self._level:
-            raise TypeError('weight not available for level monitors')
+            raise TypeError("weight not available for level monitors")
         return self.sys_weight(ex0)
 
     def duration(self, ex0=False):
-        '''
+        """
         total duration
 
         Parameters
@@ -1204,9 +1225,9 @@ class Monitor(object):
         Note
         ----
         Not available for non level monitors
-        '''
+        """
         if not self._level:
-            raise TypeError('duration not available for non level monitors')
+            raise TypeError("duration not available for non level monitors")
         return self.sys_weight(ex0)
 
     def sys_weight(self, ex0=False):
@@ -1214,7 +1235,7 @@ class Monitor(object):
         return sum(weight)
 
     def weight_zero(self):
-        '''
+        """
         sum of weights of zero entries
 
         Returns
@@ -1224,13 +1245,13 @@ class Monitor(object):
         Note
         ----
         Not available for level monitors
-        '''
+        """
         if self._level:
-            raise TypeError('weight_zero not available for level monitors')
+            raise TypeError("weight_zero not available for level monitors")
         return self.sys_weight_zero()
 
     def duration_zero(self):
-        '''
+        """
         total duratiom of zero entries
 
         Returns
@@ -1240,16 +1261,16 @@ class Monitor(object):
         Note
         ----
         Not available for non level monitors
-        '''
+        """
         if not self._level:
-            raise TypeError('duration_zero not available for non level monitors')
+            raise TypeError("duration_zero not available for non level monitors")
         return self.sys_weight_zero()
 
     def sys_weight_zero(self):
         return self.sys_weight() - self.sys_weight(ex0=True)
 
     def print_statistics(self, show_header=True, show_legend=True, do_indent=False, as_str=False, file=None):
-        '''
+        """
         print monitor statistics
 
         Parameters
@@ -1274,56 +1295,73 @@ class Monitor(object):
         Returns
         -------
         statistics (if as_str is True) : str
-        '''
+        """
         result = []
         if do_indent:
             ll = 45
         else:
             ll = 0
-        indent = pad('', ll)
+        indent = pad("", ll)
 
         if show_header:
             result.append(
-                indent + 'Statistics of {} at {}'.format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
+                indent + "Statistics of {} at {}".format(self.name(), fn(self.env._now - self.env._offset, 13, 3))
+            )
 
         if show_legend:
-            result.append(
-                indent + '                        all    excl.zero         zero')
-            result.append(
-                pad('-' * (ll - 1) + ' ', ll) + '-------------- ------------ ------------ ------------')
+            result.append(indent + "                        all    excl.zero         zero")
+            result.append(pad("-" * (ll - 1) + " ", ll) + "-------------- ------------ ------------ ------------")
 
         if self.sys_weight() == 0:
-            result.append(pad(self.name(), ll) + 'no data')
+            result.append(pad(self.name(), ll) + "no data")
             return return_or_print(result, as_str, file)
         if self._weight:
-            result.append(pad(self.name(), ll) + pad(self.weight_legend, 14) +
-              '{}{}{}'.format(fn(self.sys_weight(), 13, 3),
-              fn(self.sys_weight(ex0=True), 13, 3), fn(self.sys_weight_zero(), 13, 3)))
+            result.append(
+                pad(self.name(), ll)
+                + pad(self.weight_legend, 14)
+                + "{}{}{}".format(
+                    fn(self.sys_weight(), 13, 3),
+                    fn(self.sys_weight(ex0=True), 13, 3),
+                    fn(self.sys_weight_zero(), 13, 3),
+                )
+            )
         else:
-            result.append(pad(self.name(), ll) + pad('entries', 14) +
-              '{}{}{}'.format(fn(self.number_of_entries(), 13, 3),
-                fn(self.number_of_entries(ex0=True), 13, 3), fn(self.number_of_entries_zero(), 13, 3)))
+            result.append(
+                pad(self.name(), ll)
+                + pad("entries", 14)
+                + "{}{}{}".format(
+                    fn(self.number_of_entries(), 13, 3),
+                    fn(self.number_of_entries(ex0=True), 13, 3),
+                    fn(self.number_of_entries_zero(), 13, 3),
+                )
+            )
 
-        result.append(indent + 'mean          {}{}'.
-              format(fn(self.mean(), 13, 3), fn(self.mean(ex0=True), 13, 3)))
+        result.append(indent + "mean          {}{}".format(fn(self.mean(), 13, 3), fn(self.mean(ex0=True), 13, 3)))
 
-        result.append(indent + 'std.deviation {}{}'.
-              format(fn(self.std(), 13, 3), fn(self.std(ex0=True), 13, 3)))
-        result.append('')
-        result.append(indent + 'minimum       {}{}'.
-              format(fn(self.minimum(), 13, 3), fn(self.minimum(ex0=True), 13, 3)))
-        result.append(indent + 'median        {}{}'.
-              format(fn(self.percentile(50), 13, 3), fn(self.percentile(50, ex0=True), 13, 3)))
-        result.append(indent + '90% percentile{}{}'.
-              format(fn(self.percentile(90), 13, 3), fn(self.percentile(90, ex0=True), 13, 3)))
-        result.append(indent + '95% percentile{}{}'.
-              format(fn(self.percentile(95), 13, 3), fn(self.percentile(95, ex0=True), 13, 3)))
-        result.append(indent + 'maximum       {}{}'.
-              format(fn(self.maximum(), 13, 3), fn(self.maximum(ex0=True), 13, 3)))
+        result.append(indent + "std.deviation {}{}".format(fn(self.std(), 13, 3), fn(self.std(ex0=True), 13, 3)))
+        result.append("")
+        result.append(
+            indent + "minimum       {}{}".format(fn(self.minimum(), 13, 3), fn(self.minimum(ex0=True), 13, 3))
+        )
+        result.append(
+            indent
+            + "median        {}{}".format(fn(self.percentile(50), 13, 3), fn(self.percentile(50, ex0=True), 13, 3))
+        )
+        result.append(
+            indent
+            + "90% percentile{}{}".format(fn(self.percentile(90), 13, 3), fn(self.percentile(90, ex0=True), 13, 3))
+        )
+        result.append(
+            indent
+            + "95% percentile{}{}".format(fn(self.percentile(95), 13, 3), fn(self.percentile(95, ex0=True), 13, 3))
+        )
+        result.append(
+            indent + "maximum       {}{}".format(fn(self.maximum(), 13, 3), fn(self.maximum(ex0=True), 13, 3))
+        )
         return return_or_print(result, as_str, file)
 
     def histogram_autoscale(self, ex0=False):
-        '''
+        """
         used by histogram_print to autoscale |n|
         may be overridden.
 
@@ -1335,7 +1373,7 @@ class Monitor(object):
         Returns
         -------
         bin_width, lowerbound, number_of_bins : tuple
-        '''
+        """
         xmax = self.maximum(ex0=ex0)
         xmin = self.minimum(ex0=ex0)
 
@@ -1352,9 +1390,10 @@ class Monitor(object):
                 break
         return bin_width, lowerbound, number_of_bins
 
-    def print_histograms(self, number_of_bins=None,
-        lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None):
-        '''
+    def print_histograms(
+        self, number_of_bins=None, lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None
+    ):
+        """
         print monitor statistics and histogram
 
         Parameters
@@ -1397,12 +1436,13 @@ class Monitor(object):
         If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
         with a maximum of 30 classes. |n|
         Exactly same functionality as Monitor.print_histogram()
-        '''
+        """
         return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str, file=file)
 
-    def print_histogram(self, number_of_bins=None,
-      lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None):
-        '''
+    def print_histogram(
+        self, number_of_bins=None, lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None
+    ):
+        """
         print monitor statistics and histogram
 
         Parameters
@@ -1445,34 +1485,31 @@ class Monitor(object):
         ----
         If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
         with a maximum of 30 classes.
-        '''
+        """
         result = []
-        result.append('Histogram of ' + self.name() + ('[ex0]' if ex0 else ''))
+        result.append("Histogram of " + self.name() + ("[ex0]" if ex0 else ""))
 
         x, weight = self._xweight(ex0=ex0, force_numeric=not values)
         weight_total = sum(weight)
 
         if weight_total == 0:
-            result.append('')
-            result.append('no data')
+            result.append("")
+            result.append("no data")
         else:
             if values:
                 nentries = len(x)
                 if self._weight:
-                    result.append(pad(self.weight_legend, 13) +
-                        '{}'.format(fn(weight_total, 13, 3)))
+                    result.append(pad(self.weight_legend, 13) + "{}".format(fn(weight_total, 13, 3)))
                 if not self._level:
-                    result.append(pad('entries', 13) + '{}'.
-                        format(fn(nentries, 13, 3)))
-                result.append('')
+                    result.append(pad("entries", 13) + "{}".format(fn(nentries, 13, 3)))
+                result.append("")
                 if self._level:
-                    result.append('value                ' + rpad(self.weight_legend, 13) + '     %')
+                    result.append("value                " + rpad(self.weight_legend, 13) + "     %")
                 else:
                     if self._weight:
-                        result.append('value                ' +
-                            rpad(self.weight_legend, 13) + '     % entries     %')
+                        result.append("value                " + rpad(self.weight_legend, 13) + "     % entries     %")
                     else:
-                        result.append('value               entries     %')
+                        result.append("value               entries     %")
                 as_set = {str(x).strip() for x in set(x)}
 
                 values = sorted(list(as_set), key=self.key)
@@ -1490,28 +1527,32 @@ class Monitor(object):
                     perc = count / weight_total
                     scale = 80
                     n = int(perc * scale)
-                    s = ('*' * n) + (' ' * (scale - n))
+                    s = ("*" * n) + (" " * (scale - n))
 
                     if self._level:
-                        result.append(pad(str(value), 20) + fn(count, 14, 3) + fn(perc * 100, 6, 1) + ' ' + s)
+                        result.append(pad(str(value), 20) + fn(count, 14, 3) + fn(perc * 100, 6, 1) + " " + s)
                     else:
                         if self._weight:
-                            result.append(pad(str(value), 20) + fn(count, 14, 3) +
-                                fn(perc * 100, 6, 1) +
-                                rpad(str(count_entries), 8) +
-                                fn(count_entries * 100 / nentries, 6, 1) + ' ' + s)
-                        else:
                             result.append(
-                                pad(str(value), 20) + rpad(str(count), 7) + fn(perc * 100, 6, 1) + ' ' + s)
+                                pad(str(value), 20)
+                                + fn(count, 14, 3)
+                                + fn(perc * 100, 6, 1)
+                                + rpad(str(count_entries), 8)
+                                + fn(count_entries * 100 / nentries, 6, 1)
+                                + " "
+                                + s
+                            )
+                        else:
+                            result.append(pad(str(value), 20) + rpad(str(count), 7) + fn(perc * 100, 6, 1) + " " + s)
             else:
                 bin_width, lowerbound, number_of_bins = self.histogram_autoscale()
                 result.append(self.print_statistics(show_header=False, show_legend=True, do_indent=False, as_str=True))
                 if number_of_bins >= 0:
-                    result.append('')
+                    result.append("")
                     if self._weight:
-                        result.append('           <= ' + rpad(self.weight_legend, 13) + '     %  cum%')
+                        result.append("           <= " + rpad(self.weight_legend, 13) + "     %  cum%")
                     else:
-                        result.append('           <=       entries     %  cum%')
+                        result.append("           <=       entries     %  cum%")
 
                     cumperc = 0
                     for i in range(-1, number_of_bins + 1):
@@ -1530,31 +1571,34 @@ class Monitor(object):
 
                         perc = count / weight_total
                         if weight_total == inf:
-                            s = ''
+                            s = ""
                         else:
                             cumperc += perc
                             scale = 80
                             n = int(perc * scale)
                             ncum = int(cumperc * scale) + 1
-                            s = ('*' * n) + (' ' * (scale - n))
-                            s = s[:ncum - 1] + '|' + s[ncum + 1:]
+                            s = ("*" * n) + (" " * (scale - n))
+                            s = s[: ncum - 1] + "|" + s[ncum + 1 :]  # NOQA
 
-                        result.append('{} {}{}{} {}'.
-                              format(fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s))
-        result.append('')
+                        result.append(
+                            "{} {}{}{} {}".format(
+                                fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s
+                            )
+                        )
+        result.append("")
         return return_or_print(result, as_str=as_str, file=file)
 
     def key(self, x):
         try:
             x1 = float(x)
-            x2 = ''
+            x2 = ""
         except ValueError:
             x1 = math.inf
             x2 = x
-        return(x1, x2)
+        return (x1, x2)
 
     def animate(self, *args, **kwargs):
-        '''
+        """
         animates the monitor in a panel
 
         Parameters
@@ -1581,7 +1625,7 @@ class Monitor(object):
             color of the title (default foreground color)
 
         titlefont : font
-            font of the title (default '')
+            font of the title (default null string)
 
         titlefontsize : int
             size of the font of the title (default 15)
@@ -1635,12 +1679,12 @@ class Monitor(object):
         It is recommended to use sim.AnimateMonitor instead |n|
 
         All measures are in screen coordinates |n|
-        '''
+        """
 
         return AnimateMonitor(monitor=self, *args, **kwargs)
 
     def x(self, ex0=False, force_numeric=True):
-        '''
+        """
         array/list of tallied values
 
         Parameters
@@ -1659,13 +1703,13 @@ class Monitor(object):
         Note
         ----
         Not available for level monitors. Use xduration(), xt() or tx() instead.
-        '''
+        """
         if self._level:
-            raise TypeError('x not available for level monitors')
+            raise TypeError("x not available for level monitors")
         return self._xweight(ex0=ex0, force_numeric=force_numeric)[0]
 
     def xweight(self, ex0=False, force_numeric=True):
-        '''
+        """
         array/list of tallied values
 
         Parameters
@@ -1684,13 +1728,13 @@ class Monitor(object):
         Note
         ----
         not available for level monitors
-        '''
+        """
         if self._level:
-            raise TypeError('xweight not available for level monitors')
+            raise TypeError("xweight not available for level monitors")
         return self._xweight(ex0, force_numeric)
 
     def xduration(self, ex0=False, force_numeric=True):
-        '''
+        """
         array/list of tallied values
 
         Parameters
@@ -1709,13 +1753,13 @@ class Monitor(object):
         Note
         ----
         not available for non level monitors
-        '''
+        """
         if not self._level:
-            raise TypeError('xduration not available for non level monitors')
+            raise TypeError("xduration not available for non level monitors")
         return self._xweight(ex0, force_numeric)
 
     def xt(self, ex0=False, exoff=False, force_numeric=True, add_now=True):
-        '''
+        """
         tuple of array/list with x-values and array with timestamp
 
         Parameters
@@ -1744,7 +1788,7 @@ class Monitor(object):
         ----
         The value self.off is stored when monitoring is turned off |n|
         The timestamps are not corrected for any reset_now() adjustment.
-        '''
+        """
         if not self._level:
             exoff = False
             add_now = False
@@ -1762,7 +1806,7 @@ class Monitor(object):
             xx = array.array(typecode)
         else:
             xx = []
-        t = array.array('d')
+        t = array.array("d")
         if add_now:
             addx = [x[-1]]
             addt = [self.env._now]
@@ -1779,7 +1823,7 @@ class Monitor(object):
         return xx, t
 
     def tx(self, ex0=False, exoff=False, force_numeric=False, add_now=True):
-        '''
+        """
         tuple of array with timestamps and array/list with x-values
 
         Parameters
@@ -1808,7 +1852,7 @@ class Monitor(object):
         ----
         The value self.off is stored when monitoring is turned off |n|
         The timestamps are not corrected for any reset_now() adjustment.
-        '''
+        """
         return tuple(reversed(self.xt(ex0=ex0, exoff=exoff, force_numeric=force_numeric, add_now=add_now)))
 
     def _xweight(self, ex0=False, force_numeric=True):
@@ -1827,7 +1871,7 @@ class Monitor(object):
             typecode = x.typecode
 
         if self._level:
-            weightall = array.array('d')
+            weightall = array.array("d")
             lastt = None
             for t in self._t:
                 if lastt is not None:
@@ -1836,7 +1880,7 @@ class Monitor(object):
 
             weightall.append(self.env._now - lastt)
 
-            weight = array.array('d')
+            weight = array.array("d")
             if typecode:
                 xx = array.array(typecode)
             else:
@@ -1858,18 +1902,18 @@ class Monitor(object):
 
             if self._weight:
                 if ex0:
-                    xweight = (x, array.array('d', [vweight for vx, vweight in zip(x, self._weight) if vx != 0]))
+                    xweight = (x, array.array("d", [vweight for vx, vweight in zip(x, self._weight) if vx != 0]))
                 else:
                     xweight = (x, self._weight)
             else:
-                xweight = (x, array.array('d', (1,) * len(x)))
+                xweight = (x, array.array("d", (1,) * len(x)))
 
         Monitor.cached_xweight[(ex0, force_numeric)] = (thishash, xweight)
         return xweight
 
 
 class AnimateMonitor(object):
-    '''
+    """
     animates a monitor in a panel
 
     Parameters
@@ -1896,7 +1940,7 @@ class AnimateMonitor(object):
         color of the title (default foreground color)
 
     titlefont : font
-        font of the title (default '')
+        font of the title (default null string)
 
     titlefontsize : int
         size of the font of the title (default 15)
@@ -1947,13 +1991,32 @@ class AnimateMonitor(object):
     Note
     ----
     All measures are in screen coordinates |n|
-    '''
+    """
 
-    def __init__(self, monitor, linecolor='fg', linewidth=None, fillcolor='', bordercolor='fg', borderlinewidth=1,
-        titlecolor='fg', nowcolor='red',
-        titlefont='', titlefontsize=15,
-        title=None, x=0, y=0, vertical_offset=2, parent=None,
-        vertical_scale=5, horizontal_scale=None, width=200, height=75, xy_anchor='sw', layer=0):
+    def __init__(
+        self,
+        monitor,
+        linecolor="fg",
+        linewidth=None,
+        fillcolor="",
+        bordercolor="fg",
+        borderlinewidth=1,
+        titlecolor="fg",
+        nowcolor="red",
+        titlefont="",
+        titlefontsize=15,
+        title=None,
+        x=0,
+        y=0,
+        vertical_offset=2,
+        parent=None,
+        vertical_scale=5,
+        horizontal_scale=None,
+        width=200,
+        height=75,
+        xy_anchor="sw",
+        layer=0,
+    ):
 
         _checkismonitor(monitor)
 
@@ -1972,31 +2035,74 @@ class AnimateMonitor(object):
         self.aos = []
         self.parent = parent
         self.env = monitor.env
-        self.aos.append(AnimateRectangle(spec=(0, 0, width, height), offsetx=xll, offsety=yll,
-            fillcolor=fillcolor, linewidth=borderlinewidth, linecolor=bordercolor,
-            screen_coordinates=True, layer=layer))
-        self.aos.append(AnimateText(text=title, textcolor=titlecolor,
-            offsetx=xll, offsety=yll + height + titlefontsize * 0.15, text_anchor='sw',
-            screen_coordinates=True, fontsize=titlefontsize, font=titlefont, layer=layer))
+        self.aos.append(
+            AnimateRectangle(
+                spec=(0, 0, width, height),
+                offsetx=xll,
+                offsety=yll,
+                fillcolor=fillcolor,
+                linewidth=borderlinewidth,
+                linecolor=bordercolor,
+                screen_coordinates=True,
+                layer=layer,
+            )
+        )
+        self.aos.append(
+            AnimateText(
+                text=title,
+                textcolor=titlecolor,
+                offsetx=xll,
+                offsety=yll + height + titlefontsize * 0.15,
+                text_anchor="sw",
+                screen_coordinates=True,
+                fontsize=titlefontsize,
+                font=titlefont,
+                layer=layer,
+            )
+        )
 
-        self.aos.append(_Animate_t_Line(line0=(), linecolor0=nowcolor,
-            monitor=monitor, width=width, height=height, t_scale=horizontal_scale,
-            layer=layer, offsetx0=xll, offsety0=yll,
-            screen_coordinates=True))
-        self.aos.append(_Animate_t_x_Line(monitor=monitor, linecolor0=linecolor, line0=(),
-            linewidth0=linewidth, as_points=not monitor._level,
-            screen_coordinates=True, offsetx0=xll, offsety0=yll,
-            width=width, height=height, value_offsety=vertical_offset, value_scale=vertical_scale,
-            linewidth=linewidth, t_scale=horizontal_scale, layer=layer))
+        self.aos.append(
+            _Animate_t_Line(
+                line0=(),
+                linecolor0=nowcolor,
+                monitor=monitor,
+                width=width,
+                height=height,
+                t_scale=horizontal_scale,
+                layer=layer,
+                offsetx0=xll,
+                offsety0=yll,
+                screen_coordinates=True,
+            )
+        )
+        self.aos.append(
+            _Animate_t_x_Line(
+                monitor=monitor,
+                linecolor0=linecolor,
+                line0=(),
+                linewidth0=linewidth,
+                as_points=not monitor._level,
+                screen_coordinates=True,
+                offsetx0=xll,
+                offsety0=yll,
+                width=width,
+                height=height,
+                value_offsety=vertical_offset,
+                value_scale=vertical_scale,
+                linewidth=linewidth,
+                t_scale=horizontal_scale,
+                layer=layer,
+            )
+        )
         self.env.sys_objects.append(self)
 
     def update(self, t):
         pass
 
     def remove(self):
-        '''
+        """
         removes the animate object and thus closes this animation
-        '''
+        """
         for ao in self.aos:
             ao.remove()
         self.env.sys_objects.remove(self)
@@ -2005,7 +2111,6 @@ class AnimateMonitor(object):
 if Pythonista:
 
     class AnimationScene(scene.Scene):
-
         def __init__(self, env, *args, **kwargs):
             scene.Scene.__init__(self, *args, **kwargs)
 
@@ -2018,17 +2123,14 @@ if Pythonista:
                 for uio in env.ui_objects:
                     ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True)
                     uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True)
-                    if uio.type == 'button':
-                        if touch.location in \
-                                scene.Rect(ux - 2, uy - 2, uio.width + 2, uio.height + 2):
+                    if uio.type == "button":
+                        if touch.location in scene.Rect(ux - 2, uy - 2, uio.width + 2, uio.height + 2):
                             uio.action()
                             break  # new buttons might have been installed
-                    if uio.type == 'slider':
-                        if touch.location in\
-                                scene.Rect(ux - 2, uy - 2, uio.width + 4, uio.height + 4):
+                    if uio.type == "slider":
+                        if touch.location in scene.Rect(ux - 2, uy - 2, uio.width + 4, uio.height + 4):
                             xsel = touch.location[0] - ux
-                            uio._v = uio.vmin + \
-                                round(-0.5 + xsel / uio.xdelta) * uio.resolution
+                            uio._v = uio.vmin + round(-0.5 + xsel / uio.xdelta) * uio.resolution
                             uio._v = max(min(uio._v, uio.vmax), uio.vmin)
                             if uio.action is not None:
                                 uio.action(uio._v)
@@ -2038,7 +2140,7 @@ if Pythonista:
             env = g.animation_env
             g.in_draw = True
             if (env is not None) and env._animate and env.running:
-                scene.background(env.pythonistacolor('bg'))
+                scene.background(env.pythonistacolor("bg"))
 
                 if env._synced or env._video:  # video forces synced
                     if env._video:
@@ -2047,10 +2149,9 @@ if Pythonista:
                         if env.paused:
                             env.t = env.start_animation_time
                         else:
-                            env.t = \
-                                env.start_animation_time +\
-                                ((time.time() -
-                                  env.start_animation_clocktime) * env._speed)
+                            env.t = env.start_animation_time + (
+                                (time.time() - env.start_animation_clocktime) * env._speed
+                            )
                     while (env.peek() < env.t) and env.running and env._animate:
                         env.step()
                 else:
@@ -2062,37 +2163,34 @@ if Pythonista:
                 if not env.paused:
                     env.frametimes.append(time.time())
 
-                env.an_objects.sort(
-                    key=lambda obj: (-obj.layer(env.t), obj.sequence))
+                env.an_objects.sort(key=lambda obj: (-obj.layer(env.t), obj.sequence))
                 touchvalues = self.touches.values()
 
-                capture_image = Image.new('RGB',
-                    (env._width, env._height), env.colorspec_to_tuple('bg'))
+                capture_image = Image.new("RGB", (env._width, env._height), env.colorspec_to_tuple("bg"))
 
                 env.animation_pre_tick(env.t)
                 env.animation_pre_tick_sys(env.t)
                 for ao in env.an_objects:
                     ao.make_pil_image(env.t)
                     if ao._image_visible:
-                        capture_image.paste(ao._image,
-                            (int(ao._image_x),
-                            int(env._height - ao._image_y - ao._image.size[1])),
-                            ao._image)
+                        capture_image.paste(
+                            ao._image, (int(ao._image_x), int(env._height - ao._image_y - ao._image.size[1])), ao._image
+                        )
                 env.animation_post_tick(env.t)
 
                 ims = scene.load_pil_image(capture_image)
                 scene.image(ims, 0, 0, *capture_image.size)
                 scene.unload_image(ims)
                 if env._video and (not env.paused):
-                    if env._video_out == 'gif':  # just to be sure
-                        env._images.append(capture_image.convert('RGB'))
+                    if env._video_out == "gif":  # just to be sure
+                        env._images.append(capture_image.convert("RGB"))
                 for uio in env.ui_objects:
                     ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True)
                     uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True)
 
-                    if uio.type == 'entry':
-                        raise NotImplementedError('AnimateEntry not supported on Pythonista')
-                    if uio.type == 'button':
+                    if uio.type == "entry":
+                        raise NotImplementedError("AnimateEntry not supported on Pythonista")
+                    if uio.type == "button":
                         linewidth = uio.linewidth
 
                         scene.push_matrix()
@@ -2101,14 +2199,12 @@ if Pythonista:
                         scene.stroke_weight(linewidth)
                         scene.rect(ux - 4, uy + 2, uio.width + 8, uio.height - 4)
                         scene.tint(env.pythonistacolor(uio.color))
-                        scene.translate(ux + uio.width / 2,
-                                        uy + uio.height / 2)
-                        scene.text(uio.text(), uio.font,
-                                   uio.fontsize, alignment=5)
+                        scene.translate(ux + uio.width / 2, uy + uio.height / 2)
+                        scene.text(uio.text(), uio.font, uio.fontsize, alignment=5)
                         scene.tint(1, 1, 1, 1)
                         # required for proper loading of images
                         scene.pop_matrix()
-                    elif uio.type == 'slider':
+                    elif uio.type == "slider":
                         scene.push_matrix()
                         scene.tint(env.pythonistacolor(uio.labelcolor))
                         v = uio.vmin
@@ -2123,11 +2219,9 @@ if Pythonista:
                             v += uio.resolution
                         thisv = uio._v
                         for touch in touchvalues:
-                            if touch.location in\
-                                    scene.Rect(ux, uy, uio.width, uio.height):
+                            if touch.location in scene.Rect(ux, uy, uio.width, uio.height):
                                 xsel = touch.location[0] - ux
-                                vsel = round(-0.5 + xsel /
-                                             uio.xdelta) * uio.resolution
+                                vsel = round(-0.5 + xsel / uio.xdelta) * uio.resolution
                                 thisv = vsel
                         scene.stroke(env.pythonistacolor(uio.linecolor))
                         v = uio.vmin
@@ -2149,8 +2243,7 @@ if Pythonista:
                             scene.text(uio.label, uio.font, uio.fontsize, alignment=9)
                         scene.pop_matrix()
                         scene.translate(ux + uio.width, uy + uio.height + 2)
-                        scene.text(str(thisv) + ' ',
-                                   uio.font, uio.fontsize, alignment=7)
+                        scene.text(str(thisv) + " ", uio.font, uio.fontsize, alignment=7)
                         scene.tint(1, 1, 1, 1)
                         # required for proper loading of images later
                         scene.pop_matrix()
@@ -2159,7 +2252,7 @@ if Pythonista:
                 scene.pop_matrix()
                 scene.tint(1, 1, 1, 1)
                 scene.translate(width / 2, height / 2)
-                scene.text('salabim animation paused/stopped')
+                scene.text("salabim animation paused/stopped")
                 scene.pop_matrix()
                 scene.tint(1, 1, 1, 1)
             if env is not None:
@@ -2169,7 +2262,7 @@ if Pythonista:
             g.in_draw = False
 
 
-class Qmember():
+class Qmember:
     def __init__(self):
         pass
 
@@ -2189,12 +2282,12 @@ class Qmember():
         c._qmembers[q] = self
         if q.env._trace:
             if not q._isinternal:
-                q.env.print_trace('', '', c.name(), 'enter ' + q.name())
+                q.env.print_trace("", "", c.name(), "enter " + q.name())
         q.length.tally(q._length)
 
 
 class Queue(object):
-    '''
+    """
     Queue object
 
     Parameters
@@ -2219,7 +2312,7 @@ class Queue(object):
     env : Environment
         environment where the queue is defined |n|
         if omitted, default_env will be used
-    '''
+    """
 
     def __init__(self, name=None, monitor=True, fill=None, env=None, *args, **kwargs):
         if env is None:
@@ -2242,9 +2335,9 @@ class Queue(object):
         self._iter_touched = {}
         self._isinternal = False
         self.length = Monitor(
-            'Length of ' + self.name(), level=True, initial_tally=0, monitor=monitor, type='uint32', env=self.env)
-        self.length_of_stay = Monitor(
-            'Length of stay in ' + self.name(), monitor=monitor, type='float')
+            "Length of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="uint32", env=self.env
+        )
+        self.length_of_stay = Monitor("Length of stay in " + self.name(), monitor=monitor, type="float")
         if fill is not None:
             savetrace = self.env._trace
             self.env._trace = False
@@ -2252,21 +2345,21 @@ class Queue(object):
                 c.enter(self)
             self.env._trace = savetrace
         if self.env._trace:
-            self.env.print_trace('', '', self.name() + ' create')
+            self.env.print_trace("", "", self.name() + " create")
         self.setup(*args, **kwargs)
 
     def setup(self):
-        '''
+        """
         called immediately after initialization of a queue.
 
         by default this is a dummy method, but it can be overridden.
 
         only keyword arguments are passed
-        '''
+        """
         pass
 
     def animate(self, *args, **kwargs):
-        '''
+        """
         Animates the components in the queue.
 
         Parameters
@@ -2280,10 +2373,10 @@ class Queue(object):
             default: 50
 
         direction : str
-            if 'w', waiting line runs westwards (i.e. from right to left) |n|
-            if 'n', waiting line runs northeards (i.e. from bottom to top) |n|
-            if 'e', waiting line runs eastwards (i.e. from left to right) (default) |n|
-            if 's', waiting line runs southwards (i.e. from top to bottom)
+            if "w", waiting line runs westwards (i.e. from right to left) |n|
+            if "n", waiting line runs northeards (i.e. from bottom to top) |n|
+            if "e", waiting line runs eastwards (i.e. from left to right) (default) |n|
+            if "s", waiting line runs southwards (i.e. from top to bottom)
 
         reverse : bool
             if False (default), display in normal order. If True, reversed.
@@ -2324,11 +2417,11 @@ class Queue(object):
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
 
-        '''
+        """
         return AnimateQueue(self, *args, **kwargs)
 
     def reset_monitors(self, monitor=None):
-        '''
+        """
         resets queue monitor length_of_stay and length
 
         Parameters
@@ -2341,12 +2434,12 @@ class Queue(object):
         Note
         ----
         it is possible to reset individual monitoring with length_of_stay.reset() and length.reset()
-        '''
+        """
         self.length.reset(monitor=monitor)
         self.length_of_stay.reset(monitor=monitor)
 
     def monitor(self, value):
-        '''
+        """
         enables/disables monitoring of length_of_stay and length
 
         Parameters
@@ -2358,13 +2451,13 @@ class Queue(object):
         Note
         ----
         it is possible to individually control monitoring with length_of_stay.monitor() and length.monitor()
-        '''
+        """
 
         self.length.monitor(value=value)
         self.length_of_stay.monitor(value=value)
 
     def register(self, registry):
-        '''
+        """
         registers the queue in the registry
 
         Parameters
@@ -2379,16 +2472,16 @@ class Queue(object):
         Note
         ----
         Use Queue.deregister if queue does not longer need to be registered.
-        '''
+        """
         if not isinstance(registry, list):
-            raise TypeError('registry not list')
+            raise TypeError("registry not list")
         if self in registry:
-            raise ValueError(self.name() + ' already in registry')
+            raise ValueError(self.name() + " already in registry")
         registry.append(self)
         return self
 
     def deregister(self, registry):
-        '''
+        """
         deregisters the queue in the registry
 
         Parameters
@@ -2399,19 +2492,19 @@ class Queue(object):
         Returns
         -------
         queue (self) : Queue
-        '''
+        """
         if not isinstance(registry, list):
-            raise TypeError('registry not list')
+            raise TypeError("registry not list")
         if self not in registry:
-            raise ValueError(self.name() + ' not in registry')
+            raise ValueError(self.name() + " not in registry")
         registry.remove(self)
         return self
 
     def __repr__(self):
-        return object_to_str(self) + ' (' + self.name() + ')'
+        return object_to_str(self) + " (" + self.name() + ")"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the queue
 
         Parameters
@@ -2427,24 +2520,29 @@ class Queue(object):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append(object_to_str(self) + ' ' + hex(id(self)))
-        result.append('  name=' + self.name())
+        result.append(object_to_str(self) + " " + hex(id(self)))
+        result.append("  name=" + self.name())
         if self._length:
-            result.append('  component(s):')
+            result.append("  component(s):")
             mx = self._head.successor
             while mx != self._tail:
-                result.append('    ' + pad(mx.component.name(), 20) +
-                    ' enter_time' + self.env.time_to_str(mx.enter_time - self.env._offset) +
-                    ' priority=' + str(mx.priority))
+                result.append(
+                    "    "
+                    + pad(mx.component.name(), 20)
+                    + " enter_time"
+                    + self.env.time_to_str(mx.enter_time - self.env._offset)
+                    + " priority="
+                    + str(mx.priority)
+                )
                 mx = mx.successor
         else:
-            result.append('  no components')
+            result.append("  no components")
         return return_or_print(result, as_str, file)
 
     def print_statistics(self, as_str=False, file=None):
-        '''
+        """
         prints a summary of statistics of a queue
 
         Parameters
@@ -2460,19 +2558,19 @@ class Queue(object):
         Returns
         -------
         statistics (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Statistics of {} at {}'.format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
-        result.append(self.length.print_statistics(
-            show_header=False, show_legend=True, do_indent=True, as_str=True))
+        result.append("Statistics of {} at {}".format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
+        result.append(self.length.print_statistics(show_header=False, show_legend=True, do_indent=True, as_str=True))
 
-        result.append('')
-        result.append(self.length_of_stay.print_statistics(
-            show_header=False, show_legend=False, do_indent=True, as_str=True))
+        result.append("")
+        result.append(
+            self.length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True, as_str=True)
+        )
         return return_or_print(result, as_str, file)
 
     def print_histograms(self, exclude=(), as_str=False, file=None):
-        '''
+        """
         prints the histograms of the length and length_of_stay monitor of the queue
 
         Parameters
@@ -2492,7 +2590,7 @@ class Queue(object):
         Returns
         -------
         histograms (if as_str is True) : str
-        '''
+        """
         result = []
         for m in (self.length, self.length_of_stay):
             if m not in exclude:
@@ -2500,7 +2598,7 @@ class Queue(object):
         return return_or_print(result, as_str, file)
 
     def name(self, value=None):
-        '''
+        """
         Parameters
         ----------
         value : str
@@ -2515,23 +2613,23 @@ class Queue(object):
         ----
         base_name and sequence_number are not affected if the name is changed |n|
         All derived named are updated as well.
-        '''
+        """
         if value is not None:
             self._name = value
-            self.length.name('Length of ' + self.name())
-            self.length_of_stay.name('Length of stay of ' + self.name())
+            self.length.name("Length of " + self.name())
+            self.length_of_stay.name("Length of stay of " + self.name())
         return self._name
 
     def base_name(self):
-        '''
+        """
         Returns
         -------
         base name of the queue (the name used at initialization): str
-        '''
+        """
         return self._base_name
 
     def sequence_number(self):
-        '''
+        """
         Returns
         -------
         sequence_number of the queue : int
@@ -2539,11 +2637,11 @@ class Queue(object):
             normally this will be the integer value of a serialized name,
             but also non serialized names (without a dot or a comma at the end)
             will be numbered)
-        '''
+        """
         return self._sequence_number
 
     def add(self, component):
-        '''
+        """
         adds a component to the tail of a queue
 
         Parameters
@@ -2558,11 +2656,11 @@ class Queue(object):
         the priority of the tail of the queue, if any
         or 0 if queue is empty |n|
         This method is equivalent to append()
-        '''
+        """
         component.enter(self)
 
     def append(self, component):
-        '''
+        """
         appends a component to the tail of a queue
 
         Parameters
@@ -2577,11 +2675,11 @@ class Queue(object):
         the priority of the tail of the queue, if any
         or 0 if queue is empty |n|
         This method is equivalent to add()
-        '''
+        """
         component.enter(self)
 
     def add_at_head(self, component):
-        '''
+        """
         adds a component to the head of a queue
 
         Parameters
@@ -2596,11 +2694,11 @@ class Queue(object):
         the priority will be set to
         the priority of the head of the queue, if any
         or 0 if queue is empty
-        '''
+        """
         component.enter_at_head(self)
 
     def add_in_front_of(self, component, poscomponent):
-        '''
+        """
         adds a component to a queue, just in front of a component
 
         Parameters
@@ -2616,11 +2714,11 @@ class Queue(object):
         Note
         ----
         the priority of component will be set to the priority of poscomponent
-        '''
+        """
         component.enter_in_front_of(self, poscomponent)
 
     def insert(self, index, component):
-        '''
+        """
         Insert component before index-th element of the queue
 
         Parameters
@@ -2636,11 +2734,11 @@ class Queue(object):
         ----
         the priority of component will be set to the priority of the index'th component,
         or 0 if the queue is empty
-        '''
+        """
         if index < 0:
-            raise IndexError('index < 0')
+            raise IndexError("index < 0")
         if index > self._length:
-            raise IndexError('index > lengh of queue')
+            raise IndexError("index > lengh of queue")
         component._checknotinqueue(self)
         mx = self._head.successor
         count = 0
@@ -2653,7 +2751,7 @@ class Queue(object):
         Qmember().insert_in_front_of(mx, component, self, priority)
 
     def add_behind(self, component, poscomponent):
-        '''
+        """
         adds a component to a queue, just behind a component
 
         Parameters
@@ -2670,11 +2768,11 @@ class Queue(object):
         ----
         the priority of component will be set to the priority of poscomponent
 
-        '''
+        """
         component.enter_behind(self, poscomponent)
 
     def add_sorted(self, component, priority):
-        '''
+        """
         adds a component to a queue, according to the priority
 
         Parameters
@@ -2689,11 +2787,11 @@ class Queue(object):
         Note
         ----
         The component is placed just before the first component with a priority > given priority
-        '''
+        """
         component.enter_sorted(self, priority)
 
     def remove(self, component=None):
-        '''
+        """
         removes component from the queue
 
         Parameters
@@ -2705,14 +2803,14 @@ class Queue(object):
         Note
         ----
         component must be member of the queue
-        '''
+        """
         if component is None:
             self.clear()
         else:
             component.leave(self)
 
     def head(self):
-        '''
+        """
         Returns
         -------
         the head component of the queue, if any. None otherwise : Component
@@ -2720,11 +2818,11 @@ class Queue(object):
         Note
         ----
         q[0] is a more Pythonic way to access the head of the queue
-        '''
+        """
         return self._head.successor.component
 
     def tail(self):
-        '''
+        """
         Returns
         -------
         the tail component of the queue, if any. None otherwise : Component
@@ -2732,11 +2830,11 @@ class Queue(object):
         Note
         -----
         q[-1] is a more Pythonic way to access the tail of the queue
-        '''
+        """
         return self._tail.predecessor.component
 
     def pop(self, index=None):
-        '''
+        """
         removes a component by its position (or head)
 
         Parameters
@@ -2749,7 +2847,7 @@ class Queue(object):
         -------
         The i-th component or head : Component
             None if not existing
-        '''
+        """
         if index is None:
             c = self._head.successor.component
         else:
@@ -2759,7 +2857,7 @@ class Queue(object):
         return c
 
     def successor(self, component):
-        '''
+        """
         successor in queue
 
         Parameters
@@ -2772,11 +2870,11 @@ class Queue(object):
         -------
         successor of component, if any : Component
             None otherwise
-        '''
+        """
         return component.successor(self)
 
     def predecessor(self, component):
-        '''
+        """
         predecessor in queue
 
         Parameters
@@ -2789,7 +2887,7 @@ class Queue(object):
         -------
         predecessor of component, if any : Component |n|
             None otherwise.
-        '''
+        """
         return component.predecessor(self)
 
     def __contains__(self, component):
@@ -2844,7 +2942,7 @@ class Queue(object):
             return None  # just for safety
 
         else:
-            raise TypeError('Invalid argument type: ' + object_to_str(key))
+            raise TypeError("Invalid argument type: " + object_to_str(key))
 
     def __delitem__(self, key):
         if isinstance(key, slice):
@@ -2853,7 +2951,7 @@ class Queue(object):
         elif isinstance(key, int):
             self.remove(self[key])
         else:
-            raise TypeError('Invalid argument type:' + object_to_str(key))
+            raise TypeError("Invalid argument type:" + object_to_str(key))
 
     def __len__(self):
         return self._length
@@ -2902,7 +3000,7 @@ class Queue(object):
         return self.symmetric_difference(q)
 
     def count(self, component):
-        '''
+        """
         component count
 
         Parameters
@@ -2917,11 +3015,11 @@ class Queue(object):
         Note
         ----
         The result can only be 0 or 1
-        '''
+        """
         return component.count(self)
 
     def index(self, component):
-        '''
+        """
         get the index of a component in the queue
 
         Parameters
@@ -2935,11 +3033,11 @@ class Queue(object):
         index of component in the queue : int
             0 denotes the head, |n|
             returns -1 if component is not in the queue
-        '''
+        """
         return component.index(self)
 
     def component_with_name(self, txt):
-        '''
+        """
         returns a component in the queue according to its name
 
         Parameters
@@ -2951,7 +3049,7 @@ class Queue(object):
         -------
         the first component in the queue with name txt : Component |n|
             returns None if not found
-        '''
+        """
         mx = self._head.successor
         while mx != self._tail:
 
@@ -2989,7 +3087,7 @@ class Queue(object):
         del self._iter_touched[iter_sequence]
 
     def extend(self, q):
-        '''
+        """
         extends the queue with components of q that are not already in self
 
         Parameters
@@ -2999,7 +3097,7 @@ class Queue(object):
         Note
         ----
         The components added to the queue will get the priority of the tail of self.
-        '''
+        """
         savetrace = self.env._trace
         self.env._trace = False
         for c in q:
@@ -3014,7 +3112,7 @@ class Queue(object):
         return [c for c in self]
 
     def union(self, q, name=None, monitor=False):
-        '''
+        """
         Parameters
         ----------
         q : Queue
@@ -3041,11 +3139,11 @@ class Queue(object):
         followed by all components in q that are not in self,
         in that order. |n|
         Alternatively, the more pythonic | operator is also supported, e.g. q1 | q2
-        '''
+        """
         save_trace = self.env._trace
         self.env._trace = False
         if name is None:
-            name = self.name() + ' | ' + q.name()
+            name = self.name() + " | " + q.name()
         q1 = type(self)(name=name, monitor=monitor, env=self.env)
         self_set = self.as_set()
 
@@ -3064,7 +3162,7 @@ class Queue(object):
         return q1
 
     def intersection(self, q, name=None, monitor=False):
-        '''
+        """
         returns the intersect of two queues
 
         Parameters
@@ -3091,11 +3189,11 @@ class Queue(object):
         the order of the resulting queue is as follows: |n|
         in the same order as in self. |n|
         Alternatively, the more pythonic & operator is also supported, e.g. q1 & q2
-        '''
+        """
         save_trace = self.env._trace
         self.env._trace = False
         if name is None:
-            name = self.name() + ' & ' + q.name()
+            name = self.name() + " & " + q.name()
         q1 = type(self)(name=name, monitor=monitor, env=self.env)
         q_set = q.as_set()
         mx = self._head.successor
@@ -3107,7 +3205,7 @@ class Queue(object):
         return q1
 
     def difference(self, q, name=None, monitor=monitor):
-        '''
+        """
         returns the difference of two queues
 
         Parameters
@@ -3132,9 +3230,9 @@ class Queue(object):
         the priority will be copied from the original queue.
         Also, the order will be maintained. |n|
         Alternatively, the more pythonic - operator is also supported, e.g. q1 - q2
-        '''
+        """
         if name is None:
-            name = self.name() + ' - ' + q.name()
+            name = self.name() + " - " + q.name()
         save_trace = self.env._trace
         self.env._trace = False
         q1 = type(self)(name=name, monitor=monitor, env=self.env)
@@ -3142,14 +3240,13 @@ class Queue(object):
         mx = self._head.successor
         while mx != self._tail:
             if mx.component not in q_set:
-                Qmember().insert_in_front_of(
-                    q1._tail, mx.component, q1, mx.priority)
+                Qmember().insert_in_front_of(q1._tail, mx.component, q1, mx.priority)
             mx = mx.successor
         self.env._trace = save_trace
         return q1
 
     def symmetric_difference(self, q, name=None, monitor=monitor):
-        '''
+        """
         returns the symmetric difference of two queues
 
         Parameters
@@ -3174,9 +3271,9 @@ class Queue(object):
         the priority of all elements will be set to 0 for all components in the new queue.
         Order: First, elelements in self (in that order), then elements in q (in that order)
         Alternatively, the more pythonic ^ operator is also supported, e.g. q1 ^ q2
-        '''
+        """
         if name is None:
-            name = self.name() + ' ^ ' + q.name()
+            name = self.name() + " ^ " + q.name()
         save_trace = self.env._trace
         self.env._trace = False
         q1 = type(self)(name=name, monitor=monitor, env=self.env)
@@ -3185,28 +3282,26 @@ class Queue(object):
         mx = self._head.successor
         while mx != self._tail:
             if mx.component not in intersection_set:
-                Qmember().insert_in_front_of(
-                    q1._tail, mx.component, q1, 0)
+                Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
             mx = mx.successor
         mx = q._head.successor
         while mx != q._tail:
             if mx.component not in intersection_set:
-                Qmember().insert_in_front_of(
-                    q1._tail, mx.component, q1, 0)
+                Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
             mx = mx.successor
 
         self.env._trace = save_trace
         return q1
 
     def copy(self, name=None, monitor=monitor):
-        '''
+        """
         returns a copy of two queues
 
         Parameters
         ----------
         name : str
             name of the new queue |n|
-            if omitted, 'copy of ' + self.name()
+            if omitted, "copy of " + self.name()
 
         monitor : bool
             if True, monitor the queue |n|
@@ -3220,11 +3315,11 @@ class Queue(object):
         ----
         The priority will be copied from original queue.
         Also, the order will be maintained.
-        '''
+        """
         save_trace = self.env._trace
         self.env._trace = False
         if name is None:
-            name = 'copy of ' + self.name()
+            name = "copy of " + self.name()
         q1 = type(self)(name=name, env=self.env)
         mx = self._head.successor
         while mx != self._tail:
@@ -3234,7 +3329,7 @@ class Queue(object):
         return q1
 
     def move(self, name=None, monitor=monitor):
-        '''
+        """
         makes a copy of a queue and empties the original
 
         Parameters
@@ -3254,17 +3349,17 @@ class Queue(object):
         ----
         Priorities will be kept |n|
         self will be emptied
-        '''
+        """
         q1 = self.copy(name, monitor=monitor)
         self.clear()
         return q1
 
     def clear(self):
-        '''
+        """
         empties a queue
 
         removes all components from a queue
-        '''
+        """
         savetrace = self.env._trace
         self.env._trace = False
         mx = self._head.successor
@@ -3274,11 +3369,11 @@ class Queue(object):
             c.leave(self)
         self._trace = savetrace
         if self.env._trace:
-            self.env.print_trace('', '', self.name() + ' clear')
+            self.env.print_trace("", "", self.name() + " clear")
 
 
 class Environment(object):
-    '''
+    """
     environment object
 
     Parameters
@@ -3289,14 +3384,14 @@ class Environment(object):
 
     random_seed : hashable object, usually int
         the seed for random, equivalent to random.seed() |n|
-        if '*', a purely random value (based on the current time) will be used
+        if "*", a purely random value (based on the current time) will be used
         (not reproducable) |n|
-        if the null string (''), no action on random is taken |n|
+        if the null string, no action on random is taken |n|
         if None (the default), 1234567 will be used.
 
     time_unit : str
         Supported time_units: |n|
-        'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds', 'n/a'
+        "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds", "n/a"
 
     name : str
         name of the environment |n|
@@ -3305,7 +3400,7 @@ class Environment(object):
         if the name end with a comma,
         auto serializing starting at 1 will be applied |n|
         if omitted, the name will be derived from the class (lowercased)
-        or 'default environment' if isdefault_env is True.
+        or "default environment" if isdefault_env is True.
 
     print_trace_header : bool
         if True (default) print a (two line) header line as a legend |n|
@@ -3323,24 +3418,34 @@ class Environment(object):
     The seed may be later set with random_seed() |n|
     Initially, the random stream will be seeded with the value 1234567.
     If required to be purely, not not reproducable, values, use
-    random_seed='*'.
-    '''
+    random_seed="*".
+    """
+
     _nameserialize = {}
     cached_modelname_width = [None, None]
 
-    def __init__(self, trace=False, random_seed=None, time_unit='n/a', name=None,
-      print_trace_header=True, isdefault_env=True, *args, **kwargs):
+    def __init__(
+        self,
+        trace=False,
+        random_seed=None,
+        time_unit="n/a",
+        name=None,
+        print_trace_header=True,
+        isdefault_env=True,
+        *args,
+        **kwargs
+    ):
         if isdefault_env:
             g.default_env = self
         if name is None:
             if isdefault_env:
-                name = 'default environment'
+                name = "default environment"
         self._trace = trace
         self._source_files = {inspect.getframeinfo(_get_caller_frame()).filename: 0}
-        if random_seed != '':
+        if random_seed != "":
             if random_seed is None:
                 random_seed = 1234567
-            elif random_seed == '*':
+            elif random_seed == "*":
                 random_seed = None
             random.seed(random_seed)
 
@@ -3353,19 +3458,19 @@ class Environment(object):
         if self._trace:
             if print_trace_header:
                 self.print_trace_header()
-            self.print_trace('', '', self.name() + ' initialize')
+            self.print_trace("", "", self.name() + " initialize")
         self.env = self
         # just to allow main to be created; will be reset later
-        self._time_to_str_format = '{:10.3f}'
+        self._time_to_str_format = "{:10.3f}"
         self._nameserializeComponent = {}
         self._now = 0
         self._offset = 0
-        self._main = Component(name='main', env=self, process=None)
+        self._main = Component(name="main", env=self, process=None)
         self._main._status = current
         self._main.frame = _get_caller_frame()
         self._current_component = self._main
         if self._trace:
-            self.print_trace(self.time_to_str(0), 'main', 'current')
+            self.print_trace(self.time_to_str(0), "main", "current")
         self._nameserializeQueue = {}
         self._nameserializeComponent = {}
         self._nameserializeResource = {}
@@ -3388,7 +3493,7 @@ class Environment(object):
         self._synced = True
         self._step_pressed = False
         self.stopped = False
-        self.last_s0 = ''
+        self.last_s0 = ""
         if Pythonista:
             self._width, self._height = ui.get_screen_size()
             self._width = int(self._width)
@@ -3401,14 +3506,14 @@ class Environment(object):
         self._x1 = self._width
         self._scale = 1
         self._y1 = self._y0 + self._height
-        self._background_color = 'white'
-        self._foreground_color = 'black'
+        self._background_color = "white"
+        self._foreground_color = "black"
         self._fps = 30
-        self._modelname = ''
+        self._modelname = ""
         self.use_toplevel = False
         self._show_fps = False
         self._show_time = True
-        self._video = ''
+        self._video = ""
         self._video_out = None
         self._video_repeat = 1
         self._video_pingpong = False
@@ -3418,13 +3523,13 @@ class Environment(object):
         self.setup(*args, **kwargs)
 
     def setup(self):
-        '''
+        """
         called immediately after initialization of an environment.
 
         by default this is a dummy method, but it can be overridden.
 
         only keyword arguments are passed
-        '''
+        """
         pass
 
     def serialize(self):
@@ -3432,10 +3537,10 @@ class Environment(object):
         return self.serial
 
     def __repr__(self):
-        return object_to_str(self) + ' (' + self.name() + ')'
+        return object_to_str(self) + " (" + self.name() + ")"
 
     def animation_pre_tick(self, t):
-        '''
+        """
         called just before the animation object loop. |n|
         Default behaviour: just return
 
@@ -3443,11 +3548,11 @@ class Environment(object):
         ----------
         t : float
             Current (animation) time.
-        '''
+        """
         return
 
     def animation_post_tick(self, t):
-        '''
+        """
         called just after the animation object loop. |n|
         Default behaviour: just return
 
@@ -3455,7 +3560,7 @@ class Environment(object):
         ----------
         t : float
             Current (animation) time.
-        '''
+        """
         return
 
     def animation_pre_tick_sys(self, t):
@@ -3463,7 +3568,7 @@ class Environment(object):
             ao.update(t)
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the environment
 
         Parameters
@@ -3479,21 +3584,21 @@ class Environment(object):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append(object_to_str(self) + ' ' + hex(id(self)))
-        result.append('  name=' + self.name())
-        result.append('  now=' + self.time_to_str(self._now - self._offset))
-        result.append('  current_component=' + self._current_component.name())
-        result.append('  trace=' + str(self._trace))
+        result.append(object_to_str(self) + " " + hex(id(self)))
+        result.append("  name=" + self.name())
+        result.append("  now=" + self.time_to_str(self._now - self._offset))
+        result.append("  current_component=" + self._current_component.name())
+        result.append("  trace=" + str(self._trace))
         return return_or_print(result, as_str, file)
 
     def step(self):
-        '''
+        """
         executes the next step of the future event list
 
         for advanced use with animation / GUI loops
-        '''
+        """
         if not self._current_component._skip_standby:
             if len(self.env._pendingstandbylist) > 0:
                 c = self.env._pendingstandbylist.pop(0)
@@ -3502,8 +3607,13 @@ class Environment(object):
                     c._scheduled_time = inf
                     self.env._current_component = c
                     if self._trace:
-                        self.print_trace(self.time_to_str(self._now - self.env._offset), c.name(),
-                            'current (standby)', s0=c.lineno_txt(), _optional=self._suppress_trace_standby)
+                        self.print_trace(
+                            self.time_to_str(self._now - self.env._offset),
+                            c.name(),
+                            "current (standby)",
+                            s0=c.lineno_txt(),
+                            _optional=self._suppress_trace_standby,
+                        )
                     try:
                         next(c._process)
                         return
@@ -3525,7 +3635,7 @@ class Environment(object):
             c = self._main
             if self.end_on_empty_eventlist:
                 t = self.env._now
-                self.print_trace('', '', 'run ended', 'no events left', s0=c.lineno_txt())
+                self.print_trace("", "", "run ended", "no events left", s0=c.lineno_txt())
             else:
                 t = inf
         c._on_event_list = False
@@ -3536,8 +3646,7 @@ class Environment(object):
         c._status = current
         c._scheduled_time = inf
         if self._trace:
-            self.print_trace(self.time_to_str(self._now - self._offset), c.name(),
-              'current', s0=c.lineno_txt())
+            self.print_trace(self.time_to_str(self._now - self._offset), c.name(), "current", s0=c.lineno_txt())
         if c == self._main:
             self.running = False
             return
@@ -3556,20 +3665,20 @@ class Environment(object):
             if self._trace:
                 gi_code = c._process.gi_code
                 gs = inspect.getsourcelines(gi_code)
-                s0 = self.filename_lineno_to_str(gi_code.co_filename, len(gs[0]) + gs[1] - 1) + '+'
+                s0 = self.filename_lineno_to_str(gi_code.co_filename, len(gs[0]) + gs[1] - 1) + "+"
             else:
                 s0 = None
         else:
             if self._trace:
                 gs = inspect.getsourcelines(c._process)
-                s0 = self.filename_lineno_to_str(c._process.__code__.co_filename, len(gs[0]) + gs[1] - 1) + '+'
+                s0 = self.filename_lineno_to_str(c._process.__code__.co_filename, len(gs[0]) + gs[1] - 1) + "+"
             else:
                 s0 = None
 
         for r in list(c._claims):
             c._release(r, s0=s0)
         if self._trace:
-            self.print_trace('', '', c.name() + ' ended', s0=s0)
+            self.print_trace("", "", c.name() + " ended", s0=s0)
         c._status = data
         c._scheduled_time = inf
         c._process = None
@@ -3581,17 +3690,32 @@ class Environment(object):
                 so.remove()
 
     def _print_event_list(self, s):
-        print('eventlist ', s)
+        print("eventlist ", s)
         for (t, seq, comp) in self._event_list:
             print(self.time_to_str(t, comp.name()))
 
-    def animation_parameters(self,
-      animate=True, synced=None, speed=None, width=None, height=None,
-      x0=None, y0=None, x1=None, background_color=None, foreground_color=None,
-      fps=None, modelname=None, use_toplevel=None,
-      show_fps=None, show_time=None,
-      video=None, video_repeat=None, video_pingpong=None):
-        '''
+    def animation_parameters(
+        self,
+        animate=True,
+        synced=None,
+        speed=None,
+        width=None,
+        height=None,
+        x0=None,
+        y0=None,
+        x1=None,
+        background_color=None,
+        foreground_color=None,
+        fps=None,
+        modelname=None,
+        use_toplevel=None,
+        show_fps=None,
+        show_time=None,
+        video=None,
+        video_repeat=None,
+        video_pingpong=None,
+    ):
+        """
         set animation parameters
 
         Parameters
@@ -3648,7 +3772,7 @@ class Environment(object):
 
         modelname : str
             name of model to be shown in upper left corner,
-            along with text 'a salabim model' |n|
+            along with text "a salabim model" |n|
             if omitted, no change. At init of the environment, this will be set
             to the null string, which implies suppression of this feature.
 
@@ -3673,7 +3797,7 @@ class Environment(object):
             Normally, use .mp4 as extension. |n|
             If the video extension is not .gif, a codec may be added
             by appending a plus sign and the four letter code name,
-            like 'myvideo.avi+DIVX'. |n|
+            like "myvideo.avi+DIVX". |n|
             If no codec is given, MP4V will be used as codec.
 
         video_repeat : int
@@ -3691,7 +3815,7 @@ class Environment(object):
         ----
         The y-coordinate of the upper right corner is determined automatically
         in such a way that the x and scaling are the same. |n|
-        '''
+        """
         frame_changed = False
         width_changed = False
         height_changed = False
@@ -3744,17 +3868,17 @@ class Environment(object):
                 self.uninstall_uios()
 
         if background_color is not None:
-            if background_color in ('fg', 'bg'):
-                raise ValueError(background_color + 'not allowed for background_color')
+            if background_color in ("fg", "bg"):
+                raise ValueError(background_color + "not allowed for background_color")
             if self._background_color != background_color:
                 self._background_color = background_color
                 frame_changed = True
             if foreground_color is None:
-                self._foreground_color = 'white' if self.is_dark('bg') else 'black'
+                self._foreground_color = "white" if self.is_dark("bg") else "black"
 
         if foreground_color is not None:
-            if foreground_color in ('fg', 'bg'):
-                raise ValueError(foreground_color + 'not allowed for foreground_color')
+            if foreground_color in ("fg", "bg"):
+                raise ValueError(foreground_color + "not allowed for foreground_color")
             self._foreground_color = foreground_color
 
         if modelname is not None:
@@ -3796,29 +3920,30 @@ class Environment(object):
                 if video:
                     video_opened = True
                     extension = os.path.splitext(video)[1].lower()
-                    if extension == '.gif':
+                    if extension == ".gif":
                         self._video_name = video
                         can_animate(try_only=False)
-                        self._video_out = 'gif'
+                        self._video_out = "gif"
                         self._images = []
                     else:
-                        if len(video.split('+')) == 2:
-                            self._video_name, codec = video.split('+')
+                        if len(video.split("+")) == 2:
+                            self._video_name, codec = video.split("+")
                         else:
                             self._video_name = video
-                            codec = 'MP4V'
+                            codec = "MP4V"
                         can_video(try_only=False)
                         fourcc = cv2.VideoWriter_fourcc(*codec)
                         self._video_out = cv2.VideoWriter(
-                            self._video_name, fourcc, self._fps, (self._width, self._height))
+                            self._video_name, fourcc, self._fps, (self._width, self._height)
+                        )
 
         if self._video and (not video_opened):
             if width_changed:
-                raise ValueError('width changed while recording video.')
+                raise ValueError("width changed while recording video.")
             if height_changed:
-                raise ValueError('height changed while recording video.')
-            if fps_changed and self._video_out != 'gif':
-                raise ValueError('fps changed while recording video.')
+                raise ValueError("height changed while recording video.")
+            if fps_changed and self._video_out != "gif":
+                raise ValueError("fps changed while recording video.")
 
         if self._video:
             self.video_t = self.t
@@ -3849,9 +3974,8 @@ class Environment(object):
                         self.root = tkinter.Toplevel()
                     else:
                         self.root = tkinter.Tk()
-                    g.canvas = tkinter.Canvas(
-                        self.root, width=self._width, height=self._height)
-                    g.canvas.configure(background=self.colorspec_to_hex('bg', False))
+                    g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
+                    g.canvas.configure(background=self.colorspec_to_hex("bg", False))
                     g.canvas.pack()
                     g.canvas_objects = []
 
@@ -3862,33 +3986,40 @@ class Environment(object):
         self._animate = animate
 
     def video_close(self):
-        '''
+        """
         closes the current animation video recording, if any.
-        '''
+        """
         if self._video_out:
-            if self._video_out == 'gif':
+            if self._video_out == "gif":
                 if self._images:
                     if self._video_pingpong:
                         self._images.extend(self._images[::-1])
                     if Pythonista:
                         import images2gif
-                        images2gif.writeGif(self._video_name, self._images,
-                           duration=1 / self._fps, repeat=self._video_repeat)
+
+                        images2gif.writeGif(
+                            self._video_name, self._images, duration=1 / self._fps, repeat=self._video_repeat
+                        )
                     else:
-                        self._images[0].save(self._video_name, save_all=True,
-                            append_images=self._images[1:], loop=self._video_repeat, duration=1000 / self._fps)
+                        self._images[0].save(
+                            self._video_name,
+                            save_all=True,
+                            append_images=self._images[1:],
+                            loop=self._video_repeat,
+                            duration=1000 / self._fps,
+                        )
                     self._images = []  # release memory
             else:
                 self._video_out.release()
             self._video_out = None
-            self._video = ''
+            self._video = ""
 
     def uninstall_uios(self):
         for uio in self.ui_objects:
             uio.installed = False
 
     def x0(self, value=None):
-        '''
+        """
         x coordinate of lower left corner of animation
 
         Parameters
@@ -3899,13 +4030,13 @@ class Environment(object):
         Returns
         -------
         x coordinate of lower left corner of animation : float
-        '''
+        """
         if value is not None:
             self.animation_parameters(x0=value, animate=None)
         return self._x0
 
     def x1(self, value=None):
-        '''
+        """
         x coordinate of upper right corner of animation : float
 
         Parameters
@@ -3917,13 +4048,13 @@ class Environment(object):
         Returns
         -------
         x coordinate of upper right corner of animation : float
-        '''
+        """
         if value is not None:
             self.animation_parameters(x1=value, animate=None)
         return self._x1
 
     def y0(self, value=None):
-        '''
+        """
         y coordinate of lower left corner of animation
 
         Parameters
@@ -3935,13 +4066,13 @@ class Environment(object):
         Returns
         -------
         y coordinate of lower left corner of animation : float
-        '''
+        """
         if value is not None:
             self.animation_parameters(y0=value, animate=None)
         return self._y0
 
     def y1(self):
-        '''
+        """
         y coordinate of upper right corner of animation
 
         Returns
@@ -3951,11 +4082,11 @@ class Environment(object):
         Note
         ----
         It is not possible to set this value explicitely.
-        '''
+        """
         return self._y1
 
     def scale(self):
-        '''
+        """
         scale of the animation, i.e. width / (x1 - x0)
 
         Returns
@@ -3965,11 +4096,11 @@ class Environment(object):
         Note
         ----
         It is not possible to set this value explicitely.
-        '''
+        """
         return self._scale
 
     def user_to_screencoordinates_x(self, userx):
-        '''
+        """
         converts a user x coordinate to a screen x coordinate
 
         Parameters
@@ -3980,11 +4111,11 @@ class Environment(object):
         Returns
         -------
         screen x coordinate : float
-        '''
+        """
         return (userx - self._x0) * self._scale
 
     def user_to_screencoordinates_y(self, usery):
-        '''
+        """
         converts a user x coordinate to a screen x coordinate
 
         Parameters
@@ -3995,11 +4126,11 @@ class Environment(object):
         Returns
         -------
         screen y coordinate : float
-        '''
+        """
         return (usery - self._y0) * self._scale
 
     def user_to_screencoordinates_size(self, usersize):
-        '''
+        """
         converts a user size to a value to be used with screen coordinates
 
         Parameters
@@ -4010,11 +4141,11 @@ class Environment(object):
         Returns
         -------
         value corresponding with usersize in screen coordinates : float
-        '''
+        """
         return usersize * self._scale
 
     def screen_to_usercoordinates_x(self, screenx):
-        '''
+        """
         converts a screen x coordinate to a user x coordinate
 
         Parameters
@@ -4025,11 +4156,11 @@ class Environment(object):
         Returns
         -------
         user x coordinate : float
-        '''
+        """
         return self._x0 + screenx / self._scale
 
     def screen_to_usercoordinates_y(self, screeny):
-        '''
+        """
         converts a screen x coordinate to a user x coordinate
 
         Parameters
@@ -4040,11 +4171,11 @@ class Environment(object):
         Returns
         -------
         user y coordinate : float
-        '''
+        """
         return self._y0 + screeny / self._scale
 
     def screen_to_usercoordinates_size(self, screensize):
-        '''
+        """
         converts a screen size to a value to be used with user coordinates
 
         Parameters
@@ -4055,11 +4186,11 @@ class Environment(object):
         Returns
         -------
         value corresponding with screensize in user coordinates : float
-        '''
+        """
         return screensize / self._scale
 
     def width(self, value=None):
-        '''
+        """
         width of the animation in screen coordinates
 
         Parameters
@@ -4072,13 +4203,13 @@ class Environment(object):
         Returns
         -------
         width of animation : int
-        '''
+        """
         if value is not None:
             self.animation_parameters(width=value, animate=None)
         return self._width
 
     def height(self, value=None):
-        '''
+        """
         height of the animation in screen coordinates
 
         Parameters
@@ -4090,13 +4221,13 @@ class Environment(object):
         Returns
         -------
         height of animation : int
-        '''
+        """
         if value is not None:
             self.animation_parameters(height=value, animate=None)
         return self._height
 
     def background_color(self, value=None):
-        '''
+        """
         background_color of the animation
 
         Parameters
@@ -4108,13 +4239,13 @@ class Environment(object):
         Returns
         -------
         background_color of animation : colorspec
-        '''
+        """
         if value is not None:
             self.animation_parameters(background_color=value, animate=None)
         return self._background_color
 
     def foreground_color(self, value=None):
-        '''
+        """
         foreground_color of the animation
 
         Parameters
@@ -4126,13 +4257,13 @@ class Environment(object):
         Returns
         -------
         foreground_color of animation : colorspec
-        '''
+        """
         if value is not None:
             self.animation_parameters(foreground_color=value, animate=None)
         return self._foreground_color
 
     def animate(self, value=None):
-        '''
+        """
         animate indicator
 
         Parameters
@@ -4148,13 +4279,13 @@ class Environment(object):
         Note
         ----
         When the run is not issued, no acction will be taken.
-        '''
+        """
         if value is not None:
             self.animation_parameters(animate=value)
         return self._animate
 
     def modelname(self, value=None):
-        '''
+        """
         modelname
 
         Parameters
@@ -4170,13 +4301,13 @@ class Environment(object):
         Note
         ----
         If modelname is the null string, nothing will be displayed.
-        '''
+        """
         if value is not None:
             self.animation_parameters(modelname=value, animate=None)
         return self._modelname
 
     def video(self, value=None):
-        '''
+        """
         video name
 
         Parameters
@@ -4193,13 +4324,13 @@ class Environment(object):
         Note
         ----
         If video is the null string, the video (if any) will be closed.
-        '''
+        """
         if value is not None:
             self.animation_parameters(video=value, animate=None)
         return self._video
 
     def video_repeat(self, value=None):
-        '''
+        """
         video repeat
 
         Parameters
@@ -4215,13 +4346,13 @@ class Environment(object):
         Note
         ----
         Applies only to gif animation.
-        '''
+        """
         if value is not None:
             self.animation_parameters(video_repeat=value, animate=None)
         return self._video_repeat
 
     def video_pingpong(self, value=None):
-        '''
+        """
         video pingponf
 
         Parameters
@@ -4237,13 +4368,13 @@ class Environment(object):
         Note
         ----
         Applies only to gif animation.
-        '''
+        """
         if value is not None:
             self.animation_parameters(video_pingpong=value, animate=None)
         return self._video_pingpong
 
     def fps(self, value=None):
-        '''
+        """
         fps
 
         Parameters
@@ -4255,13 +4386,13 @@ class Environment(object):
         Returns
         -------
         fps : bool
-        '''
+        """
         if value is not None:
             self.animation_parameters(fps=value, animate=None)
         return self._fps
 
     def show_time(self, value=None):
-        '''
+        """
         show_time
 
         Parameters
@@ -4273,13 +4404,13 @@ class Environment(object):
         Returns
         -------
         show_time : bool
-        '''
+        """
         if value is not None:
             self.animation_parameters(show_time=value, animate=None)
         return self._show_time
 
     def show_fps(self, value=None):
-        '''
+        """
         show_fps
 
         Parameters
@@ -4291,13 +4422,13 @@ class Environment(object):
         Returns
         -------
         show_fps : bool
-        '''
+        """
         if value is not None:
             self.animation_parameters(show_fps=value, animate=None)
         return self._show_fps
 
     def synced(self, value=None):
-        '''
+        """
         synced
 
         Parameters
@@ -4309,13 +4440,13 @@ class Environment(object):
         Returns
         -------
         synced : bool
-        '''
+        """
         if value is not None:
             self.animation_parameters(synced=value, animate=None)
         return self._synced
 
     def speed(self, value=None):
-        '''
+        """
         speed
 
         Parameters
@@ -4327,17 +4458,17 @@ class Environment(object):
         Returns
         -------
         speed : float
-        '''
+        """
         if value is not None:
             self.animation_parameters(speed=value, animate=None)
         return self._speed
 
     def peek(self):
-        '''
+        """
         returns the time of the next component to become current |n|
         if there are no more events, peek will return inf |n|
         Only for advance use with animation / GUI event loops
-        '''
+        """
         if len(self.env._pendingstandbylist) > 0:
             return self.env._now
         else:
@@ -4350,23 +4481,23 @@ class Environment(object):
                     return inf
 
     def main(self):
-        '''
+        """
         Returns
         -------
         the main component : Component
-        '''
+        """
         return self._main
 
     def now(self):
-        '''
+        """
         Returns
         -------
         the current simulation time : float
-        '''
+        """
         return self._now - self.env._offset
 
     def reset_now(self, new_now=0):
-        '''
+        """
         reset the current time
 
         Parameters
@@ -4382,17 +4513,20 @@ class Environment(object):
 
         The registered time in monitors will be always is the 'old' time.
         This is only relevant when using the time value in Monitor.xt() or Monitor.tx().
-        '''
+        """
         offset_before = self._offset
         self._offset = self._now - new_now
 
         if self._trace:
             self.print_trace(
-                '', '', 'now reset to {:0.3f}'.format(new_now),
-                '(all times are reduced by {:0.3f})'.format(self._offset - offset_before))
+                "",
+                "",
+                "now reset to {:0.3f}".format(new_now),
+                "(all times are reduced by {:0.3f})".format(self._offset - offset_before),
+            )
 
     def trace(self, value=None):
-        '''
+        """
         trace status
 
         Parameters
@@ -4411,14 +4545,14 @@ class Environment(object):
         parentheses, like
 
             ``if env.trace():``
-        '''
+        """
         if value is not None:
             self._trace = value
             self._buffered_trace = False
         return self._trace
 
     def suppress_trace_standby(self, value=None):
-        '''
+        """
         suppress_trace_standby status
 
         Parameters
@@ -4436,22 +4570,22 @@ class Environment(object):
         By default, suppress_trace_standby is True, meaning that standby components are
         (apart from when they become non standby) suppressed from the trace. |n|
         If you set suppress_trace_standby to False, standby components are fully traced.
-        '''
+        """
         if value is not None:
             self._suppress_trace_standby = value
             self._buffered_trace = False
         return self._suppress_trace_standby
 
     def current_component(self):
-        '''
+        """
         Returns
         -------
         the current_component : Component
-        '''
+        """
         return self._current_component
 
     def run(self, duration=None, till=None, urgent=False):
-        '''
+        """
         start execution of the simulation
 
         Parameters
@@ -4462,7 +4596,7 @@ class Environment(object):
 
         till : float
             schedule time |n|
-            if omitted, inf is assumed
+            if omitted, inf is assumed. See also not below
 
         urgent : bool
             urgency indicator |n|
@@ -4476,18 +4610,18 @@ class Environment(object):
         Note
         ----
         if neither till nor duration is specified, the main component will be reactivated at
-        the time there are no more events on the eventlist, i.e. usualy not at inf. |n|
-        if you want to run till inf, issue run(sim.inf) |n|
+        the time there are no more events on the eventlist, i.e. possibly not at inf. |n|
+        if you want to run till inf (particularly when animating), issue run(sim.inf) |n|
         only issue run() from the main level
-        '''
+        """
 
         self.end_on_empty_eventlist = False
-        extra = ''
+        extra = ""
         if till is None:
             if duration is None:
                 scheduled_time = inf
-                self.end_on_empty_eventlist = True
-                extra = '*'
+                self.end_on_empty_eventlist = False
+                extra = "*"
             else:
                 if duration == inf:
                     scheduled_time = inf
@@ -4497,10 +4631,10 @@ class Environment(object):
             if duration is None:
                 scheduled_time = till + self.env._offset
             else:
-                raise ValueError('both duration and till specified')
+                raise ValueError("both duration and till specified")
 
         self._main.frame = _get_caller_frame()
-        self._main._reschedule(scheduled_time, urgent, 'run', extra=extra)
+        self._main._reschedule(scheduled_time, urgent, "run", extra=extra)
 
         self.running = True
         while self.running:
@@ -4537,9 +4671,9 @@ class Environment(object):
                     if self.paused:
                         self.t = self.start_animation_time
                     else:
-                        self.t = self.start_animation_time +\
-                            ((time.time() - self.start_animation_clocktime) *
-                            self._speed)
+                        self.t = self.start_animation_time + (
+                            (time.time() - self.start_animation_clocktime) * self._speed
+                        )
 
                 while self.peek() < self.t:
                     self.step()
@@ -4559,13 +4693,11 @@ class Environment(object):
                 return
 
             if self._video:
-                capture_image = Image.new(
-                    'RGB', (self._width, self._height), self.colorspec_to_tuple('bg'))
+                capture_image = Image.new("RGB", (self._width, self._height), self.colorspec_to_tuple("bg"))
             if not self.paused:
                 self.frametimes.append(time.time())
 
-            self.an_objects.sort(
-                key=lambda obj: (-obj.layer(self.t), obj.sequence))
+            self.an_objects.sort(key=lambda obj: (-obj.layer(self.t), obj.sequence))
 
             canvas_objects_iter = iter(g.canvas_objects[:])
             co = next(canvas_objects_iter, None)
@@ -4578,7 +4710,8 @@ class Environment(object):
                     if co is None:
                         ao.im = ImageTk.PhotoImage(ao._image)
                         co1 = g.canvas.create_image(
-                            ao._image_x, self._height - ao._image_y, image=ao.im, anchor=tkinter.SW)
+                            ao._image_x, self._height - ao._image_y, image=ao.im, anchor=tkinter.SW
+                        )
                         g.canvas_objects.append(co1)
                         ao.canvas_object = co1
 
@@ -4586,26 +4719,24 @@ class Environment(object):
                         if ao.canvas_object == co:
                             if ao._image_ident != ao._image_ident_prev:
                                 ao.im = ImageTk.PhotoImage(ao._image)
-                                g.canvas.itemconfig(
-                                    ao.canvas_object, image=ao.im)
+                                g.canvas.itemconfig(ao.canvas_object, image=ao.im)
 
                             if (ao._image_x != ao._image_x_prev) or (ao._image_y != ao._image_y_prev):
-                                g.canvas.coords(
-                                    ao.canvas_object, (ao._image_x, self._height - ao._image_y))
+                                g.canvas.coords(ao.canvas_object, (ao._image_x, self._height - ao._image_y))
 
                         else:
                             ao.im = ImageTk.PhotoImage(ao._image)
                             ao.canvas_object = co
-                            g.canvas.itemconfig(
-                                ao.canvas_object, image=ao.im)
-                            g.canvas.coords(
-                                ao.canvas_object, (ao._image_x, self._height - ao._image_y))
+                            g.canvas.itemconfig(ao.canvas_object, image=ao.im)
+                            g.canvas.coords(ao.canvas_object, (ao._image_x, self._height - ao._image_y))
                     co = next(canvas_objects_iter, None)
 
                     if self._video:
-                        capture_image.paste(ao._image,
+                        capture_image.paste(
+                            ao._image,
                             (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])),
-                            ao._image)
+                            ao._image,
+                        )
                 else:
                     ao.canvas_object = None
 
@@ -4621,18 +4752,17 @@ class Environment(object):
                     uio.install()
 
             for uio in self.ui_objects:
-                if uio.type == 'button':
+                if uio.type == "button":
                     thistext = uio.text()
                     if thistext != uio.lasttext:
                         uio.lasttext = thistext
                         uio.button.config(text=thistext)
 
             if self._video and (not self.paused):
-                if self._video_out == 'gif':
+                if self._video_out == "gif":
                     self._images.append(capture_image)
                 else:
-                    open_cv_image = cv2.cvtColor(
-                        np.array(capture_image), cv2.COLOR_RGB2BGR)
+                    open_cv_image = cv2.cvtColor(np.array(capture_image), cv2.COLOR_RGB2BGR)
                     self._video_out.write(open_cv_image)
 
             g.canvas.update()
@@ -4647,7 +4777,7 @@ class Environment(object):
                         # 0.8 compensation because of clock inaccuracy
 
     def snapshot(self, filename):
-        '''
+        """
         Takes a snapshot of the current animated frame (at time = now()) and saves it to a file
 
         Parameters
@@ -4658,40 +4788,40 @@ class Environment(object):
             Other formats are not possible.
             Note that, apart from .JPG files. the background may be semi transparent by setting
             the alpha value to something else than 255.
-        '''
+        """
         can_animate(try_only=False)
         extension = os.path.splitext(filename)[1].lower()
-        if extension in ('.png', '.gif', '.bmp', '.tiff'):
-            mode = 'RGBA'
-        elif extension == '.jpg':
-            mode = 'RGB'
+        if extension in (".png", ".gif", ".bmp", ".tiff"):
+            mode = "RGBA"
+        elif extension == ".jpg":
+            mode = "RGB"
         else:
-            raise ValueError('extension ' + extension + '  not supported')
-        capture_image = Image.new(
-            mode, (self._width, self._height), self.colorspec_to_tuple('bg'))
-        self.an_objects.sort(
-            key=lambda obj: (-obj.layer(self.t), obj.sequence))
+            raise ValueError("extension " + extension + "  not supported")
+        capture_image = Image.new(mode, (self._width, self._height), self.colorspec_to_tuple("bg"))
+        self.an_objects.sort(key=lambda obj: (-obj.layer(self.t), obj.sequence))
         self.animation_pre_tick(self._now)
         self.animation_pre_tick_sys(self._now)
         for ao in self.an_objects:
             ao.make_pil_image(self._now)
             if ao._image_visible:
-                capture_image.paste(ao._image,
-                    (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])),
-                    ao._image)
+                capture_image.paste(
+                    ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image
+                )
         capture_image.save(filename)
 
     def modelname_width(self):
         if Environment.cached_modelname_width[0] != self._modelname:
-            Environment.cached_modelname_width = \
-                [self._modelname, self.env.getwidth(self._modelname + ' : a ', font='', fontsize=18)]
+            Environment.cached_modelname_width = [
+                self._modelname,
+                self.env.getwidth(self._modelname + " : a ", font="", fontsize=18),
+            ]
         return Environment.cached_modelname_width[1]
 
     def modelname_text(self, t):
-        return self._modelname + ' : a'
+        return self._modelname + " : a"
 
     def modelname_visible(self, t):
-        return self._modelname != ''
+        return self._modelname != ""
 
     def modelname_x_logo(self, t):
         return self.modelname_width() + 8
@@ -4703,179 +4833,240 @@ class Environment(object):
         return self.salabim_logo()
 
     def an_modelname(self):
-        '''
+        """
         function to show the modelname |n|
         called by run(), if animation is True. |n|
         may be overridden to change the standard behaviour.
-        '''
+        """
 
         y = -68
-        an = Animate(text='',
-             x0=8, y0=y,
-             anchor='w', fontsize0=18,
-             screen_coordinates=True, xy_anchor='nw', env=self)
+        an = Animate(text="", x0=8, y0=y, anchor="w", fontsize0=18, screen_coordinates=True, xy_anchor="nw", env=self)
         an.visible = self.modelname_visible
         an.text = self.modelname_text
-        an = Animate(image='',
-             y0=y + 1, offsety0=5,
-             anchor='w', width0=61,
-             screen_coordinates=True, xy_anchor='nw', env=self)
+        an = Animate(
+            image="", y0=y + 1, offsety0=5, anchor="w", width0=61, screen_coordinates=True, xy_anchor="nw", env=self
+        )
         an.visible = self.modelname_visible
         an.x = self.modelname_x_logo
         an.image = self.modelname_image
-        an = Animate(text=' model',
-             y0=y,
-             anchor='w', fontsize0=18,
-             screen_coordinates=True, xy_anchor='nw', env=self)
+        an = Animate(text=" model", y0=y, anchor="w", fontsize0=18, screen_coordinates=True, xy_anchor="nw", env=self)
         an.visible = self.modelname_visible
         an.x = self.modelname_x_model
 
     def an_menu_buttons(self):
-        '''
+        """
         function to initialize the menu buttons |n|
         may be overridden to change the standard behaviour.
-        '''
+        """
         self.remove_topleft_buttons()
-        if self.colorspec_to_tuple('bg')[:-1] == self.colorspec_to_tuple('blue')[:-1]:
-            fillcolor = 'white'
-            color = 'blue'
+        if self.colorspec_to_tuple("bg")[:-1] == self.colorspec_to_tuple("blue")[:-1]:
+            fillcolor = "white"
+            color = "blue"
         else:
-            fillcolor = 'blue'
-            color = 'white'
-        uio = AnimateButton(x=38, y=-21, text='Menu',
-            width=50, action=self.env.an_menu, env=self, fillcolor=fillcolor, color=color, xy_anchor='nw')
+            fillcolor = "blue"
+            color = "white"
+        uio = AnimateButton(
+            x=38,
+            y=-21,
+            text="Menu",
+            width=50,
+            action=self.env.an_menu,
+            env=self,
+            fillcolor=fillcolor,
+            color=color,
+            xy_anchor="nw",
+        )
 
         uio.in_topleft = True
 
     def an_unsynced_buttons(self):
-        '''
+        """
         function to initialize the unsynced buttons |n|
         may be overridden to change the standard behaviour.
-        '''
+        """
         self.remove_topleft_buttons()
-        if self.colorspec_to_tuple('bg')[:-1] == self.colorspec_to_tuple('green')[:-1]:
-            fillcolor = 'lightgreen'
-            color = 'green'
+        if self.colorspec_to_tuple("bg")[:-1] == self.colorspec_to_tuple("green")[:-1]:
+            fillcolor = "lightgreen"
+            color = "green"
         else:
-            fillcolor = 'green'
-            color = 'white'
-        uio = AnimateButton(x=38, y=-21, text='Go',
-          width=50, action=self.env.an_go, env=self, fillcolor=fillcolor, color=color, xy_anchor='nw')
+            fillcolor = "green"
+            color = "white"
+        uio = AnimateButton(
+            x=38,
+            y=-21,
+            text="Go",
+            width=50,
+            action=self.env.an_go,
+            env=self,
+            fillcolor=fillcolor,
+            color=color,
+            xy_anchor="nw",
+        )
         uio.in_topleft = True
 
-        uio = AnimateButton(x=38 + 1 * 60, y=-21, text='Step',
-          width=50, action=self.env.an_step, env=self, xy_anchor='nw')
+        uio = AnimateButton(
+            x=38 + 1 * 60, y=-21, text="Step", width=50, action=self.env.an_step, env=self, xy_anchor="nw"
+        )
         uio.in_topleft = True
 
-        uio = AnimateButton(x=38 + 3 * 60, y=-21, text='Synced',
-          width=50, action=self.env.an_synced_on, env=self, xy_anchor='nw')
+        uio = AnimateButton(
+            x=38 + 3 * 60, y=-21, text="Synced", width=50, action=self.env.an_synced_on, env=self, xy_anchor="nw"
+        )
         uio.in_topleft = True
 
-        uio = AnimateButton(x=38 + 4 * 60, y=-21, text='Trace',
-          width=50, action=self.env.an_trace, env=self, xy_anchor='nw')
+        uio = AnimateButton(
+            x=38 + 4 * 60, y=-21, text="Trace", width=50, action=self.env.an_trace, env=self, xy_anchor="nw"
+        )
         uio.in_topleft = True
 
-        if self.colorspec_to_tuple('bg')[:-1] == self.colorspec_to_tuple('red')[:-1]:
-            fillcolor = 'lightsalmon'
-            color = 'white'
+        if self.colorspec_to_tuple("bg")[:-1] == self.colorspec_to_tuple("red")[:-1]:
+            fillcolor = "lightsalmon"
+            color = "white"
         else:
-            fillcolor = 'red'
-            color = 'white'
-        uio = AnimateButton(x=38 + 5 * 60, y=-21, text='Stop',
-          width=50, action=self.env.quit, env=self, fillcolor=fillcolor, color=color, xy_anchor='nw')
+            fillcolor = "red"
+            color = "white"
+        uio = AnimateButton(
+            x=38 + 5 * 60,
+            y=-21,
+            text="Stop",
+            width=50,
+            action=self.env.quit,
+            env=self,
+            fillcolor=fillcolor,
+            color=color,
+            xy_anchor="nw",
+        )
         uio.in_topleft = True
 
-        uio = Animate(x0=38 + 3 * 60, y0=-35, text='',
-          anchor='N', fontsize0=15,
-          screen_coordinates=True, xy_anchor='nw')
+        uio = Animate(
+            x0=38 + 3 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw"
+        )
         uio.text = self.syncedtext
         uio.in_topleft = True
 
-        uio = Animate(x0=38 + 4 * 60, y0=-35, text='',
-          anchor='N', fontsize0=15,
-          screen_coordinates=True, xy_anchor='nw')
+        uio = Animate(
+            x0=38 + 4 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw"
+        )
         uio.text = self.tracetext
         uio.in_topleft = True
 
     def an_synced_buttons(self):
-        '''
+        """
         function to initialize the synced buttons |n|
         may be overridden to change the standard behaviour.
-        '''
+        """
         self.remove_topleft_buttons()
-        if self.colorspec_to_tuple('bg')[:-1] == self.colorspec_to_tuple('green')[:-1]:
-            fillcolor = 'lightgreen'
-            color = 'green'
+        if self.colorspec_to_tuple("bg")[:-1] == self.colorspec_to_tuple("green")[:-1]:
+            fillcolor = "lightgreen"
+            color = "green"
         else:
-            fillcolor = 'green'
-            color = 'white'
+            fillcolor = "green"
+            color = "white"
 
-        uio = AnimateButton(x=38, y=-21, text='Go',
-          width=50, action=self.env.an_go, env=self, fillcolor=fillcolor, color=color, xy_anchor='nw')
+        uio = AnimateButton(
+            x=38,
+            y=-21,
+            text="Go",
+            width=50,
+            action=self.env.an_go,
+            env=self,
+            fillcolor=fillcolor,
+            color=color,
+            xy_anchor="nw",
+        )
         uio.in_topleft = True
 
-        uio = AnimateButton(x=38 + 1 * 60, y=-21, text='/2',
-          width=50, action=self.env.an_half, env=self, xy_anchor='nw')
+        uio = AnimateButton(
+            x=38 + 1 * 60, y=-21, text="/2", width=50, action=self.env.an_half, env=self, xy_anchor="nw"
+        )
         uio.in_topleft = True
 
-        uio = AnimateButton(x=38 + 2 * 60, y=-21, text='*2',
-          width=50, action=self.env.an_double, env=self, xy_anchor='nw')
+        uio = AnimateButton(
+            x=38 + 2 * 60, y=-21, text="*2", width=50, action=self.env.an_double, env=self, xy_anchor="nw"
+        )
         uio.in_topleft = True
 
-        uio = AnimateButton(x=38 + 3 * 60, y=-21, text='Synced',
-          width=50, action=self.env.an_synced_off, env=self, xy_anchor='nw')
+        uio = AnimateButton(
+            x=38 + 3 * 60, y=-21, text="Synced", width=50, action=self.env.an_synced_off, env=self, xy_anchor="nw"
+        )
         uio.in_topleft = True
 
-        uio = AnimateButton(x=38 + 4 * 60, y=-21, text='Trace',
-          width=50, action=self.env.an_trace, env=self, xy_anchor='nw')
+        uio = AnimateButton(
+            x=38 + 4 * 60, y=-21, text="Trace", width=50, action=self.env.an_trace, env=self, xy_anchor="nw"
+        )
         uio.in_topleft = True
 
-        if self.colorspec_to_tuple('bg') == self.colorspec_to_tuple('red'):
-            fillcolor = 'lightsalmon'
-            color = 'white'
+        if self.colorspec_to_tuple("bg") == self.colorspec_to_tuple("red"):
+            fillcolor = "lightsalmon"
+            color = "white"
         else:
-            fillcolor = 'red'
-            color = 'white'
-        uio = AnimateButton(x=38 + 5 * 60, y=-21, text='Stop',
-          width=50, action=self.env.an_quit, env=self, fillcolor=fillcolor, color=color, xy_anchor='nw')
+            fillcolor = "red"
+            color = "white"
+        uio = AnimateButton(
+            x=38 + 5 * 60,
+            y=-21,
+            text="Stop",
+            width=50,
+            action=self.env.an_quit,
+            env=self,
+            fillcolor=fillcolor,
+            color=color,
+            xy_anchor="nw",
+        )
         uio.in_topleft = True
 
-        uio = Animate(x0=38 + 1.5 * 60, y0=-35, text='',
-          textcolor0='fg', anchor='N', fontsize0=15,
-          screen_coordinates=True, xy_anchor='nw')
+        uio = Animate(
+            x0=38 + 1.5 * 60,
+            y0=-35,
+            text="",
+            textcolor0="fg",
+            anchor="N",
+            fontsize0=15,
+            screen_coordinates=True,
+            xy_anchor="nw",
+        )
         uio.text = self.speedtext
         uio.in_topleft = True
 
-        uio = Animate(x0=38 + 3 * 60, y0=-35, text='',
-          anchor='N', fontsize0=15,
-          screen_coordinates=True, xy_anchor='nw')
+        uio = Animate(
+            x0=38 + 3 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw"
+        )
         uio.text = self.syncedtext
         uio.in_topleft = True
 
-        uio = Animate(x0=38 + 4 * 60, y0=-35, text='',
-          anchor='N', fontsize0=15,
-          screen_coordinates=True, xy_anchor='nw')
+        uio = Animate(
+            x0=38 + 4 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw"
+        )
         uio.text = self.tracetext
         uio.in_topleft = True
 
     def remove_topleft_buttons(self):
         for uio in self.ui_objects[:]:
-            if getattr(uio, 'in_topleft', False):
+            if getattr(uio, "in_topleft", False):
                 uio.remove()
 
         for ao in self.an_objects[:]:
-            if getattr(ao, 'in_topleft', False):
+            if getattr(ao, "in_topleft", False):
                 ao.remove()
 
     def an_clocktext(self):
-        '''
+        """
         function to initialize the system clocktext |n|
         called by run(), if animation is True. |n|
         may be overridden to change the standard behaviour.
-        '''
-        ao = Animate(x0=-30 if Pythonista else 0, y0=-11 if Pythonista else 0, textcolor0='fg',
-            text='', fontsize0=15, font='mono', anchor='ne',
-            screen_coordinates=True, xy_anchor='ne', env=self)
+        """
+        ao = Animate(
+            x0=-30 if Pythonista else 0,
+            y0=-11 if Pythonista else 0,
+            textcolor0="fg",
+            text="",
+            fontsize0=15,
+            font="mono",
+            anchor="ne",
+            screen_coordinates=True,
+            xy_anchor="ne",
+            env=self,
+        )
         ao.text = self.clocktext
 
     def an_half(self):
@@ -4902,7 +5093,7 @@ class Environment(object):
 
     def quit(self):
         if g.animation_env is not None:
-            g.animation_env.animation_parameters(animate=False, video='')  # stop animation
+            g.animation_env.animation_parameters(animate=False, video="")  # stop animation
         if Pythonista:
             if g.animation_scene is not None:
                 g.animation_scene.view.close()
@@ -4930,35 +5121,34 @@ class Environment(object):
             self.an_unsynced_buttons()
 
     def clocktext(self, t):
-        s = ''
+        s = ""
         if self._synced and (not self.paused) and self._show_fps:
             if len(self.frametimes) >= 2:
-                fps = (len(self.frametimes) - 1) / \
-                    (self.frametimes[-1] - self.frametimes[0])
+                fps = (len(self.frametimes) - 1) / (self.frametimes[-1] - self.frametimes[0])
             else:
                 fps = 0
-            s += 'fps={:.1f}'.format(fps)
+            s += "fps={:.1f}".format(fps)
 
         if self._show_time:
-            if s != '':
-                s += ' '
-            s += 't=' + self.time_to_str(t - self.env._offset).lstrip()
+            if s != "":
+                s += " "
+            s += "t=" + self.time_to_str(t - self.env._offset).lstrip()
         return s
 
     def tracetext(self, t):
         if self._trace:
-            return '= on'
+            return "= on"
         else:
-            return '= off'
+            return "= off"
 
     def syncedtext(self, t):
         if self._synced:
-            return '= on'
+            return "= on"
         else:
-            return '= off'
+            return "= off"
 
     def speedtext(self, t):
-        return 'speed = {:.3f}'.format(self._speed)
+        return "speed = {:.3f}".format(self._speed)
 
     def set_start_animation(self):
         self.frametimes = collections.deque(maxlen=30)
@@ -4966,55 +5156,55 @@ class Environment(object):
         self.start_animation_clocktime = time.time()
 
     def xy_anchor_to_x(self, xy_anchor, screen_coordinates):
-        if xy_anchor in ('nw', 'w', 'sw'):
+        if xy_anchor in ("nw", "w", "sw"):
             if screen_coordinates:
                 return 0
             else:
                 return self._x0
 
-        if xy_anchor in ('n', 'c', 'center', 's'):
+        if xy_anchor in ("n", "c", "center", "s"):
             if screen_coordinates:
                 return self._width / 2
             else:
                 return (self._x0 + self._x1) / 2
 
-        if xy_anchor in ('ne', 'e', 'se', ''):
+        if xy_anchor in ("ne", "e", "se", ""):
             if screen_coordinates:
                 return self._width
             else:
                 return self._x1
 
-        raise ValueError('incorrect xy_anchor', xy_anchor)
+        raise ValueError("incorrect xy_anchor", xy_anchor)
 
     def xy_anchor_to_y(self, xy_anchor, screen_coordinates):
-        if xy_anchor in ('nw', 'n', 'ne'):
+        if xy_anchor in ("nw", "n", "ne"):
             if screen_coordinates:
                 return self._height
             else:
                 return self._y1
 
-        if xy_anchor in ('w', 'c', 'center', 'e'):
+        if xy_anchor in ("w", "c", "center", "e"):
             if screen_coordinates:
                 return self._height / 2
             else:
                 return (self._y0 + self._y1) / 2
 
-        if xy_anchor in ('sw', 's', 'se', ''):
+        if xy_anchor in ("sw", "s", "se", ""):
             if screen_coordinates:
                 return 0
             else:
                 return self._y0
 
-        raise ValueError('incorrect xy_anchor', xy_anchor)
+        raise ValueError("incorrect xy_anchor", xy_anchor)
 
     def salabim_logo(self):
-        if self.is_dark('bg'):
+        if self.is_dark("bg"):
             return salabim_logo_red_white_200()
         else:
             return salabim_logo_red_black_200()
 
     def colorspec_to_tuple(self, colorspec):
-        '''
+        """
         translates a colorspec to a tuple
 
         Parameters
@@ -5026,18 +5216,18 @@ class Environment(object):
             ``(colorname, alpha)`` |n|
             ``(r, g, b)`` ==> alpha = 255 |n|
             ``(r, g, b, alpha)`` |n|
-            ``'fg'`` ==> foreground_color |n|
-            ``'bg'`` ==> background_color
+            ``"fg"`` ==> foreground_color |n|
+            ``"bg"`` ==> background_color
 
         Returns
         -------
         (r, g, b, a)
-        '''
+        """
         if colorspec is None:
-            colorspec = ''
-        if colorspec == 'fg':
+            colorspec = ""
+        if colorspec == "fg":
             colorspec = self.colorspec_to_tuple(self._foreground_color)
-        elif colorspec == 'bg':
+        elif colorspec == "bg":
             colorspec = self.colorspec_to_tuple(self._background_color)
         if isinstance(colorspec, (tuple, list)):
             if len(colorspec) == 2:
@@ -5048,32 +5238,35 @@ class Environment(object):
             elif len(colorspec) == 4:
                 return colorspec
         else:
-            if (colorspec != '') and (colorspec[0]) == '#':
+            if (colorspec != "") and (colorspec[0]) == "#":
                 if len(colorspec) == 7:
-                    return (int(colorspec[1:3], 16), int(colorspec[3:5], 16),
-                            int(colorspec[5:7], 16), 255)
+                    return (int(colorspec[1:3], 16), int(colorspec[3:5], 16), int(colorspec[5:7], 16), 255)
                 elif len(colorspec) == 9:
-                    return (int(colorspec[1:3], 16), int(colorspec[3:5], 16),
-                            int(colorspec[5:7], 16), int(colorspec[7:9], 16))
+                    return (
+                        int(colorspec[1:3], 16),
+                        int(colorspec[3:5], 16),
+                        int(colorspec[5:7], 16),
+                        int(colorspec[7:9], 16),
+                    )
             else:
-                s = colorspec.split('#')
+                s = colorspec.split("#")
                 if len(s) == 2:
                     alpha = s[1]
                     colorspec = s[0]
                 else:
-                    alpha = 'FF'
+                    alpha = "FF"
                 try:
-                    colorhex = colornames()[colorspec.replace(' ', '').lower()]
+                    colorhex = colornames()[colorspec.replace(" ", "").lower()]
                     if len(colorhex) == 7:
                         colorhex = colorhex + alpha
                     return self.colorspec_to_tuple(colorhex)
                 except KeyError:
                     pass
 
-        raise ValueError('wrong color specification: ' + str(colorspec))
+        raise ValueError("wrong color specification: " + str(colorspec))
 
     def colorinterpolate(self, t, t0, t1, v0, v1):
-        '''
+        """
         does linear interpolation of colorspecs
 
         Parameters
@@ -5101,7 +5294,7 @@ class Environment(object):
         ----
         Note that no extrapolation is done, so if t<t0 ==> v0  and t>t1 ==> v1 |n|
         This function is heavily used during animation
-        '''
+        """
         if v0 == v1:
             return v0
         if t1 == inf:
@@ -5115,18 +5308,16 @@ class Environment(object):
     def colorspec_to_hex(self, colorspec, withalpha=True):
         v = self.colorspec_to_tuple(colorspec)
         if withalpha:
-            return '#{:02x}{:02x}{:02x}{:02x}'.\
-                format(int(v[0]), int(v[1]), int(v[2]), int(v[3]))
+            return "#{:02x}{:02x}{:02x}{:02x}".format(int(v[0]), int(v[1]), int(v[2]), int(v[3]))
         else:
-            return '#{:02x}{:02x}{:02x}'.\
-                format(int(v[0]), int(v[1]), int(v[2]))
+            return "#{:02x}{:02x}{:02x}".format(int(v[0]), int(v[1]), int(v[2]))
 
     def pythonistacolor(self, colorspec):
         c = self.colorspec_to_tuple(colorspec)
         return (c[0] / 255, c[1] / 255, c[2] / 255, c[3] / 255)
 
     def is_dark(self, colorspec):
-        '''
+        """
         Arguments
         ---------
         colorspec : colorspec
@@ -5138,10 +5329,10 @@ class Environment(object):
             True, if the colorspec is dark (rather black than white) |n|
             False, if the colorspec is light (rather white than black |n|
             if colorspec has alpha=0 (total transparent), the background_color will be tested
-        '''
+        """
         rgba = self.colorspec_to_tuple(colorspec)
         if rgba[3] == 0:
-            return self.is_dark(self.colorspec_to_tuple(('bg', 255)))
+            return self.is_dark(self.colorspec_to_tuple(("bg", 255)))
         luma = ((0.299 * rgba[0]) + (0.587 * rgba[1]) + (0.114 * rgba[2])) / 255
         if luma > 0.5:
             return False
@@ -5152,7 +5343,7 @@ class Environment(object):
         if not screen_coordinates:
             fontsize = fontsize * self._scale
         f, heightA = getfont(font, fontsize)
-        if text == '':  # necessary because of bug in PIL >= 4.2.1
+        if text == "":  # necessary because of bug in PIL >= 4.2.1
             thiswidth, thisheight = (0, 0)
         else:
             thiswidth, thisheight = f.getsize(text)
@@ -5165,7 +5356,7 @@ class Environment(object):
         if not screen_coordinates:
             fontsize = fontsize * self._scale
         f, heightA = getfont(font, fontsize)
-        thiswidth, thisheight = f.getsize('Ap')
+        thiswidth, thisheight = f.getsize("Ap")
         if screen_coordinates:
             return thisheight
         else:
@@ -5182,15 +5373,14 @@ class Environment(object):
             if thiswidth > width:
                 break
             lastwidth = thiswidth
-        fontsize = interpolate(
-            width, lastwidth, thiswidth, fontsize - 1, fontsize)
+        fontsize = interpolate(width, lastwidth, thiswidth, fontsize - 1, fontsize)
         if screen_coordinates:
             return fontsize
         else:
             return fontsize / self._scale
 
     def name(self, value=None):
-        '''
+        """
         Parameters
         ----------
         value : str
@@ -5204,19 +5394,19 @@ class Environment(object):
         Note
         ----
         base_name and sequence_number are not affected if the name is changed
-        '''
+        """
         if value is not None:
             self._name = value
         return self._name
 
     def base_name(self):
-        '''
+        """
         returns the base name of the environment (the name used at initialization)
-        '''
+        """
         return self._base_name
 
     def sequence_number(self):
-        '''
+        """
         Returns
         -------
         sequence_number of the environment : int
@@ -5224,21 +5414,21 @@ class Environment(object):
             normally this will be the integer value of a serialized name,
             but also non serialized names (without a dot or a comma at the end)
             will be numbered)
-        '''
+        """
         return self._sequence_number
 
     def get_time_unit(self):
-        '''
+        """
         gets time unit
 
         Returns
         -------
-        Current time unit dimension (default 'n/a') : str
-        '''
+        Current time unit dimension (default "n/a") : str
+        """
         return self._time_unit_name
 
     def years(self, t):
-        '''
+        """
         convert the given time in years to the current time unit
 
         Parameters
@@ -5249,12 +5439,12 @@ class Environment(object):
         Returns
         -------
         time in years, converted to the current time_unit : float
-        '''
+        """
         self._check_time_unit_na()
         return t * 86400 * 365 * self._time_unit
 
     def weeks(self, t):
-        '''
+        """
         convert the given time in weeks to the current time unit
 
         Parameters
@@ -5265,12 +5455,12 @@ class Environment(object):
         Returns
         -------
         time in weeks, converted to the current time_unit : float
-        '''
+        """
         self._check_time_unit_na()
         return t * 86400 * 7 * self._time_unit
 
     def days(self, t):
-        '''
+        """
         convert the given time in days to the current time unit
 
         Parameters
@@ -5281,12 +5471,12 @@ class Environment(object):
         Returns
         -------
         time in days, converted to the current time_unit : float
-        '''
+        """
         self._check_time_unit_na()
         return t * 86400 * self._time_unit
 
     def hours(self, t):
-        '''
+        """
         convert the given time in hours to the current time unit
 
         Parameters
@@ -5297,12 +5487,12 @@ class Environment(object):
         Returns
         -------
         time in hours, converted to the current time_unit : float
-        '''
+        """
         self._check_time_unit_na()
         return t * 3600 * self._time_unit
 
     def minutes(self, t):
-        '''
+        """
         convert the given time in minutes to the current time unit
 
         Parameters
@@ -5313,12 +5503,12 @@ class Environment(object):
         Returns
         -------
         time in minutes, converted to the current time_unit : float
-        '''
+        """
         self._check_time_unit_na()
         return t * 60 * self._time_unit
 
     def seconds(self, t):
-        '''
+        """
         convert the given time in seconds to the current time unit
 
         Parameters
@@ -5329,12 +5519,12 @@ class Environment(object):
         Returns
         -------
         time in secoonds, converted to the current time_unit : float
-        '''
+        """
         self._check_time_unit_na()
         return t * self._time_unit
 
     def milliseconds(self, t):
-        '''
+        """
         convert the given time in milliseconds to the current time unit
 
         Parameters
@@ -5345,12 +5535,12 @@ class Environment(object):
         Returns
         -------
         time in milliseconds, converted to the current time_unit : float
-        '''
+        """
         self._check_time_unit_na()
         return t * 1e-3 * self._time_unit
 
     def microseconds(self, t):
-        '''
+        """
         convert the given time in microseconds to the current time unit
 
         Parameters
@@ -5361,12 +5551,12 @@ class Environment(object):
         Returns
         -------
         time in microseconds, converted to the current time_unit : float
-        '''
+        """
         self._check_time_unit_na()
         return t * 1e-6 * self._time_unit
 
     def to_years(self, t):
-        '''
+        """
         convert time t to years
 
         Parameters
@@ -5376,12 +5566,12 @@ class Environment(object):
         Returns
         -------
         Time t converted to years : float
-        '''
+        """
         self._check_time_unit_na()
         return t / (86400 * 365 * self._time_unit)
 
     def to_weeks(self, t):
-        '''
+        """
         convert time t to weeks
 
         Parameters
@@ -5391,12 +5581,12 @@ class Environment(object):
         Returns
         -------
         Time t converted to weeks : float
-        '''
+        """
         self._check_time_unit_na()
         return t / (86400 * 7 * self._time_unit)
 
     def to_days(self, t):
-        '''
+        """
         convert time t to days
 
         Parameters
@@ -5406,12 +5596,12 @@ class Environment(object):
         Returns
         -------
         Time t converted to days : float
-        '''
+        """
         self._check_time_unit_na()
         return t / (86400 * self._time_unit)
 
     def to_hours(self, t):
-        '''
+        """
         convert time t to hours
 
         Parameters
@@ -5421,12 +5611,12 @@ class Environment(object):
         Returns
         -------
         Time t converted to hours : float
-        '''
+        """
         self._check_time_unit_na()
         return t / (3600 * self._time_unit)
 
     def to_minutes(self, t):
-        '''
+        """
         convert time t to minutes
 
         Parameters
@@ -5436,12 +5626,12 @@ class Environment(object):
         Returns
         -------
         Time t converted to minutes : float
-        '''
+        """
         self._check_time_unit_na()
         return t / (60 * self._time_unit)
 
     def to_seconds(self, t):
-        '''
+        """
         convert time t to seconds
 
         Parameters
@@ -5451,12 +5641,12 @@ class Environment(object):
         Returns
         -------
         Time t converted to seconds : float
-        '''
+        """
         self._check_time_unit_na()
         return t / (self._time_unit)
 
     def to_milliseconds(self, t):
-        '''
+        """
         convert time t to milliseconds
 
         Parameters
@@ -5466,12 +5656,12 @@ class Environment(object):
         Returns
         -------
         Time t converted to milliseconds : float
-        '''
+        """
         self._check_time_unit_na()
         return t / (1e-3 * self._time_unit)
 
     def to_microseconds(self, t):
-        '''
+        """
         convert time t to microseconds
 
         Parameters
@@ -5481,22 +5671,22 @@ class Environment(object):
         Returns
         -------
         Time t converted to microseconds : float
-        '''
+        """
         self._check_time_unit_na()
         return t / (1e-6 * self._time_unit)
 
     def _check_time_unit_na(self):
         if self._time_unit is None:
-            raise AttributeError('time_unit is not available')
+            raise AttributeError("time_unit is not available")
 
     def print_trace_header(self):
-        '''
+        """
         print a (two line) header line as a legend |n|
         also the legend for line numbers will be printed |n|
         not that the header is only printed if trace=True
-        '''
-        self.print_trace('      time', 'current component', 'action', 'information', 'line#')
-        self.print_trace(10 * '-', 20 * '-', 35 * '-', 48 * '-', 6 * '-')
+        """
+        self.print_trace("      time", "current component", "action", "information", "line#")
+        self.print_trace(10 * "-", 20 * "-", 35 * "-", 48 * "-", 6 * "-")
         for ref in range(len(self._source_files)):
             for fullfilename, iref in self._source_files.items():
                 if ref == iref:
@@ -5504,12 +5694,12 @@ class Environment(object):
 
     def _print_legend(self, ref):
         if ref:
-            s = 'line numbers prefixed by ' + chr(ord('A') + ref - 1) + ' refer to'
+            s = "line numbers prefixed by " + chr(ord("A") + ref - 1) + " refer to"
         else:
-            s = 'line numbers refers to'
+            s = "line numbers refers to"
         for fullfilename, iref in self._source_files.items():
             if ref == iref:
-                self.print_trace('', '', s, (os.path.basename(fullfilename)), '')
+                self.print_trace("", "", s, (os.path.basename(fullfilename)), "")
                 break
 
     def _frame_to_lineno(self, frame):
@@ -5525,15 +5715,15 @@ class Environment(object):
             self._source_files[filename] = ref
             new_entry = True
         if ref == 0:
-            pre = ''
+            pre = ""
         else:
-            pre = chr(ref + ord('A') - 1)
+            pre = chr(ref + ord("A") - 1)
         if new_entry:
             self._print_legend(ref)
         return rpad(pre + str(lineno), 5)
 
-    def print_trace(self, s1='', s2='', s3='', s4='', s0=None, _optional=False):
-        '''
+    def print_trace(self, s1="", s2="", s3="", s4="", s0=None, _optional=False):
+        """
         prints a trace line
 
         Parameters
@@ -5563,9 +5753,9 @@ class Environment(object):
         if self.trace is False, nothing is printed |n|
         if the current component's suppress_trace is True, nothing is printed |n|
 
-        '''
+        """
         if self._trace:
-            if not (hasattr(self, '_current_component') and self._current_component._suppress_trace):
+            if not (hasattr(self, "_current_component") and self._current_component._suppress_trace):
                 if s0 is None:
                     stack = inspect.stack()
                     filename0 = inspect.getframeinfo(stack[0][0]).filename
@@ -5576,8 +5766,7 @@ class Environment(object):
 
                     s0 = self._frame_to_lineno(_get_caller_frame())
                 self.last_s0 = s0
-                line = pad(s0, 7) + pad(s1, 10) + ' ' + pad(s2, 20) + ' ' + \
-                    pad(s3, max(len(s3), 36)) + ' ' + s4.strip()
+                line = pad(s0, 7) + pad(s1, 10) + " " + pad(s2, 20) + " " + pad(s3, max(len(s3), 36)) + " " + s4.strip()
                 if _optional:
                     self._buffered_trace = line
                 else:
@@ -5589,7 +5778,7 @@ class Environment(object):
                     logging.debug(line)
 
     def time_to_str_format(self, format=None):
-        '''
+        """
         sets / gets the the format to display times in trace, animation, etc.
 
         Parameters
@@ -5597,13 +5786,13 @@ class Environment(object):
         format : str
             specifies how the time should be displayed in trace, animation, etc. |n|
             the format specifier should result in 10 characters. Examples: |n|
-            '{:10.3f}', '{:10.4f}', '{:10.0f}' and '{:8.1f} h' |n|
+            "{:10.3f}", "{:10.4f}", "{:10.0f}" and "{:8.1f} h" |n|
             Make sure that the returned length is exactly 10 characters.
 
         Returns
         -------
-        current specifier (initialized to '{:10.3f}')
-        '''
+        current specifier (initialized to "{:10.3f}")
+        """
         if format is not None:
             self._time_to_str_format = format
         return self._time_to_str_format
@@ -5613,30 +5802,33 @@ class Environment(object):
         return rpad(s, 10)
 
     def beep(self):
-        '''
+        """
         Beeps
 
         Works only on Windows and iOS (Pythonista). For other platforms this is just a dummy method.
-        '''
+        """
         if Windows:
             try:
                 import winsound
+
                 winsound.PlaySound(
-                    os.environ['WINDIR'] + r'\media\Windows Ding.wav', winsound.SND_FILENAME | winsound.SND_ASYNC)
-            except:  # NOQA
+                    os.environ["WINDIR"] + r"\media\Windows Ding.wav", winsound.SND_FILENAME | winsound.SND_ASYNC
+                )
+            except Exception:
                 pass
 
         elif Pythonista:
             try:
                 import sound
+
                 sound.stop_all_effects()
-                sound.play_effect('game:Beep', pitch=0.3)
-            except:  # NOQA
+                sound.play_effect("game:Beep", pitch=0.3)
+            except Exception:
                 pass
 
 
 class Animate(object):
-    '''
+    """
     defines an animation object
 
     Parameters
@@ -5672,7 +5864,7 @@ class Animate(object):
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se`` |n|
-        If '', the given coordimates are used untranslated
+        If null string, the given coordimates are used untranslated
 
     t0 : float
         time of start of the animation (default: now)
@@ -5832,13 +6024,13 @@ class Animate(object):
         - valid colorname
         - hexname
         - tuple (R,G,B) or (R,G,B,A)
-        - 'fg' or 'bg'
+        - "fg" or "bg"
 
     colornames may contain an additional alpha, like ``red#7f`` |n|
     hexnames may be either 3 of 4 bytes long (``#rrggbb`` or ``#rrggbbaa``) |n|
     both colornames and hexnames may be given as a tuple with an
     additional alpha between 0 and 255,
-    e.g. ``(255,0,255,128)``, ('red',127)`` or ``('#ff00ff',128)`` |n|
+    e.g. ``(255,0,255,128)``, ("red",127)`` or ``("#ff00ff",128)`` |n|
     fg is the foreground color |n|
     bg is the background color |n|
 
@@ -5874,20 +6066,59 @@ class Animate(object):
     fontsize0,fontsize1                                                       -
     width0,width1                     -
     ======================  ========= ========= ========= ========= ========= =========
-    '''
+    """
 
-    def __init__(self, parent=None, layer=0, keep=True, visible=True,
-                 screen_coordinates=False,
-                 t0=None, x0=0, y0=0, offsetx0=0, offsety0=0,
-                 circle0=None, line0=None, polygon0=None, rectangle0=None, points0=None,
-                 image=None, text=None,
-                 font='', anchor='c', as_points=False, max_lines=0, text_anchor=None,
-                 linewidth0=None, fillcolor0=None, linecolor0='fg', textcolor0='fg',
-                 angle0=0, fontsize0=20, width0=None,
-                 t1=None, x1=None, y1=None, offsetx1=None, offsety1=None,
-                 circle1=None, line1=None, polygon1=None, rectangle1=None, points1=None,
-                 linewidth1=None, fillcolor1=None, linecolor1=None, textcolor1=None,
-                 angle1=None, fontsize1=None, width1=None, xy_anchor='', env=None):
+    def __init__(
+        self,
+        parent=None,
+        layer=0,
+        keep=True,
+        visible=True,
+        screen_coordinates=False,
+        t0=None,
+        x0=0,
+        y0=0,
+        offsetx0=0,
+        offsety0=0,
+        circle0=None,
+        line0=None,
+        polygon0=None,
+        rectangle0=None,
+        points0=None,
+        image=None,
+        text=None,
+        font="",
+        anchor="c",
+        as_points=False,
+        max_lines=0,
+        text_anchor=None,
+        linewidth0=None,
+        fillcolor0=None,
+        linecolor0="fg",
+        textcolor0="fg",
+        angle0=0,
+        fontsize0=20,
+        width0=None,
+        t1=None,
+        x1=None,
+        y1=None,
+        offsetx1=None,
+        offsety1=None,
+        circle1=None,
+        line1=None,
+        polygon1=None,
+        rectangle1=None,
+        points1=None,
+        linewidth1=None,
+        fillcolor1=None,
+        linecolor1=None,
+        textcolor1=None,
+        angle1=None,
+        fontsize1=None,
+        width1=None,
+        xy_anchor="",
+        env=None,
+    ):
 
         self.env = g.default_env if env is None else env
         self._image_ident = None  # denotes no image yet
@@ -5896,14 +6127,12 @@ class Animate(object):
         self._image_y = 0
         self.canvas_object = None
 
-        self.type = self.settype(
-            circle0, line0, polygon0, rectangle0, points0, image, text)
-        if self.type == '':
-            raise ValueError('no object specified')
+        self.type = self.settype(circle0, line0, polygon0, rectangle0, points0, image, text)
+        if self.type == "":
+            raise ValueError("no object specified")
         type1 = self.settype(circle1, line1, polygon1, rectangle1, points1, None, None)
-        if (type1 != '') and (type1 != self.type):
-            raise TypeError('incompatible types: ' +
-                self.type + ' and ' + type1)
+        if (type1 != "") and (type1 != self.type):
+            raise TypeError("incompatible types: " + self.type + " and " + type1)
 
         self.layer0 = layer
         self.parent = parent
@@ -5929,7 +6158,7 @@ class Animate(object):
         self.font0 = font
         self.max_lines0 = max_lines
         self.anchor0 = anchor
-        if self.type == 'text':
+        if self.type == "text":
             if text_anchor is None:
                 self.text_anchor0 = self.anchor0
             else:
@@ -5944,9 +6173,9 @@ class Animate(object):
 
         if fillcolor0 is None:
             if self.as_points0:
-                self.fillcolor0 = ''
+                self.fillcolor0 = ""
             else:
-                self.fillcolor0 = 'fg'
+                self.fillcolor0 = "fg"
         else:
             self.fillcolor0 = fillcolor0
         self.linecolor0 = linecolor0
@@ -5955,7 +6184,7 @@ class Animate(object):
             if self.as_points0:
                 self.linewidth0 = 3
             else:
-                if self.type == 'line':
+                if self.type == "line":
                     self.linewidth0 = 1
                 else:
                     self.linewidth0 = 0
@@ -5976,34 +6205,67 @@ class Animate(object):
         self.y1 = self.y0 if y1 is None else y1
         self.offsetx1 = self.offsetx0 if offsetx1 is None else offsetx1
         self.offsety1 = self.offsety0 if offsety1 is None else offsety1
-        self.fillcolor1 =\
-            self.fillcolor0 if fillcolor1 is None else fillcolor1
-        self.linecolor1 =\
-            self.linecolor0 if linecolor1 is None else linecolor1
-        self.textcolor1 =\
-            self.textcolor0 if textcolor1 is None else textcolor1
-        self.linewidth1 =\
-            self.linewidth0 if linewidth1 is None else linewidth1
+        self.fillcolor1 = self.fillcolor0 if fillcolor1 is None else fillcolor1
+        self.linecolor1 = self.linecolor0 if linecolor1 is None else linecolor1
+        self.textcolor1 = self.textcolor0 if textcolor1 is None else textcolor1
+        self.linewidth1 = self.linewidth0 if linewidth1 is None else linewidth1
         self.angle1 = self.angle0 if angle1 is None else angle1
-        self.fontsize1 =\
-            self.fontsize0 if fontsize1 is None else fontsize1
+        self.fontsize1 = self.fontsize0 if fontsize1 is None else fontsize1
         self.width1 = self.width0 if width1 is None else width1
 
         self.t1 = inf if t1 is None else t1
 
         self.env.an_objects.append(self)
 
-    def update(self, layer=None, keep=None, visible=None,
-               t0=None, x0=None, y0=None, offsetx0=None, offsety0=None,
-               circle0=None, line0=None, polygon0=None, rectangle0=None, points0=None,
-               image=None, text=None, font=None, anchor=None, max_lines=None, text_anchor=None,
-               linewidth0=None, fillcolor0=None, linecolor0=None, textcolor0=None,
-               angle0=None, fontsize0=None, width0=None, as_points=None,
-               t1=None, x1=None, y1=None, offsetx1=None, offsety1=None,
-               circle1=None, line1=None, polygon1=None, rectangle1=None, points1=None,
-               linewidth1=None, fillcolor1=None, linecolor1=None, textcolor1=None,
-               angle1=None, fontsize1=None, width1=None, xy_anchor=None):
-        '''
+    def update(
+        self,
+        layer=None,
+        keep=None,
+        visible=None,
+        t0=None,
+        x0=None,
+        y0=None,
+        offsetx0=None,
+        offsety0=None,
+        circle0=None,
+        line0=None,
+        polygon0=None,
+        rectangle0=None,
+        points0=None,
+        image=None,
+        text=None,
+        font=None,
+        anchor=None,
+        max_lines=None,
+        text_anchor=None,
+        linewidth0=None,
+        fillcolor0=None,
+        linecolor0=None,
+        textcolor0=None,
+        angle0=None,
+        fontsize0=None,
+        width0=None,
+        as_points=None,
+        t1=None,
+        x1=None,
+        y1=None,
+        offsetx1=None,
+        offsety1=None,
+        circle1=None,
+        line1=None,
+        polygon1=None,
+        rectangle1=None,
+        points1=None,
+        linewidth1=None,
+        fillcolor1=None,
+        linecolor1=None,
+        textcolor1=None,
+        angle1=None,
+        fontsize1=None,
+        width1=None,
+        xy_anchor=None,
+    ):
+        """
         updates an animation object
 
         Parameters
@@ -6028,7 +6290,7 @@ class Animate(object):
             ``nw    n    ne`` |n|
             ``w     c     e`` |n|
             ``sw    s    se`` |n|
-            If '', the given coordimates are used untranslated |n|
+            If null string, the given coordimates are used untranslated |n|
             default see below
 
         t0 : float
@@ -6174,17 +6436,15 @@ class Animate(object):
         ----
         The type of the animation cannot be changed with this method. |n|
         The default value of most of the parameters is the current value (at time now)
-        '''
+        """
 
         t = self.env._now
         type0 = self.settype(circle0, line0, polygon0, rectangle0, points0, image, text)
-        if (type0 != '') and (type0 != self.type):
-            raise TypeError('incorrect type ' +
-                type0 + ' (should be ' + self.type)
+        if (type0 != "") and (type0 != self.type):
+            raise TypeError("incorrect type " + type0 + " (should be " + self.type)
         type1 = self.settype(circle1, line1, polygon1, rectangle1, points1, None, None)
-        if (type1 != '') and (type1 != self.type):
-            raise TypeError('incompatible types: ' +
-                self.type + ' and ' + type1)
+        if (type1 != "") and (type1 != self.type):
+            raise TypeError("incompatible types: " + self.type + " and " + type1)
 
         if layer is not None:
             self.layer0 = layer
@@ -6195,8 +6455,7 @@ class Animate(object):
         self.circle0 = self.circle() if circle0 is None else circle0
         self.line0 = self.line() if line0 is None else de_none(line0)
         self.polygon0 = self.polygon() if polygon0 is None else de_none(polygon0)
-        self.rectangle0 =\
-            self.rectangle() if rectangle0 is None else de_none(rectangle0)
+        self.rectangle0 = self.rectangle() if rectangle0 is None else de_none(rectangle0)
         self.points0 = self.points() if points0 is None else de_none(points0)
         if as_points is not None:
             self.as_points0 = as_points
@@ -6213,7 +6472,7 @@ class Animate(object):
             self.font0 = font
         if anchor is not None:
             self.anchor0 = anchor
-            if self.type == 'text':
+            if self.type == "text":
                 if text_anchor is not None:
                     self.text_anchor0 = text_anchor
         if text_anchor is not None:
@@ -6224,14 +6483,10 @@ class Animate(object):
         self.offsetx0 = self.offsetx(t) if offsetx0 is None else offsetx0
         self.offsety0 = self.offsety(t) if offsety0 is None else offsety0
 
-        self.fillcolor0 =\
-            self.fillcolor(t) if fillcolor0 is None else fillcolor0
-        self.linecolor0 =\
-            self.linecolor(t) if linecolor0 is None else linecolor0
-        self.textcolor0 =\
-            self.textcolor(t) if textcolor0 is None else textcolor0
-        self.linewidth0 =\
-            self.linewidth(t) if linewidth0 is None else linewidth0
+        self.fillcolor0 = self.fillcolor(t) if fillcolor0 is None else fillcolor0
+        self.linecolor0 = self.linecolor(t) if linecolor0 is None else linecolor0
+        self.textcolor0 = self.textcolor(t) if textcolor0 is None else textcolor0
+        self.linewidth0 = self.linewidth(t) if linewidth0 is None else linewidth0
         self.angle0 = self.angle(t) if angle0 is None else angle0
         self.fontsize0 = self.fontsize(t) if fontsize0 is None else fontsize0
         self.t0 = self.env._now if t0 is None else t0
@@ -6239,25 +6494,19 @@ class Animate(object):
         self.circle1 = self.circle0 if circle1 is None else circle1
         self.line1 = self.line0 if line1 is None else de_none(line1)
         self.polygon1 = self.polygon0 if polygon1 is None else de_none(polygon1)
-        self.rectangle1 =\
-            self.rectangle0 if rectangle1 is None else de_none(rectangle1)
+        self.rectangle1 = self.rectangle0 if rectangle1 is None else de_none(rectangle1)
         self.points1 = self.points0 if points1 is None else de_none(points1)
 
         self.x1 = self.x0 if x1 is None else x1
         self.y1 = self.y0 if y1 is None else y1
         self.offsetx1 = self.offsetx0 if offsetx1 is None else offsetx1
         self.offsety1 = self.offsety0 if offsety1 is None else offsety1
-        self.fillcolor1 =\
-            self.fillcolor0 if fillcolor1 is None else fillcolor1
-        self.linecolor1 =\
-            self.linecolor0 if linecolor1 is None else linecolor1
-        self.textcolor1 =\
-            self.textcolor0 if textcolor1 is None else textcolor1
-        self.linewidth1 =\
-            self.linewidth0 if linewidth1 is None else linewidth1
+        self.fillcolor1 = self.fillcolor0 if fillcolor1 is None else fillcolor1
+        self.linecolor1 = self.linecolor0 if linecolor1 is None else linecolor1
+        self.textcolor1 = self.textcolor0 if textcolor1 is None else textcolor1
+        self.linewidth1 = self.linewidth0 if linewidth1 is None else linewidth1
         self.angle1 = self.angle0 if angle1 is None else angle1
-        self.fontsize1 =\
-            self.fontsize0 if fontsize1 is None else fontsize1
+        self.fontsize1 = self.fontsize0 if fontsize1 is None else fontsize1
         self.width1 = self.width0 if width1 is None else width1
 
         self.t1 = inf if t1 is None else t1
@@ -6265,21 +6514,21 @@ class Animate(object):
             self.env.an_objects.append(self)
 
     def remove(self):
-        '''
+        """
         removes the animation object from the animation queue,
         so effectively ending this animation.
 
         Note
         ----
         The animation object might be still updated, if required
-        '''
+        """
         if self in self.env.ui_objects:
             self.env.ui_objects.remove(self)
         if self in self.env.an_objects:
             self.env.an_objects.remove(self)
 
     def x(self, t=None):
-        '''
+        """
         x-position of an animate object. May be overridden.
 
         Parameters
@@ -6291,12 +6540,11 @@ class Animate(object):
         -------
         x : float
             default behaviour: linear interpolation between self.x0 and self.x1
-        '''
-        return interpolate((self.env._now if t is None else t),
-                           self.t0, self.t1, self.x0, self.x1)
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.x0, self.x1)
 
     def y(self, t=None):
-        '''
+        """
         y-position of an animate object. May be overridden.
 
         Parameters
@@ -6308,12 +6556,11 @@ class Animate(object):
         -------
         y : float
             default behaviour: linear interpolation between self.y0 and self.y1
-        '''
-        return interpolate((self.env._now if t is None else t),
-                           self.t0, self.t1, self.y0, self.y1)
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.y0, self.y1)
 
     def offsetx(self, t=None):
-        '''
+        """
         offsetx of an animate object. May be overridden.
 
         Parameters
@@ -6325,12 +6572,11 @@ class Animate(object):
         -------
         offsetx : float
             default behaviour: linear interpolation between self.offsetx0 and self.offsetx1
-        '''
-        return interpolate((self.env._now if t is None else t),
-                           self.t0, self.t1, self.offsetx0, self.offsetx1)
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.offsetx0, self.offsetx1)
 
     def offsety(self, t=None):
-        '''
+        """
         offsety of an animate object. May be overridden.
 
         Parameters
@@ -6342,12 +6588,11 @@ class Animate(object):
         -------
         offsety : float
             default behaviour: linear interpolation between self.offsety0 and self.offsety1
-        '''
-        return interpolate((self.env._now if t is None else t),
-                           self.t0, self.t1, self.offsety0, self.offsety1)
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.offsety0, self.offsety1)
 
     def angle(self, t=None):
-        '''
+        """
         angle of an animate object. May be overridden.
 
         Parameters
@@ -6359,12 +6604,11 @@ class Animate(object):
         -------
         angle : float
             default behaviour: linear interpolation between self.angle0 and self.angle1
-        '''
-        return interpolate((self.env._now if t is None else t),
-                           self.t0, self.t1, self.angle0, self.angle1)
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.angle0, self.angle1)
 
     def linewidth(self, t=None):
-        '''
+        """
         linewidth of an animate object. May be overridden.
 
         Parameters
@@ -6376,12 +6620,11 @@ class Animate(object):
         -------
         linewidth : float
             default behaviour: linear interpolation between self.linewidth0 and self.linewidth1
-        '''
-        return interpolate((self.env._now if t is None else t),
-                           self.t0, self.t1, self.linewidth0, self.linewidth1)
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.linewidth0, self.linewidth1)
 
     def linecolor(self, t=None):
-        '''
+        """
         linecolor of an animate object. May be overridden.
 
         Parameters
@@ -6393,12 +6636,13 @@ class Animate(object):
         -------
         linecolor : colorspec
             default behaviour: linear interpolation between self.linecolor0 and self.linecolor1
-        '''
-        return self.env.colorinterpolate((self.env._now if t is None else t),
-                                self.t0, self.t1, self.linecolor0, self.linecolor1)
+        """
+        return self.env.colorinterpolate(
+            (self.env._now if t is None else t), self.t0, self.t1, self.linecolor0, self.linecolor1
+        )
 
     def fillcolor(self, t=None):
-        '''
+        """
         fillcolor of an animate object. May be overridden.
 
         Parameters
@@ -6410,12 +6654,13 @@ class Animate(object):
         -------
         fillcolor : colorspec
             default behaviour: linear interpolation between self.fillcolor0 and self.fillcolor1
-        '''
-        return self.env.colorinterpolate((self.env._now if t is None else t),
-                                self.t0, self.t1, self.fillcolor0, self.fillcolor1)
+        """
+        return self.env.colorinterpolate(
+            (self.env._now if t is None else t), self.t0, self.t1, self.fillcolor0, self.fillcolor1
+        )
 
     def circle(self, t=None):
-        '''
+        """
         circle of an animate object. May be overridden.
 
         Parameters
@@ -6432,15 +6677,11 @@ class Animate(object):
             - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc |n|
             (see class AnimateCircle for details) |n|
             default behaviour: linear interpolation between self.circle0 and self.circle1
-        '''
-        return interpolate(
-            (self.env._now if t is None else t),
-            self.t0, self.t1,
-            self.circle0,
-            self.circle1)
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.circle0, self.circle1)
 
     def textcolor(self, t=None):
-        '''
+        """
         textcolor of an animate object. May be overridden.
 
         Parameters
@@ -6452,12 +6693,13 @@ class Animate(object):
         -------
         textcolor : colorspec
             default behaviour: linear interpolation between self.textcolor0 and self.textcolor1
-        '''
-        return self.env.colorinterpolate((self.env._now if t is None else t),
-                                self.t0, self.t1, self.textcolor0, self.textcolor1)
+        """
+        return self.env.colorinterpolate(
+            (self.env._now if t is None else t), self.t0, self.t1, self.textcolor0, self.textcolor1
+        )
 
     def line(self, t=None):
-        '''
+        """
         line of an animate object. May be overridden.
 
         Parameters
@@ -6470,12 +6712,11 @@ class Animate(object):
         line : tuple
             series of x- and y-coordinates (xa,ya,xb,yb,xc,yc, ...) |n|
             default behaviour: linear interpolation between self.line0 and self.line1
-        '''
-        return interpolate((self.env._now if t is None else t),
-                           self.t0, self.t1, self.line0, self.line1)
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.line0, self.line1)
 
     def polygon(self, t=None):
-        '''
+        """
         polygon of an animate object. May be overridden.
 
         Parameters
@@ -6488,12 +6729,11 @@ class Animate(object):
         polygon: tuple
             series of x- and y-coordinates describing the polygon (xa,ya,xb,yb,xc,yc, ...) |n|
             default behaviour: linear interpolation between self.polygon0 and self.polygon1
-        '''
-        return interpolate((self.env._now if t is None else t),
-                           self.t0, self.t1, self.polygon0, self.polygon1)
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.polygon0, self.polygon1)
 
     def rectangle(self, t=None):
-        '''
+        """
         rectangle of an animate object. May be overridden.
 
         Parameters
@@ -6506,12 +6746,11 @@ class Animate(object):
         rectangle: tuple
             (xlowerleft,ylowerlef,xupperright,yupperright) |n|
             default behaviour: linear interpolation between self.rectangle0 and self.rectangle1
-        '''
-        return interpolate((self.env._now if t is None else t),
-                           self.t0, self.t1, self.rectangle0, self.rectangle1)
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.rectangle0, self.rectangle1)
 
     def points(self, t=None):
-        '''
+        """
         points of an animate object. May be overridden.
 
         Parameters
@@ -6524,12 +6763,11 @@ class Animate(object):
         points : tuple
             series of x- and y-coordinates (xa,ya,xb,yb,xc,yc, ...) |n|
             default behaviour: linear interpolation between self.points0 and self.points1
-        '''
-        return interpolate((self.env._now if t is None else t),
-                           self.t0, self.t1, self.points0, self.points1)
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.points0, self.points1)
 
     def width(self, t=None):
-        '''
+        """
         width position of an animated image object. May be overridden.
 
         Parameters
@@ -6542,12 +6780,11 @@ class Animate(object):
         width : float
             default behaviour: linear interpolation between self.width0 and self.width1 |n|
             if None, the original width of the image will be used
-        '''
-        return interpolate((self.env._now if t is None else t),
-                           self.t0, self.t1, self.width0, self.width1)
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.width0, self.width1)
 
     def fontsize(self, t=None):
-        '''
+        """
         fontsize of an animate object. May be overridden.
 
         Parameters
@@ -6559,12 +6796,11 @@ class Animate(object):
         -------
         fontsize : float
             default behaviour: linear interpolation between self.fontsize0 and self.fontsize1
-        '''
-        return interpolate((self.env._now if t is None else t),
-                           self.t0, self.t1, self.fontsize0, self.fontsize1)
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.fontsize0, self.fontsize1)
 
     def as_points(self, t=None):
-        '''
+        """
         as_points of an animate object. May be overridden.
 
         Parameters
@@ -6576,11 +6812,11 @@ class Animate(object):
         -------
         as_points : bool
             default behaviour: self.as_points (text given at creation or update)
-        '''
+        """
         return self.as_points0
 
     def text(self, t=None):
-        '''
+        """
         text of an animate object. May be overridden.
 
         Parameters
@@ -6592,11 +6828,11 @@ class Animate(object):
         -------
         text : str
             default behaviour: self.text0 (text given at creation or update)
-        '''
+        """
         return self.text0
 
     def max_lines(self, t=None):
-        '''
+        """
         maximum number of lines to be displayed of text. May be overridden.
 
         Parameters
@@ -6608,11 +6844,11 @@ class Animate(object):
         -------
         max_lines : int
             default behaviour: self.max_lines0 (max_lines given at creation or update)
-        '''
+        """
         return self.max_lines0
 
     def anchor(self, t=None):
-        '''
+        """
         anchor of an animate object. May be overridden.
 
         Parameters
@@ -6624,12 +6860,12 @@ class Animate(object):
         -------
         anchor : str
             default behaviour: self.anchor0 (anchor given at creation or update)
-        '''
+        """
 
         return self.anchor0
 
     def text_anchor(self, t=None):
-        '''
+        """
         text_anchor of an animate object. May be overridden.
 
         Parameters
@@ -6641,12 +6877,12 @@ class Animate(object):
         -------
         text_anchor : str
             default behaviour: self.text_anchor0 (text_anchor given at creation or update)
-        '''
+        """
 
         return self.text_anchor0
 
     def layer(self, t=None):
-        '''
+        """
         layer of an animate object. May be overridden.
 
         Parameters
@@ -6658,11 +6894,11 @@ class Animate(object):
         -------
         layer : int or float
             default behaviour: self.layer0 (layer given at creation or update)
-        '''
+        """
         return self.layer0
 
     def font(self, t=None):
-        '''
+        """
         font of an animate object. May be overridden.
 
         Parameters
@@ -6674,11 +6910,11 @@ class Animate(object):
         -------
         font : str
             default behaviour: self.font0 (font given at creation or update)
-        '''
+        """
         return self.font0
 
     def xy_anchor(self, t=None):
-        '''
+        """
         xy_anchor attribute of an animate object. May be overridden.
 
         Parameters
@@ -6690,11 +6926,11 @@ class Animate(object):
         -------
         xy_anchor : str
             default behaviour: self.xy_anchor0 (xy_anchor given at creation or update)
-        '''
+        """
         return self.xy_anchor0
 
     def visible(self, t=None):
-        '''
+        """
         visible attribute of an animate object. May be overridden.
 
         Parameters
@@ -6706,11 +6942,11 @@ class Animate(object):
         -------
         visible : bool
             default behaviour: self.visible0 (visible given at creation or update)
-        '''
+        """
         return self.visible0
 
     def image(self, t=None):
-        '''
+        """
         image of an animate object. May be overridden.
 
         Parameters
@@ -6723,35 +6959,35 @@ class Animate(object):
         image : PIL.Image.Image
             use function spec_to_image to load a file
             default behaviour: self.image0 (image given at creation or update)
-        '''
+        """
         return self.image0
 
     def settype(self, circle, line, polygon, rectangle, points, image, text):
         n = 0
-        t = ''
+        t = ""
         if circle is not None:
-            t = 'circle'
+            t = "circle"
             n += 1
         if line is not None:
-            t = 'line'
+            t = "line"
             n += 1
         if polygon is not None:
-            t = 'polygon'
+            t = "polygon"
             n += 1
         if rectangle is not None:
-            t = 'rectangle'
+            t = "rectangle"
             n += 1
         if points is not None:
-            t = 'points'
+            t = "points"
             n += 1
         if image is not None:
-            t = 'image'
+            t = "image"
             n += 1
         if text is not None:
-            t = 'text'
+            t = "text"
             n += 1
         if n >= 2:
-            raise ValueError('more than one object given')
+            raise ValueError("more than one object given")
         return t
 
     def make_pil_image(self, t):
@@ -6776,7 +7012,7 @@ class Animate(object):
             angle = self.angle(t)
             as_points = self.as_points(t)
 
-            if self.type in ('polygon', 'rectangle', 'line', 'circle'):
+            if self.type in ("polygon", "rectangle", "line", "circle"):
                 if self.screen_coordinates:
                     linewidth = self.linewidth(t)
                 else:
@@ -6794,45 +7030,63 @@ class Animate(object):
                     qx = (x - self.env._x0) * self.env._scale
                     qy = (y - self.env._y0) * self.env._scale
 
-                if self.type == 'rectangle':
+                if self.type == "rectangle":
                     rectangle = tuple(self.rectangle(t))
-                    self._image_ident = (tuple(rectangle), linewidth, linecolor, fillcolor,
-                        as_points, angle, self.screen_coordinates)
-                elif self.type == 'line':
+                    self._image_ident = (
+                        tuple(rectangle),
+                        linewidth,
+                        linecolor,
+                        fillcolor,
+                        as_points,
+                        angle,
+                        self.screen_coordinates,
+                    )
+                elif self.type == "line":
                     line = tuple(self.line(t))
                     fillcolor = (0, 0, 0, 0)
-                    self._image_ident = (tuple(line), linewidth, linecolor,
-                        as_points, angle, self.screen_coordinates)
-                elif self.type == 'polygon':
+                    self._image_ident = (tuple(line), linewidth, linecolor, as_points, angle, self.screen_coordinates)
+                elif self.type == "polygon":
                     polygon = tuple(self.polygon(t))
-                    self._image_ident = (tuple(polygon), linewidth, linecolor, fillcolor,
-                        as_points, angle, self.screen_coordinates)
-                elif self.type == 'circle':
+                    self._image_ident = (
+                        tuple(polygon),
+                        linewidth,
+                        linecolor,
+                        fillcolor,
+                        as_points,
+                        angle,
+                        self.screen_coordinates,
+                    )
+                elif self.type == "circle":
                     circle = self.circle(t)
                     if isinstance(circle, list):
                         circle = tuple(circle)
-                    self._image_ident = (circle, linewidth, linecolor, fillcolor,
-                        angle, self.screen_coordinates)
+                    self._image_ident = (circle, linewidth, linecolor, fillcolor, angle, self.screen_coordinates)
 
                 if self._image_ident != self._image_ident_prev:
-                    if self.type == 'rectangle':
+                    if self.type == "rectangle":
                         p = [
-                            rectangle[0], rectangle[1],
-                            rectangle[2], rectangle[1],
-                            rectangle[2], rectangle[3],
-                            rectangle[0], rectangle[3],
-                            rectangle[0], rectangle[1]]
+                            rectangle[0],
+                            rectangle[1],
+                            rectangle[2],
+                            rectangle[1],
+                            rectangle[2],
+                            rectangle[3],
+                            rectangle[0],
+                            rectangle[3],
+                            rectangle[0],
+                            rectangle[1],
+                        ]
 
-                    elif self.type == 'line':
+                    elif self.type == "line":
                         p = line
 
-                    elif self.type == 'polygon':
+                    elif self.type == "polygon":
                         p = list(polygon)
                         if p[0:1] != p[-2:-1]:
                             p.append(p[0])  # close the polygon
                             p.append(p[1])
 
-                    elif self.type == 'circle':
+                    elif self.type == "circle":
                         arc_angle0 = 0
                         arc_angle1 = 360
                         draw_arc = False
@@ -6921,24 +7175,31 @@ class Animate(object):
                     rscaled = tuple(rscaled)  # to make it hashable
 
                     if as_points:
-                        self._image = Image.new('RGBA', (int(maxrx - minrx + 2 * linewidth),
-                          int(maxry - minry + 2 * linewidth)), (0, 0, 0, 0))
-                        point_image = Image.new('RGBA', (int(linewidth), int(linewidth)), linecolor)
+                        self._image = Image.new(
+                            "RGBA",
+                            (int(maxrx - minrx + 2 * linewidth), int(maxry - minry + 2 * linewidth)),
+                            (0, 0, 0, 0),
+                        )
+                        point_image = Image.new("RGBA", (int(linewidth), int(linewidth)), linecolor)
 
                         for i in range(0, len(r), 2):
                             rx = rscaled[i]
                             ry = rscaled[i + 1]
-                            self._image.paste(point_image,
-                              (int(rx - 0.5 * linewidth), int(ry - 0.5 * linewidth)), point_image)
+                            self._image.paste(
+                                point_image, (int(rx - 0.5 * linewidth), int(ry - 0.5 * linewidth)), point_image
+                            )
 
                     else:
-                        self._image = Image.new('RGBA', (int(maxrx - minrx + 2 * linewidth),
-                            int(maxry - minry + 2 * linewidth)), (0, 0, 0, 0))
+                        self._image = Image.new(
+                            "RGBA",
+                            (int(maxrx - minrx + 2 * linewidth), int(maxry - minry + 2 * linewidth)),
+                            (0, 0, 0, 0),
+                        )
                         draw = ImageDraw.Draw(self._image)
                         if fillcolor[3] != 0:
                             draw.polygon(rscaled, fill=fillcolor)
                         if (round(linewidth) > 0) and (linecolor[3] != 0):
-                            if self.type == 'circle' and not draw_arc:
+                            if self.type == "circle" and not draw_arc:
                                 draw.line(rscaled[2:-2], fill=linecolor, width=int(linewidth))
                                 # get rid of the first and last point (=center)
                             else:
@@ -6952,11 +7213,11 @@ class Animate(object):
                     self.minpy = minpy
                     self.maxpx = maxpx
                     self.maxpy = maxpy
-                    if self.type == 'circle':
+                    if self.type == "circle":
                         self.radius0 = radius0
                         self.radius1 = radius1
 
-                if self.type == 'circle':
+                if self.type == "circle":
                     self.env._centerx = qx
                     self.env._centery = qy
                     self.env._dimx = 2 * self.radius0
@@ -6967,12 +7228,10 @@ class Animate(object):
                     self.env._dimx = self.maxpx - self.minpx
                     self.env._dimy = self.maxpy - self.minpy
 
-                self._image_x = qx + self.minrx - linewidth + \
-                    (offsetx * cosa - offsety * sina)
-                self._image_y = qy + self.minry - linewidth + \
-                    (offsetx * sina + offsety * cosa)
+                self._image_x = qx + self.minrx - linewidth + (offsetx * cosa - offsety * sina)
+                self._image_y = qy + self.minry - linewidth + (offsetx * sina + offsety * cosa)
 
-            elif self.type == 'image':
+            elif self.type == "image":
                 image = self.image(t)
                 if isinstance(image, (tuple, list)):
                     image = image[0]  # ignore serial number (for compatibility with pre 2.2.9 versions)
@@ -6999,22 +7258,22 @@ class Animate(object):
 
                 self._image_ident = (image, width, height, angle)
                 if self._image_ident != self._image_ident_prev:
-                    im1 = image.resize(
-                        (int(width), int(height)), Image.ANTIALIAS)
+                    im1 = image.resize((int(width), int(height)), Image.ANTIALIAS)
                     self.imwidth, self.imheight = im1.size
                     self._image = im1.rotate(angle, expand=1)
 
                 anchor_to_dis = {
-                    'ne': (-0.5, -0.5),
-                    'n': (0, -0.5),
-                    'nw': (0.5, -0.5),
-                    'e': (-0.5, 0),
-                    'center': (0, 0),
-                    'c': (0, 0),
-                    'w': (0.5, 0),
-                    'se': (-0.5, 0.5),
-                    's': (0, 0.5),
-                    'sw': (0.5, 0.5)}
+                    "ne": (-0.5, -0.5),
+                    "n": (0, -0.5),
+                    "nw": (0.5, -0.5),
+                    "e": (-0.5, 0),
+                    "center": (0, 0),
+                    "c": (0, 0),
+                    "w": (0.5, 0),
+                    "se": (-0.5, 0.5),
+                    "s": (0, 0.5),
+                    "sw": (0.5, 0.5),
+                }
                 dx, dy = anchor_to_dis[anchor.lower()]
                 dx = dx * self.imwidth + offsetx
                 dy = dy * self.imheight + offsety
@@ -7032,7 +7291,7 @@ class Animate(object):
                 self._image_x = qx + ex - imrwidth / 2
                 self._image_y = qy + ey - imrheight / 2
 
-            elif self.type == 'text':
+            elif self.type == "text":
                 textcolor = self.env.colorspec_to_tuple(self.textcolor(t))
                 fontsize = self.fontsize(t)
                 angle = self.angle(t)
@@ -7044,7 +7303,7 @@ class Animate(object):
                 text = self.text(t)
                 text_anchor = self.text_anchor(t)
 
-                if hasattr(self, 'dependent'):
+                if hasattr(self, "dependent"):
                     text_offsetx = self.text_offsetx(t)
                     text_offsety = self.text_offsety(t)
                     if not self.screen_coordinates:
@@ -7053,16 +7312,17 @@ class Animate(object):
                     qx = self.env._centerx
                     qy = self.env._centery
                     anchor_to_dis = {
-                        'ne': (0.5, 0.5),
-                        'n': (0, 0.5),
-                        'nw': (-0.5, 0.5),
-                        'e': (0.5, 0),
-                        'center': (0, 0),
-                        'c': (0, 0),
-                        'w': (-0.5, 0),
-                        'se': (0.5, -0.5),
-                        's': (0, -0.5),
-                        'sw': (-0.5, -0.5)}
+                        "ne": (0.5, 0.5),
+                        "n": (0, 0.5),
+                        "nw": (-0.5, 0.5),
+                        "e": (0.5, 0),
+                        "center": (0, 0),
+                        "c": (0, 0),
+                        "w": (-0.5, 0),
+                        "se": (0.5, -0.5),
+                        "s": (0, -0.5),
+                        "sw": (-0.5, -0.5),
+                    }
                     dis = anchor_to_dis[text_anchor.lower()]
                     offsetx += text_offsetx + dis[0] * self.env._dimx - dis[0] * 4  # 2 extra at east or west
                     offsety += text_offsety + dis[1] * self.env._dimy - (2 if dis[1] > 0 else 0)  # 2 extra at north
@@ -7074,13 +7334,11 @@ class Animate(object):
                         qx = (x - self.env._x0) * self.env._scale
                         qy = (y - self.env._y0) * self.env._scale
                 max_lines = self.max_lines(t)
-                self._image_ident = (
-                    text, fontname, fontsize, angle, textcolor, max_lines)
+                self._image_ident = (text, fontname, fontsize, angle, textcolor, max_lines)
                 if self._image_ident != self._image_ident_prev:
                     font, heightA = getfont(fontname, fontsize)
-                    if text == '' or text is None:  # this code is a workaround for a bug in PIL >= 4.2.1
-                        im = Image.new(
-                            'RGBA', (0, 0), (0, 0, 0, 0))
+                    if text == "" or text is None:  # this code is a workaround for a bug in PIL >= 4.2.1
+                        im = Image.new("RGBA", (0, 0), (0, 0, 0, 0))
                     else:
                         lines = []
                         for item in deep_flatten(text):
@@ -7098,10 +7356,9 @@ class Animate(object):
                         else:
                             totwidth = 0
                         number_of_lines = len(lines)
-                        lineheight = font.getsize('Ap')[1]
+                        lineheight = font.getsize("Ap")[1]
                         totheight = number_of_lines * lineheight
-                        im = Image.new(
-                            'RGBA', (int(totwidth + 0.1 * fontsize), int(totheight)), (0, 0, 0, 0))
+                        im = Image.new("RGBA", (int(totwidth + 0.1 * fontsize), int(totheight)), (0, 0, 0, 0))
                         imwidth, imheight = im.size
                         draw = ImageDraw.Draw(im)
                         pos = 0
@@ -7127,16 +7384,17 @@ class Animate(object):
                     self._image = im.rotate(angle, expand=1)
 
                 anchor_to_dis = {
-                    'ne': (-0.5, -0.5),
-                    'n': (0, -0.5),
-                    'nw': (0.5, -0.5),
-                    'e': (-0.5, 0),
-                    'center': (0, 0),
-                    'c': (0, 0),
-                    'w': (0.5, 0),
-                    'se': (-0.5, 0.5),
-                    's': (0, 0.5),
-                    'sw': (0.5, 0.5)}
+                    "ne": (-0.5, -0.5),
+                    "n": (0, -0.5),
+                    "nw": (0.5, -0.5),
+                    "e": (-0.5, 0),
+                    "center": (0, 0),
+                    "c": (0, 0),
+                    "w": (0.5, 0),
+                    "se": (-0.5, 0.5),
+                    "s": (0, 0.5),
+                    "sw": (0.5, 0.5),
+                }
                 dx, dy = anchor_to_dis[text_anchor.lower()]
                 dx = dx * self.imwidth + offsetx - 0.1 * fontsize
 
@@ -7167,7 +7425,7 @@ class Animate(object):
 
 
 class AnimateEntry(object):
-    '''
+    """
     defines a button
 
     Parameters
@@ -7209,12 +7467,24 @@ class AnimateEntry(object):
     ----
     All measures are in screen coordinates |n|
     This class is not available under Pythonista.
-    '''
-    def __init__(self, x=0, y=0, number_of_chars=20, value='',
-        fillcolor='fg', color='bg', text='', action=None, env=None, xy_anchor='sw'):
+    """
+
+    def __init__(
+        self,
+        x=0,
+        y=0,
+        number_of_chars=20,
+        value="",
+        fillcolor="fg",
+        color="bg",
+        text="",
+        action=None,
+        env=None,
+        xy_anchor="sw",
+    ):
         self.env = g.default_env if env is None else env
         self.env.ui_objects.append(self)
-        self.type = 'entry'
+        self.type = "entry"
         self.value = value
         self.sequence = self.env.serialize()
         self.x = x
@@ -7230,17 +7500,15 @@ class AnimateEntry(object):
         x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
         y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
 
-        self.entry = tkinter.Entry(
-            self.env.root)
+        self.entry = tkinter.Entry(self.env.root)
         self.entry.configure(
             width=self.number_of_chars,
             foreground=self.env.colorspec_to_hex(self.color, False),
             background=self.env.colorspec_to_hex(self.fillcolor, False),
-            relief=tkinter.FLAT)
+            relief=tkinter.FLAT,
+        )
         self.entry.bind("<Return>", self.on_enter)
-        self.entry_window = g.canvas.create_window(
-            x, self.env._height - y,
-            anchor=tkinter.SW, window=self.entry)
+        self.entry_window = g.canvas.create_window(x, self.env._height - y, anchor=tkinter.SW, window=self.entry)
         self.entry.insert(0, self.value)
         self.installed = True
 
@@ -7249,21 +7517,21 @@ class AnimateEntry(object):
             self.action()
 
     def get(self):
-        '''
+        """
         get the current value of the entry
 
         Returns
         -------
         Current value of the entry : str
-        '''
-        return(self.entry.get())
+        """
+        return self.entry.get()
 
     def remove(self):
-        '''
+        """
         removes the entry object. |n|
         the ui object is removed from the ui queue,
         so effectively ending this ui
-        '''
+        """
         if self in self.env.ui_objects:
             self.env.ui_objects.remove(self)
         if self.installed:
@@ -7272,7 +7540,7 @@ class AnimateEntry(object):
 
 
 class AnimateButton(object):
-    '''
+    """
     defines a button
 
     Parameters
@@ -7333,15 +7601,28 @@ class AnimateButton(object):
     All measures are in screen coordinates |n|
     On Pythonista, this functionality is emulated by salabim
     On other platforms, the tkinter functionality is used.
-    '''
+    """
 
-    def __init__(self, x=0, y=0, width=80, height=30,
-                 linewidth=0, fillcolor='fg',
-                 linecolor='fg', color='bg', text='', font='',
-                 fontsize=15, action=None, env=None, xy_anchor='sw'):
+    def __init__(
+        self,
+        x=0,
+        y=0,
+        width=80,
+        height=30,
+        linewidth=0,
+        fillcolor="fg",
+        linecolor="fg",
+        color="bg",
+        text="",
+        font="",
+        fontsize=15,
+        action=None,
+        env=None,
+        xy_anchor="sw",
+    ):
 
         self.env = g.default_env if env is None else env
-        self.type = 'button'
+        self.type = "button"
         self.t0 = -inf
         self.t1 = inf
         self.x0 = 0
@@ -7360,7 +7641,7 @@ class AnimateButton(object):
         self.font = font
         self.fontsize = fontsize
         self.text0 = text
-        self.lasttext = '*'
+        self.lasttext = "*"
         self.action = action
         self.xy_anchor = xy_anchor
 
@@ -7374,24 +7655,24 @@ class AnimateButton(object):
         x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
         y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
 
-        self.button = tkinter.Button(
-            self.env.root, text=self.lasttext, command=self.action, anchor=tkinter.CENTER)
+        self.button = tkinter.Button(self.env.root, text=self.lasttext, command=self.action, anchor=tkinter.CENTER)
         self.button.configure(
             width=int(2.2 * self.width / self.fontsize),
             foreground=self.env.colorspec_to_hex(self.color, False),
             background=self.env.colorspec_to_hex(self.fillcolor, False),
-            relief=tkinter.FLAT)
+            relief=tkinter.FLAT,
+        )
         self.button_window = g.canvas.create_window(
-            x + self.width, self.env._height - y - self.height,
-            anchor=tkinter.NE, window=self.button)
+            x + self.width, self.env._height - y - self.height, anchor=tkinter.NE, window=self.button
+        )
         self.installed = True
 
     def remove(self):
-        '''
+        """
         removes the button object. |n|
         the ui object is removed from the ui queue,
         so effectively ending this ui
-        '''
+        """
         if self in self.env.ui_objects:
             self.env.ui_objects.remove(self)
         if self.installed:
@@ -7401,7 +7682,7 @@ class AnimateButton(object):
 
 
 class AnimateSlider(object):
-    '''
+    """
     defines a slider
 
     Parameters
@@ -7474,12 +7755,28 @@ class AnimateSlider(object):
     All measures are in screen coordinates |n|
     On Pythonista, this functionality is emulated by salabim
     On other platforms, the tkinter functionality is used.
-    '''
+    """
 
-    def __init__(self, layer=0, x=0, y=0, width=100, height=20,
-                 vmin=0, vmax=10, v=None, resolution=1,
-                 linecolor='fg', labelcolor='fg', label='',
-                 font='', fontsize=12, action=None, xy_anchor='sw', env=None):
+    def __init__(
+        self,
+        layer=0,
+        x=0,
+        y=0,
+        width=100,
+        height=20,
+        vmin=0,
+        vmax=10,
+        v=None,
+        resolution=1,
+        linecolor="fg",
+        labelcolor="fg",
+        label="",
+        font="",
+        fontsize=12,
+        action=None,
+        xy_anchor="sw",
+        env=None,
+    ):
 
         self.env = g.default_env if env is None else env
         n = round((vmax - vmin) / resolution) + 1
@@ -7489,7 +7786,7 @@ class AnimateSlider(object):
         self.xdelta = width / n
         self.resolution = resolution
 
-        self.type = 'slider'
+        self.type = "slider"
         self.t0 = -inf
         self.t1 = inf
         self.x0 = 0
@@ -7516,7 +7813,7 @@ class AnimateSlider(object):
         self.env.ui_objects.append(self)
 
     def v(self, value=None):
-        '''
+        """
         value
 
         Parameters
@@ -7528,7 +7825,7 @@ class AnimateSlider(object):
         Returns
         -------
         Current value of the slider : float
-        '''
+        """
         if value is not None:
             if Pythonista:
                 self._v = value
@@ -7551,28 +7848,29 @@ class AnimateSlider(object):
         y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
         self.slider = tkinter.Scale(
             self.env.root,
-            from_=self.vmin, to=self.vmax,
+            from_=self.vmin,
+            to=self.vmax,
             orient=tkinter.HORIZONTAL,
             label=self.label,
             resolution=self.resolution,
-            command=self.action)
-        self.slider.window = g.canvas.create_window(
-            x, self.env._height - y,
-            anchor=tkinter.NW, window=self.slider)
+            command=self.action,
+        )
+        self.slider.window = g.canvas.create_window(x, self.env._height - y, anchor=tkinter.NW, window=self.slider)
         self.slider.config(
             font=(self.font, int(self.fontsize * 0.8)),
-            foreground=self.env.colorspec_to_hex('fg', False),
-            background=self.env.colorspec_to_hex('bg', False),
-            highlightbackground=self.env.colorspec_to_hex('bg', False))
+            foreground=self.env.colorspec_to_hex("fg", False),
+            background=self.env.colorspec_to_hex("bg", False),
+            highlightbackground=self.env.colorspec_to_hex("bg", False),
+        )
         self.slider.set(self._v)
         self.installed = True
 
     def remove(self):
-        '''
+        """
         removes the slider object |n|
         The ui object is removed from the ui queue,
         so effectively ending this ui
-        '''
+        """
         if self in self.env.ui_objects:
             self.env.ui_objects.remove(self)
         if self.installed:
@@ -7582,7 +7880,7 @@ class AnimateSlider(object):
 
 
 class AnimateQueue(object):
-    '''
+    """
     Animates the component in a queue.
 
     Parameters
@@ -7598,10 +7896,10 @@ class AnimateQueue(object):
         default: 50
 
     direction : str
-        if 'w', waiting line runs westwards (i.e. from right to left) |n|
-        if 'n', waiting line runs northeards (i.e. from bottom to top) |n|
-        if 'e', waiting line runs eastwards (i.e. from left to right) (default) |n|
-        if 's', waiting line runs southwards (i.e. from top to bottom)
+        if "w", waiting line runs westwards (i.e. from right to left) |n|
+        if "n", waiting line runs northeards (i.e. from bottom to top) |n|
+        if "e", waiting line runs eastwards (i.e. from left to right) (default) |n|
+        if "s", waiting line runs southwards (i.e. from top to bottom)
 
     reverse : bool
         if False (default), display in normal order. If True, reversed.
@@ -7620,7 +7918,7 @@ class AnimateQueue(object):
         color of the title (default foreground color)
 
     titlefont : font
-        font of the title (default '')
+        font of the title (default null string)
 
     titlefontsize : int
         size of the font of the title (default 15)
@@ -7664,13 +7962,28 @@ class AnimateQueue(object):
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
     - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
     - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-    '''
+    """
 
-    def __init__(self, queue, x=50, y=50, direction='w', max_length=None,
-        xy_anchor='sw', reverse=False,
-        title=None, titlecolor='fg', titlefontsize=15, titlefont='', titleoffsetx=None, titleoffsety=None,
+    def __init__(
+        self,
+        queue,
+        x=50,
+        y=50,
+        direction="w",
+        max_length=None,
+        xy_anchor="sw",
+        reverse=False,
+        title=None,
+        titlecolor="fg",
+        titlefontsize=15,
+        titlefont="",
+        titleoffsetx=None,
+        titleoffsety=None,
         layer=0,
-        id=None, arg=None, parent=None):
+        id=None,
+        arg=None,
+        parent=None,
+    ):
         _checkisqueue(queue)
         self._queue = queue
         self.xy_anchor = xy_anchor
@@ -7688,7 +8001,7 @@ class AnimateQueue(object):
         self.vy = 0
         self.vangle = 0
         self.vlayer = 0
-        self.vanchor = 'e'
+        self.vanchor = "e"
         self.titleoffsetx = titleoffsetx
         self.titleoffsety = titleoffsety
         self.titlefont = titlefont
@@ -7696,10 +8009,18 @@ class AnimateQueue(object):
         self.titlecolor = titlecolor
         self.title = title
         self.layer = layer
-        self.aotitle = AnimateText(text=lambda: self.vtitle, textcolor=lambda: self.vtitlecolor,
-            x=lambda: self.vx, y=lambda: self.vy, text_anchor=lambda: self.vanchor, angle=lambda: self.vangle,
-            screen_coordinates=True, fontsize=lambda: self.vtitlefontsize, font=lambda: self.vtitlefont,
-            layer=lambda: self.vlayer)
+        self.aotitle = AnimateText(
+            text=lambda: self.vtitle,
+            textcolor=lambda: self.vtitlecolor,
+            x=lambda: self.vx,
+            y=lambda: self.vy,
+            text_anchor=lambda: self.vanchor,
+            angle=lambda: self.vangle,
+            screen_coordinates=True,
+            fontsize=lambda: self.vtitlefontsize,
+            font=lambda: self.vtitlefont,
+            layer=lambda: self.vlayer,
+        )
         self.env.sys_objects.append(self)
 
     def update(self, t):
@@ -7721,29 +8042,28 @@ class AnimateQueue(object):
         self.vlayer = _call(self.layer, t, self.arg)
         x += self._queue.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True)
         y += self._queue.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True)
-        if direction == 'e':
+        if direction == "e":
             self.vx = x + (-25 if titleoffsetx is None else titleoffsetx)
             self.vy = y + (25 if self.titleoffsety is None else titleoffsety)
-            self.vanchor = 'sw'
+            self.vanchor = "sw"
             self.vangle = 0
-        elif direction == 'w':
+        elif direction == "w":
             self.vx = x + (25 if titleoffsetx is None else titleoffsetx)
             self.vy = y + (25 if self.titleoffsety is None else titleoffsety)
-            self.vanchor = 'se'
+            self.vanchor = "se"
             self.vangle = 0
-        elif direction == 'n':
+        elif direction == "n":
             self.vx = x + (-25 if titleoffsetx is None else titleoffsetx)
             self.vy = y + (-25 - self.vtitlefontsize if self.titleoffsety is None else titleoffsety)
-            self.vanchor = 'sw'
+            self.vanchor = "sw"
             self.vangle = 0
-        elif direction == 's':
+        elif direction == "s":
             self.vx = x + (-25 if titleoffsetx is None else titleoffsetx)
-            self.vy = y + (25if self.titleoffsety is None else titleoffsety)
-            self.vanchor = 'sw'
+            self.vy = y + (25 if self.titleoffsety is None else titleoffsety)
+            self.vanchor = "sw"
             self.vangle = 0
 
-        factor_x, factor_y = \
-            {'w': (-1, 0), 'n': (0, 1), 'e': (1, 0), 's': (0, -1)}[direction.lower()]
+        factor_x, factor_y = {"w": (-1, 0), "n": (0, 1), "e": (1, 0), "s": (0, -1)}[direction.lower()]
         n = 0
         for c in reversed(self._queue) if reverse else self._queue:
             if (max_length is not None) and n >= max_length:
@@ -7787,7 +8107,7 @@ class _Vis(object):
 
 
 class AnimateText(_Vis):
-    '''
+    """
     Displays a text
 
     Parameters
@@ -7809,7 +8129,7 @@ class AnimateText(_Vis):
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se`` |n|
-        If '', the given coordimates are used untranslated
+        If null string, the given coordimates are used untranslated
 
     offsetx : float
         offsets the x-coordinate of the rectangle (default 0)
@@ -7868,43 +8188,62 @@ class AnimateText(_Vis):
     - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
     - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
 
-    '''
-    def __init__(self, text='', x=0, y=0, fontsize=15, textcolor='fg', font='', text_anchor='sw', angle=0,
-        visible=True, xy_anchor='', layer=0, env=None, screen_coordinates=False, arg=None, parent=None,
-        offsetx=0, offsety=0, max_lines=0):
+    """
+
+    def __init__(
+        self,
+        text="",
+        x=0,
+        y=0,
+        fontsize=15,
+        textcolor="fg",
+        font="",
+        text_anchor="sw",
+        angle=0,
+        visible=True,
+        xy_anchor="",
+        layer=0,
+        env=None,
+        screen_coordinates=False,
+        arg=None,
+        parent=None,
+        offsetx=0,
+        offsety=0,
+        max_lines=0,
+    ):
         self.env = g.default_env if env is None else env
 
         # the checks hasattr are req'd to not override methods of inherited classes
-        if not hasattr(self, 'x'):
+        if not hasattr(self, "x"):
             self.x = x
-        if not hasattr(self, 'y'):
+        if not hasattr(self, "y"):
             self.y = y
-        if not hasattr(self, 'offsetx'):
+        if not hasattr(self, "offsetx"):
             self.offsetx = offsetx
-        if not hasattr(self, 'offsety'):
+        if not hasattr(self, "offsety"):
             self.offsety = offsety
-        if not hasattr(self, 'text'):
+        if not hasattr(self, "text"):
             self.text = text
-        if not hasattr(self, 'max_lines'):
+        if not hasattr(self, "max_lines"):
             self.max_lines = max_lines
-        if not hasattr(self, 'textcolor'):
+        if not hasattr(self, "textcolor"):
             self.textcolor = textcolor
-        if not hasattr(self, 'angle'):
+        if not hasattr(self, "angle"):
             self.angle = angle
-        if not hasattr(self, 'text_anchor'):
+        if not hasattr(self, "text_anchor"):
             self.text_anchor = text_anchor
-        if not hasattr(self, 'font'):
+        if not hasattr(self, "font"):
             self.font = font
-        if not hasattr(self, 'fontsize'):
+        if not hasattr(self, "fontsize"):
             self.fontsize = fontsize
-        if not hasattr(self, 'visible'):
+        if not hasattr(self, "visible"):
             self.visible = visible
-        if not hasattr(self, 'xy_anchor'):
+        if not hasattr(self, "xy_anchor"):
             self.xy_anchor = xy_anchor
-        if not hasattr(self, 'layer'):
+        if not hasattr(self, "layer"):
             self.layer = layer
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao0 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         self.aos = (ao0,)
 
     def remove(self):
@@ -7913,7 +8252,7 @@ class AnimateText(_Vis):
 
 
 class AnimateRectangle(_Vis):
-    '''
+    """
     Displays a rectangle, optionally with a text
 
     Parameters
@@ -7933,7 +8272,7 @@ class AnimateRectangle(_Vis):
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se`` |n|
-        If '', the given coordimates are used untranslated
+        If null string, the given coordimates are used untranslated
 
     offsetx : float
         offsets the x-coordinate of the rectangle (default 0)
@@ -8016,61 +8355,85 @@ class AnimateRectangle(_Vis):
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
     - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
     - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-    '''
-    def __init__(self, spec=(), x=0, y=0, fillcolor='fg', linecolor='', linewidth=1,
-        text='', fontsize=15, textcolor='bg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
-        offsetx=0, offsety=0, as_points=False, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+    """
+
+    def __init__(
+        self,
+        spec=(),
+        x=0,
+        y=0,
+        fillcolor="fg",
+        linecolor="",
+        linewidth=1,
+        text="",
+        fontsize=15,
+        textcolor="bg",
+        font="",
+        angle=0,
+        xy_anchor="",
+        layer=0,
+        max_lines=0,
+        offsetx=0,
+        offsety=0,
+        as_points=False,
+        text_anchor="c",
+        text_offsetx=0,
+        text_offsety=0,
+        arg=None,
         parent=None,
-        visible=True, env=None, screen_coordinates=False):
+        visible=True,
+        env=None,
+        screen_coordinates=False,
+    ):
 
         self.env = g.default_env if env is None else env
 
         # the checks hasattr are req'd to not override methods of inherited classes
-        if not hasattr(self, 'spec'):
+        if not hasattr(self, "spec"):
             self.spec = spec
-        if not hasattr(self, 'fillcolor'):
+        if not hasattr(self, "fillcolor"):
             self.fillcolor = fillcolor
-        if not hasattr(self, 'linecolor'):
+        if not hasattr(self, "linecolor"):
             self.linecolor = linecolor
-        if not hasattr(self, 'linewidth'):
+        if not hasattr(self, "linewidth"):
             self.linewidth = linewidth
-        if not hasattr(self, 'as_points'):
+        if not hasattr(self, "as_points"):
             self.aspoint = as_points
-        if not hasattr(self, 'x'):
+        if not hasattr(self, "x"):
             self.x = x
-        if not hasattr(self, 'y'):
+        if not hasattr(self, "y"):
             self.y = y
-        if not hasattr(self, 'offsetx'):
+        if not hasattr(self, "offsetx"):
             self.offsetx = offsetx
-        if not hasattr(self, 'offsety'):
+        if not hasattr(self, "offsety"):
             self.offsety = offsety
-        if not hasattr(self, 'text_offsetx'):
+        if not hasattr(self, "text_offsetx"):
             self.text_offsetx = text_offsetx
-        if not hasattr(self, 'text_offsety'):
+        if not hasattr(self, "text_offsety"):
             self.text_offsety = text_offsety
-        if not hasattr(self, 'text'):
+        if not hasattr(self, "text"):
             self.text = text
-        if not hasattr(self, 'max_lines'):
+        if not hasattr(self, "max_lines"):
             self.max_lines = max_lines
-        if not hasattr(self, 'textcolor'):
+        if not hasattr(self, "textcolor"):
             self.textcolor = textcolor
-        if not hasattr(self, 'text_anchor'):
+        if not hasattr(self, "text_anchor"):
             self.text_anchor = text_anchor
-        if not hasattr(self, 'angle'):
+        if not hasattr(self, "angle"):
             self.angle = angle
-        if not hasattr(self, 'font'):
+        if not hasattr(self, "font"):
             self.font = font
-        if not hasattr(self, 'fontsize'):
+        if not hasattr(self, "fontsize"):
             self.fontsize = fontsize
-        if not hasattr(self, 'visible'):
+        if not hasattr(self, "visible"):
             self.visible = visible
-        if not hasattr(self, 'xy_anchor'):
+        if not hasattr(self, "xy_anchor"):
             self.xy_anchor = xy_anchor
-        if not hasattr(self, 'layer'):
+        if not hasattr(self, "layer"):
             self.layer = layer
         self.arg = self if arg is None else arg
         ao0 = _AnimateVis(rectangle0=(), vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
-        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -8080,7 +8443,7 @@ class AnimateRectangle(_Vis):
 
 
 class AnimatePolygon(_Vis):
-    '''
+    """
     Displays a polygon, optionally with a text
 
     Parameters
@@ -8100,7 +8463,7 @@ class AnimatePolygon(_Vis):
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se`` |n|
-        If '', the given coordimates are used untranslated
+        If null string, the given coordimates are used untranslated
 
     offsetx : float
         offsets the x-coordinate of the polygon (default 0)
@@ -8183,59 +8546,84 @@ class AnimatePolygon(_Vis):
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
     - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
     - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-    '''
-    def __init__(self, spec=(), x=0, y=0, fillcolor='fg', linecolor='', linewidth=1,
-        text='', fontsize=15, textcolor='bg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
-        offsetx=0, offsety=0, as_points=False, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None, parent=None,
-        visible=True, env=None, screen_coordinates=False):
+    """
+
+    def __init__(
+        self,
+        spec=(),
+        x=0,
+        y=0,
+        fillcolor="fg",
+        linecolor="",
+        linewidth=1,
+        text="",
+        fontsize=15,
+        textcolor="bg",
+        font="",
+        angle=0,
+        xy_anchor="",
+        layer=0,
+        max_lines=0,
+        offsetx=0,
+        offsety=0,
+        as_points=False,
+        text_anchor="c",
+        text_offsetx=0,
+        text_offsety=0,
+        arg=None,
+        parent=None,
+        visible=True,
+        env=None,
+        screen_coordinates=False,
+    ):
         self.env = g.default_env if env is None else env
 
         # the checks hasattr are req'd to not override methods of inherited classes
-        if not hasattr(self, 'spec'):
+        if not hasattr(self, "spec"):
             self.spec = spec
-        if not hasattr(self, 'fillcolor'):
+        if not hasattr(self, "fillcolor"):
             self.fillcolor = fillcolor
-        if not hasattr(self, 'linecolor'):
+        if not hasattr(self, "linecolor"):
             self.linecolor = linecolor
-        if not hasattr(self, 'linewidth'):
+        if not hasattr(self, "linewidth"):
             self.linewidth = linewidth
-        if not hasattr(self, 'as_points'):
+        if not hasattr(self, "as_points"):
             self.aspoint = as_points
-        if not hasattr(self, 'x'):
+        if not hasattr(self, "x"):
             self.x = x
-        if not hasattr(self, 'y'):
+        if not hasattr(self, "y"):
             self.y = y
-        if not hasattr(self, 'offsetx'):
+        if not hasattr(self, "offsetx"):
             self.offsetx = offsetx
-        if not hasattr(self, 'offsety'):
+        if not hasattr(self, "offsety"):
             self.offsety = offsety
-        if not hasattr(self, 'text_offsetx'):
+        if not hasattr(self, "text_offsetx"):
             self.text_offsetx = text_offsetx
-        if not hasattr(self, 'text_offsety'):
+        if not hasattr(self, "text_offsety"):
             self.text_offsety = text_offsety
-        if not hasattr(self, 'text'):
+        if not hasattr(self, "text"):
             self.text = text
-        if not hasattr(self, 'max_lines'):
+        if not hasattr(self, "max_lines"):
             self.max_lines = max_lines
-        if not hasattr(self, 'textcolor'):
+        if not hasattr(self, "textcolor"):
             self.textcolor = textcolor
-        if not hasattr(self, 'text_anchor'):
+        if not hasattr(self, "text_anchor"):
             self.text_anchor = text_anchor
-        if not hasattr(self, 'angle'):
+        if not hasattr(self, "angle"):
             self.angle = angle
-        if not hasattr(self, 'font'):
+        if not hasattr(self, "font"):
             self.font = font
-        if not hasattr(self, 'fontsize'):
+        if not hasattr(self, "fontsize"):
             self.fontsize = fontsize
-        if not hasattr(self, 'visible'):
+        if not hasattr(self, "visible"):
             self.visible = visible
-        if not hasattr(self, 'xy_anchor'):
+        if not hasattr(self, "xy_anchor"):
             self.xy_anchor = xy_anchor
-        if not hasattr(self, 'layer'):
+        if not hasattr(self, "layer"):
             self.layer = layer
         self.arg = self if arg is None else arg
         ao0 = _AnimateVis(polygon0=(), vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
-        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -8245,7 +8633,7 @@ class AnimatePolygon(_Vis):
 
 
 class AnimateLine(_Vis):
-    '''
+    """
     Displays a line, optionally with a text
 
     Parameters
@@ -8265,7 +8653,7 @@ class AnimateLine(_Vis):
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se`` |n|
-        If '', the given coordimates are used untranslated
+        If null string, the given coordimates are used untranslated
 
     offsetx : float
         offsets the x-coordinate of the line (default 0)
@@ -8344,59 +8732,82 @@ class AnimateLine(_Vis):
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
     - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
     - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-    '''
-    def __init__(self, spec=(), x=0, y=0, linecolor='fg', linewidth=1,
-        text='', fontsize=15, textcolor='fg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
-        offsetx=0, offsety=0, as_points=False, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None,
+    """
+
+    def __init__(
+        self,
+        spec=(),
+        x=0,
+        y=0,
+        linecolor="fg",
+        linewidth=1,
+        text="",
+        fontsize=15,
+        textcolor="fg",
+        font="",
+        angle=0,
+        xy_anchor="",
+        layer=0,
+        max_lines=0,
+        offsetx=0,
+        offsety=0,
+        as_points=False,
+        text_anchor="c",
+        text_offsetx=0,
+        text_offsety=0,
+        arg=None,
         parent=None,
-        visible=True, env=None, screen_coordinates=False):
+        visible=True,
+        env=None,
+        screen_coordinates=False,
+    ):
         self.env = g.default_env if env is None else env
 
         # the checks hasattr are req'd to not override methods of inherited classes
-        if not hasattr(self, 'spec'):
+        if not hasattr(self, "spec"):
             self.spec = spec
-        if not hasattr(self, 'linecolor'):
+        if not hasattr(self, "linecolor"):
             self.linecolor = linecolor
-        if not hasattr(self, 'linewidth'):
+        if not hasattr(self, "linewidth"):
             self.linewidth = linewidth
-        if not hasattr(self, 'as_points'):
+        if not hasattr(self, "as_points"):
             self.aspoint = as_points
-        if not hasattr(self, 'x'):
+        if not hasattr(self, "x"):
             self.x = x
-        if not hasattr(self, 'y'):
+        if not hasattr(self, "y"):
             self.y = y
-        if not hasattr(self, 'offsetx'):
+        if not hasattr(self, "offsetx"):
             self.offsetx = offsetx
-        if not hasattr(self, 'offsety'):
+        if not hasattr(self, "offsety"):
             self.offsety = offsety
-        if not hasattr(self, 'text_offsetx'):
+        if not hasattr(self, "text_offsetx"):
             self.text_offsetx = text_offsetx
-        if not hasattr(self, 'text_offsety'):
+        if not hasattr(self, "text_offsety"):
             self.text_offsety = text_offsety
-        if not hasattr(self, 'text'):
+        if not hasattr(self, "text"):
             self.text = text
-        if not hasattr(self, 'max_lines'):
+        if not hasattr(self, "max_lines"):
             self.max_lines = max_lines
-        if not hasattr(self, 'textcolor'):
+        if not hasattr(self, "textcolor"):
             self.textcolor = textcolor
-        if not hasattr(self, 'text_anchor'):
+        if not hasattr(self, "text_anchor"):
             self.text_anchor = text_anchor
-        if not hasattr(self, 'angle'):
+        if not hasattr(self, "angle"):
             self.angle = angle
-        if not hasattr(self, 'font'):
+        if not hasattr(self, "font"):
             self.font = font
-        if not hasattr(self, 'fontsize'):
+        if not hasattr(self, "fontsize"):
             self.fontsize = fontsize
-        if not hasattr(self, 'visible'):
+        if not hasattr(self, "visible"):
             self.visible = visible
-        if not hasattr(self, 'xy_anchor'):
+        if not hasattr(self, "xy_anchor"):
             self.xy_anchor = xy_anchor
-        if not hasattr(self, 'layer'):
+        if not hasattr(self, "layer"):
             self.layer = layer
-        self.fillcolor = ''
+        self.fillcolor = ""
         self.arg = self if arg is None else arg
         ao0 = _AnimateVis(line0=(), vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
-        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -8406,7 +8817,7 @@ class AnimateLine(_Vis):
 
 
 class AnimatePoints(_Vis):
-    '''
+    """
     Displays a series of points, optionally with a text
 
     Parameters
@@ -8426,7 +8837,7 @@ class AnimatePoints(_Vis):
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se`` |n|
-        If '', the given coordimates are used untranslated
+        If null string, the given coordimates are used untranslated
 
     offsetx : float
         offsets the x-coordinate of the points (default 0)
@@ -8505,57 +8916,81 @@ class AnimatePoints(_Vis):
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
     - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
     - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-    '''
-    def __init__(self, spec=(), x=0, y=0, linecolor='fg', linewidth=4,
-        text='', fontsize=15, textcolor='fg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
-        offsetx=0, offsety=0, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None, parent=None,
-        visible=True, env=None, screen_coordinates=False):
+    """
+
+    def __init__(
+        self,
+        spec=(),
+        x=0,
+        y=0,
+        linecolor="fg",
+        linewidth=4,
+        text="",
+        fontsize=15,
+        textcolor="fg",
+        font="",
+        angle=0,
+        xy_anchor="",
+        layer=0,
+        max_lines=0,
+        offsetx=0,
+        offsety=0,
+        text_anchor="c",
+        text_offsetx=0,
+        text_offsety=0,
+        arg=None,
+        parent=None,
+        visible=True,
+        env=None,
+        screen_coordinates=False,
+    ):
         self.env = g.default_env if env is None else env
 
         # the checks hasattr are req'd to not override methods of inherited classes
-        if not hasattr(self, 'spec'):
+        if not hasattr(self, "spec"):
             self.spec = spec
-        if not hasattr(self, 'linecolor'):
+        if not hasattr(self, "linecolor"):
             self.linecolor = linecolor
-        if not hasattr(self, 'linewidth'):
+        if not hasattr(self, "linewidth"):
             self.linewidth = linewidth
-        if not hasattr(self, 'x'):
+        if not hasattr(self, "x"):
             self.x = x
-        if not hasattr(self, 'y'):
+        if not hasattr(self, "y"):
             self.y = y
-        if not hasattr(self, 'offsetx'):
+        if not hasattr(self, "offsetx"):
             self.offsetx = offsetx
-        if not hasattr(self, 'offsety'):
+        if not hasattr(self, "offsety"):
             self.offsety = offsety
-        if not hasattr(self, 'text_offsetx'):
+        if not hasattr(self, "text_offsetx"):
             self.text_offsetx = text_offsetx
-        if not hasattr(self, 'text_offsety'):
+        if not hasattr(self, "text_offsety"):
             self.text_offsety = text_offsety
-        if not hasattr(self, 'text'):
+        if not hasattr(self, "text"):
             self.text = text
-        if not hasattr(self, 'max_lines'):
+        if not hasattr(self, "max_lines"):
             self.max_lines = max_lines
-        if not hasattr(self, 'textcolor'):
+        if not hasattr(self, "textcolor"):
             self.textcolor = textcolor
-        if not hasattr(self, 'text_anchor'):
+        if not hasattr(self, "text_anchor"):
             self.text_anchor = text_anchor
-        if not hasattr(self, 'angle'):
+        if not hasattr(self, "angle"):
             self.angle = angle
-        if not hasattr(self, 'font'):
+        if not hasattr(self, "font"):
             self.font = font
-        if not hasattr(self, 'fontsize'):
+        if not hasattr(self, "fontsize"):
             self.fontsize = fontsize
-        if not hasattr(self, 'visible'):
+        if not hasattr(self, "visible"):
             self.visible = visible
-        if not hasattr(self, 'xy_anchor'):
+        if not hasattr(self, "xy_anchor"):
             self.xy_anchor = xy_anchor
-        if not hasattr(self, 'layer'):
+        if not hasattr(self, "layer"):
             self.layer = layer
-        self.fillcolor = ''
+        self.fillcolor = ""
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(line0=(), as_points=True, vis=self,
-            screen_coordinates=screen_coordinates, env=env, parent=parent)
-        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao0 = _AnimateVis(
+            line0=(), as_points=True, vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent
+        )
+        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -8565,7 +9000,7 @@ class AnimatePoints(_Vis):
 
 
 class AnimateCircle(_Vis):
-    '''
+    """
     Displays a (partial) circle or (partial) ellipse , optionally with a text
 
     Parameters
@@ -8574,7 +9009,7 @@ class AnimateCircle(_Vis):
         radius of the circle
 
     radius1 : float
-        the 'height of the ellipse. If None (default), a circle will be drawn
+        the 'height' of the ellipse. If None (default), a circle will be drawn
 
     arc_angle0 : float
         start angle of the circle (default 0)
@@ -8599,7 +9034,7 @@ class AnimateCircle(_Vis):
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se`` |n|
-        If '', the given coordimates are used untranslated |n|
+        If null string, the given coordimates are used untranslated |n|
         The positions corresponds to a full circle even if arc_angle0 and/or arc_angle1 are specified.
 
     offsetx : float
@@ -8679,70 +9114,97 @@ class AnimateCircle(_Vis):
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
     - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
     - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-    '''
-    def __init__(self, radius=100, radius1=None, arc_angle0=0, arc_angle1=360,
-        draw_arc=False, x=0, y=0, fillcolor='fg', linecolor='', linewidth=1,
-        text='', fontsize=15, textcolor='bg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
-        offsetx=0, offsety=0, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None, parent=None,
-        visible=True, env=None, screen_coordinates=False):
+    """
+
+    def __init__(
+        self,
+        radius=100,
+        radius1=None,
+        arc_angle0=0,
+        arc_angle1=360,
+        draw_arc=False,
+        x=0,
+        y=0,
+        fillcolor="fg",
+        linecolor="",
+        linewidth=1,
+        text="",
+        fontsize=15,
+        textcolor="bg",
+        font="",
+        angle=0,
+        xy_anchor="",
+        layer=0,
+        max_lines=0,
+        offsetx=0,
+        offsety=0,
+        text_anchor="c",
+        text_offsetx=0,
+        text_offsety=0,
+        arg=None,
+        parent=None,
+        visible=True,
+        env=None,
+        screen_coordinates=False,
+    ):
         self.env = g.default_env if env is None else env
 
         # the checks hasattr are req'd to not override methods of inherited classes
-        if not hasattr(self, 'radius'):
+        if not hasattr(self, "radius"):
             self.radius = radius
-        if not hasattr(self, 'radius1'):
+        if not hasattr(self, "radius1"):
             self.radius1 = radius1
-        if not hasattr(self, 'arc_angle0'):
+        if not hasattr(self, "arc_angle0"):
             self.arc_angle0 = arc_angle0
-        if not hasattr(self, 'arc_angle1'):
+        if not hasattr(self, "arc_angle1"):
             self.arc_angle1 = arc_angle1
-        if not hasattr(self, 'draw_arc'):
+        if not hasattr(self, "draw_arc"):
             self.draw_arc = draw_arc
-        if not hasattr(self, 'fillcolor'):
+        if not hasattr(self, "fillcolor"):
             self.fillcolor = fillcolor
-        if not hasattr(self, 'linecolor'):
+        if not hasattr(self, "linecolor"):
             self.linecolor = linecolor
-        if not hasattr(self, 'linewidth'):
+        if not hasattr(self, "linewidth"):
             self.linewidth = linewidth
-        if not hasattr(self, 'angle'):
+        if not hasattr(self, "angle"):
             self.angle = angle
-        if not hasattr(self, 'x'):
+        if not hasattr(self, "x"):
             self.x = x
-        if not hasattr(self, 'y'):
+        if not hasattr(self, "y"):
             self.y = y
-        if not hasattr(self, 'offsetx'):
+        if not hasattr(self, "offsetx"):
             self.offsetx = offsetx
-        if not hasattr(self, 'offsety'):
+        if not hasattr(self, "offsety"):
             self.offsety = offsety
-        if not hasattr(self, 'text_offsetx'):
+        if not hasattr(self, "text_offsetx"):
             self.text_offsetx = text_offsetx
-        if not hasattr(self, 'text_offsety'):
+        if not hasattr(self, "text_offsety"):
             self.text_offsety = text_offsety
-        if not hasattr(self, 'text'):
+        if not hasattr(self, "text"):
             self.text = text
-        if not hasattr(self, 'max_lines'):
+        if not hasattr(self, "max_lines"):
             self.max_lines = max_lines
-        if not hasattr(self, 'textcolor'):
+        if not hasattr(self, "textcolor"):
             self.textcolor = textcolor
-        if not hasattr(self, 'text_anchor'):
+        if not hasattr(self, "text_anchor"):
             self.text_anchor = text_anchor
-        if not hasattr(self, 'angle'):
+        if not hasattr(self, "angle"):
             self.angle = angle
-        if not hasattr(self, 'font'):
+        if not hasattr(self, "font"):
             self.font = font
-        if not hasattr(self, 'fontsize'):
+        if not hasattr(self, "fontsize"):
             self.fontsize = fontsize
-        if not hasattr(self, 'visible'):
+        if not hasattr(self, "visible"):
             self.visible = visible
-        if not hasattr(self, 'xy_anchor'):
+        if not hasattr(self, "xy_anchor"):
             self.xy_anchor = xy_anchor
-        if not hasattr(self, 'layer'):
+        if not hasattr(self, "layer"):
             self.layer = layer
         self.arg = self if arg is None else arg
         ao0 = _AnimateVis(circle0=(), vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
-        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
-        self. aos = (ao0, ao1)
+        self.aos = (ao0, ao1)
 
     def remove(self):
         for ao in self.aos:
@@ -8750,7 +9212,7 @@ class AnimateCircle(_Vis):
 
 
 class AnimateImage(_Vis):
-    '''
+    """
     Displays an image, optionally with a text
 
     Parameters
@@ -8772,7 +9234,7 @@ class AnimateImage(_Vis):
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se`` |n|
-        If '', the given coordimates are used untranslated
+        If null string, the given coordimates are used untranslated
 
     anchor : str
         specifies where the x and refer to |n|
@@ -8847,59 +9309,81 @@ class AnimateImage(_Vis):
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
     - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
     - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-    '''
+    """
 
-    def __init__(self, spec='', x=0, y=0, width=None,
-        text='', fontsize=15, textcolor='bg', font='', angle=0, xy_anchor='', layer=0, max_lines=0,
-        offsetx=0, offsety=0, text_anchor='c', text_offsetx=0, text_offsety=0, arg=None, parent=None,
-        anchor='sw', visible=True, env=None, screen_coordinates=False):
+    def __init__(
+        self,
+        spec="",
+        x=0,
+        y=0,
+        width=None,
+        text="",
+        fontsize=15,
+        textcolor="bg",
+        font="",
+        angle=0,
+        xy_anchor="",
+        layer=0,
+        max_lines=0,
+        offsetx=0,
+        offsety=0,
+        text_anchor="c",
+        text_offsetx=0,
+        text_offsety=0,
+        arg=None,
+        parent=None,
+        anchor="sw",
+        visible=True,
+        env=None,
+        screen_coordinates=False,
+    ):
         self.env = g.default_env if env is None else env
 
         # the checks hasattr are req'd to not override methods of inherited classes
-        if not hasattr(self, 'spec'):
+        if not hasattr(self, "spec"):
             self.spec = spec_to_image(spec)
-        if not hasattr(self, 'width'):
+        if not hasattr(self, "width"):
             self.width = width
-        if not hasattr(self, 'x'):
+        if not hasattr(self, "x"):
             self.x = x
-        if not hasattr(self, 'y'):
+        if not hasattr(self, "y"):
             self.y = y
-        if not hasattr(self, 'offsetx'):
+        if not hasattr(self, "offsetx"):
             self.offsetx = offsetx
-        if not hasattr(self, 'offsety'):
+        if not hasattr(self, "offsety"):
             self.offsety = offsety
-        if not hasattr(self, 'text_offsetx'):
+        if not hasattr(self, "text_offsetx"):
             self.text_offsetx = text_offsetx
-        if not hasattr(self, 'text_offsety'):
+        if not hasattr(self, "text_offsety"):
             self.text_offsety = text_offsety
-        if not hasattr(self, 'text'):
+        if not hasattr(self, "text"):
             self.text = text
-        if not hasattr(self, 'max_lines'):
+        if not hasattr(self, "max_lines"):
             self.max_lines = max_lines
-        if not hasattr(self, 'textcolor'):
+        if not hasattr(self, "textcolor"):
             self.textcolor = textcolor
-        if not hasattr(self, 'text_anchor'):
+        if not hasattr(self, "text_anchor"):
             self.text_anchor = text_anchor
-        if not hasattr(self, 'angle'):
+        if not hasattr(self, "angle"):
             self.angle = angle
-        if not hasattr(self, 'anchor'):
+        if not hasattr(self, "anchor"):
             self.anchor = anchor
-        if not hasattr(self, 'font'):
+        if not hasattr(self, "font"):
             self.font = font
-        if not hasattr(self, 'fontsize'):
+        if not hasattr(self, "fontsize"):
             self.fontsize = fontsize
-        if not hasattr(self, 'visible'):
+        if not hasattr(self, "visible"):
             self.visible = visible
-        if not hasattr(self, 'xy_anchor'):
+        if not hasattr(self, "xy_anchor"):
             self.xy_anchor = xy_anchor
-        if not hasattr(self, 'layer'):
+        if not hasattr(self, "layer"):
             self.layer = layer
 
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(image='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
-        ao1 = _AnimateVis(text='', vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao0 = _AnimateVis(image="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
-        self. aos = (ao0, ao1)
+        self.aos = (ao0, ao1)
 
     def remove(self):
         for ao in self.aos:
@@ -8944,7 +9428,8 @@ class _AnimateVis(Animate):
             _call(self.vis.radius1, t, self.vis.arg),
             _call(self.vis.arc_angle0, t, self.vis.arg),
             _call(self.vis.arc_angle1, t, self.vis.arg),
-            _call(self.vis.draw_arc, t, self.vis.arg))
+            _call(self.vis.draw_arc, t, self.vis.arg),
+        )
 
     def image(self, t):
         return _call(self.vis.spec, t, self.vis.arg)
@@ -9037,8 +9522,8 @@ class _Animate_t_x_Line(Animate):
             except (ValueError, TypeError):
                 value = 0
         return max(
-            self._linewidth / 2, min(self.height - self._linewidth / 2,
-            value * self.value_scale + self.value_offsety))
+            self._linewidth / 2, min(self.height - self._linewidth / 2, value * self.value_scale + self.value_offsety)
+        )
 
     def line(self, t):
         self.tnow = t
@@ -9083,7 +9568,7 @@ class _Animate_t_Line(Animate):
 
 
 class Component(object):
-    '''Component object
+    """Component object
 
     A salabim component is used as component (primarily for queueing)
     or as a component with a process |n|
@@ -9120,7 +9605,7 @@ class Component(object):
     process : str
         name of process to be started. |n|
         if None (default), it will try to start self.process() |n|
-        if '', no process will be started even if self.process() exists,
+        if null string, no process will be started even if self.process() exists,
         i.e. become a data component. |n|
         note that the function *must* be a generator,
         i.e. contains at least one yield.
@@ -9152,11 +9637,22 @@ class Component(object):
     env : Environment
         environment where the component is defined |n|
         if omitted, default_env will be used
-    '''
+    """
 
-    def __init__(self, name=None, at=None, delay=None, urgent=None,
-      process=None, suppress_trace=False, suppress_pause_at_step=False, skip_standby=False, mode=None,
-      env=None, **kwargs):
+    def __init__(
+        self,
+        name=None,
+        at=None,
+        delay=None,
+        urgent=None,
+        process=None,
+        suppress_trace=False,
+        suppress_pause_at_step=False,
+        skip_standby=False,
+        mode=None,
+        env=None,
+        **kwargs
+    ):
         if env is None:
             self.env = g.default_env
         else:
@@ -9184,37 +9680,34 @@ class Component(object):
             self._mode_time = self.env._now
 
         if process is None:
-            if hasattr(self, 'process'):
+            if hasattr(self, "process"):
                 p = self.process
-                process_name = 'process'
+                process_name = "process"
             else:
                 p = None
         else:
-            if process is '':
+            if process is "":
                 p = None
             else:
                 try:
                     p = getattr(self, process)
                     process_name = process
                 except AttributeError:
-                    raise AttributeError('self.' + process + ' does not exist')
+                    raise AttributeError("self." + process + " does not exist")
         if p is None:
             if at is not None:
-                raise TypeError('at is not allowed for a data component')
+                raise TypeError("at is not allowed for a data component")
             if delay is not None:
-                raise TypeError('delay is not allowed for a data component')
+                raise TypeError("delay is not allowed for a data component")
             if urgent is not None:
-                raise TypeError('urgent is not allowed for a data component')
+                raise TypeError("urgent is not allowed for a data component")
             if self.env._trace:
-                if self._name == 'main':
-                    self.env.print_trace('', '', self.name() +
-                        ' create', _modetxt(self._mode))
+                if self._name == "main":
+                    self.env.print_trace("", "", self.name() + " create", _modetxt(self._mode))
                 else:
-                    self.env.print_trace('', '', self.name() +
-                       ' create data component', _modetxt(self._mode))
+                    self.env.print_trace("", "", self.name() + " create data component", _modetxt(self._mode))
         else:
-            self.env.print_trace('', '', self.name() +
-                ' create', _modetxt(self._mode))
+            self.env.print_trace("", "", self.name() + " create", _modetxt(self._mode))
 
             kwargs_p = {}
             if kwargs:
@@ -9236,7 +9729,7 @@ class Component(object):
                 self._process_isgenerator = False
                 self._process_kwargs = kwargs_p
 
-            extra = 'process=' + process_name
+            extra = "process=" + process_name
 
             if urgent is None:
                 urgent = False
@@ -9247,11 +9740,11 @@ class Component(object):
             else:
                 scheduled_time = at + self.env._offset + delay
 
-            self._reschedule(scheduled_time, urgent, 'activate', extra=extra)
+            self._reschedule(scheduled_time, urgent, "activate", extra=extra)
         self.setup(**kwargs)
 
     def animation_objects(self, id):
-        '''
+        """
         defines how to display a component in AnimateQueue
 
         Parameters
@@ -9271,11 +9764,12 @@ class Component(object):
         Note
         ----
         If you override this method, be sure to use the same header, either with or without the id parameter. |n|
-        '''
+        """
         size_x = 50
         size_y = 50
-        ao0 = AnimateRectangle(text=str(self.sequence_number()), textcolor='bg', spec=(-20, -20, 20, 20),
-            linewidth=0, fillcolor='fg')
+        ao0 = AnimateRectangle(
+            text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg"
+        )
         return (size_x, size_y, ao0)
 
     def _remove_from_aos(self, q):
@@ -9285,7 +9779,7 @@ class Component(object):
             del self._aos[q]
 
     def setup(self):
-        '''
+        """
         called immediately after initialization of a component.
 
         by default this is a dummy method, but it can be overridden.
@@ -9301,16 +9795,16 @@ class Component(object):
                 def process(self):
                     ...
 
-            redcar=Car(color='red') |n|
-            bluecar=Car(color='blue')
-        '''
+            redcar=Car(color="red") |n|
+            bluecar=Car(color="blue")
+        """
         pass
 
     def __repr__(self):
-        return object_to_str(self) + ' (' + self.name() + ')'
+        return object_to_str(self) + " (" + self.name() + ")"
 
     def register(self, registry):
-        '''
+        """
         registers the component in the registry
 
         Parameters
@@ -9325,16 +9819,16 @@ class Component(object):
         Note
         ----
         Use Component.deregister if component does not longer need to be registered.
-        '''
+        """
         if not isinstance(registry, list):
-            raise TypeError('registry not list')
+            raise TypeError("registry not list")
         if self in registry:
-            raise ValueError(self.name() + ' already in registry')
+            raise ValueError(self.name() + " already in registry")
         registry.append(self)
         return self
 
     def deregister(self, registry):
-        '''
+        """
         deregisters the component in the registry
 
         Parameters
@@ -9345,16 +9839,16 @@ class Component(object):
         Returns
         -------
         component (self) : Component
-        '''
+        """
         if not isinstance(registry, list):
-            raise TypeError('registry not list')
+            raise TypeError("registry not list")
         if self not in registry:
-            raise ValueError(self.name() + ' not in registry')
+            raise ValueError(self.name() + " not in registry")
         registry.remove(self)
         return self
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the component
 
         Parameters
@@ -9370,46 +9864,46 @@ class Component(object):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append(object_to_str(self) + ' ' + hex(id(self)))
-        result.append('  name=' + self.name())
-        result.append('  class=' + str(type(self)).split('.')[-1].split("'")[0])
-        result.append('  suppress_trace=' + str(self._suppress_trace))
-        result.append('  suppress_pause_at_step=' + str(self._suppress_pause_at_step))
-        result.append('  status=' + self._status())
-        result.append('  mode=' + _modetxt(self._mode).strip())
-        result.append('  mode_time=' + self.env.time_to_str(self._mode_time))
-        result.append('  creation_time=' + self.env.time_to_str(self._creation_time))
-        result.append('  scheduled_time=' +
-            self.env.time_to_str(self._scheduled_time))
+        result.append(object_to_str(self) + " " + hex(id(self)))
+        result.append("  name=" + self.name())
+        result.append("  class=" + str(type(self)).split(".")[-1].split("'")[0])
+        result.append("  suppress_trace=" + str(self._suppress_trace))
+        result.append("  suppress_pause_at_step=" + str(self._suppress_pause_at_step))
+        result.append("  status=" + self._status())
+        result.append("  mode=" + _modetxt(self._mode).strip())
+        result.append("  mode_time=" + self.env.time_to_str(self._mode_time))
+        result.append("  creation_time=" + self.env.time_to_str(self._creation_time))
+        result.append("  scheduled_time=" + self.env.time_to_str(self._scheduled_time))
         if len(self._qmembers) > 0:
-            result.append('  member of queue(s):')
+            result.append("  member of queue(s):")
             for q in sorted(self._qmembers, key=lambda obj: obj.name().lower()):
-                result.append('    ' + pad(q.name(), 20) + ' enter_time=' +
-                    self.env.time_to_str(self._qmembers[q].enter_time - self.env._offset) +
-                    ' priority=' + str(self._qmembers[q].priority))
+                result.append(
+                    "    "
+                    + pad(q.name(), 20)
+                    + " enter_time="
+                    + self.env.time_to_str(self._qmembers[q].enter_time - self.env._offset)
+                    + " priority="
+                    + str(self._qmembers[q].priority)
+                )
         if len(self._requests) > 0:
-            result.append('  requesting resource(s):')
+            result.append("  requesting resource(s):")
 
-            for r in sorted(list(self._requests),
-              key=lambda obj: obj.name().lower()):
-                result.append('    ' + pad(r.name(), 20) + ' quantity=' +
-                    str(self._requests[r]))
+            for r in sorted(list(self._requests), key=lambda obj: obj.name().lower()):
+                result.append("    " + pad(r.name(), 20) + " quantity=" + str(self._requests[r]))
         if len(self._claims) > 0:
-            result.append('  claiming resource(s):')
+            result.append("  claiming resource(s):")
 
             for r in sorted(list(self._claims), key=lambda obj: obj.name().lower()):
-                result.append('    ' + pad(r.name(), 20) +
-                    ' quantity=' + str(self._claims[r]))
+                result.append("    " + pad(r.name(), 20) + " quantity=" + str(self._claims[r]))
         if len(self._waits) > 0:
             if self._wait_all:
-                result.append('  waiting for all of state(s):')
+                result.append("  waiting for all of state(s):")
             else:
-                result.append('  waiting for any of state(s):')
+                result.append("  waiting for any of state(s):")
             for s, value, _ in self._waits:
-                result.append('    ' + pad(s.name(), 20) +
-                    ' value=' + str(value))
+                result.append("    " + pad(s.name(), 20) + " value=" + str(value))
         return return_or_print(result, as_str, file)
 
     def _push(self, t, urgent):
@@ -9430,7 +9924,7 @@ class Component(object):
                     heapq.heapify(self.env._event_list)
                     self._on_event_list = False
                     return
-            raise Exception('remove error', self.name())
+            raise Exception("remove error", self.name())
         if self.status == standby:
             if self in self.env._standby_list:
                 self.env._standby_list(self)
@@ -9440,7 +9934,7 @@ class Component(object):
     def _check_fail(self):
         if self._requests:
             if self.env._trace:
-                self.env.print_trace('', '', self.name(), 'request failed')
+                self.env.print_trace("", "", self.name(), "request failed")
             for r in list(self._requests):
                 self.leave(r._requesters)
                 if r._requesters._length == 0:
@@ -9450,40 +9944,40 @@ class Component(object):
 
         if self._waits:
             if self.env._trace:
-                self.env.print_trace('', '', self.name(), 'wait failed')
+                self.env.print_trace("", "", self.name(), "wait failed")
             for state, _, _ in self._waits:
                 if self in state._waiters:  # there might be more values for this state
                     self.leave(state._waiters)
             self._waits = []
             self._failed = True
 
-    def _reschedule(self, scheduled_time, urgent, caller, extra='', s0=None):
+    def _reschedule(self, scheduled_time, urgent, caller, extra="", s0=None):
         if scheduled_time < self.env._now:
-            raise ValueError(
-                'scheduled time ({:0.3f}) before now ({:0.3f})'.
-                format(scheduled_time, self.env._now))
+            raise ValueError("scheduled time ({:0.3f}) before now ({:0.3f})".format(scheduled_time, self.env._now))
         self._scheduled_time = scheduled_time
         if scheduled_time != inf:
             self._push(scheduled_time, urgent)
         self._status = scheduled
         if self.env._trace:
-            if extra == '*':
-                scheduled_time_str = 'ends on no events left  '
-                extra = ' '
+            if extra == "*":
+                scheduled_time_str = "ends on no events left  "
+                extra = " "
             else:
-                scheduled_time_str = 'scheduled for ' + self.env.time_to_str(scheduled_time - self.env._offset)
+                scheduled_time_str = "scheduled for " + self.env.time_to_str(scheduled_time - self.env._offset)
             self.env.print_trace(
-                '', '', self.name() + ' ' + caller,
+                "",
+                "",
+                self.name() + " " + caller,
                 merge_blanks(
-                    scheduled_time_str +
-                    _urgenttxt(urgent) + '@' + self.lineno_txt(),
-                    _modetxt(self._mode),
-                    extra),
-                s0=s0)
+                    scheduled_time_str + _urgenttxt(urgent) + "@" + self.lineno_txt(), _modetxt(self._mode), extra
+                ),
+                s0=s0,
+            )
 
-    def activate(self, at=None, delay=0, urgent=False, process=None,
-      keep_request=False, keep_wait=False, mode=None, **kwargs):
-        '''
+    def activate(
+        self, at=None, delay=0, urgent=False, process=None, keep_request=False, keep_wait=False, mode=None, **kwargs
+    ):
+        """
         activate component
 
         Parameters
@@ -9535,24 +10029,24 @@ class Component(object):
         if to be applied to the current component, use ``yield self.activate()``. |n|
         if both at and delay are specified, the component becomes current at the sum
         of the two values.
-        '''
+        """
         p = None
         if process is None:
             if self._status == data:
-                if hasattr(self, 'process'):
+                if hasattr(self, "process"):
                     p = self.process
-                    process_name = 'process'
+                    process_name = "process"
                 else:
-                    raise AttributeError('no process for data component')
+                    raise AttributeError("no process for data component")
         else:
             try:
                 p = getattr(self, process)
                 process_name = process
             except AttributeError:
-                raise AttributeError('self.' + process + ' does not exist')
+                raise AttributeError("self." + process + " does not exist")
 
         if p is None:
-            extra = ''
+            extra = ""
         else:
             if kwargs:
                 try:
@@ -9572,7 +10066,7 @@ class Component(object):
                 self._process_isgenerator = False
                 self._process_kwargs = kwargs
 
-            extra = 'process=' + process_name
+            extra = "process=" + process_name
 
         if self._status != current:
             self._remove()
@@ -9591,10 +10085,10 @@ class Component(object):
         else:
             scheduled_time = at + self.env._offset + delay
 
-        self._reschedule(scheduled_time, urgent, 'activate', extra=extra)
+        self._reschedule(scheduled_time, urgent, "activate", extra=extra)
 
     def hold(self, duration=None, till=None, urgent=False, mode=None):
-        '''
+        """
         hold the component
 
         Parameters
@@ -9630,7 +10124,7 @@ class Component(object):
 
         if both duration and till are specified, the component will become current at the sum of
         these two.
-        '''
+        """
         if self._status != passive:
             if self.status != current:
                 self._checkisnotdata()
@@ -9649,11 +10143,11 @@ class Component(object):
             if duration is None:
                 scheduled_time = till + self.env._offset
             else:
-                raise ValueError('both duration and till specified')
-        self._reschedule(scheduled_time, urgent, 'hold')
+                raise ValueError("both duration and till specified")
+        self._reschedule(scheduled_time, urgent, "hold")
 
     def passivate(self, mode=None):
-        '''
+        """
         passivate the component
 
         Parameters
@@ -9667,7 +10161,7 @@ class Component(object):
         Note
         ----
         if to be used for the current component (nearly always the case), use ``yield self.passivate()``.
-        '''
+        """
         if self._status == current:
             self._remaining_duration = 0
         else:
@@ -9680,11 +10174,11 @@ class Component(object):
             self._mode = mode
             self._mode_time = self.env._now
         if self.env._trace:
-            self.env.print_trace('', '', self.name() + ' passivate', merge_blanks(_modetxt(self._mode)))
+            self.env.print_trace("", "", self.name() + " passivate", merge_blanks(_modetxt(self._mode)))
         self._status = passive
 
     def interrupt(self, mode=None):
-        '''
+        """
         interrupt the component
 
         Parameters
@@ -9699,16 +10193,16 @@ class Component(object):
         ----
         Cannot be applied on the current component. |n|
         Use resume() to resume
-        '''
+        """
         if self._status == current:
-            raise ValueError(self.name() + ' current component cannot be interrupted')
+            raise ValueError(self.name() + " current component cannot be interrupted")
         else:
             if mode is not None:
                 self._mode = mode
                 self._mode_time = self.env._now
             if self._status == interrupted:
                 self._interrupt_level += 1
-                extra = '.' + str(self._interrupt_level)
+                extra = "." + str(self._interrupt_level)
             else:
                 self._checkisnotdata()
                 self._remove()
@@ -9716,11 +10210,11 @@ class Component(object):
                 self._interrupted_status = self._status
                 self._interrupt_level = 1
                 self._status = interrupted
-                extra = ''
-            self.env.print_trace('', '', self.name() + ' interrupt' + extra, merge_blanks(_modetxt(self._mode)))
+                extra = ""
+            self.env.print_trace("", "", self.name() + " interrupt" + extra, merge_blanks(_modetxt(self._mode)))
 
     def resume(self, all=False, mode=None, urgent=False):
-        '''
+        """
         resumes an interrupted component
 
         Parameters
@@ -9748,7 +10242,7 @@ class Component(object):
         Note
         ----
         Can be only applied to interrupted components. |n|
-        '''
+        """
         if self._status == interrupted:
             if mode is not None:
                 self._mode = mode
@@ -9756,37 +10250,41 @@ class Component(object):
             self._interrupt_level -= 1
             if self._interrupt_level and (not all):
                 self.env.print_trace(
-                    '', '', self.name() + ' resume (interrupted.' + str(self._interrupt_level) + ')',
-                    merge_blanks(_modetxt(self._mode)))
+                    "",
+                    "",
+                    self.name() + " resume (interrupted." + str(self._interrupt_level) + ")",
+                    merge_blanks(_modetxt(self._mode)),
+                )
             else:
                 self._status = self._interrupted_status
                 self.env.print_trace(
-                    '', '', self.name() + ' resume (' + self.status()() + ')', merge_blanks(_modetxt(self._mode)))
+                    "", "", self.name() + " resume (" + self.status()() + ")", merge_blanks(_modetxt(self._mode))
+                )
                 if self._status == passive:
-                    self.env.print_trace('', '', self.name() + ' passivate', merge_blanks(_modetxt(self._mode)))
+                    self.env.print_trace("", "", self.name() + " passivate", merge_blanks(_modetxt(self._mode)))
                 elif self._status == standby:
                     self._scheduled_time = self.env._now
                     self.env._standbylist.append(self)
-                    self.env.print_trace('', '', self.name() + ' standby', merge_blanks(_modetxt(self._mode)))
+                    self.env.print_trace("", "", self.name() + " standby", merge_blanks(_modetxt(self._mode)))
                 elif self._status == scheduled:
                     if self._waits:
                         if self._trywait():
                             return
-                        reason = 'wait'
+                        reason = "wait"
                     elif self._requests:
                         if self._tryrequest():
                             return
-                        reason = 'request'
+                        reason = "request"
                     else:
-                        reason = 'hold'
+                        reason = "hold"
                     self._reschedule(self.env._now + self._remaining_duration, urgent, reason)
                 else:
-                    raise Exception(self.name() + ' unexpected interrupted_status', self._status())
+                    raise Exception(self.name() + " unexpected interrupted_status", self._status())
         else:
-            raise ValueError(self.name() + ' not interrupted')
+            raise ValueError(self.name() + " not interrupted")
 
     def cancel(self, mode=None):
-        '''
+        """
         cancel component (makes the component data)
 
         Parameters
@@ -9800,7 +10298,7 @@ class Component(object):
         Note
         ----
         if to be used for the current component, use ``yield self.cancel()``.
-        '''
+        """
         if self._status != current:
             self._checkisnotdata()
             self._remove()
@@ -9811,8 +10309,7 @@ class Component(object):
             self._mode = mode
             self._mode_time = self.env._now
         if self.env._trace:
-            self.env.print_trace('', '', 'cancel ' +
-                self.name() + ' ' + _modetxt(self._mode))
+            self.env.print_trace("", "", "cancel " + self.name() + " " + _modetxt(self._mode))
         self._status = data
         for ao in self.env.an_objects[:]:
             if ao.parent == self:
@@ -9822,7 +10319,7 @@ class Component(object):
                 so.remove()
 
     def standby(self, mode=None):
-        '''
+        """
         puts the component in standby mode
 
         Parameters
@@ -9840,7 +10337,7 @@ class Component(object):
         if to be used for the current component
         (which will be nearly always the case),
         use ``yield self.standby()``.
-        '''
+        """
         if self._status != current:
             self._checkisnotdata()
             self._checkisnotmain()
@@ -9855,11 +10352,11 @@ class Component(object):
             if self.env._buffered_trace:
                 self.env._buffered_trace = False
             else:
-                self.env.print_trace('', '', 'standby', _modetxt(self._mode))
+                self.env.print_trace("", "", "standby", _modetxt(self._mode))
         self._status = standby
 
     def request(self, *args, **kwargs):
-        '''
+        """
         request from a resource or resources
 
         Parameters
@@ -9915,10 +10412,10 @@ class Component(object):
         --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100 |n|
         ``yield self.request((r1,1),(r2,2))`` |n|
         --> requests 1 from r1, 2 from r2 |n|
-        '''
-        fail_at = kwargs.pop('fail_at', None)
-        fail_delay = kwargs.pop('fail_delay', None)
-        mode = kwargs.pop('mode', None)
+        """
+        fail_at = kwargs.pop("fail_at", None)
+        fail_delay = kwargs.pop("fail_delay", None)
+        mode = kwargs.pop("mode", None)
         if kwargs:
             raise TypeError("request() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
@@ -9939,7 +10436,7 @@ class Component(object):
             if fail_delay is None:
                 scheduled_time = fail_at + self.env._offset
             else:
-                raise ValueError('both fail_at and fail_delay specified')
+                raise ValueError("both fail_at and fail_delay specified")
 
         if mode is not None:
             self._mode = mode
@@ -9959,22 +10456,24 @@ class Component(object):
                 if len(arg) >= 3:
                     priority = arg[2]
             else:
-                raise TypeError('incorrect specifier', arg)
+                raise TypeError("incorrect specifier", arg)
 
             if q <= 0:
-                raise ValueError('quantity ' + str(q) + ' <=0')
+                raise ValueError("quantity " + str(q) + " <=0")
             self._requests[r] += q  # is same resource is specified several times, just add them up
-            addstring = ''
+            addstring = ""
             if priority is None:
                 self.enter(r._requesters)
             else:
-                addstring = addstring + ' priority=' + str(priority)
+                addstring = addstring + " priority=" + str(priority)
                 self.enter_sorted(r._requesters, priority)
             if self.env._trace:
                 self.env.print_trace(
-                    '', '', self.name(),
-                    'request for ' + str(q) + ' from ' + r.name() + addstring +
-                    ' ' + _modetxt(self._mode))
+                    "",
+                    "",
+                    self.name(),
+                    "request for " + str(q) + " from " + r.name() + addstring + " " + _modetxt(self._mode),
+                )
 
         for r, q in self._requests.items():
             if q < r._minq:
@@ -9983,7 +10482,7 @@ class Component(object):
         self._tryrequest()
 
         if self._requests:
-            self._reschedule(scheduled_time, False, 'request')
+            self._reschedule(scheduled_time, False, "request")
 
     def _tryrequest(self):
         if self._status == interrupted:
@@ -10010,13 +10509,12 @@ class Component(object):
                 r.available_quantity.tally(r._capacity - r._claimed_quantity)
             self._requests = collections.defaultdict(int)
             self._remove()
-            self._reschedule(self.env._now, False, 'request honor', s0=self.env.last_s0)
+            self._reschedule(self.env._now, False, "request honor", s0=self.env.last_s0)
         return honored
 
     def _release(self, r, q=None, s0=None):
         if r not in self._claims:
-            raise ValueError(self.name() +
-                ' not claiming from resource ' + r.name())
+            raise ValueError(self.name() + " not claiming from resource " + r.name())
         if q is None:
             q = self._claims[r]
         if q > self._claims[r]:
@@ -10032,12 +10530,11 @@ class Component(object):
         r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
         r.available_quantity.tally(r._capacity - r._claimed_quantity)
         if self.env._trace:
-            self.env.print_trace('', '', self.name(),
-                'release ' + str(q) + ' from ' + r.name(), s0=s0)
+            self.env.print_trace("", "", self.name(), "release " + str(q) + " from " + r.name(), s0=s0)
         r._tryrequest()
 
     def release(self, *args):
-        '''
+        """
         release a quantity from a resource or resources
 
         Parameters
@@ -10066,7 +10563,7 @@ class Component(object):
         yield self.request(r1,(r2,2),(r3,3,100)) |n|
         c1.release((r2,1),r3) |n|
         --> releases 2 from r2,and 3 from r3
-        '''
+        """
         if args:
             for arg in args:
                 q = None
@@ -10077,17 +10574,16 @@ class Component(object):
                     if len(arg) >= 2:
                         q = arg[1]
                 else:
-                    raise TypeError('incorrect specifier' + arg)
+                    raise TypeError("incorrect specifier" + arg)
                 if r._anonymous:
-                    raise ValueError(
-                        'not possible to release anonymous resources ' + r.name())
+                    raise ValueError("not possible to release anonymous resources " + r.name())
                 self._release(r, q)
         else:
             for r in list(self._claims):
                 self._release(r)
 
     def wait(self, *args, **kwargs):
-        '''
+        """
         wait for any or all of the given state values are met
 
         Parameters
@@ -10141,19 +10637,19 @@ class Component(object):
         The value may be specified in three different ways:
 
         * constant, that value is just compared to state.value() |n|
-          yield self.wait((light,'red'))
+          yield self.wait((light,"red"))
         * an expression, containg one or more $-signs
           the $ is replaced by state.value(), each time the condition is tested. |n|
           self refers to the component under test, state refers to the state
           under test. |n|
           yield self.wait((light,'$ in ("red","yellow")')) |n|
-          yield self.wait((level,'$<30')) |n|
+          yield self.wait((level,"$<30")) |n|
         * a function. In that case the parameter should function that
           should accept three arguments: the value, the component under test and the
           state under test. |n|
           usually the function will be a lambda function, but that's not
           a requirement. |n|
-          yield self.wait((light,lambda t, comp, state: t in ('red','yellow'))) |n|
+          yield self.wait((light,lambda t, comp, state: t in ("red","yellow"))) |n|
           yield self.wait((level,lambda t, comp, state: t < 30)) |n|
 
         Example
@@ -10162,16 +10658,16 @@ class Component(object):
         --> waits for s1.value()==True |n|
         ``yield self.wait(s1,s2)`` |n|
         --> waits for s1.value()==True or s2.value==True |n|
-        ``yield self.wait((s1,False,100),(s2,'on'),s3)`` |n|
-        --> waits for s1.value()==False or s2.value=='on' or s3.value()==True |n|
+        ``yield self.wait((s1,False,100),(s2,"on"),s3)`` |n|
+        --> waits for s1.value()==False or s2.value=="on" or s3.value()==True |n|
         s1 is at the tail of waiters, because of the set priority |n|
         ``yield self.wait(s1,s2,all=True)`` |n|
         --> waits for s1.value()==True and s2.value==True |n|
-        '''
-        fail_at = kwargs.pop('fail_at', None)
-        fail_delay = kwargs.pop('fail_delay', None)
-        all = kwargs.pop('all', False)
-        mode = kwargs.pop('mode', None)
+        """
+        fail_at = kwargs.pop("fail_at", None)
+        fail_delay = kwargs.pop("fail_delay", None)
+        all = kwargs.pop("all", False)
+        mode = kwargs.pop("mode", None)
         if kwargs:
             raise TypeError("wait() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
@@ -10196,7 +10692,7 @@ class Component(object):
             if fail_delay is None:
                 scheduled_time = fail_at + self.env._offset
             else:
-                raise ValueError('both fail_at and fail_delay specified')
+                raise ValueError("both fail_at and fail_delay specified")
 
         if mode is not None:
             self._mode = mode
@@ -10214,7 +10710,7 @@ class Component(object):
                 if len(arg) >= 3:
                     priority = arg[2]
             else:
-                raise TypeError('incorrect specifier', args)
+                raise TypeError("incorrect specifier", args)
 
             for (statex, _, _) in self._waits:
                 if statex == state:
@@ -10226,17 +10722,17 @@ class Component(object):
                     self.enter_sorted(state._waiters, priority)
             if inspect.isfunction(value):
                 self._waits.append((state, value, 2))
-            elif '$' in str(value):
+            elif "$" in str(value):
                 self._waits.append((state, value, 1))
             else:
                 self._waits.append((state, value, 0))
 
         if not self._waits:
-            raise TypeError('no states specified')
+            raise TypeError("no states specified")
         self._trywait()
 
         if self._waits:
-            self._reschedule(scheduled_time, False, 'wait')
+            self._reschedule(scheduled_time, False, "wait")
 
     def _trywait(self):
         if self._status == interrupted:
@@ -10249,7 +10745,7 @@ class Component(object):
                         honored = False
                         break
                 elif valuetype == 1:
-                    if eval(value.replace('$', 'state._value')):
+                    if eval(value.replace("$", "state._value")):
                         honored = False
                         break
                 elif valuetype == 2:
@@ -10265,7 +10761,7 @@ class Component(object):
                         honored = True
                         break
                 elif valuetype == 1:
-                    if eval(value.replace('$', str(state._value))):
+                    if eval(value.replace("$", str(state._value))):
                         honored = True
                         break
                 elif valuetype == 2:
@@ -10279,12 +10775,12 @@ class Component(object):
                     self.leave(s._waiters)
             self._waits = []
             self._remove()
-            self._reschedule(self.env._now, False, 'wait honor', s0=self.env.last_s0)
+            self._reschedule(self.env._now, False, "wait honor", s0=self.env.last_s0)
 
         return honored
 
     def claimed_quantity(self, resource):
-        '''
+        """
         Parameters
         ----------
         resource : Resoure
@@ -10294,27 +10790,27 @@ class Component(object):
         -------
         the claimed quantity from a resource : float or int
             if the resource is not claimed, 0 will be returned
-        '''
+        """
         return self._claims.get(resource, 0)
 
     def claimed_resources(self):
-        '''
+        """
         Returns
         -------
         list of claimed resources : list
-        '''
+        """
         return list(self._claims)
 
     def requested_resources(self):
-        '''
+        """
         Returns
         -------
         list of requested resources : list
-        '''
+        """
         return list(self._requests)
 
     def requested_quantity(self, resource):
-        '''
+        """
         Parameters
         ----------
         resource : Resoure
@@ -10324,20 +10820,20 @@ class Component(object):
         -------
         the requested (not yet honored) quantity from a resource : float or int
             if there is no request for the resource, 0 will be returned
-        '''
+        """
         return self._requests.get(resource, 0)
 
     def failed(self):
-        '''
+        """
         Returns
         -------
         True, if the latest request/wait has failed (either by timeout or external) : bool
         False, otherwise
-        '''
+        """
         return self._failed
 
     def name(self, value=None):
-        '''
+        """
         Parameters
         ----------
         value : str
@@ -10351,21 +10847,21 @@ class Component(object):
         Note
         ----
         base_name and sequence_number are not affected if the name is changed
-        '''
+        """
         if value is not None:
             self._name = value
         return self._name
 
     def base_name(self):
-        '''
+        """
         Returns
         -------
         base name of the component (the name used at initialization): str
-        '''
+        """
         return self._base_name
 
     def sequence_number(self):
-        '''
+        """
         Returns
         -------
         sequence_number of the component : int
@@ -10373,23 +10869,23 @@ class Component(object):
             normally this will be the integer value of a serialized name,
             but also non serialized names (without a dotcomma at the end)
             will be numbered)
-        '''
+        """
         return self._sequence_number
 
     def running_process(self):
-        '''
+        """
         Returns
         -------
         name of the running process : str
             if data component, None
-        '''
+        """
         if self._process is None:
             return None
         else:
             return self._process.__name__
 
     def suppress_trace(self, value=None):
-        '''
+        """
         Parameters
         ----------
         value: bool
@@ -10400,13 +10896,13 @@ class Component(object):
         -------
         suppress_trace : bool
             components with the suppress_status of True, will be ignored in the trace
-        '''
+        """
         if value is not None:
             self._suppress_trace = value
         return self._suppress_trace
 
     def suppress_pause_at_step(self, value=None):
-        '''
+        """
         Parameters
         ----------
         value: bool
@@ -10417,13 +10913,13 @@ class Component(object):
         -------
         suppress_pause_at_step : bool
             components with the suppress_pause_at_step of True, will be ignored in a step
-        '''
+        """
         if value is not None:
             self._suppress_pause_at_step = value
         return self._suppress_pause_at_step
 
     def skip_standby(self, value=None):
-        '''
+        """
         Parameters
         ----------
         value: bool
@@ -10435,13 +10931,13 @@ class Component(object):
         skip_standby indicator : bool
             components with the skip_standby indicator of True, will not activate standby components after
             the component became current.
-        '''
+        """
         if value is not None:
             self._skip_standby = value
         return self._skip_standby
 
     def mode(self, value=None):
-        '''
+        """
         Parameters
         ----------
         value: any, str recommended
@@ -10454,7 +10950,7 @@ class Component(object):
         mode of the component : any, usually str
             the mode is useful for tracing and animations. |n|
             Usually the mode will be set in a call to passivate, hold, activate, request or standby.
-        '''
+        """
         if value is not None:
             self._mode_time = self.env._now
             self._mode = value
@@ -10462,7 +10958,7 @@ class Component(object):
         return self._mode
 
     def ispassive(self):
-        '''
+        """
         Returns
         -------
         True if status is passive, False otherwise : bool
@@ -10470,11 +10966,11 @@ class Component(object):
         Note
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
-        '''
+        """
         return self._status == passive
 
     def iscurrent(self):
-        '''
+        """
         Returns
         -------
         True if status is current, False otherwise : bool
@@ -10482,11 +10978,11 @@ class Component(object):
         Note
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
-        '''
+        """
         return self._status == current
 
     def isrequesting(self):
-        '''
+        """
         Returns
         -------
         True if status is requesting, False otherwise : bool
@@ -10494,11 +10990,11 @@ class Component(object):
         Note
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
-        '''
+        """
         return bool(self._requests)
 
     def iswaiting(self):
-        '''
+        """
         Returns
         -------
         True if status is waiting, False otherwise : bool
@@ -10506,11 +11002,11 @@ class Component(object):
         Note
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
-        '''
+        """
         return bool(self._waits)
 
     def isscheduled(self):
-        '''
+        """
         Returns
         -------
         True if status is scheduled, False otherwise : bool
@@ -10518,11 +11014,11 @@ class Component(object):
         Note
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
-        '''
+        """
         return (self._status == scheduled) and (not self._requests) and (not self._waits)
 
     def isstandby(self):
-        '''
+        """
         Returns
         -------
         True if status is standby, False otherwise : bool
@@ -10530,11 +11026,11 @@ class Component(object):
         Note
         ----
         Be sure to always include the parentheses, otherwise the result will be always True
-        '''
+        """
         return self._status == standby
 
     def isinterrupted(self):
-        '''
+        """
         Returns
         -------
         True if status is interrupted, False otherwise : bool
@@ -10542,11 +11038,11 @@ class Component(object):
         Note
         ----
         Be sure to always include the parentheses, otherwise the result will be always True
-        '''
+        """
         return self._status == interrupted
 
     def isdata(self):
-        '''
+        """
         Returns
         -------
         True if status is data, False otherwise : bool
@@ -10554,19 +11050,19 @@ class Component(object):
         Note
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
-        '''
+        """
         return self._status == data
 
     def queues(self):
-        '''
+        """
         Returns
         -------
         set of queues where the component belongs to : set
-        '''
+        """
         return set(self._qmembers)
 
     def count(self, q=None):
-        '''
+        """
         queue count
 
         Parameters
@@ -10580,14 +11076,14 @@ class Component(object):
         1 if component is in q, 0 otherwise : int
             |n|
             if q is omitted, the number of queues where the component is in
-        '''
+        """
         if q is None:
             return len(self._qmembers)
         else:
             return 1 if self in q else 0
 
     def index(self, q):
-        '''
+        """
         Parameters
         ----------
         q : Queue
@@ -10598,7 +11094,7 @@ class Component(object):
         index of component in q : int
             if component belongs to q |n|
             -1 if component does not belong to q
-        '''
+        """
         m1 = self._member(q)
         if m1 is None:
             return -1
@@ -10611,7 +11107,7 @@ class Component(object):
             return index
 
     def enter(self, q):
-        '''
+        """
         enters a queue at the tail
 
         Parameters
@@ -10624,14 +11120,14 @@ class Component(object):
         the priority will be set to
         the priority of the tail component of the queue, if any
         or 0 if queue is empty
-        '''
+        """
         self._checknotinqueue(q)
         priority = q._tail.predecessor.priority
         Qmember().insert_in_front_of(q._tail, self, q, priority)
         return self
 
     def enter_at_head(self, q):
-        '''
+        """
         enters a queue at the head
 
         Parameters
@@ -10644,7 +11140,7 @@ class Component(object):
         the priority will be set to
         the priority of the head component of the queue, if any
         or 0 if queue is empty
-        '''
+        """
 
         self._checknotinqueue(q)
         priority = q._head.successor.priority
@@ -10652,7 +11148,7 @@ class Component(object):
         return self
 
     def enter_in_front_of(self, q, poscomponent):
-        '''
+        """
         enters a queue in front of a component
 
         Parameters
@@ -10666,7 +11162,7 @@ class Component(object):
         Note
         ----
         the priority will be set to the priority of poscomponent
-        '''
+        """
 
         self._checknotinqueue(q)
         m2 = poscomponent._checkinqueue(q)
@@ -10675,7 +11171,7 @@ class Component(object):
         return self
 
     def enter_behind(self, q, poscomponent):
-        '''
+        """
         enters a queue behind a component
 
         Parameters
@@ -10689,7 +11185,7 @@ class Component(object):
         Note
         ----
         the priority will be set to the priority of poscomponent
-        '''
+        """
 
         self._checknotinqueue(q)
         m1 = poscomponent._checkinqueue(q)
@@ -10698,7 +11194,7 @@ class Component(object):
         return self
 
     def enter_sorted(self, q, priority):
-        '''
+        """
         enters a queue, according to the priority
 
         Parameters
@@ -10712,7 +11208,7 @@ class Component(object):
         Note
         ----
         The component is placed just before the first component with a priority > given priority
-        '''
+        """
 
         self._checknotinqueue(q)
         m2 = q._head.successor
@@ -10722,7 +11218,7 @@ class Component(object):
         return self
 
     def leave(self, q=None):
-        '''
+        """
         leave queue
 
         Parameters
@@ -10733,7 +11229,7 @@ class Component(object):
         Note
         ----
         statistics are updated accordingly
-        '''
+        """
         if q is None:
             for q in list(self._qmembers):
                 if not q._isinternal:
@@ -10751,14 +11247,14 @@ class Component(object):
         del self._qmembers[q]
         if self.env._trace:
             if not q._isinternal:
-                self.env.print_trace('', '', self.name(), 'leave ' + q.name())
+                self.env.print_trace("", "", self.name(), "leave " + q.name())
         length_of_stay = self.env._now - mx.enter_time
         q.length_of_stay.tally(length_of_stay)
         q.length.tally(q._length)
         return self
 
     def priority(self, q, priority=None):
-        '''
+        """
         gets/sets the priority of a component in a queue
 
         Parameters
@@ -10777,7 +11273,7 @@ class Component(object):
         Note
         ----
         if you change the priority, the order of the queue may change
-        '''
+        """
 
         mx = self._checkinqueue(q)
         if priority is not None:
@@ -10801,7 +11297,7 @@ class Component(object):
         return mx.priority
 
     def successor(self, q):
-        '''
+        """
         Parameters
         ----------
         q : Queue
@@ -10812,13 +11308,13 @@ class Component(object):
         the successor of the component in the queue: Component
             if component is not at the tail. |n|
             returns None if component is at the tail.
-        '''
+        """
 
         mx = self._checkinqueue(q)
         return mx.successor.component
 
     def predecessor(self, q):
-        '''
+        """
         Parameters
         ----------
         q : Queue
@@ -10828,13 +11324,13 @@ class Component(object):
             predecessor of the component in the queue
             if component is not at the head. |n|
             returns None if component is at the head.
-        '''
+        """
 
         mx = self._checkinqueue(q)
         return mx.predecessor.component
 
     def enter_time(self, q):
-        '''
+        """
         Parameters
         ----------
         q : Queue
@@ -10843,29 +11339,29 @@ class Component(object):
         Returns
         -------
         time the component entered the queue : float
-        '''
+        """
         mx = self._checkinqueue(q)
         return mx.enter_time - self.env._offset
 
     def creation_time(self):
-        '''
+        """
         Returns
         -------
         time the component was created : float
-        '''
+        """
         return self._creation_time - self.env._offset
 
     def scheduled_time(self):
-        '''
+        """
         Returns
         -------
         time the component scheduled for, if it is scheduled : float
             returns inf otherwise
-        '''
+        """
         return self._scheduled_time - self.env._offset
 
     def remaining_duration(self, value=None, urgent=False):
-        '''
+        """
         Parameters
         ----------
         value : float
@@ -10898,19 +11394,17 @@ class Component(object):
         ----
         This method is usefu for interrupting a process and then resuming it,
         after some (breakdown) time
-        '''
+        """
         if value is not None:
             if self._status in (passive, interrupted):
                 self._remaining_duration = value
             elif self._status == current:
-                raise ValueError(
-                    'setting remaining_duration not allowed for current component (' + self.name() + ')')
+                raise ValueError("setting remaining_duration not allowed for current component (" + self.name() + ")")
             elif self._status == standby:
-                raise ValueError(
-                    'setting remaining_duration not allowed for standby component (' + self.name() + ')')
+                raise ValueError("setting remaining_duration not allowed for standby component (" + self.name() + ")")
             else:
                 self._remove()
-                self._reschedule(value + self.env._now, urgent, 'set remaining_duration', extra='')
+                self._reschedule(value + self.env._now, urgent, "set remaining_duration", extra="")
 
         if self._status in (passive, interrupted):
             return self._remaining_duration
@@ -10920,18 +11414,18 @@ class Component(object):
             return 0
 
     def mode_time(self):
-        '''
+        """
         Returns
         -------
         time the component got it's latest mode : float
             For a new component this is
             the time the component was created. |n|
             this function is particularly useful for animations.
-        '''
+        """
         return self._mode_time - self.env._offset
 
     def status(self):
-        '''
+        """
         returns the status of a component
 
         possible values are
@@ -10943,7 +11437,7 @@ class Component(object):
             - current
             - standby
             - interrupted
-        '''
+        """
         if len(self._requests) > 0:
             return requesting
         if len(self._waits) > 0:
@@ -10951,7 +11445,7 @@ class Component(object):
         return self._status
 
     def interrupted_status(self):
-        '''
+        """
         returns the original status of an interrupted component
 
         possible values are
@@ -10960,9 +11454,9 @@ class Component(object):
             - requesting
             - waiting
             - standby
-        '''
+        """
         if self._status != interrupted:
-            raise ValueError(self.name() + 'not interrupted')
+            raise ValueError(self.name() + "not interrupted")
         if len(self._requests) > 0:
             return requesting
         if len(self._waits) > 0:
@@ -10970,10 +11464,10 @@ class Component(object):
         return self._interrupted_status
 
     def interrupt_level(self):
-        '''
+        """
         returns interrupt level of an interrupted component |n|
         non interrupted components return 0
-        '''
+        """
         if self._status == interrupted:
             return self._interrupt_level
         else:
@@ -10987,58 +11481,64 @@ class Component(object):
         if mx is None:
             pass
         else:
-            raise ValueError(
-                self.name() + ' is already member of ' + q.name())
+            raise ValueError(self.name() + " is already member of " + q.name())
 
     def _checkinqueue(self, q):
         mx = self._member(q)
         if mx is None:
-            raise ValueError(self.name() + ' is not member of ' + q.name())
+            raise ValueError(self.name() + " is not member of " + q.name())
         else:
             return mx
 
     def _checkisnotdata(self):
         if self._status == data:
-            raise ValueError(self.name() + ' data component not allowed')
+            raise ValueError(self.name() + " data component not allowed")
 
     def _checkisnotmain(self):
         if self == self.env._main:
-            raise ValueError(self.name() + ' main component not allowed')
+            raise ValueError(self.name() + " main component not allowed")
 
     def lineno_txt(self):
-        plus = '+'
+        plus = "+"
         if self == self.env._main:
             frame = self.frame
         else:
             if self._process_isgenerator:
                 frame = self._process.gi_frame
                 if frame.f_lasti == -1:  # checks whether generator is created
-                    plus = ' '
+                    plus = " "
             else:
                 gs = inspect.getsourcelines(self._process)
-                s0 = self.env.filename_lineno_to_str(self._process.__code__.co_filename, gs[1]) + ' '
+                s0 = self.env.filename_lineno_to_str(self._process.__code__.co_filename, gs[1]) + " "
                 return s0
         return self.env._frame_to_lineno(frame) + plus
 
 
 class Random(random.Random):
-    '''
+    """
     defines a randomstream, equivalent to random.Random()
 
     Parameters
     ----------
     seed : any hashable
         default: None
-    '''
+    """
+
     def __init__(self, seed=None):
         random.Random.__init__(self, seed)
 
 
-class _Distribution():
-
-    def bounded_sample(self, lowerbound=None, upperbound=None, fail_value=None, number_of_retries=None,
-        include_lowerbound=True, include_upperbound=True):
-        '''
+class _Distribution:
+    def bounded_sample(
+        self,
+        lowerbound=None,
+        upperbound=None,
+        fail_value=None,
+        number_of_retries=None,
+        include_lowerbound=True,
+        include_upperbound=True,
+    ):
+        """
         Parameters
         ----------
         lowerbound : float
@@ -11075,9 +11575,10 @@ class _Distribution():
         fail_value  will be returned |n|
         Samples that cannot be converted (only possible with Pdf and CumPdf) to float
         are assumed to be within the bounds.
-        '''
-        return Bounded(self, lowerbound, upperbound, fail_value, number_of_retries,
-            include_lowerbound, include_upperbound).sample()
+        """
+        return Bounded(
+            self, lowerbound, upperbound, fail_value, number_of_retries, include_lowerbound, include_upperbound
+        ).sample()
 
     def __call__(self, *args):
         return self.sample(*args)
@@ -11126,7 +11627,7 @@ class _Distribution():
 
 
 class _Expression(_Distribution):
-    '''
+    """
     expression distribution
 
     This class is only created when using an expression with one ore more distributions.
@@ -11134,7 +11635,8 @@ class _Expression(_Distribution):
     Note
     ----
     The randomstream of the distribution(s) in the expression are used.
-    '''
+    """
+
     def __init__(self, dis0, dis1, op):
         if isinstance(dis0, Constant):
             self.dis0 = dis0._mean
@@ -11147,11 +11649,11 @@ class _Expression(_Distribution):
         self.op = op
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the expression of distribution(s) : float
-        '''
+        """
         if isinstance(self.dis0, _Distribution):
             v0 = self.dis0.sample()
         else:
@@ -11163,17 +11665,17 @@ class _Expression(_Distribution):
         return self.op(v0, v1)
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the expression of distribution(s) : float
             returns nan if mean can't be calculated
-        '''
-        if isinstance(self. dis0, _Distribution):
+        """
+        if isinstance(self.dis0, _Distribution):
             m0 = self.dis0.mean()
         else:
             m0 = self.dis0
-        if isinstance(self. dis1, _Distribution):
+        if isinstance(self.dis1, _Distribution):
             m1 = self.dis1.mean()
         else:
             m1 = self.dis1
@@ -11203,10 +11705,10 @@ class _Expression(_Distribution):
             return nan
 
     def __repr__(self):
-        return('_Expression')
+        return "_Expression"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the expression of distribution(s)
 
         Parameters
@@ -11222,15 +11724,15 @@ class _Expression(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('_Expression ' + hex(id(self)))
-        result.append('  mean=' + str(self.mean()))
+        result.append("_Expression " + hex(id(self)))
+        result.append("  mean=" + str(self.mean()))
         return return_or_print(result, as_str, file)
 
 
 class Bounded(_Distribution):
-    '''
+    """
     Parameters
     ----------
     dis : distribution
@@ -11266,16 +11768,24 @@ class Bounded(_Distribution):
     fail_value  will be returned |n|
     Samples that cannot be converted to float (only possible with Pdf and CumPdf)
     are assumed to be within the bounds.
-    '''
+    """
 
-    def __init__(self, dis, lowerbound=None, upperbound=None, fail_value=None, number_of_retries=None,
-        include_lowerbound=None, include_upperbound=None):
+    def __init__(
+        self,
+        dis,
+        lowerbound=None,
+        upperbound=None,
+        fail_value=None,
+        number_of_retries=None,
+        include_lowerbound=None,
+        include_upperbound=None,
+    ):
 
         self.lowerbound = -inf if lowerbound is None else lowerbound
         self.upperbound = inf if upperbound is None else upperbound
 
         if self.lowerbound > self.upperbound:
-            raise ValueError('lowerbound > upperbound')
+            raise ValueError("lowerbound > upperbound")
 
         if fail_value is None:
             self.fail_value = self.upperbound if self.lowerbound == -inf else self.lowerbound
@@ -11303,21 +11813,21 @@ class Bounded(_Distribution):
         return self.fail_value
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the expression of bounded distribution : float
             unless no bounds are specified, returns nan
-        '''
+        """
         if (self.lowerbound == -inf) and (self.upperbound == inf):
             return self.dis.mean()
         return nan
 
     def __repr__(self):
-        return('Bounded ' + self.dis.__repr__())
+        return "Bounded " + self.dis.__repr__()
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the expression of distribution(s)
 
         Parameters
@@ -11333,15 +11843,15 @@ class Bounded(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Bounded ' + self.dis.__repr__() + ' ' + hex(id(self)))
-        result.append('  mean=' + str(self.mean()))
+        result.append("Bounded " + self.dis.__repr__() + " " + hex(id(self)))
+        result.append("  mean=" + str(self.mean()))
         return return_or_print(result, as_str, file)
 
 
 class Exponential(_Distribution):
-    '''
+    """
     exponential distribution
 
     Parameters
@@ -11353,7 +11863,7 @@ class Exponential(_Distribution):
 
     time_unit : str
         specifies the time unit |n|
-        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
         default : no conversion |n|
 
     rate : float
@@ -11374,23 +11884,23 @@ class Exponential(_Distribution):
     Note
     ----
     Either mean or rate has to be specified, not both
-    '''
+    """
 
     def __init__(self, mean=None, time_unit=None, rate=None, randomstream=None, env=None):
         if mean is None:
             if rate is None:
-                raise TypeError('neither mean nor rate are specified')
+                raise TypeError("neither mean nor rate are specified")
             else:
                 if rate <= 0:
-                    raise ValueError('rate<=0')
+                    raise ValueError("rate<=0")
                 self._mean = 1 / rate
         else:
             if rate is None:
                 if mean <= 0:
-                    raise ValueError('mean<=0')
+                    raise ValueError("mean<=0")
                 self._mean = mean
             else:
-                raise TypeError('both mean and rate are specified')
+                raise TypeError("both mean and rate are specified")
 
         self._mean *= _time_unit_factor(time_unit, env)
 
@@ -11401,10 +11911,10 @@ class Exponential(_Distribution):
             self.randomstream = randomstream
 
     def __repr__(self):
-        return('Exponential')
+        return "Exponential"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -11420,33 +11930,33 @@ class Exponential(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Exponential distribution ' + hex(id(self)))
-        result.append('  mean=' + str(self._mean))
-        result.append('  rate (lambda)=' + str(1 / self._mean))
-        result.append('  randomstream=' + hex(id(self.randomstream)))
+        result.append("Exponential distribution " + hex(id(self)))
+        result.append("  mean=" + str(self._mean))
+        result.append("  rate (lambda)=" + str(1 / self._mean))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the distribution : float
-        '''
+        """
         return self.randomstream.expovariate(1 / (self._mean))
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the distribution : float
-        '''
+        """
         return self._mean
 
 
 class Normal(_Distribution):
-    '''
+    """
     normal distribution
 
     Parameters
@@ -11481,10 +11991,18 @@ class Normal(_Distribution):
     env : Environment
         environment where the distribution is defined |n|
         if omitted, default_env will be used
-    '''
+    """
 
-    def __init__(self, mean, standard_deviation=None, time_unit=None, coefficient_of_variation=None,
-      use_gauss=False, randomstream=None, env=None):
+    def __init__(
+        self,
+        mean,
+        standard_deviation=None,
+        time_unit=None,
+        coefficient_of_variation=None,
+        use_gauss=False,
+        randomstream=None,
+        env=None,
+    ):
         self._use_gauss = use_gauss
         self._mean = mean
         if standard_deviation is None:
@@ -11492,15 +12010,15 @@ class Normal(_Distribution):
                 self._standard_deviation = 0
             else:
                 if mean == 0:
-                    raise ValueError('coefficient_of_variation not allowed with mean = 0')
+                    raise ValueError("coefficient_of_variation not allowed with mean = 0")
                 self._standard_deviation = coefficient_of_variation * mean
         else:
             if coefficient_of_variation is None:
                 self._standard_deviation = standard_deviation
             else:
-                raise TypeError('both standard_deviation and coefficient_of_variation specified')
+                raise TypeError("both standard_deviation and coefficient_of_variation specified")
         if self._standard_deviation < 0:
-            raise ValueError('standard_deviation < 0')
+            raise ValueError("standard_deviation < 0")
         if randomstream is None:
             self.randomstream = random
         else:
@@ -11510,10 +12028,10 @@ class Normal(_Distribution):
         self._standard_deviation *= _time_unit_factor(time_unit, env)
 
     def __repr__(self):
-        return 'Normal'
+        return "Normal"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -11529,42 +12047,42 @@ class Normal(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Normal distribution ' + hex(id(self)))
-        result.append('  mean=' + str(self._mean))
-        result.append('  standard_deviation=' + str(self._standard_deviation))
+        result.append("Normal distribution " + hex(id(self)))
+        result.append("  mean=" + str(self._mean))
+        result.append("  standard_deviation=" + str(self._standard_deviation))
         if self._mean == 0:
-            result.append('  coefficient of variation= N/A')
+            result.append("  coefficient of variation= N/A")
         else:
-            result.append('  coefficient_of_variation=' + str(self._standard_deviation / self._mean))
+            result.append("  coefficient_of_variation=" + str(self._standard_deviation / self._mean))
         if self._use_gauss:
-            result.append('  use_gauss=True')
-        result.append('  randomstream=' + hex(id(self.randomstream)))
+            result.append("  use_gauss=True")
+        result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the distribution : float
-        '''
+        """
         if self._use_gauss:
             return self.randomstream.gauss(self._mean, self._standard_deviation)
         else:
             return self.randomstream.normalvariate(self._mean, self._standard_deviation)
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the distribution : float
-        '''
+        """
         return self._mean
 
 
 class IntUniform(_Distribution):
-    '''
+    """
     integer uniform distribution, i.e. sample integer values between lowerbound and upperbound (inclusive)
 
     Parameters
@@ -11594,7 +12112,7 @@ class IntUniform(_Distribution):
         print (die())
 
     This will print 10 throws of a die.
-    '''
+    """
 
     def __init__(self, lowerbound, upperbound=None, randomstream=None):
         self._lowerbound = lowerbound
@@ -11603,11 +12121,11 @@ class IntUniform(_Distribution):
         else:
             self._upperbound = upperbound
         if self._lowerbound > self._upperbound:
-            raise ValueError('lowerbound>upperbound')
+            raise ValueError("lowerbound>upperbound")
         if self._lowerbound != int(self._lowerbound):
-            raise TypeError('lowerbound not integer')
+            raise TypeError("lowerbound not integer")
         if self._upperbound != int(self._upperbound):
-            raise TypeError('upperbound not integer')
+            raise TypeError("upperbound not integer")
 
         if randomstream is None:
             self.randomstream = random
@@ -11617,10 +12135,10 @@ class IntUniform(_Distribution):
         self._mean = (self._lowerbound + self._upperbound) / 2
 
     def __repr__(self):
-        return 'IntUniform'
+        return "IntUniform"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -11636,33 +12154,33 @@ class IntUniform(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('IntUniform distribution ' + hex(id(self)))
-        result.append('  lowerbound=' + str(self._lowerbound))
-        result.append('  upperbound=' + str(self._upperbound))
-        result.append('  randomstream=' + hex(id(self.randomstream)))
+        result.append("IntUniform distribution " + hex(id(self)))
+        result.append("  lowerbound=" + str(self._lowerbound))
+        result.append("  upperbound=" + str(self._upperbound))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the distribution: int
-        '''
+        """
         return self.randomstream.randint(self._lowerbound, self._upperbound)
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the distribution : float
-        '''
+        """
         return self._mean
 
 
 class Uniform(_Distribution):
-    '''
+    """
     uniform distribution
 
     Parameters
@@ -11677,7 +12195,7 @@ class Uniform(_Distribution):
 
     time_unit : str
         specifies the time unit |n|
-        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
         default : no conversion |n|
 
     randomstream: randomstream
@@ -11689,7 +12207,7 @@ class Uniform(_Distribution):
     env : Environment
         environment where the distribution is defined |n|
         if omitted, default_env will be used
-    '''
+    """
 
     def __init__(self, lowerbound, upperbound=None, time_unit=None, randomstream=None, env=None):
         self._lowerbound = lowerbound
@@ -11698,7 +12216,7 @@ class Uniform(_Distribution):
         else:
             self._upperbound = upperbound
         if self._lowerbound > self._upperbound:
-            raise ValueError('lowerbound>upperbound')
+            raise ValueError("lowerbound>upperbound")
         if randomstream is None:
             self.randomstream = random
         else:
@@ -11709,10 +12227,10 @@ class Uniform(_Distribution):
         self._mean = (self._lowerbound + self._upperbound) / 2
 
     def __repr__(self):
-        return 'Uniform'
+        return "Uniform"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -11728,33 +12246,33 @@ class Uniform(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Uniform distribution ' + hex(id(self)))
-        result.append('  lowerbound=' + str(self._lowerbound))
-        result.append('  upperbound=' + str(self._upperbound))
-        result.append('  randomstream=' + hex(id(self.randomstream)))
+        result.append("Uniform distribution " + hex(id(self)))
+        result.append("  lowerbound=" + str(self._lowerbound))
+        result.append("  upperbound=" + str(self._upperbound))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the distribution: float
-        '''
+        """
         return self.randomstream.uniform(self._lowerbound, self._upperbound)
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the distribution : float
-        '''
+        """
         return self._mean
 
 
 class Triangular(_Distribution):
-    '''
+    """
     triangular distribution
 
     Parameters
@@ -11774,7 +12292,7 @@ class Triangular(_Distribution):
 
     time_unit : str
         specifies the time unit |n|
-        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
         default : no conversion |n|
 
     randomstream: randomstream
@@ -11786,7 +12304,7 @@ class Triangular(_Distribution):
     env : Environment
         environment where the distribution is defined |n|
         if omitted, default_env will be used
-    '''
+    """
 
     def __init__(self, low, high=None, mode=None, time_unit=None, randomstream=None, env=None):
         self._low = low
@@ -11799,11 +12317,11 @@ class Triangular(_Distribution):
         else:
             self._mode = mode
         if self._low > self._high:
-            raise ValueError('low>high')
+            raise ValueError("low>high")
         if self._low > self._mode:
-            raise ValueError('low>mode')
+            raise ValueError("low>mode")
         if self._high < self._mode:
-            raise ValueError('high<mode')
+            raise ValueError("high<mode")
         if randomstream is None:
             self.randomstream = random
         else:
@@ -11815,10 +12333,10 @@ class Triangular(_Distribution):
         self._mean = (self._low + self._mode + self._high) / 3
 
     def __repr__(self):
-        return 'Triangular'
+        return "Triangular"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -11834,34 +12352,34 @@ class Triangular(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Triangular distribution ' + hex(id(self)))
-        result.append('  low=' + str(self._low))
-        result.append('  high=' + str(self._high))
-        result.append('  mode=' + str(self._mode))
-        result.append('  randomstream=' + hex(id(self.randomstream)))
+        result.append("Triangular distribution " + hex(id(self)))
+        result.append("  low=" + str(self._low))
+        result.append("  high=" + str(self._high))
+        result.append("  mode=" + str(self._mode))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the distribtion : float
-        '''
+        """
         return self.randomstream.triangular(self._low, self._high, self._mode)
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the distribution : float
-        '''
+        """
         return self._mean
 
 
 class Constant(_Distribution):
-    '''
+    """
     constant distribution
 
     Parameters
@@ -11871,7 +12389,7 @@ class Constant(_Distribution):
 
     time_unit : str
         specifies the time unit |n|
-        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
         default : no conversion |n|
 
     randomstream: randomstream
@@ -11884,7 +12402,7 @@ class Constant(_Distribution):
     env : Environment
         environment where the distribution is defined |n|
         if omitted, default_env will be used
-    '''
+    """
 
     def __init__(self, value, time_unit=None, randomstream=None, env=None):
         self._value = value
@@ -11897,10 +12415,10 @@ class Constant(_Distribution):
         self._mean *= _time_unit_factor(time_unit, env)
 
     def __repr__(self):
-        return 'Constant'
+        return "Constant"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -11916,32 +12434,32 @@ class Constant(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Constant distribution ' + hex(id(self)))
-        result.append('  value=' + str(self._value))
-        result.append('  randomstream=' + hex(id(self.randomstream)))
+        result.append("Constant distribution " + hex(id(self)))
+        result.append("  value=" + str(self._value))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         sample of the distribution (= the specified constant) : float
-        '''
-        return(self._value)
+        """
+        return self._value
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         mean of the distribution (= the specified constant) : float
-        '''
+        """
         return self._mean
 
 
 class Poisson(_Distribution):
-    '''
+    """
     Poisson distribution
 
     Parameters
@@ -11959,11 +12477,11 @@ class Poisson(_Distribution):
     ----
     The run time of this function increases when mean (lambda) increases. |n|
     It is not recommended to use mean (lambda) > 100
-    '''
+    """
 
     def __init__(self, mean, randomstream=None):
         if mean <= 0:
-            raise ValueError('mean (lambda) <=0')
+            raise ValueError("mean (lambda) <=0")
 
         self._mean = mean
 
@@ -11974,10 +12492,10 @@ class Poisson(_Distribution):
             self.randomstream = randomstream
 
     def __repr__(self):
-        return 'Poisson'
+        return "Poisson"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -11993,18 +12511,18 @@ class Poisson(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Poisson distribution ' + hex(id(self)))
-        result.append('  mean (lambda)' + str(self._lambda_))
+        result.append("Poisson distribution " + hex(id(self)))
+        result.append("  mean (lambda)" + str(self._lambda_))
         return return_or_print(result, as_str, file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the distribution : int
-        '''
+        """
         t = math.exp(-self._mean)
         s = t
         k = 0
@@ -12021,16 +12539,16 @@ class Poisson(_Distribution):
         return k
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the distribution : float
-        '''
+        """
         return self._mean
 
 
 class Weibull(_Distribution):
-    '''
+    """
     weibull distribution
 
     Parameters
@@ -12044,7 +12562,7 @@ class Weibull(_Distribution):
 
     time_unit : str
         specifies the time unit |n|
-        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
         default : no conversion |n|
 
     randomstream: randomstream
@@ -12056,12 +12574,12 @@ class Weibull(_Distribution):
     env : Environment
         environment where the distribution is defined |n|
         if omitted, default_env will be used
-    '''
+    """
 
     def __init__(self, scale, shape, time_unit=None, randomstream=None, env=None):
         self._scale = scale
         if shape <= 0:
-            raise ValueError('shape<=0')
+            raise ValueError("shape<=0")
 
         self._shape = shape
         if randomstream is None:
@@ -12073,10 +12591,10 @@ class Weibull(_Distribution):
         self._mean = self._scale * math.gamma((1 / self._shape) + 1)
 
     def __repr__(self):
-        return 'Weibull'
+        return "Weibull"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -12092,33 +12610,33 @@ class Weibull(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Weibull distribution ' + hex(id(self)))
-        result.append('  scale (alpha or k)=' + str(self._scale))
-        result.append('  shape (beta or lambda)=' + str(self._shape))
-        result.append('  randomstream=' + hex(id(self.randomstream)))
+        result.append("Weibull distribution " + hex(id(self)))
+        result.append("  scale (alpha or k)=" + str(self._scale))
+        result.append("  shape (beta or lambda)=" + str(self._shape))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the distribution : float
-        '''
+        """
         return self.randomstream.weibullvariate(self._scale, self._shape)
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the distribution : float
-        '''
+        """
         return self._mean
 
 
 class Gamma(_Distribution):
-    '''
+    """
     gamma distribution
 
     Parameters
@@ -12133,7 +12651,7 @@ class Gamma(_Distribution):
 
     time_unit : str
         specifies the time unit |n|
-        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
         default : no conversion |n|
 
     rate : float
@@ -12154,26 +12672,26 @@ class Gamma(_Distribution):
     Note
     ----
     Either scale or rate has to be specified, not both.
-    '''
+    """
 
     def __init__(self, shape, scale=None, time_unit=None, rate=None, randomstream=None, env=None):
         if shape <= 0:
-            raise ValueError('shape<=0')
+            raise ValueError("shape<=0")
         self._shape = shape
         if rate is None:
             if scale is None:
-                raise TypeError('neither scale nor rate specified')
+                raise TypeError("neither scale nor rate specified")
             else:
                 if scale <= 0:
-                    raise ValueError('scale<=0')
+                    raise ValueError("scale<=0")
                 self._scale = scale
         else:
             if scale is None:
                 if rate <= 0:
-                    raise ValueError('rate<=0')
+                    raise ValueError("rate<=0")
                 self._scale = 1 / rate
             else:
-                raise TypeError('both scale and rate specified')
+                raise TypeError("both scale and rate specified")
 
         self._scale *= _time_unit_factor(time_unit, env)
 
@@ -12186,10 +12704,10 @@ class Gamma(_Distribution):
         self._mean = self._shape * self._scale
 
     def __repr__(self):
-        return 'Gamma'
+        return "Gamma"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -12205,34 +12723,34 @@ class Gamma(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Gamma distribution ' + hex(id(self)))
-        result.append('  shape (k)=' + str(self._shape))
-        result.append('  scale (teta)=' + str(self._scale))
-        result.append('  rate (beta)=' + str(1 / self._scale))
-        result.append('  randomstream=' + hex(id(self.randomstream)))
+        result.append("Gamma distribution " + hex(id(self)))
+        result.append("  shape (k)=" + str(self._shape))
+        result.append("  scale (teta)=" + str(self._scale))
+        result.append("  rate (beta)=" + str(1 / self._scale))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the distribution : float
-        '''
+        """
         return self.randomstream.gammavariate(self._shape, self._scale)
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the distribution : float
-        '''
+        """
         return self._mean
 
 
 class Beta(_Distribution):
-    '''
+    """
     beta distribution
 
     Parameters
@@ -12250,14 +12768,14 @@ class Beta(_Distribution):
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
-    '''
+    """
 
     def __init__(self, alpha, beta, randomstream=None):
         if alpha <= 0:
-            raise ValueError('alpha<=0')
+            raise ValueError("alpha<=0")
         self._alpha = alpha
         if beta <= 0:
-            raise ValueError('beta<>=0')
+            raise ValueError("beta<>=0")
         self._beta = beta
 
         if randomstream is None:
@@ -12269,10 +12787,10 @@ class Beta(_Distribution):
         self._mean = self._alpha / (self._alpha + self._beta)
 
     def __repr__(self):
-        return 'Beta'
+        return "Beta"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -12288,33 +12806,33 @@ class Beta(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Beta distribution ' + hex(id(self)))
-        result.append('  alpha=' + str(self._alpha))
-        result.append('  beta=' + str(self._beta))
-        result.append('  randomstream=' + hex(id(self.randomstream)))
+        result.append("Beta distribution " + hex(id(self)))
+        result.append("  alpha=" + str(self._alpha))
+        result.append("  beta=" + str(self._beta))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the distribution : float
-        '''
+        """
         return self.randomstream.betavariate(self._alpha, self._beta)
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the distribution : float
-        '''
+        """
         return self._mean
 
 
 class Erlang(_Distribution):
-    '''
+    """
     erlang distribution
 
     Parameters
@@ -12330,7 +12848,7 @@ class Erlang(_Distribution):
 
     time_unit : str
         specifies the time unit |n|
-        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
         default : no conversion |n|
 
     scale: float
@@ -12351,28 +12869,28 @@ class Erlang(_Distribution):
     Note
     ----
     Either rate or scale has to be specified, not both.
-    '''
+    """
 
     def __init__(self, shape, rate=None, time_unit=None, scale=None, randomstream=None, env=None):
         if int(shape) != shape:
-            raise TypeError('shape not integer')
+            raise TypeError("shape not integer")
         if shape <= 0:
-            raise ValueError('shape <=0')
+            raise ValueError("shape <=0")
         self._shape = shape
         if rate is None:
             if scale is None:
-                raise TypeError('neither rate nor scale specified')
+                raise TypeError("neither rate nor scale specified")
             else:
                 if scale <= 0:
-                    raise ValueError('scale<=0')
+                    raise ValueError("scale<=0")
                 self._rate = 1 / scale
         else:
             if scale is None:
                 if rate <= 0:
-                    raise ValueError('rate<=0')
+                    raise ValueError("rate<=0")
                 self._rate = rate
             else:
-                raise ValueError('both rate and scale specified')
+                raise ValueError("both rate and scale specified")
 
         self._rate /= _time_unit_factor(time_unit, env)
 
@@ -12385,10 +12903,10 @@ class Erlang(_Distribution):
         self._mean = self._shape / self._rate
 
     def __repr__(self):
-        return 'Erlang'
+        return "Erlang"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -12404,34 +12922,34 @@ class Erlang(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Erlang distribution ' + hex(id(self)))
-        result.append('  shape (k)=' + str(self._shape))
-        result.append('  rate (lambda)=' + str(self._rate))
-        result.append('  scale (mu)=' + str(1 / self._rate))
-        result.append('  randomstream=' + hex(id(self.randomstream)))
+        result.append("Erlang distribution " + hex(id(self)))
+        result.append("  shape (k)=" + str(self._shape))
+        result.append("  rate (lambda)=" + str(self._rate))
+        result.append("  scale (mu)=" + str(1 / self._rate))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the distribution : float
-        '''
+        """
         return self.randomstream.gammavariate(self._shape, 1 / self._rate)
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the distribution : float
-        '''
+        """
         return self._mean
 
 
 class Cdf(_Distribution):
-    '''
+    """
     Cumulative distribution function
 
     Parameters
@@ -12450,7 +12968,7 @@ class Cdf(_Distribution):
 
     time_unit : str
         specifies the time unit |n|
-        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
         default : no conversion |n|
 
     randomstream: randomstream
@@ -12461,7 +12979,7 @@ class Cdf(_Distribution):
     env : Environment
         environment where the distribution is defined |n|
         if omitted, default_env will be used
-    '''
+    """
 
     def __init__(self, spec, time_unit=None, randomstream=None, env=None):
         self._x = []
@@ -12476,38 +12994,34 @@ class Cdf(_Distribution):
         lastx = -inf
         spec = list(spec)
         if not spec:
-            raise TypeError('no arguments specified')
+            raise TypeError("no arguments specified")
         if spec[1] != 0:
-            raise ValueError('first cumulative value should be 0')
+            raise ValueError("first cumulative value should be 0")
         while len(spec) > 0:
             x = spec.pop(0) * _time_unit_factor(time_unit, env)
             if not spec:
-                raise ValueError('uneven number of parameters specified')
+                raise ValueError("uneven number of parameters specified")
             if x < lastx:
-                raise ValueError(
-                    'x value {} is smaller than previous value {}'.format(x, lastx))
+                raise ValueError("x value {} is smaller than previous value {}".format(x, lastx))
             cum = spec.pop(0)
             if cum < lastcum:
-                raise ValueError('cumulative value {} is smaller than previous value {}'
-                    .format(cum, lastcum))
+                raise ValueError("cumulative value {} is smaller than previous value {}".format(cum, lastcum))
             self._x.append(x)
             self._cum.append(cum)
             lastx = x
             lastcum = cum
         if lastcum == 0:
-            raise ValueError('last cumulative value should be > 0')
+            raise ValueError("last cumulative value should be > 0")
         self._cum = [x / lastcum for x in self._cum]
         self._mean = 0
         for i in range(len(self._cum) - 1):
-            self._mean +=\
-                ((self._x[i] + self._x[i + 1]) / 2) * \
-                (self._cum[i + 1] - self._cum[i])
+            self._mean += ((self._x[i] + self._x[i + 1]) / 2) * (self._cum[i + 1] - self._cum[i])
 
     def __repr__(self):
-        return 'Cdf'
+        return "Cdf"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -12523,18 +13037,18 @@ class Cdf(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Cdf distribution ' + hex(id(self)))
-        result.append('  randomstream=' + hex(id(self.randomstream)))
+        result.append("Cdf distribution " + hex(id(self)))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the distribution : float
-        '''
+        """
         r = self.randomstream.random()
         for i in range(len(self._cum)):
             if r < self._cum[i]:
@@ -12542,16 +13056,16 @@ class Cdf(_Distribution):
         return self._x[i]
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the distribution : float
-        '''
+        """
         return self._mean
 
 
 class Pdf(_Distribution):
-    '''
+    """
     Probability distribution function
 
     Parameters
@@ -12574,7 +13088,7 @@ class Pdf(_Distribution):
 
     time_unit : str
         specifies the time unit |n|
-        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
         default : no conversion |n|
 
     randomstream : randomstream
@@ -12594,11 +13108,11 @@ class Pdf(_Distribution):
     The x-values can be any type. |n|
     If it is a salabim distribution, not the distribution,
     but a sample will be returned when calling sample.
-    '''
+    """
 
     def __init__(self, spec, probabilities=None, time_unit=None, randomstream=None, env=None):
-        self._x = [0]  # just a place holder
-        self._cum = [0]
+        self._x = []
+        self._cum = []
         if randomstream is None:
             self.randomstream = random
         else:
@@ -12609,65 +13123,45 @@ class Pdf(_Distribution):
         sumxp = 0
         hasmean = True
         if probabilities is None:
-            spec = list(spec)
 
             if not spec:
-                raise TypeError('no arguments specified')
-            while len(spec) > 0:
-                x = spec.pop(0) * _time_unit_factor(time_unit, env)
-                if time_unit is not None:
-                    if isinstance(x, _Distribution):
-                        raise TypeError('time_unit can\'t be combined with distribution value')
-                    try:
-                        x = float(x) * _time_unit_factor(time_unit, env)
-                    except (ValueError, TypeError):
-                        raise TypeError('time_unit can\'t be combined with non numeric value')
-                if not spec:
-                    raise ValueError(
-                        'uneven number of parameters specified')
-                self._x.append(x)
-                p = spec.pop(0)
-                sump += p
-                self._cum.append(sump)
-                if isinstance(x, _Distribution):
-                    x = x._mean
-                try:
-                    sumxp += float(x) * p
-                except (ValueError, TypeError):
-                    hasmean = False
+                raise TypeError("no arguments specified")
+            xs = spec[::2]
+            probabilities = spec[1::2]
+            if len(xs) != len(probabilities):
+                raise ValueError("uneven number of parameters specified")
         else:
-            spec = list(spec)
+            xs = list(spec)
             if isinstance(probabilities, (list, tuple)):
                 probabilities = list(probabilities)
+                if len(xs) != len(probabilities):
+                    raise ValueError("length of x-values does not match length of probabilities")
             else:
                 probabilities = len(spec) * [1]
-            if len(spec) != len(probabilities):
-                raise ValueError(
-                    'length of x-values does not match length of probabilities')
 
-            while len(spec) > 0:
-                x = spec.pop(0)
-                if time_unit is not None:
-                    if isinstance(x, _Distribution):
-                        raise TypeError('time_unit can\'t be combined with distribution value')
-                    try:
-                        x = float(x) * _time_unit_factor(time_unit, env)
-                    except (ValueError, TypeError):
-                        raise TypeError('time_unit can\'t be combined with non numeric value')
+        self.supports_n = probabilities[1:] == probabilities[:-1]
 
-                self._x.append(x)
-                p = probabilities.pop(0)
-                sump += p
-                self._cum.append(sump)
+        for x, p in zip(xs, probabilities):
+            if time_unit is not None:
                 if isinstance(x, _Distribution):
-                    x = x._mean
+                    raise TypeError("time_unit can't be combined with distribution value")
                 try:
-                    sumxp += float(x) * p * _time_unit_factor(time_unit, env)
+                    x = float(x) * _time_unit_factor(time_unit, env)
                 except (ValueError, TypeError):
-                    hasmean = False
+                    raise TypeError("time_unit can't be combined with non numeric value")
+
+            self._x.append(x)
+            sump += p
+            self._cum.append(sump)
+            if isinstance(x, _Distribution):
+                x = x._mean
+            try:
+                sumxp += float(x) * p * _time_unit_factor(time_unit, env)
+            except (ValueError, TypeError):
+                hasmean = False
 
         if sump == 0:
-            raise ValueError('at least one probability should be >0')
+            raise ValueError("at least one probability should be >0")
 
         self._cum = [x / sump for x in self._cum]
         if hasmean:
@@ -12676,10 +13170,10 @@ class Pdf(_Distribution):
             self._mean = nan
 
     def __repr__(self):
-        return 'Pdf'
+        return "Pdf"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -12695,38 +13189,63 @@ class Pdf(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Pdf distribution ' + hex(id(self)))
-        result.append('  randomstream=' + hex(id(self.randomstream)))
+        result.append("Pdf distribution " + hex(id(self)))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
-    def sample(self):
-        '''
+    def sample(self, n=None):
+        """
+        Parameters
+        ----------
+        n : number of samples : int
+            if not specified, specifies just return one sample, as usual |n|
+            if specified, return a list of n sampled values from the distribution without replacement.
+            This requires that all probabilities are equal. |n|
+            If n > number of values in the Pdf distribution, n is assumed to be the number of values
+            in the distribution. |n|
+            If a sampled value is a distribution, a sample from that distribution will be returned.
+
         Returns
         -------
-        Sample of the distribution : any (usually float)
-        '''
-        r = self.randomstream.random()
-        for cum, x in zip(self._cum, self._x):
-            if r <= cum:
-                if isinstance(x, _Distribution):
-                    return x.sample()
-                return x
+        Sample of the distribution : any (usually float) or list
+            In case n is specified, returns a list of n values
+
+        """
+        if self.supports_n:
+            if n is None:
+                return self.randomstream.sample(self._x, 1)[0]
+            else:
+                if n < 0:
+                    raise ValueError("n < 0")
+                n = min(n, len(self._x))
+                xs = self.randomstream.sample(self._x, n)
+                return [x.sample() if isinstance(x, _Distribution) else x for x in xs]
+        else:
+            if n is None:
+                r = self.randomstream.random()
+                for cum, x in zip([0] + self._cum, [0] + self._x):
+                    if r <= cum:
+                        if isinstance(x, _Distribution):
+                            return x.sample()
+                        return x
+            else:
+                raise ValueError("not all probabilities are the same")
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         mean of the distribution : float
             if the mean can't be calculated (if not all x-values are scalars or distributions),
             nan will be returned.
-        '''
+        """
         return self._mean
 
 
 class CumPdf(_Distribution):
-    '''
+    """
     Cumulative Probability distribution function
 
     Parameters
@@ -12747,7 +13266,7 @@ class CumPdf(_Distribution):
 
     time_unit : str
         specifies the time unit |n|
-        must be one of 'years', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds' |n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
         default : no conversion |n|
 
     randomstream : randomstream
@@ -12767,11 +13286,11 @@ class CumPdf(_Distribution):
     The x-values can be any type. |n|
     If it is a salabim distribution, not the distribution,
     but a sample will be returned when calling sample.
-    '''
+    """
 
     def __init__(self, spec, cumprobabilities=None, time_unit=None, randomstream=None, env=None):
-        self._x = [0]  # just a place holder
-        self._cum = [0]
+        self._x = []
+        self._cum = []
         if randomstream is None:
             self.randomstream = random
         else:
@@ -12781,83 +13300,58 @@ class CumPdf(_Distribution):
         sump = 0
         sumxp = 0
         hasmean = True
+        if not spec:
+            raise TypeError("no arguments specified")
         if cumprobabilities is None:
-            spec = list(spec)
-
-            if not spec:
-                raise TypeError('no arguments specified')
-            while len(spec) > 0:
-                x = spec.pop(0)
-                if time_unit is not None:
-                    if isinstance(x, _Distribution):
-                        raise TypeError('time_unit can\'t be combined with distribution value')
-                    try:
-                        x = float(x) * _time_unit_factor(time_unit, env)
-                    except (ValueError, TypeError):
-                        raise TypeError('time_unit can\'t be combined with non numeric value')
-                if not spec:
-                    raise ValueError(
-                        'uneven number of parameters specified')
-                self._x.append(x)
-                p = spec.pop(0)
-                p = p - sump
-                if p < 0:
-                    raise ValueError('non increasing cumulative probabilities')
-                sump += p
-                self._cum.append(sump)
-                if isinstance(x, _Distribution):
-                    x = x._mean
-                try:
-                    sumxp += float(x) * p
-                except (ValueError, TypeError):
-                    hasmean = False
+            xs = spec[::2]
+            cumprobabilities = spec[1::2]
+            if len(xs) != len(cumprobabilities):
+                raise ValueError("uneven number of parameters specified")
         else:
-            spec = list(spec)
             if isinstance(cumprobabilities, (list, tuple)):
                 cumprobabilities = list(cumprobabilities)
             else:
-                raise TypeError('wrong type for cumulative probabilities')
-            if len(spec) != len(cumprobabilities):
-                raise ValueError(
-                    'length of x-values does not match length of cumulative probabilities')
+                raise TypeError("wrong type for cumulative probabilities")
+            xs = list(spec)
 
-            while len(spec) > 0:
-                x = spec.pop(0)
-                if time_unit is not None:
-                    if isinstance(x, _Distribution):
-                        raise TypeError('time_unit can\'t be combined with distribution value')
-                    try:
-                        x = float(x) * _time_unit_factor(time_unit, env)
-                    except (ValueError, TypeError):
-                        raise TypeError('time_unit can\'t be combined with non numeric value')
-                self._x.append(x)
-                p = cumprobabilities.pop(0)
-                p = p - sump
-                if p < 0:
-                    raise ValueError('non increasing cumulative probabilities')
-                sump += p
-                self._cum.append(sump)
+            if len(xs) != len(cumprobabilities):
+                raise ValueError("length of x-values does not match length of cumulative probabilities")
+
+        for x, p in zip(xs, cumprobabilities):
+            if time_unit is not None:
                 if isinstance(x, _Distribution):
-                    x = x._mean
+                    raise TypeError("time_unit can't be combined with distribution value")
                 try:
-                    sumxp += float(x) * p
+                    x = float(x) * _time_unit_factor(time_unit, env)
                 except (ValueError, TypeError):
-                    hasmean = False
+                    raise TypeError("time_unit can't be combined with non numeric value")
+            self._x.append(x)
+            p = p - sump
+            if p < 0:
+                raise ValueError("non increasing cumulative probabilities")
+            sump += p
+            self._cum.append(sump)
+            if isinstance(x, _Distribution):
+                x = x._mean
+            try:
+                sumxp += float(x) * p
+            except (ValueError, TypeError):
+                hasmean = False
 
         if sump == 0:
-            raise ValueError('last cumulative probability should be >0')
+            raise ValueError("last cumulative probability should be >0")
 
-        self._cum = [x / sump for x in self._cum]
+        self._cum = [p / sump for p in self._cum]
         if hasmean:
             self._mean = sumxp / sump
         else:
             self._mean = nan
 
     def __repr__(self):
-        return 'CumPdf'
+        return "CumPdf"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -12873,38 +13367,38 @@ class CumPdf(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('CumPdf distribution ' + hex(id(self)))
-        result.append('  randomstream=' + hex(id(self.randomstream)))
+        result.append("CumPdf distribution " + hex(id(self)))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the distribution : any (usually float)
-        '''
+        """
         r = self.randomstream.random()
-        for cum, x in zip(self._cum, self._x):
+        for cum, x in zip([0] + self._cum, [0] + self._x):
             if r <= cum:
                 if isinstance(x, _Distribution):
                     return x.sample()
                 return x
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         mean of the distribution : float
             if the mean can't be calculated (if not all x-values are scalars or distributions),
             nan will be returned.
-        '''
+        """
         return self._mean
 
 
 class Distribution(_Distribution):
-    '''
+    """
     Generate a distribution from a string
 
     Parameters
@@ -12945,41 +13439,55 @@ class Distribution(_Distribution):
     Exp(a)       ==> Exponential(100), provided sim.a=100 |n|
     E(2)         ==> Exponential(2)
     Er(2,3)      ==> Erlang(2,3)
-    '''
+    """
 
     def __init__(self, spec, randomstream=None):
 
         spec_orig = spec
 
-        sp = spec.split('(')
+        sp = spec.split("(")
         pre = sp[0].upper().strip()
 
         # here we have either a string starting with a ( of no ( at all
-        if (pre == '') or not('(' in spec):
-            spec = spec.replace(')', '')  # get rid of closing parenthesis
-            spec = spec.replace('(', '')  # get rid of starting parenthesis
-            sp = spec.split(',')
+        if (pre == "") or not ("(" in spec):
+            spec = spec.replace(")", "")  # get rid of closing parenthesis
+            spec = spec.replace("(", "")  # get rid of starting parenthesis
+            sp = spec.split(",")
             if len(sp) == 1:
                 c1 = sp[0]
-                spec = 'Constant({})'.format(c1)
+                spec = "Constant({})".format(c1)
             elif len(sp) == 2:
                 c1 = sp[0]
                 c2 = sp[1]
-                spec = 'Uniform({},{})'.format(c1, c2)
+                spec = "Uniform({},{})".format(c1, c2)
             elif len(sp) == 3:
                 c1 = sp[0]
                 c2 = sp[1]
                 c3 = sp[2]
-                spec = 'Triangular({},{},{})'.format(c1, c2, c3)
+                spec = "Triangular({},{},{})".format(c1, c2, c3)
             else:
-                raise ValueError('incorrect specifier', spec_orig)
+                raise ValueError("incorrect specifier", spec_orig)
 
         else:
-            for distype in ('Uniform', 'Constant', 'Triangular', 'Exponential', 'Normal',
-              'Cdf', 'Pdf', 'CumPdf', 'Weibull', 'Gamma', 'Erlang', 'Beta', 'IntUniform', 'Poisson'):
-                if pre == distype.upper()[:len(pre)]:
+            for distype in (
+                "Uniform",
+                "Constant",
+                "Triangular",
+                "Exponential",
+                "Normal",
+                "Cdf",
+                "Pdf",
+                "CumPdf",
+                "Weibull",
+                "Gamma",
+                "Erlang",
+                "Beta",
+                "IntUniform",
+                "Poisson",
+            ):
+                if pre == distype.upper()[: len(pre)]:
                     sp[0] = distype
-                    spec = '('.join(sp)
+                    spec = "(".join(sp)
                     break
 
         d = eval(spec)
@@ -12996,7 +13504,7 @@ class Distribution(_Distribution):
         return self._distribution.__repr__()
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints information about the distribution
 
         Parameters
@@ -13012,29 +13520,29 @@ class Distribution(_Distribution):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         return self._distribution.print_info(as_str=as_str, file=file)
 
     def sample(self):
-        '''
+        """
         Returns
         -------
         Sample of the  distribution : any (usually float)
-        '''
+        """
         self._distribution.randomstream = self.randomstream
         return self._distribution.sample()
 
     def mean(self):
-        '''
+        """
         Returns
         -------
         Mean of the distribution : float
-        '''
+        """
         return self._mean
 
 
 class State(object):
-    '''
+    """
     State
 
     Parameters
@@ -13062,19 +13570,19 @@ class State(object):
         performance. Note that you should avoid the number not to use
         as this is used to indicate 'off'
 
-        -  'any' (default) stores values in a list. This allows for
+        -  "any" (default) stores values in a list. This allows for
            non numeric values. In calculations the values are
            forced to a numeric value (0 if not possible) do not use -inf
-        -  'bool' bool (False, True). Actually integer >= 0 <= 254 1 byte do not use 255
-        -  'int8' integer >= -127 <= 127 1 byte do not use -128
-        -  'uint8' integer >= 0 <= 254 1 byte do not use 255
-        -  'int16' integer >= -32767 <= 32767 2 bytes do not use -32768
-        -  'uint16' integer >= 0 <= 65534 2 bytes do not use 65535
-        -  'int32' integer >= -2147483647 <= 2147483647 4 bytes do not use -2147483648
-        -  'uint32' integer >= 0 <= 4294967294 4 bytes do not use 4294967295
-        -  'int64' integer >= -9223372036854775807 <= 9223372036854775807 8 bytes do not use -9223372036854775808
-        -  'uint64' integer >= 0 <= 18446744073709551614 8 bytes do not use 18446744073709551615
-        -  'float' float 8 bytes do not use -inf
+        -  "bool" bool (False, True). Actually integer >= 0 <= 254 1 byte do not use 255
+        -  "int8" integer >= -127 <= 127 1 byte do not use -128
+        -  "uint8" integer >= 0 <= 254 1 byte do not use 255
+        -  "int16" integer >= -32767 <= 32767 2 bytes do not use -32768
+        -  "uint16" integer >= 0 <= 65534 2 bytes do not use 65535
+        -  "int32" integer >= -2147483647 <= 2147483647 4 bytes do not use -2147483648
+        -  "uint32" integer >= 0 <= 4294967294 4 bytes do not use 4294967295
+        -  "int64" integer >= -9223372036854775807 <= 9223372036854775807 8 bytes do not use -9223372036854775808
+        -  "uint64" integer >= 0 <= 18446744073709551614 8 bytes do not use 18446744073709551615
+        -  "float" float 8 bytes do not use -inf
 
     animation_objects : list or tuple
         overrides the default animation_object method |n|
@@ -13090,9 +13598,11 @@ class State(object):
     env : Environment
         environment to be used |n|
         if omitted, default_env is used
-    '''
-    def __init__(self, name=None, value=False, type='any',
-      monitor=True, animation_objects=None, env=None, *args, **kwargs):
+    """
+
+    def __init__(
+        self, name=None, value=False, type="any", monitor=True, animation_objects=None, env=None, *args, **kwargs
+    ):
         if env is None:
             self.env = g.default_env
         else:
@@ -13102,34 +13612,30 @@ class State(object):
         self._aos = []
         savetrace = self.env._trace
         self.env._trace = False
-        self._waiters = Queue(
-            name='waiters of ' + self.name(),
-            monitor=monitor, env=self.env)
+        self._waiters = Queue(name="waiters of " + self.name(), monitor=monitor, env=self.env)
         self._waiters._isinternal = True
         self.env._trace = savetrace
         self.value = Monitor(
-            name='Value of ' + self.name(), level=True,
-            initial_tally=value, monitor=monitor, type=type, env=self.env)
+            name="Value of " + self.name(), level=True, initial_tally=value, monitor=monitor, type=type, env=self.env
+        )
         if animation_objects is not None:
             self.animation_objects = animation_objects.__get__(self, State)
         if self.env._trace:
-            self.env.print_trace(
-                '', '', self.name() + ' create',
-                'value= ' + str(self._value))
+            self.env.print_trace("", "", self.name() + " create", "value= " + str(self._value))
         self.setup(*args, **kwargs)
 
     def setup(self):
-        '''
+        """
         called immediately after initialization of a state.
 
         by default this is a dummy method, but it can be overridden.
 
         only keyword arguments will be passed
-        '''
+        """
         pass
 
     def register(self, registry):
-        '''
+        """
         registers the state in the registry
 
         Parameters
@@ -13144,16 +13650,16 @@ class State(object):
         Note
         ----
         Use State.deregister if state does not longer need to be registered.
-        '''
+        """
         if not isinstance(registry, list):
-            raise TypeError('registry not list')
+            raise TypeError("registry not list")
         if self in registry:
-            raise ValueError(self.name() + ' already in registry')
+            raise ValueError(self.name() + " already in registry")
         registry.append(self)
         return self
 
     def deregister(self, registry):
-        '''
+        """
         deregisters the state in the registry
 
         Parameters
@@ -13164,19 +13670,19 @@ class State(object):
         Returns
         -------
         state (self) : State
-        '''
+        """
         if not isinstance(registry, list):
-            raise TypeError('registry not list')
+            raise TypeError("registry not list")
         if self not in registry:
-            raise ValueError(self.name() + ' not in registry')
+            raise ValueError(self.name() + " not in registry")
         registry.remove(self)
         return self
 
     def __repr__(self):
-        return object_to_str(self) + ' (' + self.name() + ')'
+        return object_to_str(self) + " (" + self.name() + ")"
 
     def print_histograms(self, exclude=(), as_str=False, file=None):
-        '''
+        """
         print histograms of the waiters queue and the value monitor
 
         Parameters
@@ -13196,7 +13702,7 @@ class State(object):
         Returns
         -------
         histograms (if as_str is True) : str
-        '''
+        """
         result = []
         if self.waiters() not in exclude:
             result.append(self.waiters().print_histograms(exclude=exclude, as_str=True))
@@ -13205,7 +13711,7 @@ class State(object):
         return return_or_print(result, as_str, file)
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints info about the state
 
         Parameters
@@ -13221,34 +13727,34 @@ class State(object):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append(object_to_str(self) + ' ' + hex(id(self)))
-        result.append('  name=' + self.name())
-        result.append('  value=' + str(self._value))
+        result.append(object_to_str(self) + " " + hex(id(self)))
+        result.append("  name=" + self.name())
+        result.append("  value=" + str(self._value))
         if self._waiters:
-            result.append('  waiting component(s):')
+            result.append("  waiting component(s):")
             mx = self._waiters._head.successor
             while mx != self._waiters._tail:
                 c = mx.component
                 mx = mx.successor
-                values = ''
+                values = ""
                 for s, value, valuetype in c._waits:
                     if s == self:
-                        if values != '':
-                            values = values + ', '
+                        if values != "":
+                            values = values + ", "
                         values = values + str(value)
 
-                result.append('    ' + pad(c.name(), 20), ' value(s): ' + values)
+                result.append("    " + pad(c.name(), 20), " value(s): " + values)
         else:
-            result.append('  no waiting components')
+            result.append("  no waiting components")
         return return_or_print(result, as_str, file)
 
     def __call__(self):
         return self._value
 
     def get(self):
-        '''
+        """
         get value of the state
 
         Returns
@@ -13256,15 +13762,15 @@ class State(object):
         value of the state : any
             Instead of this method, the state can also be called directly, like |n|
 
-            level = sim.State('level') |n|
+            level = sim.State("level") |n|
             ... |n|
             print(level()) |n|
             print(level.get())  # identical |n|
-        '''
+        """
         return self._value
 
     def set(self, value=True):
-        '''
+        """
         set the value of the state
 
         Parameters
@@ -13277,16 +13783,16 @@ class State(object):
         Note
         ----
         This method is identical to reset, except the default value is True.
-        '''
+        """
         if self.env._trace:
-            self.env.print_trace('', '', self.name() + ' set', 'value = ' + str(value))
+            self.env.print_trace("", "", self.name() + " set", "value = " + str(value))
         if self._value != value:
             self._value = value
             self.value.tally(value)
             self._trywait()
 
     def reset(self, value=False):
-        '''
+        """
         reset the value of the state
 
         Parameters
@@ -13299,16 +13805,16 @@ class State(object):
         Note
         ----
         This method is identical to set, except the default value is False.
-        '''
+        """
         if self.env._trace:
-            self.env.print_trace('', '', self.name() + ' reset', 'value = ' + str(value))
+            self.env.print_trace("", "", self.name() + " reset", "value = " + str(value))
         if self._value != value:
             self._value = value
             self.value.tally(value)
             self._trywait()
 
     def trigger(self, value=True, value_after=None, max=inf):
-        '''
+        """
         triggers the value of the state
 
         Parameters
@@ -13330,13 +13836,16 @@ class State(object):
             max waiting components for this state  will be honored and next
             the value will be set to value_after and again checked for possible
             honors.
-        '''
+        """
         if value_after is None:
             value_after = self._value
         if self.env._trace:
-            self.env.print_trace('', '', self.name() + ' trigger',
-                ' value = ' + str(value) + ' --> ' + str(value_after) +
-                ' allow ' + str(max) + ' components')
+            self.env.print_trace(
+                "",
+                "",
+                self.name() + " trigger",
+                " value = " + str(value) + " --> " + str(value_after) + " allow " + str(max) + " components",
+            )
         self._value = value
         self.value.tally(value)  # strictly speaking, not required
         self._trywait(max)
@@ -13355,7 +13864,7 @@ class State(object):
                     return
 
     def monitor(self, value=None):
-        '''
+        """
         enables/disables the state monitors and value monitor
 
         Parameters
@@ -13369,12 +13878,12 @@ class State(object):
         ----
         it is possible to individually control requesters().monitor(),
             value.monitor()
-        '''
+        """
         self.waiters().monitor(value)
         self.value.monitor(value)
 
     def reset_monitors(self, monitor=None):
-        '''
+        """
         resets the monitor for the state's value and the monitors of the waiters queue
 
         Parameters
@@ -13384,7 +13893,7 @@ class State(object):
             if False, monitoring is disabled |n|
             if omitted, no change of monitoring state
 
-        '''
+        """
         self._waiters.reset_monitors(monitor)
         self.value.reset()
 
@@ -13392,7 +13901,7 @@ class State(object):
         return self._value
 
     def name(self, value=None):
-        '''
+        """
         Parameters
         ----------
         value : str
@@ -13407,24 +13916,24 @@ class State(object):
         ----
         base_name and sequence_number are not affected if the name is changed |n|
         All derived named are updated as well.
-        '''
+        """
         if value is not None:
             self._name = value
-            self._waiters.name('waiters of ' + value)
-            self.value.name('Value of ' + value)
+            self._waiters.name("waiters of " + value)
+            self.value.name("Value of " + value)
 
         return self._name
 
     def base_name(self):
-        '''
+        """
         Returns
         -------
         base name of the state (the name used at initialization): str
-        '''
+        """
         return self._base_name
 
     def sequence_number(self):
-        '''
+        """
         Returns
         -------
         sequence_number of the state : int
@@ -13432,11 +13941,11 @@ class State(object):
             normally this will be the integer value of a serialized name,
             but also non serialized names (without a dot or a comma at the end)
             will be numbered)
-        '''
+        """
         return self._sequence_number
 
     def print_statistics(self, as_str=False, file=None):
-        '''
+        """
         prints a summary of statistics of the state
 
         Parameters
@@ -13452,30 +13961,33 @@ class State(object):
         Returns
         -------
         statistics (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Statistics of {} at {}'.format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
+        result.append("Statistics of {} at {}".format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
         result.append(
-            self.waiters().length.print_statistics(show_header=False, show_legend=True, do_indent=True, as_str=True))
-        result.append('')
+            self.waiters().length.print_statistics(show_header=False, show_legend=True, do_indent=True, as_str=True)
+        )
+        result.append("")
         result.append(
-            self.waiters().length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True,
-            as_str=True))
-        result.append('')
+            self.waiters().length_of_stay.print_statistics(
+                show_header=False, show_legend=False, do_indent=True, as_str=True
+            )
+        )
+        result.append("")
         result.append(self.value.print_statistics(show_header=False, show_legend=False, do_indent=True, as_str=True))
         return return_or_print(result, as_str, file)
 
     def waiters(self):
-        '''
+        """
         Returns
         -------
         queue containing all components waiting for this state : Queue
-        '''
+        """
         return self._waiters
 
 
 class Resource(object):
-    '''
+    """
     Resource
 
     Parameters
@@ -13507,10 +14019,9 @@ class Resource(object):
     env : Environment
         environment to be used |n|
         if omitted, default_env is used
-    '''
+    """
 
-    def __init__(self, name=None, capacity=1,
-                 anonymous=False, monitor=True, env=None, *args, **kwargs):
+    def __init__(self, name=None, capacity=1, anonymous=False, monitor=True, env=None, *args, **kwargs):
         if env is None:
             self.env = g.default_env
         else:
@@ -13519,48 +14030,62 @@ class Resource(object):
         _set_name(name, self.env._nameserializeResource, self)
         savetrace = self.env._trace
         self.env._trace = False
-        self._requesters = Queue(
-            name='requesters of ' + self.name(),
-            monitor=monitor, env=self.env)
+        self._requesters = Queue(name="requesters of " + self.name(), monitor=monitor, env=self.env)
         self._requesters._isinternal = True
-        self._claimers = Queue(
-            name='claimers of ' + self.name(),
-            monitor=monitor, env=self.env)
+        self._claimers = Queue(name="claimers of " + self.name(), monitor=monitor, env=self.env)
         self._claimers._isinternal = True
         self.env._trace = savetrace
         self._claimed_quantity = 0
         self._anonymous = anonymous
         self._minq = inf
         self.capacity = Monitor(
-            'Capacity of ' + self.name(), level=True,
-            initial_tally=capacity, monitor=monitor, type='float', env=self.env)
+            "Capacity of " + self.name(),
+            level=True,
+            initial_tally=capacity,
+            monitor=monitor,
+            type="float",
+            env=self.env,
+        )
         self.claimed_quantity = Monitor(
-            'Claimed quantity of ' + self.name(), level=True,
-            initial_tally=0, monitor=monitor, type='float', env=self.env)
+            "Claimed quantity of " + self.name(),
+            level=True,
+            initial_tally=0,
+            monitor=monitor,
+            type="float",
+            env=self.env,
+        )
         self.available_quantity = Monitor(
-            'Available quantity of ' + self.name(), level=True,
-            initial_tally=capacity, monitor=monitor, type='float', env=self.env)
+            "Available quantity of " + self.name(),
+            level=True,
+            initial_tally=capacity,
+            monitor=monitor,
+            type="float",
+            env=self.env,
+        )
         self.occupancy = Monitor(
-            'Occupancy of ' + self.name(), level=True,
-            initial_tally=0, monitor=monitor, type='float', env=self.env)
+            "Occupancy of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="float", env=self.env
+        )
         if self.env._trace:
             self.env.print_trace(
-                '', '', self.name() + ' create',
-                'capacity=' + str(self._capacity) + (' anonymous' if self._anonymous else ''))
+                "",
+                "",
+                self.name() + " create",
+                "capacity=" + str(self._capacity) + (" anonymous" if self._anonymous else ""),
+            )
         self.setup(*args, **kwargs)
 
     def setup(self):
-        '''
+        """
         called immediately after initialization of a resource.
 
         by default this is a dummy method, but it can be overridden.
 
         only keyword arguments are passed
-        '''
+        """
         pass
 
     def reset_monitors(self, monitor=None):
-        '''
+        """
         resets the resource monitors
 
         Parameters
@@ -13579,7 +14104,7 @@ class Resource(object):
             available_quantity.reset() or
             claimed_quantity.reset() or
             occupancy.reset()
-        '''
+        """
 
         self.requesters().reset_monitors(monitor)
         self.claimers().reset_monitors(monitor)
@@ -13587,7 +14112,7 @@ class Resource(object):
             m.reset(monitor)
 
     def print_statistics(self, as_str=False, file=None):
-        '''
+        """
         prints a summary of statistics of a resource
 
         Parameters
@@ -13603,27 +14128,30 @@ class Resource(object):
         Returns
         -------
         statistics (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append('Statistics of {} at {:13.3f}'.format(self.name(), self.env._now - self.env._offset))
+        result.append("Statistics of {} at {:13.3f}".format(self.name(), self.env._now - self.env._offset))
         show_legend = True
         for q in [self.requesters(), self.claimers()]:
             result.append(
-                q.length.print_statistics(show_header=False, show_legend=show_legend, do_indent=True, as_str=True))
+                q.length.print_statistics(show_header=False, show_legend=show_legend, do_indent=True, as_str=True)
+            )
             show_legend = False
-            result.append('')
+            result.append("")
             result.append(
                 q.length_of_stay.print_statistics(
-                    show_header=False, show_legend=show_legend, do_indent=True, as_str=True))
-            result.append('')
+                    show_header=False, show_legend=show_legend, do_indent=True, as_str=True
+                )
+            )
+            result.append("")
 
         for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
             result.append(m.print_statistics(show_header=False, show_legend=show_legend, do_indent=True, as_str=True))
-            result.append('')
+            result.append("")
         return return_or_print(result, as_str, file)
 
     def print_histograms(self, exclude=(), as_str=False, file=None):
-        '''
+        """
         prints histograms of the requesters and claimers queue as well as
         the capacity, available_quantity and claimed_quantity timstamped monitors of the resource
 
@@ -13644,7 +14172,7 @@ class Resource(object):
         Returns
         -------
         histograms (if as_str is True) : str
-        '''
+        """
         result = []
         for q in (self.requesters(), self.claimers()):
             if q not in exclude:
@@ -13655,7 +14183,7 @@ class Resource(object):
         return return_or_print(result, as_str, file)
 
     def monitor(self, value):
-        '''
+        """
         enables/disables the resource monitors
 
         Parameters
@@ -13669,14 +14197,14 @@ class Resource(object):
         it is possible to individually control monitoring with claimers().monitor()
         and requesters().monitor(), capacity.monitor(), available_quantity.monitor),
         claimed_quantity.monitor() or occupancy.monitor()
-        '''
+        """
         self.requesters().monitor(value)
         self.claimers().monitor(value)
         for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
             m.monitor(value)
 
     def register(self, registry):
-        '''
+        """
         registers the resource in the registry
 
         Parameters
@@ -13691,16 +14219,16 @@ class Resource(object):
         Note
         ----
         Use Resource.deregister if resource does not longer need to be registered.
-        '''
+        """
         if not isinstance(registry, list):
-            raise TypeError('registry not list')
+            raise TypeError("registry not list")
         if self in registry:
-            raise ValueError(self.name() + ' already in registry')
+            raise ValueError(self.name() + " already in registry")
         registry.append(self)
         return self
 
     def deregister(self, registry):
-        '''
+        """
         deregisters the resource in the registry
 
         Parameters
@@ -13711,19 +14239,19 @@ class Resource(object):
         Returns
         -------
         resource (self) : Resource
-        '''
+        """
         if not isinstance(registry, list):
-            raise TypeError('registry not list')
+            raise TypeError("registry not list")
         if self not in registry:
-            raise ValueError(self.name() + ' not in registry')
+            raise ValueError(self.name() + " not in registry")
         registry.remove(self)
         return self
 
     def __repr__(self):
-        return object_to_str(self) + ' (' + self.name() + ')'
+        return object_to_str(self) + " (" + self.name() + ")"
 
     def print_info(self, as_str=False, file=None):
-        '''
+        """
         prints info about the resource
 
         Parameters
@@ -13739,35 +14267,32 @@ class Resource(object):
         Returns
         -------
         info (if as_str is True) : str
-        '''
+        """
         result = []
-        result.append(object_to_str(self) + ' ' + hex(id(self)))
-        result.append('  name=' + self.name())
-        result.append('  capacity=' + str(self._capacity))
+        result.append(object_to_str(self) + " " + hex(id(self)))
+        result.append("  name=" + self.name())
+        result.append("  capacity=" + str(self._capacity))
         if self._requesters:
-            result.append('  requesting component(s):')
+            result.append("  requesting component(s):")
             mx = self._requesters._head.successor
             while mx != self._requesters._tail:
                 c = mx.component
                 mx = mx.successor
-                result.append('    ' + pad(c.name(), 20) +
-                    ' quantity=' + str(c._requests[self]))
+                result.append("    " + pad(c.name(), 20) + " quantity=" + str(c._requests[self]))
         else:
-            result.append('  no requesting components')
+            result.append("  no requesting components")
 
-        result.append('  claimed_quantity=' + str(self._claimed_quantity))
+        result.append("  claimed_quantity=" + str(self._claimed_quantity))
         if self._claimed_quantity >= 0:
             if self._anonymous:
-                result.append('  not claimed by any components,' +
-                    ' because the resource is anonymous')
+                result.append("  not claimed by any components," + " because the resource is anonymous")
             else:
-                result.append('  claimed by:')
+                result.append("  claimed by:")
                 mx = self._claimers._head.successor
                 while mx != self._claimers._tail:
                     c = mx.component
                     mx = mx.successor
-                    result.append('    ' + pad(c.name(), 20) +
-                        ' quantity=' + str(c._claims[self]))
+                    result.append("    " + pad(c.name(), 20) + " quantity=" + str(c._claims[self]))
         return return_or_print(result, as_str, file)
 
     def _tryrequest(self):
@@ -13780,7 +14305,7 @@ class Resource(object):
             c._tryrequest()
 
     def release(self, quantity=None):
-        '''
+        """
         releases all claims or a specified quantity
 
         Parameters
@@ -13794,7 +14319,7 @@ class Resource(object):
         Note
         ----
         quantity may not be specified for a non-anomymous resoure
-        '''
+        """
 
         if self._anonymous:
             if quantity is None:
@@ -13812,8 +14337,7 @@ class Resource(object):
 
         else:
             if quantity is not None:
-                raise ValueError(
-                    'no quantity allowed for non-anonymous resource')
+                raise ValueError("no quantity allowed for non-anonymous resource")
 
             mx = self._claimers._head.successor
             while mx != self._tail:
@@ -13822,31 +14346,31 @@ class Resource(object):
                 c.release(self)
 
     def requesters(self):
-        '''
+        """
         Return
         ------
         queue containing all components with not yet honored requests: Queue
-        '''
+        """
         return self._requesters
 
     def claimers(self):
-        '''
+        """
         Returns
         -------
         queue with all components claiming from the resource: Queue
             will be an empty queue for an anonymous resource
-        '''
+        """
         return self._claimers
 
     def set_capacity(self, cap):
-        '''
+        """
         Parameters
         ----------
         cap : float or int
             capacity of the resource |n|
             this may lead to honoring one or more requests. |n|
             if omitted, no change
-        '''
+        """
         self._capacity = cap
         self.capacity.tally(self._capacity)
         self.available_quantity.tally(self._capacity - self._claimed_quantity)
@@ -13854,7 +14378,7 @@ class Resource(object):
         self._tryrequest()
 
     def name(self, value=None):
-        '''
+        """
         Parameters
         ----------
         value : str
@@ -13869,28 +14393,28 @@ class Resource(object):
         ----
         base_name and sequence_number are not affected if the name is changed |n|
         All derived named are updated as well.
-        '''
+        """
         if value is not None:
             self._name = value
-            self._requesters.name('requesters of ' + value)
-            self._claimers.name('claimers of ' + value)
-            self.capacity.name('Capacity of ' + value)
-            self.claimed_quantity.name('Clamed quantity of ' + value)
-            self.available_quantity.name('Available quantity of ' + value)
-            self.occupancy.name('Occupancy of ' + value)
+            self._requesters.name("requesters of " + value)
+            self._claimers.name("claimers of " + value)
+            self.capacity.name("Capacity of " + value)
+            self.claimed_quantity.name("Clamed quantity of " + value)
+            self.available_quantity.name("Available quantity of " + value)
+            self.occupancy.name("Occupancy of " + value)
 
         return self._name
 
     def base_name(self):
-        '''
+        """
         Returns
         -------
         base name of the resource (the name used at initialization): str
-        '''
+        """
         return self._base_name
 
     def sequence_number(self):
-        '''
+        """
         Returns
         -------
         sequence_number of the resource : int
@@ -13898,7 +14422,7 @@ class Resource(object):
             normally this will be the integer value of a serialized name,
             but also non serialized names (without a dot or a comma at the end)
             will be numbered)
-        '''
+        """
         return self._sequence_number
 
 
@@ -13917,7 +14441,7 @@ class _PeriodComponent(Component):
 
 
 class PeriodMonitor(object):
-    '''
+    """
     defines a number of period monitors for a given monitor.
 
     Parameters
@@ -13938,7 +14462,7 @@ class PeriodMonitor(object):
     Note
     ----
     The period monitors can be accessed by indexing the instance of PeriodMonitor.
-    '''
+    """
 
     @staticmethod
     def new_tally(self, x):
@@ -13957,11 +14481,11 @@ class PeriodMonitor(object):
         return self.perperiod[i]
 
     def remove(self):
-        '''
+        """
         removes the period monitor
-        '''
+        """
         self.pc.cancel()
-        del(self.periods)
+        del (self.periods)
         self.m.period_monitors.remove(self)
 
     def __init__(self, parent_monitor, periods=None, period_monitor_names=None):
@@ -13974,11 +14498,12 @@ class PeriodMonitor(object):
             period_monitor_names = []
             for duration in periods:
                 period_monitor_names.append(
-                    parent_monitor.name() + '.period [' + str(cum) + ' - ' + str(cum + duration) + ']')
+                    parent_monitor.name() + ".period [" + str(cum) + " - " + str(cum + duration) + "]"
+                )
                 cum += duration
 
         self.m = parent_monitor
-        if not hasattr(self, 'period_monitors'):
+        if not hasattr(self, "period_monitors"):
             self.m.period_monitors = []
             self.m.org_tally = self.m.tally
             self.m.tally = types.MethodType(self.new_tally, self.m)
@@ -13988,23 +14513,28 @@ class PeriodMonitor(object):
 
         self.iperiod = 0
         if self.m._level:
-            self.perperiod = [Monitor(
-                name=period_monitor_name, level=True, monitor=False) for period_monitor_name in period_monitor_names]
+            self.perperiod = [
+                Monitor(name=period_monitor_name, level=True, monitor=False)
+                for period_monitor_name in period_monitor_names
+            ]
         else:
-            self.perperiod = [Monitor(
-                name=period_monitor_name, monitor=False) for period_monitor_name in period_monitor_names]
+            self.perperiod = [
+                Monitor(name=period_monitor_name, monitor=False) for period_monitor_name in period_monitor_names
+            ]
 
 
 def colornames():
-    '''
+    """
     available colornames
 
     Returns
     -------
     dict with name of color as key, #rrggbb or #rrggbbaa as value : dict
-    '''
-    if not hasattr(colornames, 'cached'):
-        colornames.cached = pickle.loads(b'(dp0\nVfuchsia\np1\nV#FF00FF\np2\nsV\np3\nV#00000000\np4\nsVtransparent\np5\ng4\nsVpalevioletred\np6\nV#DB7093\np7\nsVskyblue\np8\nV#87CEEB\np9\nsVpaleturquoise\np10\nV#AFEEEE\np11\nsVcadetblue\np12\nV#5F9EA0\np13\nsVorangered\np14\nV#FF4500\np15\nsVsteelblue\np16\nV#4682B4\np17\nsVdimgray\np18\nV#696969\np19\nsVdarkseagreen\np20\nV#8FBC8F\np21\nsV60%gray\np22\nV#999999\np23\nsVroyalblue\np24\nV#4169E1\np25\nsVmediumblue\np26\nV#0000CD\np27\nsVgoldenrod\np28\nV#DAA520\np29\nsVmediumvioletred\np30\nV#C71585\np31\nsVblueviolet\np32\nV#8A2BE2\np33\nsVgainsboro\np34\nV#DCDCDC\np35\nsVdarkred\np36\nV#8B0000\np37\nsVrosybrown\np38\nV#BC8F8F\np39\nsVgold\np40\nV#FFD700\np41\nsVcoral\np42\nV#FF7F50\np43\nsVwhite\np44\nV#FFFFFF\np45\nsVdarkcyan\np46\nV#008B8B\np47\nsVblack\np48\nV#000000\np49\nsVorchid\np50\nV#DA70D6\np51\nsVmediumturquoise\np52\nV#48D1CC\np53\nsVlightgreen\np54\nV#90EE90\np55\nsVlime\np56\nV#00FF00\np57\nsVpapayawhip\np58\nV#FFEFD5\np59\nsVchocolate\np60\nV#D2691E\np61\nsV40%gray\np62\nV#666666\np63\nsVoldlace\np64\nV#FDF5E6\np65\nsVdarkblue\np66\nV#00008B\np67\nsVsilver\np68\nV#C0C0C0\np69\nsVaquamarine\np70\nV#7FFFD4\np71\nsVlightcoral\np72\nV#F08080\np73\nsVcyan\np74\nV#00FFFF\np75\nsVdodgerblue\np76\nV#1E90FF\np77\nsV10%gray\np78\nV#191919\np79\nsVmidnightblue\np80\nV#191970\np81\nsVgreen\np82\nV#008000\np83\nsVlightsalmon\np84\nV#FFA07A\np85\nsVazure\np86\nV#F0FFFF\np87\nsVred\np88\nV#FF0000\np89\nsVlightpink\np90\nV#FFB6C1\np91\nsVwhitesmoke\np92\nV#F5F5F5\np93\nsVyellow\np94\nV#FFFF00\np95\nsVlawngreen\np96\nV#7CFC00\np97\nsVmagenta\np98\ng2\nsVlightsteelblue\np99\nV#B0C4DE\np100\nsVolivedrab\np101\nV#6B8E23\np102\nsVlightslategray\np103\nV#778899\np104\nsVslategray\np105\nV#708090\np106\nsVlightblue\np107\nV#ADD8E6\np108\nsVmoccasin\np109\nV#FFE4B5\np110\nsVmediumspringgreen\np111\nV#00FA9A\np112\nsVlightgray\np113\nV#D3D3D3\np114\nsVseashell\np115\nV#FFF5EE\np116\nsVdarkkhaki\np117\nV#BDB76B\np118\nsVslateblue\np119\nV#6A5ACD\np120\nsVaqua\np121\ng75\nsVpalegoldenrod\np122\nV#EEE8AA\np123\nsVdeeppink\np124\nV#FF1493\np125\nsVdarkgreen\np126\nV#006400\np127\nsVblanchedalmond\np128\nV#FFEBCD\np129\nsVturquoise\np130\nV#40E0D0\np131\nsVnavy\np132\nV#000080\np133\nsVtomato\np134\nV#FF6347\np135\nsVyellowgreen\np136\nV#9ACD32\np137\nsVpeachpuff\np138\nV#FFDAB9\np139\nsV30%gray\np140\nV#464646\np141\nsVpink\np142\nV#FFC0CB\np143\nsVpalegreen\np144\nV#98FB98\np145\nsVlightskyblue\np146\nV#87CEFA\np147\nsVchartreuse\np148\nV#7FFF00\np149\nsVmediumorchid\np150\nV#BA55D3\np151\nsVolive\np152\nV#808000\np153\nsVdarkorange\np154\nV#FF8C00\np155\nsVbeige\np156\nV#F5F5DC\np157\nsVforestgreen\np158\nV#228B22\np159\nsVmediumpurple\np160\nV#9370DB\np161\nsVmintcream\np162\nV#F5FFFA\np163\nsVhotpink\np164\nV#FF69B4\np165\nsVdarkgoldenrod\np166\nV#B8860B\np167\nsVpowderblue\np168\nV#B0E0E6\np169\nsVhoneydew\np170\nV#F0FFF0\np171\nsVsalmon\np172\nV#FA8072\np173\nsVsnow\np174\nV#FFFAFA\np175\nsVmistyrose\np176\nV#FFE4E1\np177\nsVkhaki\np178\nV#F0E68C\np179\nsVmediumaquamarine\np180\nV#66CDAA\np181\nsVdarksalmon\np182\nV#E9967A\np183\nsValiceblue\np184\nV#F0F8FF\np185\nsVdarkturquoise\np186\nV#00CED1\np187\nsVlightyellow\np188\nV#FFFFE0\np189\nsVwheat\np190\nV#F5DEB3\np191\nsVlightseagreen\np192\nV#20B2AA\np193\nsVlightcyan\np194\nV#E0FFFF\np195\nsVantiquewhite\np196\nV#FAEBD7\np197\nsVsaddlebrown\np198\nV#8B4513\np199\nsVmediumseagreen\np200\nV#3CB371\np201\nsV70%gray\np202\nV#B2B2B2\np203\nsVsienna\np204\nV#A0522D\np205\nsVcornflowerblue\np206\nV#6495ED\np207\nsVseagreen\np208\nV#2E8B57\np209\nsVfloralwhite\np210\nV#FFFAF0\np211\nsVivory\np212\nV#FFFFF0\np213\nsVcornsilk\np214\nV#FFF8DC\np215\nsVindianred\np216\nV#CD5C5C\np217\nsVplum\np218\nV#DDA0DD\np219\nsV90%gray\np220\nV#E6E6E6\np221\nsVgreenyellow\np222\nV#ADFF2F\np223\nsVteal\np224\nV#008080\np225\nsVbrown\np226\nV#A52A2A\np227\nsVdarkslategray\np228\nV#2F4F4F\np229\nsVpurple\np230\nV#800080\np231\nsVviolet\np232\nV#EE82EE\np233\nsVdeepskyblue\np234\nV#00BFFF\np235\nsVghostwhite\np236\nV#F8F8FF\np237\nsVburlywood\np238\nV#DEB887\np239\nsVblue\np240\nV#0000FF\np241\nsVcrimson\np242\nV#DC143C\np243\nsVindigo\np244\nV#4B0082\np245\nsV20%gray\np246\nV#333333\np247\nsVdarkmagenta\np248\nV#8B008B\np249\nsV80%gray\np250\nV#CCCCCC\np251\nsVlightgoldenrodyellow\np252\nV#FAFAD2\np253\nsVtan\np254\nV#D2B48C\np255\nsVlimegreen\np256\nV#32CD32\np257\nsVlemonchiffon\np258\nV#FFFACD\np259\nsVbisque\np260\nV#FFE4C4\np261\nsVfirebrick\np262\nV#B22222\np263\nsVnavajowhite\np264\nV#FFDEAD\np265\nsVnone\np266\ng4\nsVmaroon\np267\nV#800000\np268\nsV50%gray\np269\nV#7F7F7F\np270\nsVdarkgray\np271\nV#A9A9A9\np272\nsVorange\np273\nV#FFA500\np274\nsVlavenderblush\np275\nV#FFF0F5\np276\nsVdarkorchid\np277\nV#9932CC\np278\nsVlavender\np279\nV#E6E6FA\np280\nsVspringgreen\np281\nV#00FF7F\np282\nsVthistle\np283\nV#D8BFD8\np284\nsVlinen\np285\nV#FAF0E6\np286\nsVdarkolivegreen\np287\nV#556B2F\np288\nsVdarkslateblue\np289\nV#483D8B\np290\nsVgray\np291\nV#808080\np292\nsVdarkviolet\np293\nV#9400D3\np294\nsVperu\np295\nV#CD853F\np296\nsVsandybrown\np297\nV#FAA460\np298\nsVmediumslateblue\np299\nV#7B68EE\np300\ns.')  # NOQA
+    """
+    if not hasattr(colornames, "cached"):
+        colornames.cached = pickle.loads(
+            b"(dp0\nVfuchsia\np1\nV#FF00FF\np2\nsV\np3\nV#00000000\np4\nsVtransparent\np5\ng4\nsVpalevioletred\np6\nV#DB7093\np7\nsVskyblue\np8\nV#87CEEB\np9\nsVpaleturquoise\np10\nV#AFEEEE\np11\nsVcadetblue\np12\nV#5F9EA0\np13\nsVorangered\np14\nV#FF4500\np15\nsVsteelblue\np16\nV#4682B4\np17\nsVdimgray\np18\nV#696969\np19\nsVdarkseagreen\np20\nV#8FBC8F\np21\nsV60%gray\np22\nV#999999\np23\nsVroyalblue\np24\nV#4169E1\np25\nsVmediumblue\np26\nV#0000CD\np27\nsVgoldenrod\np28\nV#DAA520\np29\nsVmediumvioletred\np30\nV#C71585\np31\nsVblueviolet\np32\nV#8A2BE2\np33\nsVgainsboro\np34\nV#DCDCDC\np35\nsVdarkred\np36\nV#8B0000\np37\nsVrosybrown\np38\nV#BC8F8F\np39\nsVgold\np40\nV#FFD700\np41\nsVcoral\np42\nV#FF7F50\np43\nsVwhite\np44\nV#FFFFFF\np45\nsVdarkcyan\np46\nV#008B8B\np47\nsVblack\np48\nV#000000\np49\nsVorchid\np50\nV#DA70D6\np51\nsVmediumturquoise\np52\nV#48D1CC\np53\nsVlightgreen\np54\nV#90EE90\np55\nsVlime\np56\nV#00FF00\np57\nsVpapayawhip\np58\nV#FFEFD5\np59\nsVchocolate\np60\nV#D2691E\np61\nsV40%gray\np62\nV#666666\np63\nsVoldlace\np64\nV#FDF5E6\np65\nsVdarkblue\np66\nV#00008B\np67\nsVsilver\np68\nV#C0C0C0\np69\nsVaquamarine\np70\nV#7FFFD4\np71\nsVlightcoral\np72\nV#F08080\np73\nsVcyan\np74\nV#00FFFF\np75\nsVdodgerblue\np76\nV#1E90FF\np77\nsV10%gray\np78\nV#191919\np79\nsVmidnightblue\np80\nV#191970\np81\nsVgreen\np82\nV#008000\np83\nsVlightsalmon\np84\nV#FFA07A\np85\nsVazure\np86\nV#F0FFFF\np87\nsVred\np88\nV#FF0000\np89\nsVlightpink\np90\nV#FFB6C1\np91\nsVwhitesmoke\np92\nV#F5F5F5\np93\nsVyellow\np94\nV#FFFF00\np95\nsVlawngreen\np96\nV#7CFC00\np97\nsVmagenta\np98\ng2\nsVlightsteelblue\np99\nV#B0C4DE\np100\nsVolivedrab\np101\nV#6B8E23\np102\nsVlightslategray\np103\nV#778899\np104\nsVslategray\np105\nV#708090\np106\nsVlightblue\np107\nV#ADD8E6\np108\nsVmoccasin\np109\nV#FFE4B5\np110\nsVmediumspringgreen\np111\nV#00FA9A\np112\nsVlightgray\np113\nV#D3D3D3\np114\nsVseashell\np115\nV#FFF5EE\np116\nsVdarkkhaki\np117\nV#BDB76B\np118\nsVslateblue\np119\nV#6A5ACD\np120\nsVaqua\np121\ng75\nsVpalegoldenrod\np122\nV#EEE8AA\np123\nsVdeeppink\np124\nV#FF1493\np125\nsVdarkgreen\np126\nV#006400\np127\nsVblanchedalmond\np128\nV#FFEBCD\np129\nsVturquoise\np130\nV#40E0D0\np131\nsVnavy\np132\nV#000080\np133\nsVtomato\np134\nV#FF6347\np135\nsVyellowgreen\np136\nV#9ACD32\np137\nsVpeachpuff\np138\nV#FFDAB9\np139\nsV30%gray\np140\nV#464646\np141\nsVpink\np142\nV#FFC0CB\np143\nsVpalegreen\np144\nV#98FB98\np145\nsVlightskyblue\np146\nV#87CEFA\np147\nsVchartreuse\np148\nV#7FFF00\np149\nsVmediumorchid\np150\nV#BA55D3\np151\nsVolive\np152\nV#808000\np153\nsVdarkorange\np154\nV#FF8C00\np155\nsVbeige\np156\nV#F5F5DC\np157\nsVforestgreen\np158\nV#228B22\np159\nsVmediumpurple\np160\nV#9370DB\np161\nsVmintcream\np162\nV#F5FFFA\np163\nsVhotpink\np164\nV#FF69B4\np165\nsVdarkgoldenrod\np166\nV#B8860B\np167\nsVpowderblue\np168\nV#B0E0E6\np169\nsVhoneydew\np170\nV#F0FFF0\np171\nsVsalmon\np172\nV#FA8072\np173\nsVsnow\np174\nV#FFFAFA\np175\nsVmistyrose\np176\nV#FFE4E1\np177\nsVkhaki\np178\nV#F0E68C\np179\nsVmediumaquamarine\np180\nV#66CDAA\np181\nsVdarksalmon\np182\nV#E9967A\np183\nsValiceblue\np184\nV#F0F8FF\np185\nsVdarkturquoise\np186\nV#00CED1\np187\nsVlightyellow\np188\nV#FFFFE0\np189\nsVwheat\np190\nV#F5DEB3\np191\nsVlightseagreen\np192\nV#20B2AA\np193\nsVlightcyan\np194\nV#E0FFFF\np195\nsVantiquewhite\np196\nV#FAEBD7\np197\nsVsaddlebrown\np198\nV#8B4513\np199\nsVmediumseagreen\np200\nV#3CB371\np201\nsV70%gray\np202\nV#B2B2B2\np203\nsVsienna\np204\nV#A0522D\np205\nsVcornflowerblue\np206\nV#6495ED\np207\nsVseagreen\np208\nV#2E8B57\np209\nsVfloralwhite\np210\nV#FFFAF0\np211\nsVivory\np212\nV#FFFFF0\np213\nsVcornsilk\np214\nV#FFF8DC\np215\nsVindianred\np216\nV#CD5C5C\np217\nsVplum\np218\nV#DDA0DD\np219\nsV90%gray\np220\nV#E6E6E6\np221\nsVgreenyellow\np222\nV#ADFF2F\np223\nsVteal\np224\nV#008080\np225\nsVbrown\np226\nV#A52A2A\np227\nsVdarkslategray\np228\nV#2F4F4F\np229\nsVpurple\np230\nV#800080\np231\nsVviolet\np232\nV#EE82EE\np233\nsVdeepskyblue\np234\nV#00BFFF\np235\nsVghostwhite\np236\nV#F8F8FF\np237\nsVburlywood\np238\nV#DEB887\np239\nsVblue\np240\nV#0000FF\np241\nsVcrimson\np242\nV#DC143C\np243\nsVindigo\np244\nV#4B0082\np245\nsV20%gray\np246\nV#333333\np247\nsVdarkmagenta\np248\nV#8B008B\np249\nsV80%gray\np250\nV#CCCCCC\np251\nsVlightgoldenrodyellow\np252\nV#FAFAD2\np253\nsVtan\np254\nV#D2B48C\np255\nsVlimegreen\np256\nV#32CD32\np257\nsVlemonchiffon\np258\nV#FFFACD\np259\nsVbisque\np260\nV#FFE4C4\np261\nsVfirebrick\np262\nV#B22222\np263\nsVnavajowhite\np264\nV#FFDEAD\np265\nsVnone\np266\ng4\nsVmaroon\np267\nV#800000\np268\nsV50%gray\np269\nV#7F7F7F\np270\nsVdarkgray\np271\nV#A9A9A9\np272\nsVorange\np273\nV#FFA500\np274\nsVlavenderblush\np275\nV#FFF0F5\np276\nsVdarkorchid\np277\nV#9932CC\np278\nsVlavender\np279\nV#E6E6FA\np280\nsVspringgreen\np281\nV#00FF7F\np282\nsVthistle\np283\nV#D8BFD8\np284\nsVlinen\np285\nV#FAF0E6\np286\nsVdarkolivegreen\np287\nV#556B2F\np288\nsVdarkslateblue\np289\nV#483D8B\np290\nsVgray\np291\nV#808080\np292\nsVdarkviolet\np293\nV#9400D3\np294\nsVperu\np295\nV#CD853F\np296\nsVsandybrown\np297\nV#FAA460\np298\nsVmediumslateblue\np299\nV#7B68EE\np300\ns."  # NOQA
+        )
     return colornames.cached
 
 
@@ -14013,10 +14543,17 @@ def salabim_logo_red_white_200():
     from PIL import Image
     import io
     import base64
-    if not hasattr(salabim_logo_red_white_200, 'cached'):
-        salabim_logo_red_white_200.cached = Image.open(io.BytesIO(base64.b64decode(''
-           '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'  # NOQA
-           ''.encode('ascii')))).convert('RGBA')
+
+    if not hasattr(salabim_logo_red_white_200, "cached"):
+        salabim_logo_red_white_200.cached = Image.open(
+            io.BytesIO(
+                base64.b64decode(
+                    ""
+                    "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"  # NOQA
+                    "".encode("ascii")
+                )
+            )
+        ).convert("RGBA")
     return salabim_logo_red_white_200.cached
 
 
@@ -14025,47 +14562,54 @@ def salabim_logo_red_black_200():
     from PIL import Image
     import io
     import base64
-    if not hasattr(salabim_logo_red_black_200, 'cached'):
-        salabim_logo_red_black_200.cached = Image.open(io.BytesIO(base64.b64decode(''
-           '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'  # NOQA
-           ''.encode('ascii')))).convert('RGBA')
+
+    if not hasattr(salabim_logo_red_black_200, "cached"):
+        salabim_logo_red_black_200.cached = Image.open(
+            io.BytesIO(
+                base64.b64decode(
+                    ""
+                    "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"  # NOQA
+                    "".encode("ascii")
+                )
+            )
+        ).convert("RGBA")
     return salabim_logo_red_black_200.cached
 
 
 def hex_to_rgb(v):
-    if v == '':
-        return(0, 0, 0, 0)
-    if v[0] == '#':
+    if v == "":
+        return (0, 0, 0, 0)
+    if v[0] == "#":
         v = v[1:]
     if len(v) == 6:
         return int(v[:2], 16), int(v[2:4], 16), int(v[4:6], 16)
     if len(v) == 8:
         return int(v[:2], 16), int(v[2:4], 16), int(v[4:6], 16), int(v[6:8], 16)
-    raise ValueError('Incorrect value' + str(v))
+    raise ValueError("Incorrect value" + str(v))
 
 
 def spec_to_image(spec):
-    '''
+    """
     convert an image specification to an image
 
     Parameters
     ----------
     image : str or PIL.Image.Image
         if str: filename of file to be loaded |n|
-        if '': dummy image will be returned |n|
+        if null string: dummy image will be returned |n|
         if PIL.Image.Image: return this image untranslated
 
     Returns
     -------
     image : PIL.Image.Image
-    '''
+    """
     if isinstance(spec, str):
         if can_animate(try_only=True):
-            if spec == '':
-                im = Image.new('RGBA', (0, 0), (0, 0, 0, 0))
+            if spec == "":
+                im = Image.new("RGBA", (0, 0), (0, 0, 0, 0))
             else:
                 im = Image.open(spec)
-                im = im.convert('RGBA')
+                im = im.convert("RGBA")
             return im
         else:
             return None  # will never be used!
@@ -14076,18 +14620,19 @@ def spec_to_image(spec):
 def _time_unit_lookup(descr):
 
     lookup = {
-        'years': 1 / (86400 * 365),
-        'weeks': 1 / (86400 * 7),
-        'days': 1 / 86400,
-        'hours': 1 / 3600,
-        'minutes': 1 / 60,
-        'seconds': 1,
-        'milliseconds': 1e3,
-        'microseconds': 1e6,
-        'n/a': None}
+        "years": 1 / (86400 * 365),
+        "weeks": 1 / (86400 * 7),
+        "days": 1 / 86400,
+        "hours": 1 / 3600,
+        "minutes": 1 / 60,
+        "seconds": 1,
+        "milliseconds": 1e3,
+        "microseconds": 1e6,
+        "n/a": None,
+    }
 
     if descr not in lookup:
-        raise ValueError('time_unit ' + descr + ' not supported')
+        raise ValueError("time_unit " + descr + " not supported")
     return lookup[descr]
 
 
@@ -14097,9 +14642,9 @@ def _time_unit_factor(time_unit, env):
     if time_unit is None:
         return 1
     if env._time_unit is None:
-        raise AttributeError('time unit not set.')
+        raise AttributeError("time unit not set.")
 
-    return(env._time_unit / _time_unit_lookup(time_unit))
+    return env._time_unit / _time_unit_lookup(time_unit)
 
 
 def _i(p, v0, v1):
@@ -14111,7 +14656,7 @@ def _i(p, v0, v1):
 
 
 def interpolate(t, t0, t1, v0, v1):
-    '''
+    """
     does linear interpolation
 
     Parameters
@@ -14140,7 +14685,7 @@ def interpolate(t, t0, t1, v0, v1):
     ----
     Note that no extrapolation is done, so if t<t0 ==> v0  and t>t1 ==> v1 |n|
     This function is heavily used during animation.
-    '''
+    """
     if v0 == v1:
         return v0
 
@@ -14164,14 +14709,14 @@ def interpolate(t, t0, t1, v0, v1):
 
 def _set_name(name, _nameserialize, object):
     if name is None:
-        name = object_to_str(object).lower() + '.'
+        name = object_to_str(object).lower() + "."
     elif len(name) <= 1:
-        if name == '':
+        if name == "":
             name = object_to_str(object).lower()
-        elif name == '.':
-            name = object_to_str(object).lower() + '.'
-        elif name == ',':
-            name = object_to_str(object).lower() + ','
+        elif name == ".":
+            name = object_to_str(object).lower() + "."
+        elif name == ",":
+            name = object_to_str(object).lower() + ","
 
     object._base_name = name
 
@@ -14180,17 +14725,17 @@ def _set_name(name, _nameserialize, object):
         _nameserialize[name] = sequence_number
 
     else:
-        if name.endswith(','):
+        if name.endswith(","):
             _nameserialize[name] = 1
             sequence_number = 1
         else:
             _nameserialize[name] = 0
             sequence_number = 0
 
-    if name.endswith('.'):
+    if name.endswith("."):
         object._name = name + str(sequence_number)
-    elif name.endswith(','):
-        object._name = name[:-1] + '.' + str(sequence_number)
+    elif name.endswith(","):
+        object._name = name[:-1] + "." + str(sequence_number)
     else:
         object._name = name
     object._sequence_number = sequence_number
@@ -14205,7 +14750,7 @@ def _decode_name(name):
 
 def pad(txt, n):
     if n <= 0:
-        return ''
+        return ""
     else:
         return txt.ljust(n)[:n]
 
@@ -14216,49 +14761,49 @@ def rpad(txt, n):
 
 def fn(x, l, d):
     if math.isnan(x):
-        return ('{:' + str(l) + 's}').format('')
-    if x >= 10**(l - d - 1):
-        return ('{:' + str(l) + '.' + str(l - d - 3) + 'e}').format(x)
+        return ("{:" + str(l) + "s}").format("")
+    if x >= 10 ** (l - d - 1):
+        return ("{:" + str(l) + "." + str(l - d - 3) + "e}").format(x)
     if x == int(x):
-        return ('{:' + str(l - d - 1) + 'd}{:' + str(d + 1) + 's}').format(int(x), '')
-    return ('{:' + str(l) + '.' + str(d) + 'f}').format(x)
+        return ("{:" + str(l - d - 1) + "d}{:" + str(d + 1) + "s}").format(int(x), "")
+    return ("{:" + str(l) + "." + str(d) + "f}").format(x)
 
 
 def _checkrandomstream(randomstream):
     if not isinstance(randomstream, random.Random):
-        raise TypeError('Type randomstream or random.Random expected, got ' + str(type(randomstream)))
+        raise TypeError("Type randomstream or random.Random expected, got " + str(type(randomstream)))
 
 
 def _checkismonitor(monitor):
     if not isinstance(monitor, Monitor):
-        raise TypeError('Type Monitor expected, got ' + str(type(monitor)))
+        raise TypeError("Type Monitor expected, got " + str(type(monitor)))
 
 
 def _checkisqueue(queue):
     if not isinstance(queue, Queue):
-        raise TypeError('Type Queue expected, got ' + str(type(queue)))
+        raise TypeError("Type Queue expected, got " + str(type(queue)))
 
 
 def type_to_typecode_off(type):
     lookup = {
-        'bool': ('B', 255),
-        'int8': ('b', -128),
-        'uint8': ('B', 255),
-        'int16': ('h', -32768),
-        'uint16': ('H', 65535),
-        'int32': ('i', -2147483648),
-        'uint32': ('I', 4294967295),
-        'int64': ('l', -9223372036854775808),
-        'uint64': ('L', 18446744073709551615),
-        'float': ('d', -inf),
-        'double': ('d', -inf),
-        'any': ('', -inf)
-        }
+        "bool": ("B", 255),
+        "int8": ("b", -128),
+        "uint8": ("B", 255),
+        "int16": ("h", -32768),
+        "uint16": ("H", 65535),
+        "int32": ("i", -2147483648),
+        "uint32": ("I", 4294967295),
+        "int64": ("l", -9223372036854775808),
+        "uint64": ("L", 18446744073709551615),
+        "float": ("d", -inf),
+        "double": ("d", -inf),
+        "any": ("", -inf),
+    }
     return lookup[type]
 
 
 def list_to_array(l):
-    float_result = array.array('d')
+    float_result = array.array("d")
     for v in l:
         try:
             vfloat = float(v)
@@ -14271,7 +14816,7 @@ def list_to_array(l):
 
 def deep_flatten(l):
 
-    if hasattr(l, '__iter__') and not isinstance(l, str):
+    if hasattr(l, "__iter__") and not isinstance(l, str):
         for x in l:
             #  the two following lines are equivalent to 'yield from deep_flatten(x)' (not supported in Python 2.7)
             for xx in deep_flatten(x):
@@ -14281,7 +14826,7 @@ def deep_flatten(l):
 
 
 def merge_blanks(*l):
-    '''
+    """
     merges all non blank elements of l, separated by a blank
 
     Parameters
@@ -14291,34 +14836,34 @@ def merge_blanks(*l):
     Returns
     -------
     string with merged elements of l : str
-    '''
-    return ' '.join(x for x in l if x)
+    """
+    return " ".join(x for x in l if x)
 
 
 def normalize(s):
-    res = ''
+    res = ""
     for c in s.upper():
-        if (c.isalpha() or c.isdigit()):
+        if c.isalpha() or c.isdigit():
             res = res + c
     return res
 
 
 def _urgenttxt(urgent):
     if urgent:
-        return '!'
+        return "!"
     else:
-        return ' '
+        return " "
 
 
 def _modetxt(mode):
     if mode is None:
-        return ''
+        return ""
     else:
-        return 'mode=' + str(mode)
+        return "mode=" + str(mode)
 
 
 def object_to_str(object, quoted=False):
-    add = '\'' if quoted else ''
+    add = "'" if quoted else ""
     return add + type(object).__name__ + add
 
 
@@ -14333,7 +14878,7 @@ def _get_caller_frame():
 
 
 def return_or_print(result, as_str, file):
-    result = '\n'.join(result)
+    result = "\n".join(result)
     if as_str:
         return result
     else:
@@ -14344,9 +14889,9 @@ def return_or_print(result, as_str, file):
 
 
 def _call(c, t, self):
-    '''
+    """
     special function to support scalars, methods (with one parameter) and function with zero, one or two parameters
-    '''
+    """
     if inspect.isfunction(c):
         nargs = c.__code__.co_argcount
         if nargs == 0:
@@ -14373,77 +14918,79 @@ def de_none(l):
 
 
 def data():
-    return 'data'
+    return "data"
 
 
 def current():
-    return 'current'
+    return "current"
 
 
 def standby():
-    return 'standby'
+    return "standby"
 
 
 def passive():
-    return 'passive'
+    return "passive"
 
 
 def interrupted():
-    return 'interrupted'
+    return "interrupted"
 
 
 def scheduled():
-    return 'scheduled'
+    return "scheduled"
 
 
 def requesting():
-    return 'requesting'
+    return "requesting"
 
 
 def waiting():
-    return 'waiting'
+    return "waiting"
 
 
 def random_seed(seed, randomstream=None):
-    '''
+    """
     Reseeds a randomstream
 
     Parameters
     ----------
     seed : hashable object, usually int
         the seed for random, equivalent to random.seed() |n|
-        if None or '*', a purely random value (based on the current time) will be used
+        if None or "*", a purely random value (based on the current time) will be used
         (not reproducable) |n|
 
     randomstream: randomstream
         randomstream to be used |n|
         if omitted, random will be used |n|
-    '''
+    """
     if randomstream is None:
         randomstream = random
-    if seed == '*':
+    if seed == "*":
         seed = None
     randomstream.seed(seed)
 
 
 def _std_fonts():
     # the names of the standard fonts are generated by ttf fontdict.py on the standard development machine
-    if not hasattr(_std_fonts, 'cached'):
-        _std_fonts.cached = pickle.loads(b'(dp0\nVHuxley_Titling\np1\nVHuxley Titling\np2\nsVGlock___\np3\nVGlockenspiel\np4\nsVPENLIIT_\np5\nVPenultimateLightItal\np6\nsVERASMD\np7\nVEras Medium ITC\np8\nsVNirmala\np9\nVNirmala UI\np10\nsVebrimabd\np11\nVEbrima Bold\np12\nsVostrich-dashed\np13\nVOstrich Sans Dashed Medium\np14\nsVLato-Hairline\np15\nVLato Hairline\np16\nsVLTYPEO\np17\nVLucida Sans Typewriter Oblique\np18\nsVbnmachine\np19\nVBN Machine\np20\nsVLTYPEB\np21\nVLucida Sans Typewriter Bold\np22\nsVBOOKOSI\np23\nVBookman Old Style Italic\np24\nsVEmmett__\np25\nVEmmett\np26\nsVCURLZ___\np27\nVCurlz MT\np28\nsVhandmeds\np29\nVHand Me Down S (BRK)\np30\nsVsegoesc\np31\nVSegoe Script\np32\nsVTCM_____\np33\nVTw Cen MT\np34\nsVJosefinSlab-ThinItalic\np35\nVJosefin Slab Thin Italic\np36\nsVSTENCIL\np37\nVStencil\np38\nsVsanss___\np39\nVSansSerif\np40\nsVBOD_CI\np41\nVBodoni MT Condensed Italic\np42\nsVGreek_i\np43\nVGreek Diner Inline TT\np44\nsVHTOWERT\np45\nVHigh Tower Text\np46\nsVTCCB____\np47\nVTw Cen MT Condensed Bold\np48\nsVCools___\np49\nVCoolsville\np50\nsVbnjinx\np51\nVBN Jinx\np52\nsVFREESCPT\np53\nVFreestyle Script\np54\nsVGARA\np55\nVGaramond\np56\nsVDejaVuSansMono\np57\nVDejaVu Sans Mono Book\np58\nsVCALVIN__\np59\nVCalvin\np60\nsVGIL_____\np61\nVGill Sans MT\np62\nsVCandaraz\np63\nVCandara Bold Italic\np64\nsVVollkorn-Bold\np65\nVVollkorn Bold\np66\nsVariblk\np67\nVArial Black\np68\nsVGOTHIC\np69\nVCentury Gothic\np70\nsVMAIAN\np71\nVMaiandra GD\np72\nsVBSSYM7\np73\nVBookshelf Symbol 7\np74\nsVAcme____\np75\nVAcmeFont\np76\nsVDetente_\np77\nVDetente\np78\nsVCandarai\np79\nVCandara Italic\np80\nsVFTLTLT\np81\nVFootlight MT Light\np82\nsVGILC____\np83\nVGill Sans MT Condensed\np84\nsVLFAXD\np85\nVLucida Fax Demibold\np86\nsVNIAGSOL\np87\nVNiagara Solid\np88\nsVLFAXI\np89\nVLucida Fax Italic\np90\nsVCandarab\np91\nVCandara Bold\np92\nsVFRSCRIPT\np93\nVFrench Script MT\np94\nsVLBRITE\np95\nVLucida Bright\np96\nsVFRABK\np97\nVFranklin Gothic Book\np98\nsVostrich-bold\np99\nVOstrich Sans Bold\np100\nsVTCCM____\np101\nVTw Cen MT Condensed\np102\nsVcorbelz\np103\nVCorbel Bold Italic\np104\nsVTCMI____\np105\nVTw Cen MT Italic\np106\nsVethnocen\np107\nVEthnocentric\np108\nsVVINERITC\np109\nVViner Hand ITC\np110\nsVROCKB\np111\nVRockwell Bold\np112\nsVconsola\np113\nVConsolas\np114\nsVcorbeli\np115\nVCorbel Italic\np116\nsVPENUL___\np117\nVPenultimate\np118\nsVMAGNETOB\np119\nVMagneto Bold\np120\nsVisocp___\np121\nVISOCP\np122\nsVQUIVEIT_\np123\nVQuiverItal\np124\nsVARLRDBD\np125\nVArial Rounded MT Bold\np126\nsVJosefinSlab-SemiBold\np127\nVJosefin Slab SemiBold\np128\nsVntailub\np129\nVMicrosoft New Tai Lue Bold\np130\nsVflubber\np131\nVFlubber\np132\nsVBASKVILL\np133\nVBaskerville Old Face\np134\nsVGILB____\np135\nVGill Sans MT Bold\np136\nsVPERTILI\np137\nVPerpetua Titling MT Light\np138\nsVLato-HairlineItalic\np139\nVLato Hairline Italic\np140\nsVComfortaa-Light\np141\nVComfortaa Light\np142\nsVtrebucit\np143\nVTrebuchet MS Italic\np144\nsVmalgunbd\np145\nVMalgun Gothic Bold\np146\nsVITCBLKAD\np147\nVBlackadder ITC\np148\nsVsansso__\np149\nVSansSerif Oblique\np150\nsVCALISTBI\np151\nVCalisto MT Bold Italic\np152\nsVsyastro_\np153\nVSyastro\np154\nsVSamsungIF_Md\np155\nVSamsung InterFace Medium\np156\nsVHombre__\np157\nVHombre\np158\nsVseguiemj\np159\nVSegoe UI Emoji\np160\nsVFRAHVIT\np161\nVFranklin Gothic Heavy Italic\np162\nsVJUICE___\np163\nVJuice ITC\np164\nsVFRAMDCN\np165\nVFranklin Gothic Medium Cond\np166\nsVseguisb\np167\nVSegoe UI Semibold\np168\nsVconsolai\np169\nVConsolas Italic\np170\nsVGLECB\np171\nVGloucester MT Extra Condensed\np172\nsVframd\np173\nVFranklin Gothic Medium\np174\nsVSCHLBKI\np175\nVCentury Schoolbook Italic\np176\nsVCENTAUR\np177\nVCentaur\np178\nsVromantic\np179\nVRomantic\np180\nsVBOD_CB\np181\nVBodoni MT Condensed Bold\np182\nsVverdana\np183\nVVerdana\np184\nsVTangerine_Regular\np185\nVTangerine\np186\nsVseguili\np187\nVSegoe UI Light Italic\np188\nsVNunito-Regular\np189\nVNunito\np190\nsVSCHLBKB\np191\nVCentury Schoolbook Bold\np192\nsVGOTHICB\np193\nVCentury Gothic Bold\np194\nsVpalai\np195\nVPalatino Linotype Italic\np196\nsVBKANT\np197\nVBook Antiqua\np198\nsVLato-Italic\np199\nVLato Italic\np200\nsVPERBI___\np201\nVPerpetua Bold Italic\np202\nsVGOTHICI\np203\nVCentury Gothic Italic\np204\nsVROCKBI\np205\nVRockwell Bold Italic\np206\nsVLTYPEBO\np207\nVLucida Sans Typewriter Bold Oblique\np208\nsVAmeth___\np209\nVAmethyst\np210\nsVyearsupplyoffairycakes\np211\nVYear supply of fairy cakes\np212\nsVGILBI___\np213\nVGill Sans MT Bold Italic\np214\nsVBOOKOS\np215\nVBookman Old Style\np216\nsVVollkorn-Italic\np217\nVVollkorn Italic\np218\nsVswiss\np219\nVSwis721 BT Roman\np220\nsVcomsc\np221\nVCommercialScript BT\np222\nsVchinyen\np223\nVChinyen Normal\np224\nsVeurr____\np225\nVEuroRoman\np226\nsVROCK\np227\nVRockwell\np228\nsVPERTIBD\np229\nVPerpetua Titling MT Bold\np230\nsVCHILLER\np231\nVChiller\np232\nsVtechb___\np233\nVTechnicBold\np234\nsVLato-Light\np235\nVLato Light\np236\nsVOUTLOOK\np237\nVMS Outlook\np238\nsVmtproxy6\np239\nVProxy 6\np240\nsVdutcheb\np241\nVDutch801 XBd BT Extra Bold\np242\nsVgadugib\np243\nVGadugi Bold\np244\nsVBOD_CR\np245\nVBodoni MT Condensed\np246\nsVmtproxy7\np247\nVProxy 7\np248\nsVnobile_bold\np249\nVNobile Bold\np250\nsVELEPHNT\np251\nVElephant\np252\nsVCOPRGTL\np253\nVCopperplate Gothic Light\np254\nsVMTCORSVA\np255\nVMonotype Corsiva\np256\nsVconsolaz\np257\nVConsolas Bold Italic\np258\nsVBOOKOSBI\np259\nVBookman Old Style Bold Italic\np260\nsVtrebuc\np261\nVTrebuchet MS\np262\nsVcomici\np263\nVComic Sans MS Italic\np264\nsVJosefinSlab-BoldItalic\np265\nVJosefin Slab Bold Italic\np266\nsVMycalc__\np267\nVMycalc\np268\nsVmarlett\np269\nVMarlett\np270\nsVsymeteo_\np271\nVSymeteo\np272\nsVcandles_\np273\nVCandles\np274\nsVbobcat\np275\nVBobcat Normal\np276\nsVLSANSDI\np277\nVLucida Sans Demibold Italic\np278\nsVINFROMAN\np279\nVInformal Roman\np280\nsVsf movie poster2\np281\nVSF Movie Poster\np282\nsVcomicz\np283\nVComic Sans MS Bold Italic\np284\nsVcracj___\np285\nVCracked Johnnie\np286\nsVcourbd\np287\nVCourier New Bold\np288\nsVItali___\np289\nVItalianate\np290\nsVITCEDSCR\np291\nVEdwardian Script ITC\np292\nsVcourbi\np293\nVCourier New Bold Italic\np294\nsVcalibrili\np295\nVCalibri Light Italic\np296\nsVgazzarelli\np297\nVGazzarelli\np298\nsVGabriola\np299\nVGabriola\np300\nsVVollkorn-BoldItalic\np301\nVVollkorn Bold Italic\np302\nsVromant__\np303\nVRomanT\np304\nsVisoct3__\np305\nVISOCT3\np306\nsVsegoeuib\np307\nVSegoe UI Bold\np308\nsVtimesbd\np309\nVTimes New Roman Bold\np310\nsVgoodtime\np311\nVGood Times\np312\nsVsegoeuii\np313\nVSegoe UI Italic\np314\nsVBOD_BLAR\np315\nVBodoni MT Black\np316\nsVhimalaya\np317\nVMicrosoft Himalaya\np318\nsVsegoeuil\np319\nVSegoe UI Light\np320\nsVPermanentMarker\np321\nVPermanent Marker\np322\nsVBOD_BLAI\np323\nVBodoni MT Black Italic\np324\nsVTCBI____\np325\nVTw Cen MT Bold Italic\np326\nsVarial\np327\nVArial\np328\nsVBrand___\np329\nVBrandish\np330\nsVsegoeuiz\np331\nVSegoe UI Bold Italic\np332\nsVswisscb\np333\nVSwis721 Cn BT Bold\np334\nsVPAPYRUS\np335\nVPapyrus\np336\nsVANTIC___\np337\nVAnticFont\np338\nsVGIGI\np339\nVGigi\np340\nsVENGR\np341\nVEngravers MT\np342\nsVsegmdl2\np343\nVSegoe MDL2 Assets\np344\nsVBRLNSDB\np345\nVBerlin Sans FB Demi Bold\np346\nsVLato-BoldItalic\np347\nVLato Bold Italic\np348\nsVholomdl2\np349\nVHoloLens MDL2 Assets\np350\nsVBRITANIC\np351\nVBritannic Bold\np352\nsVNirmalaB\np353\nVNirmala UI Bold\np354\nsVVollkorn-Regular\np355\nVVollkorn\np356\nsVStephen_\np357\nVStephen\np358\nsVbabyk___\np359\nVBaby Kruffy\np360\nsVHARVEST_\np361\nVHarvest\np362\nsVKUNSTLER\np363\nVKunstler Script\np364\nsVstylu\np365\nVStylus BT Roman\np366\nsVWINGDNG3\np367\nVWingdings 3\np368\nsVWINGDNG2\np369\nVWingdings 2\np370\nsVlucon\np371\nVLucida Console\np372\nsVCandara\np373\nVCandara\np374\nsVBERNHC\np375\nVBernard MT Condensed\np376\nsVtechnic_\np377\nVTechnic\np378\nsVLimou___\np379\nVLimousine\np380\nsVTCB_____\np381\nVTw Cen MT Bold\np382\nsVPirate__\np383\nVPirate\np384\nsVFrnkvent\np385\nVFrankfurter Venetian TT\np386\nsVromand__\np387\nVRomanD\np388\nsVLTYPE\np389\nVLucida Sans Typewriter\np390\nsVSHOWG\np391\nVShowcard Gothic\np392\nsVMOD20\np393\nVModern No. 20\np394\nsVostrich-rounded\np395\nVOstrich Sans Rounded Medium\np396\nsVJosefinSlab-Italic\np397\nVJosefin Slab Italic\np398\nsVneon2\np399\nVNeon Lights\np400\nsVpalabi\np401\nVPalatino Linotype Bold Italic\np402\nsVwoodcut\np403\nVWoodcut\np404\nsVToledo__\np405\nVToledo\np406\nsVverdanai\np407\nVVerdana Italic\np408\nsVSamsungIF_Rg\np409\nVSamsung InterFace\np410\nsVtrebucbd\np411\nVTrebuchet MS Bold\np412\nsVPALSCRI\np413\nVPalace Script MT\np414\nsVComfortaa-Regular\np415\nVComfortaa\np416\nsVmicross\np417\nVMicrosoft Sans Serif\np418\nsVseguisli\np419\nVSegoe UI Semilight Italic\np420\nsVtaile\np421\nVMicrosoft Tai Le\np422\nsVcour\np423\nVCourier New\np424\nsVparryhotter\np425\nVParry Hotter\np426\nsVgreekc__\np427\nVGreekC\np428\nsVRAGE\np429\nVRage Italic\np430\nsVMATURASC\np431\nVMatura MT Script Capitals\np432\nsVBASTION_\np433\nVBastion\np434\nsVREFSAN\np435\nVMS Reference Sans Serif\np436\nsVterminat\np437\nVTerminator Two\np438\nsVmmrtextb\np439\nVMyanmar Text Bold\np440\nsVgothici_\np441\nVGothicI\np442\nsVmonotxt_\np443\nVMonotxt\np444\nsVcorbelb\np445\nVCorbel Bold\np446\nsVVALKEN__\np447\nVValken\np448\nsVRowdyhe_\np449\nVRowdyHeavy\np450\nsVLato-Black\np451\nVLato Black\np452\nsVswisski\np453\nVSwis721 Blk BT Black Italic\np454\nsVcouri\np455\nVCourier New Italic\np456\nsVMTEXTRA\np457\nVMT Extra\np458\nsVsanssbo_\np459\nVSansSerif BoldOblique\np460\nsVl_10646\np461\nVLucida Sans Unicode\np462\nsVLato-BlackItalic\np463\nVLato Black Italic\np464\nsVseguibli\np465\nVSegoe UI Black Italic\np466\nsVGeotype\np467\nVGeotype TT\np468\nsVxfiles\np469\nVX-Files\np470\nsVjavatext\np471\nVJavanese Text\np472\nsVseguisym\np473\nVSegoe UI Symbol\np474\nsVverdanaz\np475\nVVerdana Bold Italic\np476\nsVGILI____\np477\nVGill Sans MT Italic\np478\nsVALGER\np479\nVAlgerian\np480\nsVAGENCYR\np481\nVAgency FB\np482\nsVnobile\np483\nVNobile\np484\nsVHaxton\np485\nVHaxton Logos TT\np486\nsVswissbo\np487\nVSwis721 BdOul BT Bold\np488\nsVBELLI\np489\nVBell MT Italic\np490\nsVBROADW\np491\nVBroadway\np492\nsVsegoepr\np493\nVSegoe Print\np494\nsVGILLUBCD\np495\nVGill Sans Ultra Bold Condensed\np496\nsVverdanab\np497\nVVerdana Bold\np498\nsVSalina__\np499\nVSalina\np500\nsVAGENCYB\np501\nVAgency FB Bold\np502\nsVAutumn__\np503\nVAutumn\np504\nsVGOUDOS\np505\nVGoudy Old Style\np506\nsVconstanz\np507\nVConstantia Bold Italic\np508\nsVPOORICH\np509\nVPoor Richard\np510\nsVPRISTINA\np511\nVPristina\np512\nsVLATINWD\np513\nVWide Latin\np514\nsVromanc__\np515\nVRomanC\np516\nsVLeelawUI\np517\nVLeelawadee UI\np518\nsVitalict_\np519\nVItalicT\np520\nsVostrich-regular\np521\nVOstrich Sans Medium\np522\nsVmonosbi\np523\nVMonospac821 BT Bold Italic\np524\nsVcambriai\np525\nVCambria Italic\np526\nsVisocp2__\np527\nVISOCP2\np528\nsVltromatic\np529\nVLetterOMatic!\np530\nsVbgothm\np531\nVBankGothic Md BT Medium\np532\nsVbgothl\np533\nVBankGothic Lt BT Light\np534\nsVSwkeys1\np535\nVSWGamekeys MT\np536\nsVCENSCBK\np537\nVCentury Schoolbook\np538\nsVgothicg_\np539\nVGothicG\np540\nsValmosnow\np541\nVAlmonte Snow\np542\nsVTangerine_Bold\np543\nVTangerine Bold\np544\nsVswisseb\np545\nVSwis721 Ex BT Bold\np546\nsVCOLONNA\np547\nVColonna MT\np548\nsVsupef___\np549\nVSuperFrench\np550\nsVTCCEB\np551\nVTw Cen MT Condensed Extra Bold\np552\nsVsylfaen\np553\nVSylfaen\np554\nsVcomicbd\np555\nVComic Sans MS Bold\np556\nsVRoland__\np557\nVRoland\np558\nsVELEPHNTI\np559\nVElephant Italic\np560\nsVmmrtext\np561\nVMyanmar Text\np562\nsVsymap___\np563\nVSymap\np564\nsVswissko\np565\nVSwis721 BlkOul BT Black\np566\nsVswissck\np567\nVSwis721 BlkCn BT Black\np568\nsVWhimsy\np569\nVWhimsy TT\np570\nsVsanssb__\np571\nVSansSerif Bold\np572\nsVtaileb\np573\nVMicrosoft Tai Le Bold\np574\nsVcomic\np575\nVComic Sans MS\np576\nsVGLSNECB\np577\nVGill Sans MT Ext Condensed Bold\np578\nsVColbert_\np579\nVColbert\np580\nsVJOKERMAN\np581\nVJokerman\np582\nsVARIALNB\np583\nVArial Narrow Bold\np584\nsVDOMIN___\np585\nVDominican\np586\nsVBRUSHSCI\np587\nVBrush Script MT Italic\np588\nsVCALLI___\np589\nVCalligraphic\np590\nsVFRADM\np591\nVFranklin Gothic Demi\np592\nsVJosefinSlab-LightItalic\np593\nVJosefin Slab Light Italic\np594\nsVsimplex_\np595\nVSimplex\np596\nsVphagspab\np597\nVMicrosoft PhagsPa Bold\np598\nsVswissek\np599\nVSwis721 BlkEx BT Black\np600\nsVscripts_\np601\nVScriptS\np602\nsVswisscl\np603\nVSwis721 LtCn BT Light\np604\nsVCASTELAR\np605\nVCastellar\np606\nsVdutchi\np607\nVDutch801 Rm BT Italic\np608\nsVnasaliza\np609\nVNasalization Medium\np610\nsVariali\np611\nVArial Italic\np612\nsVOpinehe_\np613\nVOpineHeavy\np614\nsVPLAYBILL\np615\nVPlaybill\np616\nsVROCCB___\np617\nVRockwell Condensed Bold\np618\nsVCALIST\np619\nVCalisto MT\np620\nsVCALISTB\np621\nVCalisto MT Bold\np622\nsVHATTEN\np623\nVHaettenschweiler\np624\nsVntailu\np625\nVMicrosoft New Tai Lue\np626\nsVCALISTI\np627\nVCalisto MT Italic\np628\nsVsegoeprb\np629\nVSegoe Print Bold\np630\nsVDAYTON__\np631\nVDayton\np632\nsVswissel\np633\nVSwis721 LtEx BT Light\np634\nsVmael____\np635\nVMael\np636\nsVisoct2__\np637\nVISOCT2\np638\nsVBorea___\np639\nVBorealis\np640\nsVwingding\np641\nVWingdings\np642\nsVONYX\np643\nVOnyx\np644\nsVmonosi\np645\nVMonospac821 BT Italic\np646\nsVtimesi\np647\nVTimes New Roman Italic\np648\nsVostrich-light\np649\nVOstrich Sans Condensed Light\np650\nsVseguihis\np651\nVSegoe UI Historic\np652\nsVNovem___\np653\nVNovember\np654\nsVOCRAEXT\np655\nVOCR A Extended\np656\nsVostrich-black\np657\nVOstrich Sans Black\np658\nsVnarrow\np659\nVPR Celtic Narrow Normal\np660\nsVitalic__\np661\nVItalic\np662\nsVmonosb\np663\nVMonospac821 BT Bold\np664\nsVPERB____\np665\nVPerpetua Bold\np666\nsVCreteRound-Regular\np667\nVCrete Round\np668\nsVcalibri\np669\nVCalibri\np670\nsVSCRIPTBL\np671\nVScript MT Bold\np672\nsVComfortaa-Bold\np673\nVComfortaa Bold\np674\nsVARIALN\np675\nVArial Narrow\np676\nsVHARNGTON\np677\nVHarrington\np678\nsVJosefinSlab-Bold\np679\nVJosefin Slab Bold\np680\nsVVIVALDII\np681\nVVivaldi Italic\np682\nsVhollh___\np683\nVHollywood Hills\np684\nsVBOD_R\np685\nVBodoni MT\np686\nsVSkinny__\np687\nVSkinny\np688\nsVLBRITED\np689\nVLucida Bright Demibold\np690\nsVframdit\np691\nVFranklin Gothic Medium Italic\np692\nsVsymusic_\np693\nVSymusic\np694\nsVgadugi\np695\nVGadugi\np696\nsVswissbi\np697\nVSwis721 BT Bold Italic\np698\nsVBOD_B\np699\nVBodoni MT Bold\np700\nsVERASDEMI\np701\nVEras Demi ITC\np702\nsVWaverly_\np703\nVWaverly\np704\nsVcompi\np705\nVCommercialPi BT\np706\nsVBOD_I\np707\nVBodoni MT Italic\np708\nsVconstan\np709\nVConstantia\np710\nsVARIALNBI\np711\nVArial Narrow Bold Italic\np712\nsVarialbi\np713\nVArial Bold Italic\np714\nsVJosefinSlab-Light\np715\nVJosefin Slab Light\np716\nsVBOD_CBI\np717\nVBodoni MT Condensed Bold Italic\np718\nsVwebdings\np719\nVWebdings\np720\nsVRAVIE\np721\nVRavie\np722\nsVROCC____\np723\nVRockwell Condensed\np724\nsVFELIXTI\np725\nVFelix Titling\np726\nsVRussrite\np727\nVRussel Write TT\np728\nsVisocteur\np729\nVISOCTEUR\np730\nsVLSANSD\np731\nVLucida Sans Demibold Roman\np732\nsVmalgun\np733\nVMalgun Gothic\np734\nsVheavyhea2\np735\nVHeavy Heap\np736\nsVGOUDYSTO\np737\nVGoudy Stout\np738\nsVVLADIMIR\np739\nVVladimir Script\np740\nsVARIALUNI\np741\nVArial Unicode MS\np742\nsVJosefinSlab-Thin\np743\nVJosefin Slab Thin\np744\nsVFRADMCN\np745\nVFranklin Gothic Demi Cond\np746\nsVBlackout-2am\np747\nVBlackout 2 AM\np748\nsVpalab\np749\nVPalatino Linotype Bold\np750\nsVDejaVuSansMono-Oblique\np751\nVDejaVu Sans Mono Oblique\np752\nsVANTQUABI\np753\nVBook Antiqua Bold Italic\np754\nsVswissc\np755\nVSwis721 Cn BT Roman\np756\nsVSPLASH__\np757\nVSplash\np758\nsVNIAGENG\np759\nVNiagara Engraved\np760\nsVCOPRGTB\np761\nVCopperplate Gothic Bold\np762\nsVBruss___\np763\nVBrussels\np764\nsVconsolab\np765\nVConsolas Bold\np766\nsVGOTHICBI\np767\nVCentury Gothic Bold Italic\np768\nsVmtproxy4\np769\nVProxy 4\np770\nsVmtproxy5\np771\nVProxy 5\np772\nsVromai___\np773\nVRomantic Italic\np774\nsVFRABKIT\np775\nVFranklin Gothic Book Italic\np776\nsVBELL\np777\nVBell MT\np778\nsVmtproxy1\np779\nVProxy 1\np780\nsVmtproxy2\np781\nVProxy 2\np782\nsVmtproxy3\np783\nVProxy 3\np784\nsVLCALLIG\np785\nVLucida Calligraphy Italic\np786\nsVphagspa\np787\nVMicrosoft PhagsPa\np788\nsVANTQUAI\np789\nVBook Antiqua Italic\np790\nsVmtproxy8\np791\nVProxy 8\np792\nsVmtproxy9\np793\nVProxy 9\np794\nsVLato-Bold\np795\nVLato Bold\np796\nsVtxt_____\np797\nVTxt\np798\nsVconstanb\np799\nVConstantia Bold\np800\nsVERASBD\np801\nVEras Bold ITC\np802\nsVLato-LightItalic\np803\nVLato Light Italic\np804\nsVRONDALO_\np805\nVRondalo\np806\nsVconstani\np807\nVConstantia Italic\np808\nsVBRLNSB\np809\nVBerlin Sans FB Bold\np810\nsVgeorgiaz\np811\nVGeorgia Bold Italic\np812\nsVgothice_\np813\nVGothicE\np814\nsVcalibriz\np815\nVCalibri Bold Italic\np816\nsVgeorgiab\np817\nVGeorgia Bold\np818\nsVLeelaUIb\np819\nVLeelawadee UI Bold\np820\nsVtimesbi\np821\nVTimes New Roman Bold Italic\np822\nsVPERI____\np823\nVPerpetua Italic\np824\nsVromab___\np825\nVRomantic Bold\np826\nsVBRLNSR\np827\nVBerlin Sans FB\np828\nsVBELLB\np829\nVBell MT Bold\np830\nsVgeorgiai\np831\nVGeorgia Italic\np832\nsVNirmalaS\np833\nVNirmala UI Semilight\np834\nsVdutchb\np835\nVDutch801 Rm BT Bold\np836\nsVdigifit\np837\nVDigifit Normal\np838\nsVROCKEB\np839\nVRockwell Extra Bold\np840\nsVgdt_____\np841\nVGDT\np842\nsVmonbaiti\np843\nVMongolian Baiti\np844\nsVsegoescb\np845\nVSegoe Script Bold\np846\nsVsymath__\np847\nVSymath\np848\nsVisoct___\np849\nVISOCT\np850\nsVTarzan__\np851\nVTarzan\np852\nsVsnowdrft\np853\nVSnowdrift\np854\nsVHTOWERTI\np855\nVHigh Tower Text Italic\np856\nsVCENTURY\np857\nVCentury\np858\nsVmalgunsl\np859\nVMalgun Gothic Semilight\np860\nsVseguibl\np861\nVSegoe UI Black\np862\nsVCreteRound-Italic\np863\nVCrete Round Italic\np864\nsVAlfredo_\np865\nVAlfredo\np866\nsVCOMMONS_\np867\nVCommons\np868\nsVLFAX\np869\nVLucida Fax\np870\nsVLBRITEI\np871\nVLucida Bright Italic\np872\nsVFRAHV\np873\nVFranklin Gothic Heavy\np874\nsVisocteui\np875\nVISOCTEUR Italic\np876\nsVManorly_\np877\nVManorly\np878\nsVBolstbo_\np879\nVBolsterBold Bold\np880\nsVsegoeui\np881\nVSegoe UI\np882\nsVNunito-Light\np883\nVNunito Light\np884\nsVIMPRISHA\np885\nVImprint MT Shadow\np886\nsVgeorgia\np887\nVGeorgia\np888\nsV18cents\np889\nV18thCentury\np890\nsVMOONB___\np891\nVMoonbeam\np892\nsVPER_____\np893\nVPerpetua\np894\nsVHansen__\np895\nVHansen\np896\nsVLato-Regular\np897\nVLato\np898\nsVBOUTON_International_symbols\np899\nVBOUTON International Symbols\np900\nsVCOOPBL\np901\nVCooper Black\np902\nsVmonos\np903\nVMonospac821 BT Roman\np904\nsVtahoma\np905\nVTahoma\np906\nsVcityb___\np907\nVCityBlueprint\np908\nsVswisscbi\np909\nVSwis721 Cn BT Bold Italic\np910\nsVEnliven_\np911\nVEnliven\np912\nsVLeelUIsl\np913\nVLeelawadee UI Semilight\np914\nsVCALIFR\np915\nVCalifornian FB\np916\nsVumath\np917\nVUniversalMath1 BT\np918\nsVswisscbo\np919\nVSwis721 BdCnOul BT Bold Outline\np920\nsVcomplex_\np921\nVComplex\np922\nsVBOOKOSB\np923\nVBookman Old Style Bold\np924\nsVMartina_\np925\nVMartina\np926\nsVromans__\np927\nVRomanS\np928\nsVmvboli\np929\nVMV Boli\np930\nsVCALIFI\np931\nVCalifornian FB Italic\np932\nsVGARABD\np933\nVGaramond Bold\np934\nsVebrima\np935\nVEbrima\np936\nsVTEMPSITC\np937\nVTempus Sans ITC\np938\nsVCALIFB\np939\nVCalifornian FB Bold\np940\nsVitalicc_\np941\nVItalicC\np942\nsVisocp3__\np943\nVISOCP3\np944\nsVscriptc_\np945\nVScriptC\np946\nsValiee13\np947\nVAlien Encounters\np948\nsVnobile_italic\np949\nVNobile Italic\np950\nsVGARAIT\np951\nVGaramond Italic\np952\nsVswissli\np953\nVSwis721 Lt BT Light Italic\np954\nsVCabinSketch-Bold\np955\nVCabinSketch Bold\np956\nsVcorbel\np957\nVCorbel\np958\nsVseguisbi\np959\nVSegoe UI Semibold Italic\np960\nsVSCHLBKBI\np961\nVCentury Schoolbook Bold Italic\np962\nsVasimov\np963\nVAsimov\np964\nsVLFAXDI\np965\nVLucida Fax Demibold Italic\np966\nsVBRADHITC\np967\nVBradley Hand ITC\np968\nsVswisscki\np969\nVSwis721 BlkCn BT Black Italic\np970\nsVGILSANUB\np971\nVGill Sans Ultra Bold\np972\nsVHARLOWSI\np973\nVHarlow Solid Italic Italic\np974\nsVHARVEIT_\np975\nVHarvestItal\np976\nsVcambriab\np977\nVCambria Bold\np978\nsVswissci\np979\nVSwis721 Cn BT Italic\np980\nsVcounb___\np981\nVCountryBlueprint\np982\nsVNotram__\np983\nVNotram\np984\nsVPENULLI_\np985\nVPenultimateLight\np986\nsVtahomabd\np987\nVTahoma Bold\np988\nsVMISTRAL\np989\nVMistral\np990\nsVpala\np991\nVPalatino Linotype\np992\nsVOLDENGL\np993\nVOld English Text MT\np994\nsVinductio\np995\nVInduction Normal\np996\nsVJosefinSlab-SemiBoldItalic\np997\nVJosefin Slab SemiBold Italic\np998\nsVMinerva_\np999\nVMinerva\np1000\nsVsymbol\np1001\nVSymbol\np1002\nsVcambriaz\np1003\nVCambria Bold Italic\np1004\nsVtrebucbi\np1005\nVTrebuchet MS Bold Italic\np1006\nsVtimes\np1007\nVTimes New Roman\np1008\nsVERASLGHT\np1009\nVEras Light ITC\np1010\nsVSteppes\np1011\nVSteppes TT\np1012\nsVREFSPCL\np1013\nVMS Reference Specialty\np1014\nsVPARCHM\np1015\nVParchment\np1016\nsVDejaVuSansMono-Bold\np1017\nVDejaVu Sans Mono Bold\np1018\nsVswisscli\np1019\nVSwis721 LtCn BT Light Italic\np1020\nsVLSANS\np1021\nVLucida Sans\np1022\nsVPhrasme_\np1023\nVPhrasticMedium\np1024\nsVDejaVuSansMono-BoldOblique\np1025\nVDejaVu Sans Mono Bold Oblique\np1026\nsVarialbd\np1027\nVArial Bold\np1028\nsVSNAP____\np1029\nVSnap ITC\np1030\nsVArchitectsDaughter\np1031\nVArchitects Daughter\np1032\nsVCorpo___\np1033\nVCorporate\np1034\nsVeurro___\np1035\nVEuroRoman Oblique\np1036\nsVimpact\np1037\nVImpact\np1038\nsVlittlelo\np1039\nVLittleLordFontleroy\np1040\nsVsimsunb\np1041\nVSimSun-ExtB\np1042\nsVARIALNI\np1043\nVArial Narrow Italic\np1044\nsVdutchbi\np1045\nVDutch801 Rm BT Bold Italic\np1046\nsVcalibrii\np1047\nVCalibri Italic\np1048\nsVDeneane_\np1049\nVDeneane\np1050\nsVFRADMIT\np1051\nVFranklin Gothic Demi Italic\np1052\nsVANTQUAB\np1053\nVBook Antiqua Bold\np1054\nsVcalibril\np1055\nVCalibri Light\np1056\nsVisocpeui\np1057\nVISOCPEUR Italic\np1058\nsVpanroman\np1059\nVPanRoman\np1060\nsVMelodbo_\np1061\nVMelodBold Bold\np1062\nsVcalibrib\np1063\nVCalibri Bold\np1064\nsVdistant galaxy 2\np1065\nVDistant Galaxy\np1066\nsVPacifico\np1067\nVPacifico\np1068\nsVnobile_bold_italic\np1069\nVNobile Bold Italic\np1070\nsVmsyi\np1071\nVMicrosoft Yi Baiti\np1072\nsVBOD_PSTC\np1073\nVBodoni MT Poster Compressed\np1074\nsVLSANSI\np1075\nVLucida Sans Italic\np1076\nsVcreerg__\np1077\nVCreepygirl\np1078\nsVsegoeuisl\np1079\nVSegoe UI Semilight\np1080\nsVvinet\np1081\nVVineta BT\np1082\nsVisocpeur\np1083\nVISOCPEUR\np1084\nsVtechl___\np1085\nVTechnicLite\np1086\nsVswissb\np1087\nVSwis721 BT Bold\np1088\nsVCLARE___\np1089\nVClarendon\np1090\nsVdutch\np1091\nVDutch801 Rm BT Roman\np1092\nsVLBRITEDI\np1093\nVLucida Bright Demibold Italic\np1094\nsVswisse\np1095\nVSwis721 Ex BT Roman\np1096\nsVswissk\np1097\nVSwis721 Blk BT Black\np1098\nsVswissi\np1099\nVSwis721 BT Italic\np1100\nsVfingerpop2\np1101\nVFingerpop\np1102\nsVswissl\np1103\nVSwis721 Lt BT Light\np1104\nsVBAUHS93\np1105\nVBauhaus 93\np1106\nsVVivian__\np1107\nVVivian\np1108\nsVgreeks__\np1109\nVGreekS\np1110\nsVGOUDOSI\np1111\nVGoudy Old Style Italic\np1112\nsVBOD_BI\np1113\nVBodoni MT Bold Italic\np1114\nsVLHANDW\np1115\nVLucida Handwriting Italic\np1116\nsVITCKRIST\np1117\nVKristen ITC\np1118\nsVBALTH___\np1119\nVBalthazar\np1120\nsVFORTE\np1121\nVForte\np1122\nsVJosefinSlab-Regular\np1123\nVJosefin Slab\np1124\nsVROCKI\np1125\nVRockwell Italic\np1126\nsVGOUDOSB\np1127\nVGoudy Old Style Bold\np1128\nsVLEELAWAD\np1129\nVLeelawadee\np1130\nsVLEELAWDB\np1131\nVLeelawadee Bold\np1132\nsVmarlett_0\np1133\nVMarlett\np1134\nsVmplus-1m-bold\np1135\nVM+ 1m bold\np1136\nsVmplus-1m-light\np1137\nVM+ 1m light\np1138\nsVmplus-1m-medium\np1139\nVM+ 1m medium\np1140\nsVmplus-1m-regular\np1141\nVM+ 1m\np1142\nsVmplus-1m-thin\np1143\nVM+ 1m thin\np1144\nsVMSUIGHUB\np1145\nVMicrosoft Uighur Bold\np1146\nsVMSUIGHUR\np1147\nVMicrosoft Uighur\np1148\nsVSamsungIF_Md_0\np1149\nVSamsung InterFace Medium\np1150\nsVSamsungIF_Rg_0\np1151\nVSamsung InterFace\np1152\nsVbahnschrift\np1153\nVBahnschrift\np1154\nsVBowlbyOneSC-Regular\np1155\nVBowlby One SC\np1156\nsVCabinSketch-Regular\np1157\nVCabin Sketch\np1158\nsVCookie-Regular\np1159\nVCookie\np1160\nsVCourgette-Regular\np1161\nVCourgette\np1162\nsVdead\np1163\nVDead Kansas\np1164\nsVDoppioOne-Regular\np1165\nVDoppio One\np1166\nsVeuphorig\np1167\nVEuphorigenic\np1168\nsVGreatVibes-Regular\np1169\nVGreat Vibes\np1170\nsVKalam-Bold\np1171\nVKalam Bold\np1172\nsVKalam-Light\np1173\nVKalam Light\np1174\nsVKalam-Regular\np1175\nVKalam\np1176\nsVLemon-Regular\np1177\nVLemon\np1178\nsVLimelight-Regular\np1179\nVLimelight\np1180\nsVMegrim\np1181\nVMegrim Medium\np1182\nsVMontserratSubrayada-Bold\np1183\nVMontserrat Subrayada Bold\np1184\nsVNotoSans-Regular\np1185\nVNoto Sans\np1186\nsVRussoOne-Regular\np1187\nVRusso One\np1188\nsVSigmarOne-Regular\np1189\nVSigmar One\np1190\nsVYellowtail-Regular\np1191\nVYellowtail\np1192\ns.')  # NOQA
+    if not hasattr(_std_fonts, "cached"):
+        _std_fonts.cached = pickle.loads(
+            b"(dp0\nVHuxley_Titling\np1\nVHuxley Titling\np2\nsVGlock___\np3\nVGlockenspiel\np4\nsVPENLIIT_\np5\nVPenultimateLightItal\np6\nsVERASMD\np7\nVEras Medium ITC\np8\nsVNirmala\np9\nVNirmala UI\np10\nsVebrimabd\np11\nVEbrima Bold\np12\nsVostrich-dashed\np13\nVOstrich Sans Dashed Medium\np14\nsVLato-Hairline\np15\nVLato Hairline\np16\nsVLTYPEO\np17\nVLucida Sans Typewriter Oblique\np18\nsVbnmachine\np19\nVBN Machine\np20\nsVLTYPEB\np21\nVLucida Sans Typewriter Bold\np22\nsVBOOKOSI\np23\nVBookman Old Style Italic\np24\nsVEmmett__\np25\nVEmmett\np26\nsVCURLZ___\np27\nVCurlz MT\np28\nsVhandmeds\np29\nVHand Me Down S (BRK)\np30\nsVsegoesc\np31\nVSegoe Script\np32\nsVTCM_____\np33\nVTw Cen MT\np34\nsVJosefinSlab-ThinItalic\np35\nVJosefin Slab Thin Italic\np36\nsVSTENCIL\np37\nVStencil\np38\nsVsanss___\np39\nVSansSerif\np40\nsVBOD_CI\np41\nVBodoni MT Condensed Italic\np42\nsVGreek_i\np43\nVGreek Diner Inline TT\np44\nsVHTOWERT\np45\nVHigh Tower Text\np46\nsVTCCB____\np47\nVTw Cen MT Condensed Bold\np48\nsVCools___\np49\nVCoolsville\np50\nsVbnjinx\np51\nVBN Jinx\np52\nsVFREESCPT\np53\nVFreestyle Script\np54\nsVGARA\np55\nVGaramond\np56\nsVDejaVuSansMono\np57\nVDejaVu Sans Mono Book\np58\nsVCALVIN__\np59\nVCalvin\np60\nsVGIL_____\np61\nVGill Sans MT\np62\nsVCandaraz\np63\nVCandara Bold Italic\np64\nsVVollkorn-Bold\np65\nVVollkorn Bold\np66\nsVariblk\np67\nVArial Black\np68\nsVGOTHIC\np69\nVCentury Gothic\np70\nsVMAIAN\np71\nVMaiandra GD\np72\nsVBSSYM7\np73\nVBookshelf Symbol 7\np74\nsVAcme____\np75\nVAcmeFont\np76\nsVDetente_\np77\nVDetente\np78\nsVCandarai\np79\nVCandara Italic\np80\nsVFTLTLT\np81\nVFootlight MT Light\np82\nsVGILC____\np83\nVGill Sans MT Condensed\np84\nsVLFAXD\np85\nVLucida Fax Demibold\np86\nsVNIAGSOL\np87\nVNiagara Solid\np88\nsVLFAXI\np89\nVLucida Fax Italic\np90\nsVCandarab\np91\nVCandara Bold\np92\nsVFRSCRIPT\np93\nVFrench Script MT\np94\nsVLBRITE\np95\nVLucida Bright\np96\nsVFRABK\np97\nVFranklin Gothic Book\np98\nsVostrich-bold\np99\nVOstrich Sans Bold\np100\nsVTCCM____\np101\nVTw Cen MT Condensed\np102\nsVcorbelz\np103\nVCorbel Bold Italic\np104\nsVTCMI____\np105\nVTw Cen MT Italic\np106\nsVethnocen\np107\nVEthnocentric\np108\nsVVINERITC\np109\nVViner Hand ITC\np110\nsVROCKB\np111\nVRockwell Bold\np112\nsVconsola\np113\nVConsolas\np114\nsVcorbeli\np115\nVCorbel Italic\np116\nsVPENUL___\np117\nVPenultimate\np118\nsVMAGNETOB\np119\nVMagneto Bold\np120\nsVisocp___\np121\nVISOCP\np122\nsVQUIVEIT_\np123\nVQuiverItal\np124\nsVARLRDBD\np125\nVArial Rounded MT Bold\np126\nsVJosefinSlab-SemiBold\np127\nVJosefin Slab SemiBold\np128\nsVntailub\np129\nVMicrosoft New Tai Lue Bold\np130\nsVflubber\np131\nVFlubber\np132\nsVBASKVILL\np133\nVBaskerville Old Face\np134\nsVGILB____\np135\nVGill Sans MT Bold\np136\nsVPERTILI\np137\nVPerpetua Titling MT Light\np138\nsVLato-HairlineItalic\np139\nVLato Hairline Italic\np140\nsVComfortaa-Light\np141\nVComfortaa Light\np142\nsVtrebucit\np143\nVTrebuchet MS Italic\np144\nsVmalgunbd\np145\nVMalgun Gothic Bold\np146\nsVITCBLKAD\np147\nVBlackadder ITC\np148\nsVsansso__\np149\nVSansSerif Oblique\np150\nsVCALISTBI\np151\nVCalisto MT Bold Italic\np152\nsVsyastro_\np153\nVSyastro\np154\nsVSamsungIF_Md\np155\nVSamsung InterFace Medium\np156\nsVHombre__\np157\nVHombre\np158\nsVseguiemj\np159\nVSegoe UI Emoji\np160\nsVFRAHVIT\np161\nVFranklin Gothic Heavy Italic\np162\nsVJUICE___\np163\nVJuice ITC\np164\nsVFRAMDCN\np165\nVFranklin Gothic Medium Cond\np166\nsVseguisb\np167\nVSegoe UI Semibold\np168\nsVconsolai\np169\nVConsolas Italic\np170\nsVGLECB\np171\nVGloucester MT Extra Condensed\np172\nsVframd\np173\nVFranklin Gothic Medium\np174\nsVSCHLBKI\np175\nVCentury Schoolbook Italic\np176\nsVCENTAUR\np177\nVCentaur\np178\nsVromantic\np179\nVRomantic\np180\nsVBOD_CB\np181\nVBodoni MT Condensed Bold\np182\nsVverdana\np183\nVVerdana\np184\nsVTangerine_Regular\np185\nVTangerine\np186\nsVseguili\np187\nVSegoe UI Light Italic\np188\nsVNunito-Regular\np189\nVNunito\np190\nsVSCHLBKB\np191\nVCentury Schoolbook Bold\np192\nsVGOTHICB\np193\nVCentury Gothic Bold\np194\nsVpalai\np195\nVPalatino Linotype Italic\np196\nsVBKANT\np197\nVBook Antiqua\np198\nsVLato-Italic\np199\nVLato Italic\np200\nsVPERBI___\np201\nVPerpetua Bold Italic\np202\nsVGOTHICI\np203\nVCentury Gothic Italic\np204\nsVROCKBI\np205\nVRockwell Bold Italic\np206\nsVLTYPEBO\np207\nVLucida Sans Typewriter Bold Oblique\np208\nsVAmeth___\np209\nVAmethyst\np210\nsVyearsupplyoffairycakes\np211\nVYear supply of fairy cakes\np212\nsVGILBI___\np213\nVGill Sans MT Bold Italic\np214\nsVBOOKOS\np215\nVBookman Old Style\np216\nsVVollkorn-Italic\np217\nVVollkorn Italic\np218\nsVswiss\np219\nVSwis721 BT Roman\np220\nsVcomsc\np221\nVCommercialScript BT\np222\nsVchinyen\np223\nVChinyen Normal\np224\nsVeurr____\np225\nVEuroRoman\np226\nsVROCK\np227\nVRockwell\np228\nsVPERTIBD\np229\nVPerpetua Titling MT Bold\np230\nsVCHILLER\np231\nVChiller\np232\nsVtechb___\np233\nVTechnicBold\np234\nsVLato-Light\np235\nVLato Light\np236\nsVOUTLOOK\np237\nVMS Outlook\np238\nsVmtproxy6\np239\nVProxy 6\np240\nsVdutcheb\np241\nVDutch801 XBd BT Extra Bold\np242\nsVgadugib\np243\nVGadugi Bold\np244\nsVBOD_CR\np245\nVBodoni MT Condensed\np246\nsVmtproxy7\np247\nVProxy 7\np248\nsVnobile_bold\np249\nVNobile Bold\np250\nsVELEPHNT\np251\nVElephant\np252\nsVCOPRGTL\np253\nVCopperplate Gothic Light\np254\nsVMTCORSVA\np255\nVMonotype Corsiva\np256\nsVconsolaz\np257\nVConsolas Bold Italic\np258\nsVBOOKOSBI\np259\nVBookman Old Style Bold Italic\np260\nsVtrebuc\np261\nVTrebuchet MS\np262\nsVcomici\np263\nVComic Sans MS Italic\np264\nsVJosefinSlab-BoldItalic\np265\nVJosefin Slab Bold Italic\np266\nsVMycalc__\np267\nVMycalc\np268\nsVmarlett\np269\nVMarlett\np270\nsVsymeteo_\np271\nVSymeteo\np272\nsVcandles_\np273\nVCandles\np274\nsVbobcat\np275\nVBobcat Normal\np276\nsVLSANSDI\np277\nVLucida Sans Demibold Italic\np278\nsVINFROMAN\np279\nVInformal Roman\np280\nsVsf movie poster2\np281\nVSF Movie Poster\np282\nsVcomicz\np283\nVComic Sans MS Bold Italic\np284\nsVcracj___\np285\nVCracked Johnnie\np286\nsVcourbd\np287\nVCourier New Bold\np288\nsVItali___\np289\nVItalianate\np290\nsVITCEDSCR\np291\nVEdwardian Script ITC\np292\nsVcourbi\np293\nVCourier New Bold Italic\np294\nsVcalibrili\np295\nVCalibri Light Italic\np296\nsVgazzarelli\np297\nVGazzarelli\np298\nsVGabriola\np299\nVGabriola\np300\nsVVollkorn-BoldItalic\np301\nVVollkorn Bold Italic\np302\nsVromant__\np303\nVRomanT\np304\nsVisoct3__\np305\nVISOCT3\np306\nsVsegoeuib\np307\nVSegoe UI Bold\np308\nsVtimesbd\np309\nVTimes New Roman Bold\np310\nsVgoodtime\np311\nVGood Times\np312\nsVsegoeuii\np313\nVSegoe UI Italic\np314\nsVBOD_BLAR\np315\nVBodoni MT Black\np316\nsVhimalaya\np317\nVMicrosoft Himalaya\np318\nsVsegoeuil\np319\nVSegoe UI Light\np320\nsVPermanentMarker\np321\nVPermanent Marker\np322\nsVBOD_BLAI\np323\nVBodoni MT Black Italic\np324\nsVTCBI____\np325\nVTw Cen MT Bold Italic\np326\nsVarial\np327\nVArial\np328\nsVBrand___\np329\nVBrandish\np330\nsVsegoeuiz\np331\nVSegoe UI Bold Italic\np332\nsVswisscb\np333\nVSwis721 Cn BT Bold\np334\nsVPAPYRUS\np335\nVPapyrus\np336\nsVANTIC___\np337\nVAnticFont\np338\nsVGIGI\np339\nVGigi\np340\nsVENGR\np341\nVEngravers MT\np342\nsVsegmdl2\np343\nVSegoe MDL2 Assets\np344\nsVBRLNSDB\np345\nVBerlin Sans FB Demi Bold\np346\nsVLato-BoldItalic\np347\nVLato Bold Italic\np348\nsVholomdl2\np349\nVHoloLens MDL2 Assets\np350\nsVBRITANIC\np351\nVBritannic Bold\np352\nsVNirmalaB\np353\nVNirmala UI Bold\np354\nsVVollkorn-Regular\np355\nVVollkorn\np356\nsVStephen_\np357\nVStephen\np358\nsVbabyk___\np359\nVBaby Kruffy\np360\nsVHARVEST_\np361\nVHarvest\np362\nsVKUNSTLER\np363\nVKunstler Script\np364\nsVstylu\np365\nVStylus BT Roman\np366\nsVWINGDNG3\np367\nVWingdings 3\np368\nsVWINGDNG2\np369\nVWingdings 2\np370\nsVlucon\np371\nVLucida Console\np372\nsVCandara\np373\nVCandara\np374\nsVBERNHC\np375\nVBernard MT Condensed\np376\nsVtechnic_\np377\nVTechnic\np378\nsVLimou___\np379\nVLimousine\np380\nsVTCB_____\np381\nVTw Cen MT Bold\np382\nsVPirate__\np383\nVPirate\np384\nsVFrnkvent\np385\nVFrankfurter Venetian TT\np386\nsVromand__\np387\nVRomanD\np388\nsVLTYPE\np389\nVLucida Sans Typewriter\np390\nsVSHOWG\np391\nVShowcard Gothic\np392\nsVMOD20\np393\nVModern No. 20\np394\nsVostrich-rounded\np395\nVOstrich Sans Rounded Medium\np396\nsVJosefinSlab-Italic\np397\nVJosefin Slab Italic\np398\nsVneon2\np399\nVNeon Lights\np400\nsVpalabi\np401\nVPalatino Linotype Bold Italic\np402\nsVwoodcut\np403\nVWoodcut\np404\nsVToledo__\np405\nVToledo\np406\nsVverdanai\np407\nVVerdana Italic\np408\nsVSamsungIF_Rg\np409\nVSamsung InterFace\np410\nsVtrebucbd\np411\nVTrebuchet MS Bold\np412\nsVPALSCRI\np413\nVPalace Script MT\np414\nsVComfortaa-Regular\np415\nVComfortaa\np416\nsVmicross\np417\nVMicrosoft Sans Serif\np418\nsVseguisli\np419\nVSegoe UI Semilight Italic\np420\nsVtaile\np421\nVMicrosoft Tai Le\np422\nsVcour\np423\nVCourier New\np424\nsVparryhotter\np425\nVParry Hotter\np426\nsVgreekc__\np427\nVGreekC\np428\nsVRAGE\np429\nVRage Italic\np430\nsVMATURASC\np431\nVMatura MT Script Capitals\np432\nsVBASTION_\np433\nVBastion\np434\nsVREFSAN\np435\nVMS Reference Sans Serif\np436\nsVterminat\np437\nVTerminator Two\np438\nsVmmrtextb\np439\nVMyanmar Text Bold\np440\nsVgothici_\np441\nVGothicI\np442\nsVmonotxt_\np443\nVMonotxt\np444\nsVcorbelb\np445\nVCorbel Bold\np446\nsVVALKEN__\np447\nVValken\np448\nsVRowdyhe_\np449\nVRowdyHeavy\np450\nsVLato-Black\np451\nVLato Black\np452\nsVswisski\np453\nVSwis721 Blk BT Black Italic\np454\nsVcouri\np455\nVCourier New Italic\np456\nsVMTEXTRA\np457\nVMT Extra\np458\nsVsanssbo_\np459\nVSansSerif BoldOblique\np460\nsVl_10646\np461\nVLucida Sans Unicode\np462\nsVLato-BlackItalic\np463\nVLato Black Italic\np464\nsVseguibli\np465\nVSegoe UI Black Italic\np466\nsVGeotype\np467\nVGeotype TT\np468\nsVxfiles\np469\nVX-Files\np470\nsVjavatext\np471\nVJavanese Text\np472\nsVseguisym\np473\nVSegoe UI Symbol\np474\nsVverdanaz\np475\nVVerdana Bold Italic\np476\nsVGILI____\np477\nVGill Sans MT Italic\np478\nsVALGER\np479\nVAlgerian\np480\nsVAGENCYR\np481\nVAgency FB\np482\nsVnobile\np483\nVNobile\np484\nsVHaxton\np485\nVHaxton Logos TT\np486\nsVswissbo\np487\nVSwis721 BdOul BT Bold\np488\nsVBELLI\np489\nVBell MT Italic\np490\nsVBROADW\np491\nVBroadway\np492\nsVsegoepr\np493\nVSegoe Print\np494\nsVGILLUBCD\np495\nVGill Sans Ultra Bold Condensed\np496\nsVverdanab\np497\nVVerdana Bold\np498\nsVSalina__\np499\nVSalina\np500\nsVAGENCYB\np501\nVAgency FB Bold\np502\nsVAutumn__\np503\nVAutumn\np504\nsVGOUDOS\np505\nVGoudy Old Style\np506\nsVconstanz\np507\nVConstantia Bold Italic\np508\nsVPOORICH\np509\nVPoor Richard\np510\nsVPRISTINA\np511\nVPristina\np512\nsVLATINWD\np513\nVWide Latin\np514\nsVromanc__\np515\nVRomanC\np516\nsVLeelawUI\np517\nVLeelawadee UI\np518\nsVitalict_\np519\nVItalicT\np520\nsVostrich-regular\np521\nVOstrich Sans Medium\np522\nsVmonosbi\np523\nVMonospac821 BT Bold Italic\np524\nsVcambriai\np525\nVCambria Italic\np526\nsVisocp2__\np527\nVISOCP2\np528\nsVltromatic\np529\nVLetterOMatic!\np530\nsVbgothm\np531\nVBankGothic Md BT Medium\np532\nsVbgothl\np533\nVBankGothic Lt BT Light\np534\nsVSwkeys1\np535\nVSWGamekeys MT\np536\nsVCENSCBK\np537\nVCentury Schoolbook\np538\nsVgothicg_\np539\nVGothicG\np540\nsValmosnow\np541\nVAlmonte Snow\np542\nsVTangerine_Bold\np543\nVTangerine Bold\np544\nsVswisseb\np545\nVSwis721 Ex BT Bold\np546\nsVCOLONNA\np547\nVColonna MT\np548\nsVsupef___\np549\nVSuperFrench\np550\nsVTCCEB\np551\nVTw Cen MT Condensed Extra Bold\np552\nsVsylfaen\np553\nVSylfaen\np554\nsVcomicbd\np555\nVComic Sans MS Bold\np556\nsVRoland__\np557\nVRoland\np558\nsVELEPHNTI\np559\nVElephant Italic\np560\nsVmmrtext\np561\nVMyanmar Text\np562\nsVsymap___\np563\nVSymap\np564\nsVswissko\np565\nVSwis721 BlkOul BT Black\np566\nsVswissck\np567\nVSwis721 BlkCn BT Black\np568\nsVWhimsy\np569\nVWhimsy TT\np570\nsVsanssb__\np571\nVSansSerif Bold\np572\nsVtaileb\np573\nVMicrosoft Tai Le Bold\np574\nsVcomic\np575\nVComic Sans MS\np576\nsVGLSNECB\np577\nVGill Sans MT Ext Condensed Bold\np578\nsVColbert_\np579\nVColbert\np580\nsVJOKERMAN\np581\nVJokerman\np582\nsVARIALNB\np583\nVArial Narrow Bold\np584\nsVDOMIN___\np585\nVDominican\np586\nsVBRUSHSCI\np587\nVBrush Script MT Italic\np588\nsVCALLI___\np589\nVCalligraphic\np590\nsVFRADM\np591\nVFranklin Gothic Demi\np592\nsVJosefinSlab-LightItalic\np593\nVJosefin Slab Light Italic\np594\nsVsimplex_\np595\nVSimplex\np596\nsVphagspab\np597\nVMicrosoft PhagsPa Bold\np598\nsVswissek\np599\nVSwis721 BlkEx BT Black\np600\nsVscripts_\np601\nVScriptS\np602\nsVswisscl\np603\nVSwis721 LtCn BT Light\np604\nsVCASTELAR\np605\nVCastellar\np606\nsVdutchi\np607\nVDutch801 Rm BT Italic\np608\nsVnasaliza\np609\nVNasalization Medium\np610\nsVariali\np611\nVArial Italic\np612\nsVOpinehe_\np613\nVOpineHeavy\np614\nsVPLAYBILL\np615\nVPlaybill\np616\nsVROCCB___\np617\nVRockwell Condensed Bold\np618\nsVCALIST\np619\nVCalisto MT\np620\nsVCALISTB\np621\nVCalisto MT Bold\np622\nsVHATTEN\np623\nVHaettenschweiler\np624\nsVntailu\np625\nVMicrosoft New Tai Lue\np626\nsVCALISTI\np627\nVCalisto MT Italic\np628\nsVsegoeprb\np629\nVSegoe Print Bold\np630\nsVDAYTON__\np631\nVDayton\np632\nsVswissel\np633\nVSwis721 LtEx BT Light\np634\nsVmael____\np635\nVMael\np636\nsVisoct2__\np637\nVISOCT2\np638\nsVBorea___\np639\nVBorealis\np640\nsVwingding\np641\nVWingdings\np642\nsVONYX\np643\nVOnyx\np644\nsVmonosi\np645\nVMonospac821 BT Italic\np646\nsVtimesi\np647\nVTimes New Roman Italic\np648\nsVostrich-light\np649\nVOstrich Sans Condensed Light\np650\nsVseguihis\np651\nVSegoe UI Historic\np652\nsVNovem___\np653\nVNovember\np654\nsVOCRAEXT\np655\nVOCR A Extended\np656\nsVostrich-black\np657\nVOstrich Sans Black\np658\nsVnarrow\np659\nVPR Celtic Narrow Normal\np660\nsVitalic__\np661\nVItalic\np662\nsVmonosb\np663\nVMonospac821 BT Bold\np664\nsVPERB____\np665\nVPerpetua Bold\np666\nsVCreteRound-Regular\np667\nVCrete Round\np668\nsVcalibri\np669\nVCalibri\np670\nsVSCRIPTBL\np671\nVScript MT Bold\np672\nsVComfortaa-Bold\np673\nVComfortaa Bold\np674\nsVARIALN\np675\nVArial Narrow\np676\nsVHARNGTON\np677\nVHarrington\np678\nsVJosefinSlab-Bold\np679\nVJosefin Slab Bold\np680\nsVVIVALDII\np681\nVVivaldi Italic\np682\nsVhollh___\np683\nVHollywood Hills\np684\nsVBOD_R\np685\nVBodoni MT\np686\nsVSkinny__\np687\nVSkinny\np688\nsVLBRITED\np689\nVLucida Bright Demibold\np690\nsVframdit\np691\nVFranklin Gothic Medium Italic\np692\nsVsymusic_\np693\nVSymusic\np694\nsVgadugi\np695\nVGadugi\np696\nsVswissbi\np697\nVSwis721 BT Bold Italic\np698\nsVBOD_B\np699\nVBodoni MT Bold\np700\nsVERASDEMI\np701\nVEras Demi ITC\np702\nsVWaverly_\np703\nVWaverly\np704\nsVcompi\np705\nVCommercialPi BT\np706\nsVBOD_I\np707\nVBodoni MT Italic\np708\nsVconstan\np709\nVConstantia\np710\nsVARIALNBI\np711\nVArial Narrow Bold Italic\np712\nsVarialbi\np713\nVArial Bold Italic\np714\nsVJosefinSlab-Light\np715\nVJosefin Slab Light\np716\nsVBOD_CBI\np717\nVBodoni MT Condensed Bold Italic\np718\nsVwebdings\np719\nVWebdings\np720\nsVRAVIE\np721\nVRavie\np722\nsVROCC____\np723\nVRockwell Condensed\np724\nsVFELIXTI\np725\nVFelix Titling\np726\nsVRussrite\np727\nVRussel Write TT\np728\nsVisocteur\np729\nVISOCTEUR\np730\nsVLSANSD\np731\nVLucida Sans Demibold Roman\np732\nsVmalgun\np733\nVMalgun Gothic\np734\nsVheavyhea2\np735\nVHeavy Heap\np736\nsVGOUDYSTO\np737\nVGoudy Stout\np738\nsVVLADIMIR\np739\nVVladimir Script\np740\nsVARIALUNI\np741\nVArial Unicode MS\np742\nsVJosefinSlab-Thin\np743\nVJosefin Slab Thin\np744\nsVFRADMCN\np745\nVFranklin Gothic Demi Cond\np746\nsVBlackout-2am\np747\nVBlackout 2 AM\np748\nsVpalab\np749\nVPalatino Linotype Bold\np750\nsVDejaVuSansMono-Oblique\np751\nVDejaVu Sans Mono Oblique\np752\nsVANTQUABI\np753\nVBook Antiqua Bold Italic\np754\nsVswissc\np755\nVSwis721 Cn BT Roman\np756\nsVSPLASH__\np757\nVSplash\np758\nsVNIAGENG\np759\nVNiagara Engraved\np760\nsVCOPRGTB\np761\nVCopperplate Gothic Bold\np762\nsVBruss___\np763\nVBrussels\np764\nsVconsolab\np765\nVConsolas Bold\np766\nsVGOTHICBI\np767\nVCentury Gothic Bold Italic\np768\nsVmtproxy4\np769\nVProxy 4\np770\nsVmtproxy5\np771\nVProxy 5\np772\nsVromai___\np773\nVRomantic Italic\np774\nsVFRABKIT\np775\nVFranklin Gothic Book Italic\np776\nsVBELL\np777\nVBell MT\np778\nsVmtproxy1\np779\nVProxy 1\np780\nsVmtproxy2\np781\nVProxy 2\np782\nsVmtproxy3\np783\nVProxy 3\np784\nsVLCALLIG\np785\nVLucida Calligraphy Italic\np786\nsVphagspa\np787\nVMicrosoft PhagsPa\np788\nsVANTQUAI\np789\nVBook Antiqua Italic\np790\nsVmtproxy8\np791\nVProxy 8\np792\nsVmtproxy9\np793\nVProxy 9\np794\nsVLato-Bold\np795\nVLato Bold\np796\nsVtxt_____\np797\nVTxt\np798\nsVconstanb\np799\nVConstantia Bold\np800\nsVERASBD\np801\nVEras Bold ITC\np802\nsVLato-LightItalic\np803\nVLato Light Italic\np804\nsVRONDALO_\np805\nVRondalo\np806\nsVconstani\np807\nVConstantia Italic\np808\nsVBRLNSB\np809\nVBerlin Sans FB Bold\np810\nsVgeorgiaz\np811\nVGeorgia Bold Italic\np812\nsVgothice_\np813\nVGothicE\np814\nsVcalibriz\np815\nVCalibri Bold Italic\np816\nsVgeorgiab\np817\nVGeorgia Bold\np818\nsVLeelaUIb\np819\nVLeelawadee UI Bold\np820\nsVtimesbi\np821\nVTimes New Roman Bold Italic\np822\nsVPERI____\np823\nVPerpetua Italic\np824\nsVromab___\np825\nVRomantic Bold\np826\nsVBRLNSR\np827\nVBerlin Sans FB\np828\nsVBELLB\np829\nVBell MT Bold\np830\nsVgeorgiai\np831\nVGeorgia Italic\np832\nsVNirmalaS\np833\nVNirmala UI Semilight\np834\nsVdutchb\np835\nVDutch801 Rm BT Bold\np836\nsVdigifit\np837\nVDigifit Normal\np838\nsVROCKEB\np839\nVRockwell Extra Bold\np840\nsVgdt_____\np841\nVGDT\np842\nsVmonbaiti\np843\nVMongolian Baiti\np844\nsVsegoescb\np845\nVSegoe Script Bold\np846\nsVsymath__\np847\nVSymath\np848\nsVisoct___\np849\nVISOCT\np850\nsVTarzan__\np851\nVTarzan\np852\nsVsnowdrft\np853\nVSnowdrift\np854\nsVHTOWERTI\np855\nVHigh Tower Text Italic\np856\nsVCENTURY\np857\nVCentury\np858\nsVmalgunsl\np859\nVMalgun Gothic Semilight\np860\nsVseguibl\np861\nVSegoe UI Black\np862\nsVCreteRound-Italic\np863\nVCrete Round Italic\np864\nsVAlfredo_\np865\nVAlfredo\np866\nsVCOMMONS_\np867\nVCommons\np868\nsVLFAX\np869\nVLucida Fax\np870\nsVLBRITEI\np871\nVLucida Bright Italic\np872\nsVFRAHV\np873\nVFranklin Gothic Heavy\np874\nsVisocteui\np875\nVISOCTEUR Italic\np876\nsVManorly_\np877\nVManorly\np878\nsVBolstbo_\np879\nVBolsterBold Bold\np880\nsVsegoeui\np881\nVSegoe UI\np882\nsVNunito-Light\np883\nVNunito Light\np884\nsVIMPRISHA\np885\nVImprint MT Shadow\np886\nsVgeorgia\np887\nVGeorgia\np888\nsV18cents\np889\nV18thCentury\np890\nsVMOONB___\np891\nVMoonbeam\np892\nsVPER_____\np893\nVPerpetua\np894\nsVHansen__\np895\nVHansen\np896\nsVLato-Regular\np897\nVLato\np898\nsVBOUTON_International_symbols\np899\nVBOUTON International Symbols\np900\nsVCOOPBL\np901\nVCooper Black\np902\nsVmonos\np903\nVMonospac821 BT Roman\np904\nsVtahoma\np905\nVTahoma\np906\nsVcityb___\np907\nVCityBlueprint\np908\nsVswisscbi\np909\nVSwis721 Cn BT Bold Italic\np910\nsVEnliven_\np911\nVEnliven\np912\nsVLeelUIsl\np913\nVLeelawadee UI Semilight\np914\nsVCALIFR\np915\nVCalifornian FB\np916\nsVumath\np917\nVUniversalMath1 BT\np918\nsVswisscbo\np919\nVSwis721 BdCnOul BT Bold Outline\np920\nsVcomplex_\np921\nVComplex\np922\nsVBOOKOSB\np923\nVBookman Old Style Bold\np924\nsVMartina_\np925\nVMartina\np926\nsVromans__\np927\nVRomanS\np928\nsVmvboli\np929\nVMV Boli\np930\nsVCALIFI\np931\nVCalifornian FB Italic\np932\nsVGARABD\np933\nVGaramond Bold\np934\nsVebrima\np935\nVEbrima\np936\nsVTEMPSITC\np937\nVTempus Sans ITC\np938\nsVCALIFB\np939\nVCalifornian FB Bold\np940\nsVitalicc_\np941\nVItalicC\np942\nsVisocp3__\np943\nVISOCP3\np944\nsVscriptc_\np945\nVScriptC\np946\nsValiee13\np947\nVAlien Encounters\np948\nsVnobile_italic\np949\nVNobile Italic\np950\nsVGARAIT\np951\nVGaramond Italic\np952\nsVswissli\np953\nVSwis721 Lt BT Light Italic\np954\nsVCabinSketch-Bold\np955\nVCabinSketch Bold\np956\nsVcorbel\np957\nVCorbel\np958\nsVseguisbi\np959\nVSegoe UI Semibold Italic\np960\nsVSCHLBKBI\np961\nVCentury Schoolbook Bold Italic\np962\nsVasimov\np963\nVAsimov\np964\nsVLFAXDI\np965\nVLucida Fax Demibold Italic\np966\nsVBRADHITC\np967\nVBradley Hand ITC\np968\nsVswisscki\np969\nVSwis721 BlkCn BT Black Italic\np970\nsVGILSANUB\np971\nVGill Sans Ultra Bold\np972\nsVHARLOWSI\np973\nVHarlow Solid Italic Italic\np974\nsVHARVEIT_\np975\nVHarvestItal\np976\nsVcambriab\np977\nVCambria Bold\np978\nsVswissci\np979\nVSwis721 Cn BT Italic\np980\nsVcounb___\np981\nVCountryBlueprint\np982\nsVNotram__\np983\nVNotram\np984\nsVPENULLI_\np985\nVPenultimateLight\np986\nsVtahomabd\np987\nVTahoma Bold\np988\nsVMISTRAL\np989\nVMistral\np990\nsVpala\np991\nVPalatino Linotype\np992\nsVOLDENGL\np993\nVOld English Text MT\np994\nsVinductio\np995\nVInduction Normal\np996\nsVJosefinSlab-SemiBoldItalic\np997\nVJosefin Slab SemiBold Italic\np998\nsVMinerva_\np999\nVMinerva\np1000\nsVsymbol\np1001\nVSymbol\np1002\nsVcambriaz\np1003\nVCambria Bold Italic\np1004\nsVtrebucbi\np1005\nVTrebuchet MS Bold Italic\np1006\nsVtimes\np1007\nVTimes New Roman\np1008\nsVERASLGHT\np1009\nVEras Light ITC\np1010\nsVSteppes\np1011\nVSteppes TT\np1012\nsVREFSPCL\np1013\nVMS Reference Specialty\np1014\nsVPARCHM\np1015\nVParchment\np1016\nsVDejaVuSansMono-Bold\np1017\nVDejaVu Sans Mono Bold\np1018\nsVswisscli\np1019\nVSwis721 LtCn BT Light Italic\np1020\nsVLSANS\np1021\nVLucida Sans\np1022\nsVPhrasme_\np1023\nVPhrasticMedium\np1024\nsVDejaVuSansMono-BoldOblique\np1025\nVDejaVu Sans Mono Bold Oblique\np1026\nsVarialbd\np1027\nVArial Bold\np1028\nsVSNAP____\np1029\nVSnap ITC\np1030\nsVArchitectsDaughter\np1031\nVArchitects Daughter\np1032\nsVCorpo___\np1033\nVCorporate\np1034\nsVeurro___\np1035\nVEuroRoman Oblique\np1036\nsVimpact\np1037\nVImpact\np1038\nsVlittlelo\np1039\nVLittleLordFontleroy\np1040\nsVsimsunb\np1041\nVSimSun-ExtB\np1042\nsVARIALNI\np1043\nVArial Narrow Italic\np1044\nsVdutchbi\np1045\nVDutch801 Rm BT Bold Italic\np1046\nsVcalibrii\np1047\nVCalibri Italic\np1048\nsVDeneane_\np1049\nVDeneane\np1050\nsVFRADMIT\np1051\nVFranklin Gothic Demi Italic\np1052\nsVANTQUAB\np1053\nVBook Antiqua Bold\np1054\nsVcalibril\np1055\nVCalibri Light\np1056\nsVisocpeui\np1057\nVISOCPEUR Italic\np1058\nsVpanroman\np1059\nVPanRoman\np1060\nsVMelodbo_\np1061\nVMelodBold Bold\np1062\nsVcalibrib\np1063\nVCalibri Bold\np1064\nsVdistant galaxy 2\np1065\nVDistant Galaxy\np1066\nsVPacifico\np1067\nVPacifico\np1068\nsVnobile_bold_italic\np1069\nVNobile Bold Italic\np1070\nsVmsyi\np1071\nVMicrosoft Yi Baiti\np1072\nsVBOD_PSTC\np1073\nVBodoni MT Poster Compressed\np1074\nsVLSANSI\np1075\nVLucida Sans Italic\np1076\nsVcreerg__\np1077\nVCreepygirl\np1078\nsVsegoeuisl\np1079\nVSegoe UI Semilight\np1080\nsVvinet\np1081\nVVineta BT\np1082\nsVisocpeur\np1083\nVISOCPEUR\np1084\nsVtechl___\np1085\nVTechnicLite\np1086\nsVswissb\np1087\nVSwis721 BT Bold\np1088\nsVCLARE___\np1089\nVClarendon\np1090\nsVdutch\np1091\nVDutch801 Rm BT Roman\np1092\nsVLBRITEDI\np1093\nVLucida Bright Demibold Italic\np1094\nsVswisse\np1095\nVSwis721 Ex BT Roman\np1096\nsVswissk\np1097\nVSwis721 Blk BT Black\np1098\nsVswissi\np1099\nVSwis721 BT Italic\np1100\nsVfingerpop2\np1101\nVFingerpop\np1102\nsVswissl\np1103\nVSwis721 Lt BT Light\np1104\nsVBAUHS93\np1105\nVBauhaus 93\np1106\nsVVivian__\np1107\nVVivian\np1108\nsVgreeks__\np1109\nVGreekS\np1110\nsVGOUDOSI\np1111\nVGoudy Old Style Italic\np1112\nsVBOD_BI\np1113\nVBodoni MT Bold Italic\np1114\nsVLHANDW\np1115\nVLucida Handwriting Italic\np1116\nsVITCKRIST\np1117\nVKristen ITC\np1118\nsVBALTH___\np1119\nVBalthazar\np1120\nsVFORTE\np1121\nVForte\np1122\nsVJosefinSlab-Regular\np1123\nVJosefin Slab\np1124\nsVROCKI\np1125\nVRockwell Italic\np1126\nsVGOUDOSB\np1127\nVGoudy Old Style Bold\np1128\nsVLEELAWAD\np1129\nVLeelawadee\np1130\nsVLEELAWDB\np1131\nVLeelawadee Bold\np1132\nsVmarlett_0\np1133\nVMarlett\np1134\nsVmplus-1m-bold\np1135\nVM+ 1m bold\np1136\nsVmplus-1m-light\np1137\nVM+ 1m light\np1138\nsVmplus-1m-medium\np1139\nVM+ 1m medium\np1140\nsVmplus-1m-regular\np1141\nVM+ 1m\np1142\nsVmplus-1m-thin\np1143\nVM+ 1m thin\np1144\nsVMSUIGHUB\np1145\nVMicrosoft Uighur Bold\np1146\nsVMSUIGHUR\np1147\nVMicrosoft Uighur\np1148\nsVSamsungIF_Md_0\np1149\nVSamsung InterFace Medium\np1150\nsVSamsungIF_Rg_0\np1151\nVSamsung InterFace\np1152\nsVbahnschrift\np1153\nVBahnschrift\np1154\nsVBowlbyOneSC-Regular\np1155\nVBowlby One SC\np1156\nsVCabinSketch-Regular\np1157\nVCabin Sketch\np1158\nsVCookie-Regular\np1159\nVCookie\np1160\nsVCourgette-Regular\np1161\nVCourgette\np1162\nsVdead\np1163\nVDead Kansas\np1164\nsVDoppioOne-Regular\np1165\nVDoppio One\np1166\nsVeuphorig\np1167\nVEuphorigenic\np1168\nsVGreatVibes-Regular\np1169\nVGreat Vibes\np1170\nsVKalam-Bold\np1171\nVKalam Bold\np1172\nsVKalam-Light\np1173\nVKalam Light\np1174\nsVKalam-Regular\np1175\nVKalam\np1176\nsVLemon-Regular\np1177\nVLemon\np1178\nsVLimelight-Regular\np1179\nVLimelight\np1180\nsVMegrim\np1181\nVMegrim Medium\np1182\nsVMontserratSubrayada-Bold\np1183\nVMontserrat Subrayada Bold\np1184\nsVNotoSans-Regular\np1185\nVNoto Sans\np1186\nsVRussoOne-Regular\np1187\nVRusso One\np1188\nsVSigmarOne-Regular\np1189\nVSigmar One\np1190\nsVYellowtail-Regular\np1191\nVYellowtail\np1192\ns."  # NOQA
+        )
     return _std_fonts.cached
 
 
 def fonts():
-    if not hasattr(fonts, 'font_list'):
+    if not hasattr(fonts, "font_list"):
         fonts.font_list = []
         if Pythonista:
-            UIFont = objc_util.ObjCClass('UIFont')
+            UIFont = objc_util.ObjCClass("UIFont")
             for family in UIFont.familyNames():
                 family = str(family)
                 try:
                     ImageFont.truetype(family)
                     fonts.font_list.append(((family,), family))
-                except:  # NOQA
+                except Exception:
                     pass
 
                 for name in UIFont.fontNamesForFamilyName_(family):
@@ -14456,23 +15003,23 @@ def fonts():
         if cur_dir != salabim_dir:
             dirs.append(cur_dir)
         if Windows:
-            dirs.append(r'c:\windows\fonts')
+            dirs.append(r"c:\windows\fonts")
 
         for dir in dirs:
-            for file in glob.glob(dir + os.sep + '*.ttf'):
-                fn = os.path.basename(file).split('.')[0]
+            for file in glob.glob(dir + os.sep + "*.ttf"):
+                fn = os.path.basename(file).split(".")[0]
                 if fn in _std_fonts():
                     fullname = _std_fonts()[fn]
                 else:
                     f = ImageFont.truetype(file, 12)
                     if f is None:
-                        fullname = ''
+                        fullname = ""
                     else:
-                        if str(f.font.style).lower() == 'regular':
+                        if str(f.font.style).lower() == "regular":
                             fullname = str(f.font.family)
                         else:
-                            fullname = str(f.font.family) + ' ' + str(f.font.style)
-                if fullname != '':
+                            fullname = str(f.font.family) + " " + str(f.font.style)
+                if fullname != "":
                     if fn.lower() == fullname.lower():
                         fonts.font_list.append(((fullname,), file))
                     else:
@@ -14481,16 +15028,11 @@ def fonts():
 
 
 def standardfonts():
-    return {
-        '': 'calibri',
-        'std': 'calibri',
-        'mono': 'DejaVuSansMono',
-        'narrow': 'mplus-1m-regular'
-    }
+    return {"": "calibri", "std": "calibri", "mono": "DejaVuSansMono", "narrow": "mplus-1m-regular"}
 
 
 def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
-    if hasattr(getfont, 'lookup'):
+    if hasattr(getfont, "lookup"):
         if (fontname, fontsize) in getfont.lookup:
             return getfont.lookup[(fontname, fontsize)]
     else:
@@ -14501,7 +15043,7 @@ def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
     else:
         fontlist1 = list(fontname)
 
-    fontlist1.extend(['calibri', 'arial'])
+    fontlist1.extend(["calibri", "arial"])
 
     fontlist = [standardfonts().get(f.lower(), f) for f in fontlist1]
 
@@ -14512,42 +15054,42 @@ def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
         try:
             result = ImageFont.truetype(font=ifont, size=int(fontsize))
             break
-        except:  # NOQA
+        except Exception:
             pass
 
-        filename = ''
+        filename = ""
         for fns, ifilename in fonts():
             for fn in fns:
                 if normalize(fn) == normalize(ifont):
                     filename = ifilename
                     break
-            if filename != '':
+            if filename != "":
                 break
-        if filename != '':
+        if filename != "":
             try:
                 result = ImageFont.truetype(font=filename, size=int(fontsize))
                 break
-            except:  # NOQA
+            except Exception:
                 pass
 
     if result is None:
         result = ImageFont.load_default()  # last resort
 
-    heightA = result.getsize('A')[1]
+    heightA = result.getsize("A")[1]
     getfont.lookup[(fontname, fontsize)] = result, heightA
     return result, heightA
 
 
 def show_fonts():
-    '''
+    """
     show (print) all available fonts on this machine
-    '''
+    """
     fontnames = []
     for fns, ifilename in fonts():
         for fn in fns:
             fontnames.append(fn)
     fontnames.extend(list(standardfonts()))
-    last = ''
+    last = ""
     for font in sorted(fontnames, key=normalize):
         if font != last:  # remove duplicates
             print(font)
@@ -14555,29 +15097,29 @@ def show_fonts():
 
 
 def show_colornames():
-    '''
+    """
     show (print) all available color names and their value.
-    '''
+    """
     names = sorted(colornames())
     for name in names:
-        print('{:22s}{}'.format(name, colornames()[name]))
+        print("{:22s}{}".format(name, colornames()[name]))
 
 
 def arrow_polygon(size):
-    '''
+    """
     creates a polygon tuple with a centerd arrow for use with sim.Animate
 
     Parameters
     ----------
     size : float
         length of the arrow
-    '''
+    """
     size /= 4
     return (-2 * size, -size, 0, -size, 0, -2 * size, 2 * size, 0, 0, 2 * size, 0, size, -2 * size, size)
 
 
 def centered_rectangle(width, height):
-    '''
+    """
     creates a rectangle tuple with a centered rectangle for use with sim.Animate
 
     Parameters
@@ -14587,12 +15129,12 @@ def centered_rectangle(width, height):
 
     height : float
         height of the rectangle
-    '''
+    """
     return -width / 2, -height / 2, width / 2, height / 2
 
 
 def regular_polygon(radius=1, number_of_sides=3, initial_angle=0):
-    '''
+    """
     creates a polygon tuple with a regular polygon (within a circle) for use with sim.Animate
 
     Parameters
@@ -14609,10 +15151,10 @@ def regular_polygon(radius=1, number_of_sides=3, initial_angle=0):
     initial_angle : float
         angle of the first corner point, relative to the origin |n|
         default : 0
-    '''
+    """
     number_of_sides = int(number_of_sides)
     if number_of_sides < 3:
-        raise ValueError('number of sides < 3')
+        raise ValueError("number of sides < 3")
     tangle = 2 * math.pi / number_of_sides
     sint = math.sin(tangle)
     cost = math.cos(tangle)
@@ -14629,7 +15171,7 @@ def regular_polygon(radius=1, number_of_sides=3, initial_angle=0):
 
 
 def can_animate(try_only=True):
-    '''
+    """
     Tests whether animation is supported.
 
     Parameters
@@ -14641,7 +15183,7 @@ def can_animate(try_only=True):
     Returns
     -------
     True, if required modules could be imported, False otherwise : bool
-    '''
+    """
     global Image
     global ImageDraw
     global ImageFont
@@ -14654,12 +15196,13 @@ def can_animate(try_only=True):
         from PIL import ImageDraw
         from PIL import ImageFont
         from PIL import GifImagePlugin
+
         if not Pythonista:
             from PIL import ImageTk
     except ImportError:
         if try_only:
             return False
-        raise ImportError('PIL is required for animation. Install with pip install Pillow or see salabim manual')
+        raise ImportError("PIL is required for animation. Install with pip install Pillow or see salabim manual")
 
     if not Pythonista:
         try:
@@ -14670,12 +15213,12 @@ def can_animate(try_only=True):
             except ImportError:
                 if try_only:
                     return False
-                raise ImportError('tkinter is required for animation')
+                raise ImportError("tkinter is required for animation")
     return True
 
 
 def can_video(try_only=True):
-    '''
+    """
     Tests whether video is supported.
 
     Parameters
@@ -14687,13 +15230,13 @@ def can_video(try_only=True):
     Returns
     -------
     True, if required modules could be imported, False otherwise : bool
-    '''
+    """
     global cv2
     global np
     if Pythonista:
         if try_only:
             return False
-        raise NotImplementedError('video production not supported on Pythonista')
+        raise NotImplementedError("video production not supported on Pythonista")
     else:
         try:
             import cv2
@@ -14701,33 +15244,33 @@ def can_video(try_only=True):
         except ImportError:
             if try_only:
                 return False
-            if platform.python_implementation == 'PyPy':
-                raise NotImplementedError('video production is not supported under PyPy.')
+            if platform.python_implementation == "PyPy":
+                raise NotImplementedError("video production is not supported under PyPy.")
             else:
-                raise ImportError('cv2 required for video production. Install with pip install opencv-python')
+                raise ImportError("cv2 required for video production. Install with pip install opencv-python")
     return True
 
 
 def default_env():
-    '''
+    """
     Returns
     -------
     default environment : Environment
-    '''
+    """
     return g.default_env
 
 
 def reset():
-    '''
+    """
     resets global variables
 
     used internally at import of salabim
 
     might be useful for REPLs or for Pythonista
-    '''
+    """
     try:
         g.default_env.video_close()
-    except:  # NOQA
+    except Exception:
         pass
 
     g.default_env = None
@@ -14738,17 +15281,18 @@ def reset():
 
 reset()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         import salabim_test
-    except Exception:
-        print('salabim_test.py not found or ?')
+    except Exception as e:
+        print("salabim_test.py not found or ?")
+        raise e
         quit()
 
     try:
-        salabim_test.__dict__['test']
+        salabim_test.__dict__["test"]
     except KeyError:
-        print('salabim_test.test() not found')
+        print("salabim_test.test() not found")
         quit()
 
     salabim_test.test()
