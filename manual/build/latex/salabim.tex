@@ -54,8 +54,8 @@
 
 
 \title{salabim Documentation}
-\date{Oct 25, 2018}
-\release{2.4.1}
+\date{Nov 01, 2018}
+\release{2.4.2}
 \author{Ruud van der Ham}
 \newcommand{\sphinxlogo}{\vbox{}}
 \renewcommand{\releasename}{Release}
@@ -252,10 +252,12 @@ process interaction, component definition and output:
 \PYG{c+c1}{\PYGZsh{} Example \PYGZhy{} basic.py}
 \PYG{k+kn}{import} \PYG{n+nn}{salabim} \PYG{k}{as} \PYG{n+nn}{sim}
 
+
 \PYG{k}{class} \PYG{n+nc}{Car}\PYG{p}{(}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{Component}\PYG{p}{)}\PYG{p}{:}
     \PYG{k}{def} \PYG{n+nf}{process}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{)}\PYG{p}{:}
         \PYG{k}{while} \PYG{k+kc}{True}\PYG{p}{:}
             \PYG{k}{yield} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{hold}\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{p}{)}
+
 
 \PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{trace}\PYG{o}{=}\PYG{k+kc}{True}\PYG{p}{)}
 \PYG{n}{Car}\PYG{p}{(}\PYG{p}{)}
@@ -288,7 +290,7 @@ It is also possible to import all methods, classes and globals by
 The main body of every salabim model usually starts with
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
-\PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{parameters}\PYG{p}{)}
+\PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{p}{)}
 \end{sphinxVerbatim}
 
 For each (active) component we define a class as in
@@ -310,7 +312,7 @@ In this example,
 \PYG{k}{yield} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{hold}\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{p}{)}
 \end{sphinxVerbatim}
 
-gives control,to the sequence mechanism and \sphinxstyleemphasis{comes back} after 1 time unit. The self. part means that
+gives control,to the sequence mechanism and \sphinxstyleemphasis{comes back} after 1 time unit. The \sphinxtitleref{self.} part means that
 it is this component to be held for some time. We will see later other uses of yield like passivate,
 request, wait and standby.
 
@@ -408,9 +410,9 @@ The model code is:
 
 \PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{trace}\PYG{o}{=}\PYG{k+kc}{True}\PYG{p}{)}
 
-\PYG{n}{CustomerGenerator}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} using name=\PYGZsq{}\PYGZsq{} prevents the name customergenerator to be serialized}
+\PYG{n}{CustomerGenerator}\PYG{p}{(}\PYG{p}{)}
 \PYG{n}{clerk} \PYG{o}{=} \PYG{n}{Clerk}\PYG{p}{(}\PYG{p}{)}
-\PYG{n}{waitingline} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Queue}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{waitingline}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{waitingline} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Queue}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{waitingline}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
 
 \PYG{n}{env}\PYG{o}{.}\PYG{n}{run}\PYG{p}{(}\PYG{n}{till}\PYG{o}{=}\PYG{l+m+mi}{50}\PYG{p}{)}
 \PYG{n+nb}{print}\PYG{p}{(}\PYG{p}{)}
@@ -610,11 +612,11 @@ The complete source of a three clerk post office:
             \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{customer}\PYG{o}{.}\PYG{n}{activate}\PYG{p}{(}\PYG{p}{)}
 
 
-\PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{trace}\PYG{o}{=}\PYG{k+kc}{False}\PYG{p}{)}
-\PYG{n}{CustomerGenerator}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{trace}\PYG{o}{=}\PYG{k+kc}{True}\PYG{p}{)}
+\PYG{n}{CustomerGenerator}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} avoid serialization}
 \PYG{n}{clerks} \PYG{o}{=} \PYG{p}{[}\PYG{n}{Clerk}\PYG{p}{(}\PYG{p}{)} \PYG{k}{for} \PYG{n}{\PYGZus{}} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{l+m+mi}{3}\PYG{p}{)}\PYG{p}{]}
 
-\PYG{n}{waitingline} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Queue}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{waitingline}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{waitingline} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Queue}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{waitingline}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
 
 \PYG{n}{env}\PYG{o}{.}\PYG{n}{run}\PYG{p}{(}\PYG{n}{till}\PYG{o}{=}\PYG{l+m+mi}{50000}\PYG{p}{)}
 \PYG{n}{waitingline}\PYG{o}{.}\PYG{n}{print\PYGZus{}histograms}\PYG{p}{(}\PYG{p}{)}
@@ -653,8 +655,8 @@ The model code is:
 
 
 \PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{trace}\PYG{o}{=}\PYG{k+kc}{False}\PYG{p}{)}
-\PYG{n}{CustomerGenerator}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{customergenerator}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-\PYG{n}{clerks} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Resource}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{clerks}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{capacity}\PYG{o}{=}\PYG{l+m+mi}{3}\PYG{p}{)}
+\PYG{n}{CustomerGenerator}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{customergenerator}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
+\PYG{n}{clerks} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Resource}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{clerks}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{capacity}\PYG{o}{=}\PYG{l+m+mi}{3}\PYG{p}{)}
 
 \PYG{n}{env}\PYG{o}{.}\PYG{n}{run}\PYG{p}{(}\PYG{n}{till}\PYG{o}{=}\PYG{l+m+mi}{50000}\PYG{p}{)}
 
@@ -690,7 +692,10 @@ And after these 10 time units, the customer releases the resource with
 
 The effect is that salabim then tries to honor the next pending request, if any.
 
-The statistics are maintained in a system queue, called clerk.requesters().
+\sphinxtitleref{(actually, in this case this release statement is not required, as resources that were claimed are automatically
+released when a process terminates).}
+
+The statistics are maintained in two system queue, called clerk.requesters() and clerk.claimers().
 
 The output is very similar to the earlier example. The statistics are exactly the same.
 
@@ -719,7 +724,7 @@ The model code is:
     \PYG{k}{def} \PYG{n+nf}{process}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{)}\PYG{p}{:}
         \PYG{k}{if} \PYG{n+nb}{len}\PYG{p}{(}\PYG{n}{waitingline}\PYG{p}{)} \PYG{o}{\PYGZgt{}}\PYG{o}{=} \PYG{l+m+mi}{5}\PYG{p}{:}
             \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}balked} \PYG{o}{+}\PYG{o}{=} \PYG{l+m+mi}{1}
-            \PYG{n}{env}\PYG{o}{.}\PYG{n}{print\PYGZus{}trace}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{balked}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+            \PYG{n}{env}\PYG{o}{.}\PYG{n}{print\PYGZus{}trace}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{balked}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
             \PYG{k}{yield} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{cancel}\PYG{p}{(}\PYG{p}{)}
         \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{enter}\PYG{p}{(}\PYG{n}{waitingline}\PYG{p}{)}
         \PYG{k}{for} \PYG{n}{clerk} \PYG{o+ow}{in} \PYG{n}{clerks}\PYG{p}{:}
@@ -730,7 +735,7 @@ The model code is:
         \PYG{k}{if} \PYG{n+nb+bp}{self} \PYG{o+ow}{in} \PYG{n}{waitingline}\PYG{p}{:}
             \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{leave}\PYG{p}{(}\PYG{n}{waitingline}\PYG{p}{)}
             \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}reneged} \PYG{o}{+}\PYG{o}{=} \PYG{l+m+mi}{1}
-            \PYG{n}{env}\PYG{o}{.}\PYG{n}{print\PYGZus{}trace}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{reneged}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+            \PYG{n}{env}\PYG{o}{.}\PYG{n}{print\PYGZus{}trace}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{reneged}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
         \PYG{k}{else}\PYG{p}{:}
             \PYG{k}{yield} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{passivate}\PYG{p}{(}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} wait for service to be completed}
 
@@ -747,12 +752,12 @@ The model code is:
 
 
 \PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{trace}\PYG{o}{=}\PYG{k+kc}{False}\PYG{p}{)}
-\PYG{n}{CustomerGenerator}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{customergenerator}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{CustomerGenerator}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{customergenerator}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
 \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}balked} \PYG{o}{=} \PYG{l+m+mi}{0}
 \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}reneged} \PYG{o}{=} \PYG{l+m+mi}{0}
 \PYG{n}{clerks} \PYG{o}{=} \PYG{p}{[}\PYG{n}{Clerk}\PYG{p}{(}\PYG{p}{)} \PYG{k}{for} \PYG{n}{\PYGZus{}} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{l+m+mi}{3}\PYG{p}{)}\PYG{p}{]}
 
-\PYG{n}{waitingline} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Queue}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{waitingline}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{waitingline} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Queue}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{waitingline}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
 \PYG{n}{waitingline}\PYG{o}{.}\PYG{n}{length}\PYG{o}{.}\PYG{n}{monitor}\PYG{p}{(}\PYG{k+kc}{False}\PYG{p}{)}
 \PYG{n}{env}\PYG{o}{.}\PYG{n}{run}\PYG{p}{(}\PYG{n}{duration}\PYG{o}{=}\PYG{l+m+mi}{1500}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} first do a prerun of 1500 time units without collecting data}
 \PYG{n}{waitingline}\PYG{o}{.}\PYG{n}{length}\PYG{o}{.}\PYG{n}{monitor}\PYG{p}{(}\PYG{k+kc}{True}\PYG{p}{)}
@@ -760,9 +765,8 @@ The model code is:
 \PYG{n}{waitingline}\PYG{o}{.}\PYG{n}{length}\PYG{o}{.}\PYG{n}{print\PYGZus{}histogram}\PYG{p}{(}\PYG{l+m+mi}{30}\PYG{p}{,} \PYG{l+m+mi}{0}\PYG{p}{,} \PYG{l+m+mi}{1}\PYG{p}{)}
 \PYG{n+nb}{print}\PYG{p}{(}\PYG{p}{)}
 \PYG{n}{waitingline}\PYG{o}{.}\PYG{n}{length\PYGZus{}of\PYGZus{}stay}\PYG{o}{.}\PYG{n}{print\PYGZus{}histogram}\PYG{p}{(}\PYG{l+m+mi}{30}\PYG{p}{,} \PYG{l+m+mi}{0}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{)}
-\PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{number reneged}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}reneged}\PYG{p}{)}
-\PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{number balked}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}balked}\PYG{p}{)}
-
+\PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{number reneged}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}reneged}\PYG{p}{)}
+\PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{number balked}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}balked}\PYG{p}{)}
 \end{sphinxVerbatim}
 
 Let’s look at some details.
@@ -819,30 +823,30 @@ The model code is:
     \PYG{k}{def} \PYG{n+nf}{process}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{)}\PYG{p}{:}
         \PYG{k}{if} \PYG{n+nb}{len}\PYG{p}{(}\PYG{n}{clerks}\PYG{o}{.}\PYG{n}{requesters}\PYG{p}{(}\PYG{p}{)}\PYG{p}{)} \PYG{o}{\PYGZgt{}}\PYG{o}{=} \PYG{l+m+mi}{5}\PYG{p}{:}
             \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}balked} \PYG{o}{+}\PYG{o}{=} \PYG{l+m+mi}{1}
-            \PYG{n}{env}\PYG{o}{.}\PYG{n}{print\PYGZus{}trace}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{balked}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+            \PYG{n}{env}\PYG{o}{.}\PYG{n}{print\PYGZus{}trace}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{balked}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
             \PYG{k}{yield} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{cancel}\PYG{p}{(}\PYG{p}{)}
         \PYG{k}{yield} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{request}\PYG{p}{(}\PYG{n}{clerks}\PYG{p}{,} \PYG{n}{fail\PYGZus{}delay}\PYG{o}{=}\PYG{l+m+mi}{50}\PYG{p}{)}
         \PYG{k}{if} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{failed}\PYG{p}{(}\PYG{p}{)}\PYG{p}{:}
             \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}reneged} \PYG{o}{+}\PYG{o}{=} \PYG{l+m+mi}{1}
-            \PYG{n}{env}\PYG{o}{.}\PYG{n}{print\PYGZus{}trace}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{reneged}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+            \PYG{n}{env}\PYG{o}{.}\PYG{n}{print\PYGZus{}trace}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{reneged}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
         \PYG{k}{else}\PYG{p}{:}
             \PYG{k}{yield} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{hold}\PYG{p}{(}\PYG{l+m+mi}{30}\PYG{p}{)}
             \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{release}\PYG{p}{(}\PYG{p}{)}
 
 
 \PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{trace}\PYG{o}{=}\PYG{k+kc}{False}\PYG{p}{)}
-\PYG{n}{CustomerGenerator}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{customergenerator}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{CustomerGenerator}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{customergenerator}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
 \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}balked} \PYG{o}{=} \PYG{l+m+mi}{0}
 \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}reneged} \PYG{o}{=} \PYG{l+m+mi}{0}
-\PYG{n}{clerks} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Resource}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{clerk}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{l+m+mi}{3}\PYG{p}{)}
+\PYG{n}{clerks} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Resource}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{clerk}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{l+m+mi}{3}\PYG{p}{)}
 
 \PYG{n}{env}\PYG{o}{.}\PYG{n}{run}\PYG{p}{(}\PYG{n}{till}\PYG{o}{=}\PYG{l+m+mi}{50000}\PYG{p}{)}
 
 \PYG{n}{clerks}\PYG{o}{.}\PYG{n}{requesters}\PYG{p}{(}\PYG{p}{)}\PYG{o}{.}\PYG{n}{length}\PYG{o}{.}\PYG{n}{print\PYGZus{}histogram}\PYG{p}{(}\PYG{l+m+mi}{30}\PYG{p}{,} \PYG{l+m+mi}{0}\PYG{p}{,} \PYG{l+m+mi}{1}\PYG{p}{)}
 \PYG{n+nb}{print}\PYG{p}{(}\PYG{p}{)}
 \PYG{n}{clerks}\PYG{o}{.}\PYG{n}{requesters}\PYG{p}{(}\PYG{p}{)}\PYG{o}{.}\PYG{n}{length\PYGZus{}of\PYGZus{}stay}\PYG{o}{.}\PYG{n}{print\PYGZus{}histogram}\PYG{p}{(}\PYG{l+m+mi}{30}\PYG{p}{,} \PYG{l+m+mi}{0}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{)}
-\PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{number reneged}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}reneged}\PYG{p}{)}
-\PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{number balked}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}balked}\PYG{p}{)}
+\PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{number reneged}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}reneged}\PYG{p}{)}
+\PYG{n+nb}{print}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{number balked}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{env}\PYG{o}{.}\PYG{n}{number\PYGZus{}balked}\PYG{p}{)}
 \end{sphinxVerbatim}
 
 As you can see, the balking part is exactly the same as in the example without resources.
@@ -901,11 +905,11 @@ The model code is:
 
 
 \PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{trace}\PYG{o}{=}\PYG{k+kc}{False}\PYG{p}{)}
-\PYG{n}{CustomerGenerator}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{customergenerator}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{CustomerGenerator}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{customergenerator}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
 \PYG{k}{for} \PYG{n}{i} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{l+m+mi}{3}\PYG{p}{)}\PYG{p}{:}
     \PYG{n}{Clerk}\PYG{p}{(}\PYG{p}{)}
-\PYG{n}{waitingline} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Queue}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{waitingline}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-\PYG{n}{worktodo} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{State}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{worktodo}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{waitingline} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Queue}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{waitingline}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
+\PYG{n}{worktodo} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{State}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{worktodo}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
 
 \PYG{n}{env}\PYG{o}{.}\PYG{n}{run}\PYG{p}{(}\PYG{n}{till}\PYG{o}{=}\PYG{l+m+mi}{50000}\PYG{p}{)}
 \PYG{n}{waitingline}\PYG{o}{.}\PYG{n}{print\PYGZus{}histograms}\PYG{p}{(}\PYG{p}{)}
@@ -967,7 +971,7 @@ construction.
 
 
 \chapter{Component}
-\label{\detokenize{Component::doc}}\label{\detokenize{Component:component}}
+\label{\detokenize{Component:component}}\label{\detokenize{Component::doc}}
 Components are the key elements of salabim simulations.
 
 Components can be either data or active. An active component has one or more process descriptions and is activated
@@ -980,7 +984,7 @@ It is easy to create a data component by:
 \PYG{n}{data\PYGZus{}component} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Component}\PYG{p}{(}\PYG{p}{)}
 \end{sphinxVerbatim}
 
-Data components may be placed in a queue. You can’t activate this component as such as there is no associated process method.
+Data components may be placed in a queue. This component will not be actiavted as there is no associated process method.
 
 In order to make an active component it is necessary to first define a class:
 
@@ -1334,8 +1338,8 @@ sim.Component
         \PYG{o}{.}\PYG{o}{.}\PYG{o}{.}
 \end{sphinxVerbatim}
 
-If we then say \sphinxtitleref{car=Car()}, a component is created and it activated from process. This
-process is nearly always but not necessarily a generator method (i.e. it has at least one yield (or yield from) statement.
+If we then say \sphinxcode{car=Car()}, a component is created and it activated from process. This
+process is nearly always, but not necessarily a generator method (i.e. it has at least one yield (or yield from) statement.
 
 The result is that car is put on the future event list (for time now) and when it’s its
 turn, the component becomes current.
@@ -1343,12 +1347,12 @@ turn, the component becomes current.
 It is also possible to set a time at which the component (car) becomes active, like \sphinxtitleref{car=Car(at=10)}.
 
 And instead of starting at process, the component may be initialized to start at another (generator) method,
-like \sphinxtitleref{car=Car(process=’wash’)}.
+like \sphinxcode{car=Car(process='wash')}.
 
 And, finally, if there is a process method, you can disable the automatic activation (i.e.
-make it a data component) , by specifying \sphinxtitleref{process=’‘}.
+make it a data component) , by specifying \sphinxcode{process='{'}}.
 
-If there is no process method, and process= is not given, the component becomes a data component.
+If there is no process method, and process= is not given, the component will be a data component.
 
 
 \subsection{activate}
@@ -1582,7 +1586,7 @@ So remember if the method contains a yield statement (technically speaking that�
 
 
 \chapter{Queue}
-\label{\detokenize{Queue::doc}}\label{\detokenize{Queue:queue}}
+\label{\detokenize{Queue:queue}}\label{\detokenize{Queue::doc}}
 Salabim has a class Queue for queue handling of components. The advantage over the standard list and deque are:
 \begin{itemize}
 \item {} 
@@ -1771,7 +1775,7 @@ It is possible to do a number of operations that work on the queues:
 
 \end{itemize}
 
-Salabim keeps track of the enter time in a queue: \sphinxcode{c.enter\_time(q)}
+Salabim keeps track of the enter time in a queue: \sphinxcode{c.enter\_time (q)}
 
 Unless disabled explicitly, the length of the queue and length of stay of components are monitored in
 \sphinxcode{q.length} and \sphinxcode{q.length\_of\_stay}. It is possible to obtain a number of statistics on these monitors (cf. Monitor).
@@ -1817,7 +1821,7 @@ Queue 0x20e116153c8
 
 
 \chapter{Resource}
-\label{\detokenize{Resource::doc}}\label{\detokenize{Resource:resource}}
+\label{\detokenize{Resource:resource}}\label{\detokenize{Resource::doc}}
 Resources are a powerful way of process interaction.
 
 A resource has always a capacity (which can be zero and even negative). This capacity will be specified at time of creation, but
@@ -2031,7 +2035,7 @@ Note that the occupancy is set to 0 if the capacity of the resource is \textless
 
 
 \chapter{State}
-\label{\detokenize{State::doc}}\label{\detokenize{State:state}}
+\label{\detokenize{State:state}}\label{\detokenize{State::doc}}
 States together with the Component.wait() method provide a powerful way of process interaction.
 
 A state will have a certain value at a given time. In its simplest form a component can then wait for
@@ -3065,7 +3069,7 @@ Sliced monitors are disabled and cannot be enabled again.
 
 
 \chapter{Distributions}
-\label{\detokenize{Distributions:distributions}}\label{\detokenize{Distributions::doc}}
+\label{\detokenize{Distributions::doc}}\label{\detokenize{Distributions:distributions}}
 
 \section{Introduction}
 \label{\detokenize{Distributions:introduction}}
@@ -3503,6 +3507,19 @@ If the x-value is a salabim distribution, not the distribution but a sample of t
 
 Here proctime will have a probability of 50\% being between 5 and 10, 40\% between 10 and 15 and 10\% between 15 and 20.
 
+Pdf supports also sampling a number of items from a pdf without replacement. In that case, the probabilities for
+all items have to be the same. If that is the case, multiple sampling can be done by specifying the number of items to
+sampled as a parameters to sample.
+
+Examples
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{colors\PYGZus{}dis} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Pdf}\PYG{p}{(}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{red}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{green}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{blue}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{yellow}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}\PYG{p}{,} \PYG{l+m+mi}{1}\PYG{p}{)}
+\PYG{n}{colors\PYGZus{}dis}\PYG{o}{.}\PYG{n}{sample}\PYG{p}{(}\PYG{l+m+mi}{4}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} e.g. [\PYGZdq{}yellow\PYGZdq{}, \PYGZdq{}green\PYGZdq{}, \PYGZdq{}blue\PYGZdq{}, \PYGZdq{}red\PYGZdq{}]}
+\PYG{n}{colors\PYGZus{}dis}\PYG{o}{.}\PYG{n}{sample}\PYG{p}{(}\PYG{l+m+mi}{2}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} e.g. [\PYGZdq{}green\PYGZdq{}, \PYGZdq{}blue\PYGZdq{}]}
+\PYG{n}{colors\PYGZus{}dis}\PYG{p}{,}\PYG{n}{sample}\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} e.g. [\PYGZdq{}blue\PYGZdq{}], so not \PYGZdq{}blue\PYGZdq{} !}
+\end{sphinxVerbatim}
+
 
 \subsection{CumPdf}
 \label{\detokenize{Distributions:cumpdf}}
@@ -3596,7 +3613,7 @@ or even
 
 
 \chapter{Miscellaneous}
-\label{\detokenize{Miscellaneous::doc}}\label{\detokenize{Miscellaneous:miscellaneous}}
+\label{\detokenize{Miscellaneous:miscellaneous}}\label{\detokenize{Miscellaneous::doc}}
 
 \section{Time units}
 \label{\detokenize{Miscellaneous:time-units}}
@@ -3875,7 +3892,7 @@ All trace output is also written to logging.
 
 
 \chapter{Animation}
-\label{\detokenize{Animation::doc}}\label{\detokenize{Animation:animation}}
+\label{\detokenize{Animation:animation}}\label{\detokenize{Animation::doc}}
 Animation is a powerful tool to debug, test and demonstrate simulations.
 
 It is possible to show a number of shapes (lines, rectangles, circles, etc), texts as well (images) in a window. These objects can be dynamically updated.
@@ -3928,40 +3945,51 @@ additional functionality.
 New style animation classes can be used to put texts, rectangles, polygon, lines, series of points, circles
 or images on the screen. All types can be connected to an optional text.
 
-Here is a sample program to show of all the new style animation classes
+Here is a sample program to show of all the new style animation classes:
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
-    \PYG{n}{env}\PYG{o}{=}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{trace}\PYG{o}{=}\PYG{k+kc}{False}\PYG{p}{)}
-    \PYG{n}{env}\PYG{o}{.}\PYG{n}{animate}\PYG{p}{(}\PYG{k+kc}{True}\PYG{p}{)}
-    \PYG{n}{env}\PYG{o}{.}\PYG{n}{background\PYGZus{}color}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{20}\PYG{l+s+si}{\PYGZpc{}g}\PYG{l+s+s1}{ray}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{c+c1}{\PYGZsh{} Animate classes.py}
 
-    \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimatePolygon}\PYG{p}{(}\PYG{n}{spec}\PYG{o}{=}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{l+m+mi}{100}\PYG{p}{,} \PYG{l+m+mi}{300}\PYG{p}{,} \PYG{l+m+mi}{100}\PYG{p}{,} \PYG{l+m+mi}{200}\PYG{p}{,}\PYG{l+m+mi}{190}\PYG{p}{)}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{This is}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s+s1}{a polygon}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-    \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateLine}\PYG{p}{(}\PYG{n}{spec}\PYG{o}{=}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{l+m+mi}{200}\PYG{p}{,} \PYG{l+m+mi}{300}\PYG{p}{,} \PYG{l+m+mi}{300}\PYG{p}{)}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{This is a line}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-    \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateRectangle}\PYG{p}{(}\PYG{n}{spec}\PYG{o}{=}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{,} \PYG{l+m+mi}{300}\PYG{p}{,} \PYG{l+m+mi}{30}\PYG{p}{)}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{This is a rectangle}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-    \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateCircle}\PYG{p}{(}\PYG{n}{radius}\PYG{o}{=}\PYG{l+m+mi}{60}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{400}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{This is a cicle}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-    \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateCircle}\PYG{p}{(}\PYG{n}{radius}\PYG{o}{=}\PYG{l+m+mi}{60}\PYG{p}{,} \PYG{n}{radius1}\PYG{o}{=}\PYG{l+m+mi}{30}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{300}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{400}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{This is an ellipse}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-    \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimatePoints}\PYG{p}{(}\PYG{n}{spec}\PYG{o}{=}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{,}\PYG{l+m+mi}{500}\PYG{p}{,} \PYG{l+m+mi}{150}\PYG{p}{,} \PYG{l+m+mi}{550}\PYG{p}{,} \PYG{l+m+mi}{180}\PYG{p}{,} \PYG{l+m+mi}{570}\PYG{p}{,} \PYG{l+m+mi}{250}\PYG{p}{,} \PYG{l+m+mi}{500}\PYG{p}{,} \PYG{l+m+mi}{300}\PYG{p}{,} \PYG{l+m+mi}{500}\PYG{p}{)}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{These are points}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-    \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateText}\PYG{p}{(}\PYG{n}{text}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{This is a one\PYGZhy{}line text}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{600}\PYG{p}{)}
-    \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateText}\PYG{p}{(}\PYG{n}{text}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}\PYGZsq{}\PYGZsq{}}\PYG{l+s+se}{\PYGZbs{}}
-\PYG{l+s+s1}{Multi line text}
-\PYG{l+s+s1}{\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}}
-\PYG{l+s+s1}{Lorem ipsum dolor sit amet, consectetur}
-\PYG{l+s+s1}{adipiscing elit, sed do eiusmod tempor}
-\PYG{l+s+s1}{incididunt ut labore et dolore magna aliqua.}
-\PYG{l+s+s1}{Ut enim ad minim veniam, quis nostrud}
-\PYG{l+s+s1}{exercitation ullamco laboris nisi ut}
-\PYG{l+s+s1}{aliquip ex ea commodo consequat. Duis aute}
-\PYG{l+s+s1}{irure dolor in reprehenderit in voluptate}
-\PYG{l+s+s1}{velit esse cillum dolore eu fugiat nulla}
-\PYG{l+s+s1}{pariatur.}
+\PYG{l+s+sd}{\PYGZdq{}\PYGZdq{}\PYGZdq{}}
+\PYG{l+s+sd}{This program demonstrates the various animation classes available in salabim.}
+\PYG{l+s+sd}{\PYGZdq{}\PYGZdq{}\PYGZdq{}}
 
-\PYG{l+s+s1}{Excepteur sint occaecat cupidatat non}
-\PYG{l+s+s1}{proident, sunt in culpa qui officia}
-\PYG{l+s+s1}{deserunt mollit anim id est laborum.}
-\PYG{l+s+s1}{\PYGZsq{}\PYGZsq{}\PYGZsq{}}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{500}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{)}
+\PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{trace}\PYG{o}{=}\PYG{k+kc}{False}\PYG{p}{)}
+\PYG{n}{env}\PYG{o}{.}\PYG{n}{animate}\PYG{p}{(}\PYG{k+kc}{True}\PYG{p}{)}
+\PYG{n}{env}\PYG{o}{.}\PYG{n}{modelname}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{Demo animation classes}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
+\PYG{n}{env}\PYG{o}{.}\PYG{n}{background\PYGZus{}color}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{20}\PYG{l+s+si}{\PYGZpc{}g}\PYG{l+s+s2}{ray}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
 
-    \PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateImage}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{Pas un pipe.jpg}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{500}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{400}\PYG{p}{)}
-    \PYG{n}{env}\PYG{o}{.}\PYG{n}{run}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{)}
+\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimatePolygon}\PYG{p}{(}\PYG{n}{spec}\PYG{o}{=}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{l+m+mi}{100}\PYG{p}{,} \PYG{l+m+mi}{300}\PYG{p}{,} \PYG{l+m+mi}{100}\PYG{p}{,} \PYG{l+m+mi}{200}\PYG{p}{,} \PYG{l+m+mi}{190}\PYG{p}{)}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{This is}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s+s2}{a polygon}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
+\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateLine}\PYG{p}{(}\PYG{n}{spec}\PYG{o}{=}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{l+m+mi}{200}\PYG{p}{,} \PYG{l+m+mi}{300}\PYG{p}{,} \PYG{l+m+mi}{300}\PYG{p}{)}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{This is a line}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
+\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateRectangle}\PYG{p}{(}\PYG{n}{spec}\PYG{o}{=}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{,} \PYG{l+m+mi}{300}\PYG{p}{,} \PYG{l+m+mi}{30}\PYG{p}{)}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{This is a rectangle}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
+\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateCircle}\PYG{p}{(}\PYG{n}{radius}\PYG{o}{=}\PYG{l+m+mi}{60}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{400}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{This is a cicle}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
+\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateCircle}\PYG{p}{(}\PYG{n}{radius}\PYG{o}{=}\PYG{l+m+mi}{60}\PYG{p}{,} \PYG{n}{radius1}\PYG{o}{=}\PYG{l+m+mi}{30}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{300}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{400}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{This is an ellipse}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
+\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimatePoints}\PYG{p}{(}\PYG{n}{spec}\PYG{o}{=}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{l+m+mi}{500}\PYG{p}{,} \PYG{l+m+mi}{150}\PYG{p}{,} \PYG{l+m+mi}{550}\PYG{p}{,} \PYG{l+m+mi}{180}\PYG{p}{,} \PYG{l+m+mi}{570}\PYG{p}{,} \PYG{l+m+mi}{250}\PYG{p}{,} \PYG{l+m+mi}{500}\PYG{p}{,} \PYG{l+m+mi}{300}\PYG{p}{,} \PYG{l+m+mi}{500}\PYG{p}{)}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{These are points}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
+\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateText}\PYG{p}{(}\PYG{n}{text}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{This is a one\PYGZhy{}line text}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{600}\PYG{p}{)}
+\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateText}\PYG{p}{(}
+    \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}\PYGZdq{}\PYGZdq{}}\PYG{l+s+se}{\PYGZbs{}}
+\PYG{l+s+s2}{Multi line text}
+\PYG{l+s+s2}{\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}}
+\PYG{l+s+s2}{Lorem ipsum dolor sit amet, consectetur}
+\PYG{l+s+s2}{adipiscing elit, sed do eiusmod tempor}
+\PYG{l+s+s2}{incididunt ut labore et dolore magna aliqua.}
+\PYG{l+s+s2}{Ut enim ad minim veniam, quis nostrud}
+\PYG{l+s+s2}{exercitation ullamco laboris nisi ut}
+\PYG{l+s+s2}{aliquip ex ea commodo consequat. Duis aute}
+\PYG{l+s+s2}{irure dolor in reprehenderit in voluptate}
+\PYG{l+s+s2}{velit esse cillum dolore eu fugiat nulla}
+\PYG{l+s+s2}{pariatur.}
+
+\PYG{l+s+s2}{Excepteur sint occaecat cupidatat non}
+\PYG{l+s+s2}{proident, sunt in culpa qui officia}
+\PYG{l+s+s2}{deserunt mollit anim id est laborum.}
+\PYG{l+s+s2}{\PYGZdq{}\PYGZdq{}\PYGZdq{}}\PYG{p}{,}
+    \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{500}\PYG{p}{,}
+    \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,}
+\PYG{p}{)}
+
+\PYG{n}{sim}\PYG{o}{.}\PYG{n}{AnimateImage}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{Pas un pipe.jpg}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{x}\PYG{o}{=}\PYG{l+m+mi}{500}\PYG{p}{,} \PYG{n}{y}\PYG{o}{=}\PYG{l+m+mi}{400}\PYG{p}{)}
+\PYG{n}{env}\PYG{o}{.}\PYG{n}{run}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{)}
 \end{sphinxVerbatim}
 
 Resulting in:
@@ -4150,27 +4178,25 @@ An application can however override the x method. The prefered way is to subclas
 
 \PYG{k}{class} \PYG{n+nc}{AnimateMovingText}\PYG{p}{(}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{Animate}\PYG{p}{)}\PYG{p}{:}
     \PYG{k}{def} \PYG{n+nf}{\PYGZus{}\PYGZus{}init\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{)}\PYG{p}{:}
-        \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Animate}\PYG{o}{.}\PYG{n+nf+fm}{\PYGZus{}\PYGZus{}init\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{x0}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{x1}\PYG{o}{=}\PYG{l+m+mi}{1000}\PYG{p}{,} \PYG{n}{y0}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{t1}\PYG{o}{=}\PYG{n}{env}\PYG{o}{.}\PYG{n}{now}\PYG{p}{(}\PYG{p}{)} \PYG{o}{+} \PYG{l+m+mi}{10}\PYG{p}{)}
+        \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Animate}\PYG{o}{.}\PYG{n+nf+fm}{\PYGZus{}\PYGZus{}init\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{x0}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{x1}\PYG{o}{=}\PYG{l+m+mi}{1000}\PYG{p}{,} \PYG{n}{y0}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{t1}\PYG{o}{=}\PYG{n}{env}\PYG{o}{.}\PYG{n}{now}\PYG{p}{(}\PYG{p}{)} \PYG{o}{+} \PYG{l+m+mi}{10}\PYG{p}{)}
 
     \PYG{k}{def} \PYG{n+nf}{x}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{t}\PYG{p}{)}\PYG{p}{:}
-        \PYG{k}{return} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{interpolate}\PYG{p}{(}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{interpolate}\PYG{p}{(}\PYG{n}{t}\PYG{p}{,} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{t0}\PYG{p}{,} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{t1}\PYG{p}{,} \PYG{l+m+mi}{0}\PYG{p}{,} \PYG{l+m+mi}{1}\PYG{p}{)}\PYG{o}{*}\PYG{o}{*}\PYG{l+m+mi}{2}\PYG{p}{,} \PYG{l+m+mi}{0}\PYG{p}{,} \PYG{l+m+mi}{1}\PYG{p}{,} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{x0}\PYG{p}{,} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{x1}\PYG{p}{)}
+        \PYG{k}{return} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{interpolate}\PYG{p}{(}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{interpolate}\PYG{p}{(}\PYG{n}{t}\PYG{p}{,} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{t0}\PYG{p}{,} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{t1}\PYG{p}{,} \PYG{l+m+mi}{0}\PYG{p}{,} \PYG{l+m+mi}{1}\PYG{p}{)} \PYG{o}{*}\PYG{o}{*} \PYG{l+m+mi}{2}\PYG{p}{,} \PYG{l+m+mi}{0}\PYG{p}{,} \PYG{l+m+mi}{1}\PYG{p}{,} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{x0}\PYG{p}{,} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{x1}\PYG{p}{)}
 
     \PYG{k}{def} \PYG{n+nf}{y}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{t}\PYG{p}{)}\PYG{p}{:}
         \PYG{k}{return} \PYG{n+nb}{int}\PYG{p}{(}\PYG{n}{t}\PYG{p}{)} \PYG{o}{*} \PYG{l+m+mi}{50}
 
     \PYG{k}{def} \PYG{n+nf}{text}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{t}\PYG{p}{)}\PYG{p}{:}
-        \PYG{k}{return} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+si}{\PYGZob{}:0.1f\PYGZcb{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{o}{.}\PYG{n}{format}\PYG{p}{(}\PYG{n}{t}\PYG{p}{)}
+        \PYG{k}{return} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+si}{\PYGZob{}:0.1f\PYGZcb{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{o}{.}\PYG{n}{format}\PYG{p}{(}\PYG{n}{t}\PYG{p}{)}
 
 
 \PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{p}{)}
 
-\PYG{n}{env}\PYG{o}{.}\PYG{n}{animation\PYGZus{}parameters}\PYG{p}{(}\PYG{p}{)}
+\PYG{n}{env}\PYG{o}{.}\PYG{n}{animate}\PYG{p}{(}\PYG{k+kc}{False}\PYG{p}{)}
 
 \PYG{n}{AnimateMovingText}\PYG{p}{(}\PYG{p}{)}
 
-\PYG{n}{env}\PYG{o}{.}\PYG{n}{run}\PYG{p}{(}\PYG{p}{)}
-
-
+\PYG{n}{env}\PYG{o}{.}\PYG{n}{run}\PYG{p}{(}\PYG{n}{till}\PYG{o}{=}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{inf}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} otherwise the simulation will end at t=0, because there are no events left}
 \end{sphinxVerbatim}
 
 This code will show the current simulation time moving from left to right, uniformly accelerated.
@@ -4504,8 +4530,9 @@ The animation dashboard shows the first 10 persons in the queue q, along with th
 \PYG{k}{class} \PYG{n+nc}{AnimateWaitSquare}\PYG{p}{(}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{Animate}\PYG{p}{)}\PYG{p}{:}
     \PYG{k}{def} \PYG{n+nf}{\PYGZus{}\PYGZus{}init\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{i}\PYG{p}{)}\PYG{p}{:}
         \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{i} \PYG{o}{=} \PYG{n}{i}
-        \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Animate}\PYG{o}{.}\PYG{n+nf+fm}{\PYGZus{}\PYGZus{}init\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,}
-            \PYG{n}{rectangle0}\PYG{o}{=}\PYG{p}{(}\PYG{o}{\PYGZhy{}}\PYG{l+m+mi}{10}\PYG{p}{,} \PYG{o}{\PYGZhy{}}\PYG{l+m+mi}{10}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{)}\PYG{p}{,} \PYG{n}{x0}\PYG{o}{=}\PYG{l+m+mi}{300} \PYG{o}{\PYGZhy{}} \PYG{l+m+mi}{30} \PYG{o}{*} \PYG{n}{i}\PYG{p}{,} \PYG{n}{y0}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{fillcolor0}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{red}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{linewidth0}\PYG{o}{=}\PYG{l+m+mi}{0}\PYG{p}{)}
+        \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Animate}\PYG{o}{.}\PYG{n+nf+fm}{\PYGZus{}\PYGZus{}init\PYGZus{}\PYGZus{}}\PYG{p}{(}
+            \PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{rectangle0}\PYG{o}{=}\PYG{p}{(}\PYG{o}{\PYGZhy{}}\PYG{l+m+mi}{10}\PYG{p}{,} \PYG{o}{\PYGZhy{}}\PYG{l+m+mi}{10}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{,} \PYG{l+m+mi}{10}\PYG{p}{)}\PYG{p}{,} \PYG{n}{x0}\PYG{o}{=}\PYG{l+m+mi}{300} \PYG{o}{\PYGZhy{}} \PYG{l+m+mi}{30} \PYG{o}{*} \PYG{n}{i}\PYG{p}{,} \PYG{n}{y0}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{fillcolor0}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{red}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{linewidth0}\PYG{o}{=}\PYG{l+m+mi}{0}
+        \PYG{p}{)}
 
     \PYG{k}{def} \PYG{n+nf}{visible}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{t}\PYG{p}{)}\PYG{p}{:}
         \PYG{k}{return} \PYG{n}{q}\PYG{p}{[}\PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{i}\PYG{p}{]} \PYG{o+ow}{is} \PYG{o+ow}{not} \PYG{k+kc}{None}
@@ -4514,13 +4541,13 @@ The animation dashboard shows the first 10 persons in the queue q, along with th
 \PYG{k}{class} \PYG{n+nc}{AnimateWaitText}\PYG{p}{(}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{Animate}\PYG{p}{)}\PYG{p}{:}
     \PYG{k}{def} \PYG{n+nf}{\PYGZus{}\PYGZus{}init\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{i}\PYG{p}{)}\PYG{p}{:}
         \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{i} \PYG{o}{=} \PYG{n}{i}
-        \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Animate}\PYG{o}{.}\PYG{n+nf+fm}{\PYGZus{}\PYGZus{}init\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{x0}\PYG{o}{=}\PYG{l+m+mi}{300} \PYG{o}{\PYGZhy{}} \PYG{l+m+mi}{30} \PYG{o}{*} \PYG{n}{i}\PYG{p}{,} \PYG{n}{y0}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{textcolor0}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{white}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+        \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Animate}\PYG{o}{.}\PYG{n+nf+fm}{\PYGZus{}\PYGZus{}init\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{text}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{x0}\PYG{o}{=}\PYG{l+m+mi}{300} \PYG{o}{\PYGZhy{}} \PYG{l+m+mi}{30} \PYG{o}{*} \PYG{n}{i}\PYG{p}{,} \PYG{n}{y0}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{textcolor0}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{white}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
 
     \PYG{k}{def} \PYG{n+nf}{text}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{t}\PYG{p}{)}\PYG{p}{:}
         \PYG{n}{component\PYGZus{}i} \PYG{o}{=} \PYG{n}{q}\PYG{p}{[}\PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{i}\PYG{p}{]}
 
         \PYG{k}{if} \PYG{n}{component\PYGZus{}i} \PYG{o+ow}{is} \PYG{k+kc}{None}\PYG{p}{:}
-            \PYG{k}{return} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}
+            \PYG{k}{return} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{\PYGZdq{}}
         \PYG{k}{else}\PYG{p}{:}
             \PYG{k}{return} \PYG{n}{component\PYGZus{}i}\PYG{o}{.}\PYG{n}{name}\PYG{p}{(}\PYG{p}{)}
 
@@ -4530,8 +4557,8 @@ The animation dashboard shows the first 10 persons in the queue q, along with th
     \PYG{k}{for} \PYG{n}{i} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{l+m+mi}{10}\PYG{p}{)}\PYG{p}{:}
         \PYG{n}{AnimateWaitSquare}\PYG{p}{(}\PYG{n}{i}\PYG{p}{)}
         \PYG{n}{AnimateWaitText}\PYG{p}{(}\PYG{n}{i}\PYG{p}{)}
-    \PYG{n}{show\PYGZus{}length} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Animate}\PYG{p}{(}\PYG{n}{text}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{x0}\PYG{o}{=}\PYG{l+m+mi}{330}\PYG{p}{,} \PYG{n}{y0}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{textcolor0}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{black}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{,} \PYG{n}{anchor}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{w}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
-    \PYG{n}{show\PYGZus{}length}\PYG{o}{.}\PYG{n}{text} \PYG{o}{=} \PYG{k}{lambda} \PYG{n}{t}\PYG{p}{:} \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{Length= }\PYG{l+s+s1}{\PYGZsq{}} \PYG{o}{+} \PYG{n+nb}{str}\PYG{p}{(}\PYG{n+nb}{len}\PYG{p}{(}\PYG{n}{q}\PYG{p}{)}\PYG{p}{)}
+    \PYG{n}{show\PYGZus{}length} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Animate}\PYG{p}{(}\PYG{n}{text}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{x0}\PYG{o}{=}\PYG{l+m+mi}{330}\PYG{p}{,} \PYG{n}{y0}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{,} \PYG{n}{textcolor0}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{black}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{anchor}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{w}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
+    \PYG{n}{show\PYGZus{}length}\PYG{o}{.}\PYG{n}{text} \PYG{o}{=} \PYG{k}{lambda} \PYG{n}{t}\PYG{p}{:} \PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{Length= }\PYG{l+s+s2}{\PYGZdq{}} \PYG{o}{+} \PYG{n+nb}{str}\PYG{p}{(}\PYG{n+nb}{len}\PYG{p}{(}\PYG{n}{q}\PYG{p}{)}\PYG{p}{)}
 
 
 \PYG{k}{class} \PYG{n+nc}{Person}\PYG{p}{(}\PYG{n}{sim}\PYG{o}{.}\PYG{n}{Component}\PYG{p}{)}\PYG{p}{:}
@@ -4543,9 +4570,9 @@ The animation dashboard shows the first 10 persons in the queue q, along with th
 
 \PYG{n}{env} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Environment}\PYG{p}{(}\PYG{n}{trace}\PYG{o}{=}\PYG{k+kc}{True}\PYG{p}{)}
 
-\PYG{n}{q} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Queue}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{q}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{q} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{Queue}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{q}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
 \PYG{k}{for} \PYG{n}{i} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{l+m+mi}{15}\PYG{p}{)}\PYG{p}{:}
-    \PYG{n}{Person}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+si}{\PYGZob{}:02d\PYGZcb{}}\PYG{l+s+s1}{\PYGZsq{}}\PYG{o}{.}\PYG{n}{format}\PYG{p}{(}\PYG{n}{i}\PYG{p}{)}\PYG{p}{,} \PYG{n}{at}\PYG{o}{=}\PYG{n}{i}\PYG{p}{)}
+    \PYG{n}{Person}\PYG{p}{(}\PYG{n}{name}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+si}{\PYGZob{}:02d\PYGZcb{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{o}{.}\PYG{n}{format}\PYG{p}{(}\PYG{n}{i}\PYG{p}{)}\PYG{p}{,} \PYG{n}{at}\PYG{o}{=}\PYG{n}{i}\PYG{p}{)}
 
 \PYG{n}{do\PYGZus{}animation}\PYG{p}{(}\PYG{p}{)}
 
@@ -4581,7 +4608,7 @@ Salabim also suppports taking a snapshot of an animated screen with \sphinxcode{
 
 
 \chapter{Reading items from a file}
-\label{\detokenize{Reading items from a file:reading-items-from-a-file}}\label{\detokenize{Reading items from a file::doc}}
+\label{\detokenize{Reading items from a file::doc}}\label{\detokenize{Reading items from a file:reading-items-from-a-file}}
 Salabim models often need to read input values from a file.
 
 As these data are quite often quite unstructured, using the standard read facilities of text files can be rather tedious.
@@ -4653,7 +4680,7 @@ quoted. This can be very useful during testing as the input is part of the sourc
 
 
 \chapter{Reference}
-\label{\detokenize{Reference::doc}}\label{\detokenize{Reference:reference}}
+\label{\detokenize{Reference:reference}}\label{\detokenize{Reference::doc}}
 
 \section{Animation}
 \label{\detokenize{Reference:animation}}\index{Animate (class in salabim)}
@@ -4694,7 +4721,7 @@ possible values are (default: sw) :
 \sphinxcode{nw    n    ne} 
 \sphinxcode{w     c     e} 
 \sphinxcode{sw    s    se} 
-If ‘’, the given coordimates are used untranslated
+If null string, the given coordimates are used untranslated
 
 \item {} 
 \sphinxstyleliteralstrong{t0} (\sphinxstyleliteralemphasis{float}) \textendash{} time of start of the animation (default: now)
@@ -4877,7 +4904,7 @@ hexname
 tuple (R,G,B) or (R,G,B,A)
 
 \item {} 
-‘fg’ or ‘bg’
+“fg” or “bg”
 
 \end{itemize}
 
@@ -4887,7 +4914,7 @@ colornames may contain an additional alpha, like \sphinxcode{red\#7f}
 hexnames may be either 3 of 4 bytes long (\sphinxcode{\#rrggbb} or \sphinxcode{\#rrggbbaa}) 
 both colornames and hexnames may be given as a tuple with an
 additional alpha between 0 and 255,
-e.g. \sphinxcode{(255,0,255,128)}, (‘red’,127){}`{}` or \sphinxcode{('\#ff00ff',128)} 
+e.g. \sphinxcode{(255,0,255,128)}, (“red”,127){}`{}` or \sphinxcode{("\#ff00ff",128)} 
 fg is the foreground color 
 bg is the background color 
 
@@ -5718,7 +5745,7 @@ possible values are:
 \sphinxcode{nw    n    ne} 
 \sphinxcode{w     c     e} 
 \sphinxcode{sw    s    se} 
-If ‘’, the given coordimates are used untranslated 
+If null string, the given coordimates are used untranslated 
 default see below
 
 \item {} 
@@ -6061,7 +6088,7 @@ Displays a (partial) circle or (partial) ellipse , optionally with a text
 \sphinxstyleliteralstrong{radius} (\sphinxstyleliteralemphasis{float}) \textendash{} radius of the circle
 
 \item {} 
-\sphinxstyleliteralstrong{radius1} (\sphinxstyleliteralemphasis{float}) \textendash{} the ‘height of the ellipse. If None (default), a circle will be drawn
+\sphinxstyleliteralstrong{radius1} (\sphinxstyleliteralemphasis{float}) \textendash{} the ‘height’ of the ellipse. If None (default), a circle will be drawn
 
 \item {} 
 \sphinxstyleliteralstrong{arc\_angle0} (\sphinxstyleliteralemphasis{float}) \textendash{} start angle of the circle (default 0)
@@ -6086,7 +6113,7 @@ possible values are (default: sw) :
 \sphinxcode{nw    n    ne} 
 \sphinxcode{w     c     e} 
 \sphinxcode{sw    s    se} 
-If ‘’, the given coordimates are used untranslated 
+If null string, the given coordimates are used untranslated 
 The positions corresponds to a full circle even if arc\_angle0 and/or arc\_angle1 are specified.
 
 \item {} 
@@ -6274,7 +6301,7 @@ possible values are (default: sw) :
 \sphinxcode{nw    n    ne} 
 \sphinxcode{w     c     e} 
 \sphinxcode{sw    s    se} 
-If ‘’, the given coordimates are used untranslated
+If null string, the given coordimates are used untranslated
 
 \item {} 
 \sphinxstyleliteralstrong{anchor} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies where the x and refer to 
@@ -6378,7 +6405,7 @@ possible values are (default: sw) :
 \sphinxcode{nw    n    ne} 
 \sphinxcode{w     c     e} 
 \sphinxcode{sw    s    se} 
-If ‘’, the given coordimates are used untranslated
+If null string, the given coordimates are used untranslated
 
 \item {} 
 \sphinxstyleliteralstrong{offsetx} (\sphinxstyleliteralemphasis{float}) \textendash{} offsets the x-coordinate of the line (default 0)
@@ -6493,7 +6520,7 @@ animates a monitor in a panel
 \sphinxstyleliteralstrong{titlecolor} (\sphinxstyleliteralemphasis{colorspec}) \textendash{} color of the title (default foreground color)
 
 \item {} 
-\sphinxstyleliteralstrong{titlefont} ({\hyperref[\detokenize{Reference:salabim.Animate.font}]{\sphinxcrossref{\sphinxstyleliteralemphasis{font}}}}) \textendash{} font of the title (default ‘’)
+\sphinxstyleliteralstrong{titlefont} ({\hyperref[\detokenize{Reference:salabim.Animate.font}]{\sphinxcrossref{\sphinxstyleliteralemphasis{font}}}}) \textendash{} font of the title (default null string)
 
 \item {} 
 \sphinxstyleliteralstrong{titlefontsize} (\sphinxstyleliteralemphasis{int}) \textendash{} size of the font of the title (default 15)
@@ -6585,7 +6612,7 @@ possible values are (default: sw) :
 \sphinxcode{nw    n    ne} 
 \sphinxcode{w     c     e} 
 \sphinxcode{sw    s    se} 
-If ‘’, the given coordimates are used untranslated
+If null string, the given coordimates are used untranslated
 
 \item {} 
 \sphinxstyleliteralstrong{offsetx} (\sphinxstyleliteralemphasis{float}) \textendash{} offsets the x-coordinate of the points (default 0)
@@ -6693,7 +6720,7 @@ possible values are (default: sw) :
 \sphinxcode{nw    n    ne} 
 \sphinxcode{w     c     e} 
 \sphinxcode{sw    s    se} 
-If ‘’, the given coordimates are used untranslated
+If null string, the given coordimates are used untranslated
 
 \item {} 
 \sphinxstyleliteralstrong{offsetx} (\sphinxstyleliteralemphasis{float}) \textendash{} offsets the x-coordinate of the polygon (default 0)
@@ -6802,10 +6829,10 @@ default: 50
 default: 50
 
 \item {} 
-\sphinxstyleliteralstrong{direction} (\sphinxstyleliteralemphasis{str}) \textendash{} if ‘w’, waiting line runs westwards (i.e. from right to left) 
-if ‘n’, waiting line runs northeards (i.e. from bottom to top) 
-if ‘e’, waiting line runs eastwards (i.e. from left to right) (default) 
-if ‘s’, waiting line runs southwards (i.e. from top to bottom)
+\sphinxstyleliteralstrong{direction} (\sphinxstyleliteralemphasis{str}) \textendash{} if “w”, waiting line runs westwards (i.e. from right to left) 
+if “n”, waiting line runs northeards (i.e. from bottom to top) 
+if “e”, waiting line runs eastwards (i.e. from left to right) (default) 
+if “s”, waiting line runs southwards (i.e. from top to bottom)
 
 \item {} 
 \sphinxstyleliteralstrong{reverse} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), display in normal order. If True, reversed.
@@ -6824,7 +6851,7 @@ possible values are (default: sw):
 \sphinxstyleliteralstrong{titlecolor} (\sphinxstyleliteralemphasis{colorspec}) \textendash{} color of the title (default foreground color)
 
 \item {} 
-\sphinxstyleliteralstrong{titlefont} ({\hyperref[\detokenize{Reference:salabim.Animate.font}]{\sphinxcrossref{\sphinxstyleliteralemphasis{font}}}}) \textendash{} font of the title (default ‘’)
+\sphinxstyleliteralstrong{titlefont} ({\hyperref[\detokenize{Reference:salabim.Animate.font}]{\sphinxcrossref{\sphinxstyleliteralemphasis{font}}}}) \textendash{} font of the title (default null string)
 
 \item {} 
 \sphinxstyleliteralstrong{titlefontsize} (\sphinxstyleliteralemphasis{int}) \textendash{} size of the font of the title (default 15)
@@ -6897,7 +6924,7 @@ possible values are (default: sw) :
 \sphinxcode{nw    n    ne} 
 \sphinxcode{w     c     e} 
 \sphinxcode{sw    s    se} 
-If ‘’, the given coordimates are used untranslated
+If null string, the given coordimates are used untranslated
 
 \item {} 
 \sphinxstyleliteralstrong{offsetx} (\sphinxstyleliteralemphasis{float}) \textendash{} offsets the x-coordinate of the rectangle (default 0)
@@ -7123,7 +7150,7 @@ possible values are (default: sw) :
 \sphinxcode{nw    n    ne} 
 \sphinxcode{w     c     e} 
 \sphinxcode{sw    s    se} 
-If ‘’, the given coordimates are used untranslated
+If null string, the given coordimates are used untranslated
 
 \item {} 
 \sphinxstyleliteralstrong{offsetx} (\sphinxstyleliteralemphasis{float}) \textendash{} offsets the x-coordinate of the rectangle (default 0)
@@ -7421,7 +7448,7 @@ so no need to set cn to 1 or 100.
 
 \item {} 
 \sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
-must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+must be one of “years”, “weeks”, “days”, “hours”, “minutes”, “seconds”, “milliseconds”, “microseconds” 
 default : no conversion 
 
 \item {} 
@@ -7506,7 +7533,7 @@ constant distribution
 
 \item {} 
 \sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
-must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+must be one of “years”, “weeks”, “days”, “hours”, “minutes”, “seconds”, “milliseconds”, “microseconds” 
 default : no conversion 
 
 \item {} 
@@ -7714,7 +7741,7 @@ should be \textgreater{}0
 
 \item {} 
 \sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
-must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+must be one of “years”, “weeks”, “days”, “hours”, “minutes”, “seconds”, “milliseconds”, “microseconds” 
 default : no conversion 
 
 \item {} 
@@ -7811,7 +7838,7 @@ must be \textgreater{}0
 
 \item {} 
 \sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
-must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+must be one of “years”, “weeks”, “days”, “hours”, “minutes”, “seconds”, “milliseconds”, “microseconds” 
 default : no conversion 
 
 \item {} 
@@ -7911,7 +7938,7 @@ should be \textgreater{}0
 
 \item {} 
 \sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
-must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+must be one of “years”, “weeks”, “days”, “hours”, “minutes”, “seconds”, “milliseconds”, “microseconds” 
 default : no conversion 
 
 \item {} 
@@ -8126,7 +8153,7 @@ have equal probability. The value is not important.
 
 \item {} 
 \sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
-must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+must be one of “years”, “weeks”, “days”, “hours”, “minutes”, “seconds”, “milliseconds”, “microseconds” 
 default : no conversion 
 
 \item {} 
@@ -8195,12 +8222,20 @@ str
 \index{sample() (salabim.Pdf method)}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{Reference:salabim.Pdf.sample}}\pysiglinewithargsret{\sphinxbfcode{sample}}{}{}~\begin{quote}\begin{description}
+\phantomsection\label{\detokenize{Reference:salabim.Pdf.sample}}\pysiglinewithargsret{\sphinxbfcode{sample}}{\emph{n=None}}{}~\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{n} (\sphinxstyleliteralemphasis{number of samples : int}) \textendash{} if not specified, specifies just return one sample, as usual 
+if specified, return a list of n sampled values from the distribution without replacement.
+This requires that all probabilities are equal. 
+If n \textgreater{} number of values in the Pdf distribution, n is assumed to be the number of values
+in the distribution. 
+If a sampled value is a distribution, a sample from that distribution will be returned.
+
 \item[{Returns}] \leavevmode
-\sphinxstylestrong{Sample of the distribution}
+\sphinxstylestrong{Sample of the distribution} \textendash{} In case n is specified, returns a list of n values
 
 \item[{Return type}] \leavevmode
-any (usually float)
+any (usually float) or list
 
 \end{description}\end{quote}
 
@@ -8313,7 +8348,7 @@ mode must be between low and high
 
 \item {} 
 \sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
-must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+must be one of “years”, “weeks”, “days”, “hours”, “minutes”, “seconds”, “milliseconds”, “microseconds” 
 default : no conversion 
 
 \item {} 
@@ -8404,7 +8439,7 @@ must be \textgreater{}= lowerbound
 
 \item {} 
 \sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
-must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+must be one of “years”, “weeks”, “days”, “hours”, “minutes”, “seconds”, “milliseconds”, “microseconds” 
 default : no conversion 
 
 \item {} 
@@ -8494,7 +8529,7 @@ should be \textgreater{}0
 
 \item {} 
 \sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies the time unit 
-must be one of ‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’ 
+must be one of “years”, “weeks”, “days”, “hours”, “minutes”, “seconds”, “milliseconds”, “microseconds” 
 default : no conversion 
 
 \item {} 
@@ -8611,7 +8646,7 @@ for the same time
 \item {} 
 \sphinxstyleliteralstrong{process} (\sphinxstyleliteralemphasis{str}) \textendash{} name of process to be started. 
 if None (default), it will try to start self.process() 
-if ‘’, no process will be started even if self.process() exists,
+if null string, no process will be started even if self.process() exists,
 i.e. become a data component. 
 note that the function \sphinxstyleemphasis{must} be a generator,
 i.e. contains at least one yield.
@@ -9762,8 +9797,8 @@ self.color = color
 
 \end{description}
 
-redcar=Car(color=’red’) 
-bluecar=Car(color=’blue’)
+redcar=Car(color=”red”) 
+bluecar=Car(color=”blue”)
 
 \end{fulllineitems}
 
@@ -9970,7 +10005,7 @@ The value may be specified in three different ways:
 \begin{itemize}
 \item {} 
 constant, that value is just compared to state.value() 
-yield self.wait((light,’red’))
+yield self.wait((light,”red”))
 
 \item {} 
 an expression, containg one or more \$-signs
@@ -9978,7 +10013,7 @@ the \$ is replaced by state.value(), each time the condition is tested.
 self refers to the component under test, state refers to the state
 under test. 
 yield self.wait((light,’\$ in (“red”,”yellow”)’)) 
-yield self.wait((level,’\$\textless{}30’)) 
+yield self.wait((level,”\$\textless{}30”)) 
 
 \item {} 
 a function. In that case the parameter should function that
@@ -9986,7 +10021,7 @@ should accept three arguments: the value, the component under test and the
 state under test. 
 usually the function will be a lambda function, but that’s not
 a requirement. 
-yield self.wait((light,lambda t, comp, state: t in (‘red’,’yellow’))) 
+yield self.wait((light,lambda t, comp, state: t in (“red”,”yellow”))) 
 yield self.wait((level,lambda t, comp, state: t \textless{} 30)) 
 
 \end{itemize}
@@ -9997,8 +10032,8 @@ yield self.wait((level,lambda t, comp, state: t \textless{} 30))
 \textendash{}\textgreater{} waits for s1.value()==True 
 \sphinxcode{yield self.wait(s1,s2)} 
 \textendash{}\textgreater{} waits for s1.value()==True or s2.value==True 
-\sphinxcode{yield self.wait((s1,False,100),(s2,'on'),s3)} 
-\textendash{}\textgreater{} waits for s1.value()==False or s2.value==’on’ or s3.value()==True 
+\sphinxcode{yield self.wait((s1,False,100),(s2,"on"),s3)} 
+\textendash{}\textgreater{} waits for s1.value()==False or s2.value==”on” or s3.value()==True 
 s1 is at the tail of waiters, because of the set priority 
 \sphinxcode{yield self.wait(s1,s2,all=True)} 
 \textendash{}\textgreater{} waits for s1.value()==True and s2.value==True 
@@ -10024,14 +10059,14 @@ if omitted, False
 
 \item {} 
 \sphinxstyleliteralstrong{random\_seed} (\sphinxstyleliteralemphasis{hashable object}\sphinxstyleliteralemphasis{, }\sphinxstyleliteralemphasis{usually int}) \textendash{} the seed for random, equivalent to random.seed() 
-if ‘*’, a purely random value (based on the current time) will be used
+if “*”, a purely random value (based on the current time) will be used
 (not reproducable) 
-if the null string (‘’), no action on random is taken 
+if the null string, no action on random is taken 
 if None (the default), 1234567 will be used.
 
 \item {} 
 \sphinxstyleliteralstrong{time\_unit} (\sphinxstyleliteralemphasis{str}) \textendash{} Supported time\_units: 
-‘years’, ‘weeks’, ‘days’, ‘hours’, ‘minutes’, ‘seconds’, ‘milliseconds’, ‘microseconds’, ‘n/a’
+“years”, “weeks”, “days”, “hours”, “minutes”, “seconds”, “milliseconds”, “microseconds”, “n/a”
 
 \item {} 
 \sphinxstyleliteralstrong{name} (\sphinxstyleliteralemphasis{str}) \textendash{} name of the environment 
@@ -10040,7 +10075,7 @@ auto serializing will be applied
 if the name end with a comma,
 auto serializing starting at 1 will be applied 
 if omitted, the name will be derived from the class (lowercased)
-or ‘default environment’ if isdefault\_env is True.
+or “default environment” if isdefault\_env is True.
 
 \item {} 
 \sphinxstyleliteralstrong{print\_trace\_header} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True (default) print a (two line) header line as a legend 
@@ -10061,7 +10096,7 @@ The trace may be switched on/off later with trace
 The seed may be later set with random\_seed() 
 Initially, the random stream will be seeded with the value 1234567.
 If required to be purely, not not reproducable, values, use
-random\_seed=’*’.
+random\_seed=”*”.
 \end{sphinxadmonition}
 \index{an\_clocktext() (salabim.Environment method)}
 
@@ -10193,7 +10228,7 @@ environment, this will be set to black.
 
 \item {} 
 \sphinxstyleliteralstrong{modelname} (\sphinxstyleliteralemphasis{str}) \textendash{} name of model to be shown in upper left corner,
-along with text ‘a salabim model’ 
+along with text “a salabim model” 
 if omitted, no change. At init of the environment, this will be set
 to the null string, which implies suppression of this feature.
 
@@ -10218,7 +10253,7 @@ will be created.
 Normally, use .mp4 as extension. 
 If the video extension is not .gif, a codec may be added
 by appending a plus sign and the four letter code name,
-like ‘myvideo.avi+DIVX’. 
+like “myvideo.avi+DIVX”. 
 If no codec is given, MP4V will be used as codec.
 
 \item {} 
@@ -10361,8 +10396,8 @@ translates a colorspec to a tuple
 \sphinxcode{(colorname, alpha)} 
 \sphinxcode{(r, g, b)} ==\textgreater{} alpha = 255 
 \sphinxcode{(r, g, b, alpha)} 
-\sphinxcode{'fg'} ==\textgreater{} foreground\_color 
-\sphinxcode{'bg'} ==\textgreater{} background\_color
+\sphinxcode{"fg"} ==\textgreater{} foreground\_color 
+\sphinxcode{"bg"} ==\textgreater{} background\_color
 
 \item[{Returns}] \leavevmode
 
@@ -10452,7 +10487,7 @@ bool
 gets time unit
 \begin{quote}\begin{description}
 \item[{Returns}] \leavevmode
-\sphinxstylestrong{Current time unit dimension (default ‘n/a’)}
+\sphinxstylestrong{Current time unit dimension (default “n/a”)}
 
 \item[{Return type}] \leavevmode
 str
@@ -10768,7 +10803,7 @@ if 0, now is used
 
 \item {} 
 \sphinxstyleliteralstrong{till} (\sphinxstyleliteralemphasis{float}) \textendash{} schedule time 
-if omitted, inf is assumed
+if omitted, inf is assumed. See also not below
 
 \item {} 
 \sphinxstyleliteralstrong{urgent} (\sphinxstyleliteralemphasis{bool}) \textendash{} urgency indicator 
@@ -10785,8 +10820,8 @@ for the same time
 
 \begin{sphinxadmonition}{note}{Note:}
 if neither till nor duration is specified, the main component will be reactivated at
-the time there are no more events on the eventlist, i.e. usualy not at inf. 
-if you want to run till inf, issue run(sim.inf) 
+the time there are no more events on the eventlist, i.e. possibly not at inf. 
+if you want to run till inf (particularly when animating), issue run(sim.inf) 
 only issue run() from the main level
 \end{sphinxadmonition}
 
@@ -11051,14 +11086,14 @@ sets / gets the the format to display times in trace, animation, etc.
 \item[{Parameters}] \leavevmode
 \sphinxstyleliteralstrong{format} (\sphinxstyleliteralemphasis{str}) \textendash{} specifies how the time should be displayed in trace, animation, etc. 
 the format specifier should result in 10 characters. Examples: 
-‘\{:10.3f\}’, ‘\{:10.4f\}’, ‘\{:10.0f\}’ and ‘\{:8.1f\} h’ 
+“\{:10.3f\}”, “\{:10.4f\}”, “\{:10.0f\}” and “\{:8.1f\} h” 
 Make sure that the returned length is exactly 10 characters.
 
 \item[{Returns}] \leavevmode
-\sphinxstylestrong{current specifier (initialized to ‘\{}
+\sphinxstylestrong{current specifier (initialized to “\{}
 
 \item[{Return type}] \leavevmode
-10.3f\}’)
+10.3f\}”)
 
 \end{description}\end{quote}
 
@@ -11544,7 +11579,7 @@ character and will be usually  triple quoted.
 It is advised to use ItemFile with a context manager, like
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
-\PYG{k}{with} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{ItemFile}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{experiment0.txt}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)} \PYG{k}{as} \PYG{n}{f}\PYG{p}{:}
+\PYG{k}{with} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{ItemFile}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{experiment0.txt}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)} \PYG{k}{as} \PYG{n}{f}\PYG{p}{:}
     \PYG{n}{run\PYGZus{}length} \PYG{o}{=} \PYG{n}{f}\PYG{o}{.}\PYG{n}{read\PYGZus{}item\PYGZus{}float}\PYG{p}{(}\PYG{p}{)} \PYG{o}{\textbar{}}\PYG{n}{n}\PYG{o}{\textbar{}}
     \PYG{n}{run\PYGZus{}name} \PYG{o}{=} \PYG{n}{f}\PYG{o}{.}\PYG{n}{read\PYGZus{}item}\PYG{p}{(}\PYG{p}{)} \PYG{o}{\textbar{}}\PYG{n}{n}\PYG{o}{\textbar{}}
 \end{sphinxVerbatim}
@@ -11552,7 +11587,7 @@ It is advised to use ItemFile with a context manager, like
 Alternatively, the file can be opened and closed explicitely, like
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
-\PYG{n}{f} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{ItemFile}\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{experiment0.txt}\PYG{l+s+s1}{\PYGZsq{}}\PYG{p}{)}
+\PYG{n}{f} \PYG{o}{=} \PYG{n}{sim}\PYG{o}{.}\PYG{n}{ItemFile}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{experiment0.txt}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
 \PYG{n}{run\PYGZus{}length} \PYG{o}{=} \PYG{n}{f}\PYG{o}{.}\PYG{n}{read\PYGZus{}item\PYGZus{}float}\PYG{p}{(}\PYG{p}{)}
 \PYG{n}{run\PYGZus{}name} \PYG{o}{=} \PYG{n}{f}\PYG{o}{.}\PYG{n}{read\PYGZus{}item}\PYG{p}{(}\PYG{p}{)}
 \PYG{n}{f}\PYG{o}{.}\PYG{n}{close}\PYG{p}{(}\PYG{p}{)}
@@ -11568,7 +11603,7 @@ Example
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
 \PYG{n}{Item1}
-\PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{Item 2}\PYG{l+s+s1}{\PYGZsq{}}
+\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{Item 2}\PYG{l+s+s2}{\PYGZdq{}}
     \PYG{n}{Item3} \PYG{n}{Item4} \PYG{c+c1}{\PYGZsh{} comment}
 \PYG{n}{Item5} \PYG{p}{\PYGZob{}}\PYG{n}{five}\PYG{p}{\PYGZcb{}} \PYG{n}{Item6} \PYG{p}{\PYGZob{}}\PYG{n}{six}\PYG{p}{\PYGZcb{}}
 \PYG{l+s+s1}{\PYGZsq{}}\PYG{l+s+s1}{Double quote}\PYG{l+s+s1}{\PYGZdq{}}\PYG{l+s+s1}{ in item}\PYG{l+s+s1}{\PYGZsq{}}
@@ -11663,41 +11698,41 @@ not available for non level monitors
 \sphinxstyleliteralstrong{type} (\sphinxstyleliteralemphasis{str}) \textendash{} \begin{description}
 \item[{specifies how tallied values are to be stored}] \leavevmode\begin{itemize}
 \item {} \begin{description}
-\item[{’any’ (default) stores values in a list. This allows}] \leavevmode
+\item[{”any” (default) stores values in a list. This allows}] \leavevmode
 non numeric values. In calculations the values are
 forced to a numeric value (0 if not possible)
 
 \end{description}
 
 \item {} 
-’bool’ (True, False) Actually integer \textgreater{}= 0 \textless{}= 255 1 byte
+”bool” (True, False) Actually integer \textgreater{}= 0 \textless{}= 255 1 byte
 
 \item {} 
-’int8’ integer \textgreater{}= -128 \textless{}= 127 1 byte
+”int8” integer \textgreater{}= -128 \textless{}= 127 1 byte
 
 \item {} 
-’uint8’ integer \textgreater{}= 0 \textless{}= 255 1 byte
+”uint8” integer \textgreater{}= 0 \textless{}= 255 1 byte
 
 \item {} 
-’int16’ integer \textgreater{}= -32768 \textless{}= 32767 2 bytes
+”int16” integer \textgreater{}= -32768 \textless{}= 32767 2 bytes
 
 \item {} 
-’uint16’ integer \textgreater{}= 0 \textless{}= 65535 2 bytes
+”uint16” integer \textgreater{}= 0 \textless{}= 65535 2 bytes
 
 \item {} 
-’int32’ integer \textgreater{}= -2147483648\textless{}= 2147483647 4 bytes
+”int32” integer \textgreater{}= -2147483648\textless{}= 2147483647 4 bytes
 
 \item {} 
-’uint32’ integer \textgreater{}= 0 \textless{}= 4294967295 4 bytes
+”uint32” integer \textgreater{}= 0 \textless{}= 4294967295 4 bytes
 
 \item {} 
-’int64’ integer \textgreater{}= -9223372036854775808 \textless{}= 9223372036854775807 8 bytes
+”int64” integer \textgreater{}= -9223372036854775808 \textless{}= 9223372036854775807 8 bytes
 
 \item {} 
-’uint64’ integer \textgreater{}= 0 \textless{}= 18446744073709551615 8 bytes
+”uint64” integer \textgreater{}= 0 \textless{}= 18446744073709551615 8 bytes
 
 \item {} 
-’float’ float 8 bytes
+”float” float 8 bytes
 
 \end{itemize}
 
@@ -11744,7 +11779,7 @@ animates the monitor in a panel
 \sphinxstyleliteralstrong{titlecolor} (\sphinxstyleliteralemphasis{colorspec}) \textendash{} color of the title (default foreground color)
 
 \item {} 
-\sphinxstyleliteralstrong{titlefont} ({\hyperref[\detokenize{Reference:salabim.Animate.font}]{\sphinxcrossref{\sphinxstyleliteralemphasis{font}}}}) \textendash{} font of the title (default ‘’)
+\sphinxstyleliteralstrong{titlefont} ({\hyperref[\detokenize{Reference:salabim.Animate.font}]{\sphinxcrossref{\sphinxstyleliteralemphasis{font}}}}) \textendash{} font of the title (default null string)
 
 \item {} 
 \sphinxstyleliteralstrong{titlefontsize} (\sphinxstyleliteralemphasis{int}) \textendash{} size of the font of the title (default 15)
@@ -11995,7 +12030,7 @@ default: now
 
 \sphinxstylestrong{last tallied value} \textendash{} Instead of this method, the level monitor can also be called directly, like 
 
-level = sim.Monitor(‘level’, level=True) 
+level = sim.Monitor(“level”, level=True) 
 … 
 print(level()) 
 print(level.get())  \# identical 
@@ -12109,7 +12144,7 @@ merges this monitor with other monitors
 
 \item {} 
 \sphinxstyleliteralstrong{name} (\sphinxstyleliteralemphasis{str}) \textendash{} name of the merged monitor 
-default: name of this monitor + ‘.merged’
+default: name of this monitor + “.merged”
 
 \end{itemize}
 
@@ -12523,7 +12558,7 @@ if not specified, just one slice subset is used.
 
 \item {} 
 \sphinxstyleliteralstrong{name} (\sphinxstyleliteralemphasis{str}) \textendash{} name of the sliced monitor 
-default: name of this monitor + ‘.sliced’
+default: name of this monitor + “.sliced”
 
 \end{itemize}
 
@@ -13031,10 +13066,10 @@ default: 50
 default: 50
 
 \item {} 
-\sphinxstyleliteralstrong{direction} (\sphinxstyleliteralemphasis{str}) \textendash{} if ‘w’, waiting line runs westwards (i.e. from right to left) 
-if ‘n’, waiting line runs northeards (i.e. from bottom to top) 
-if ‘e’, waiting line runs eastwards (i.e. from left to right) (default) 
-if ‘s’, waiting line runs southwards (i.e. from top to bottom)
+\sphinxstyleliteralstrong{direction} (\sphinxstyleliteralemphasis{str}) \textendash{} if “w”, waiting line runs westwards (i.e. from right to left) 
+if “n”, waiting line runs northeards (i.e. from bottom to top) 
+if “e”, waiting line runs eastwards (i.e. from left to right) (default) 
+if “s”, waiting line runs southwards (i.e. from top to bottom)
 
 \item {} 
 \sphinxstyleliteralstrong{reverse} (\sphinxstyleliteralemphasis{bool}) \textendash{} if False (default), display in normal order. If True, reversed.
@@ -13156,7 +13191,7 @@ returns a copy of two queues
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
 \sphinxstyleliteralstrong{name} (\sphinxstyleliteralemphasis{str}) \textendash{} name of the new queue 
-if omitted, ‘copy of ‘ + self.name()
+if omitted, “copy of ” + self.name()
 
 \item {} 
 \sphinxstyleliteralstrong{monitor} (\sphinxstyleliteralemphasis{bool}) \textendash{} if True, monitor the queue 
@@ -14152,39 +14187,39 @@ performance. Note that you should avoid the number not to use
 as this is used to indicate ‘off’
 \begin{itemize}
 \item {} 
-’any’ (default) stores values in a list. This allows for
+”any” (default) stores values in a list. This allows for
 non numeric values. In calculations the values are
 forced to a numeric value (0 if not possible) do not use -inf
 
 \item {} 
-’bool’ bool (False, True). Actually integer \textgreater{}= 0 \textless{}= 254 1 byte do not use 255
+”bool” bool (False, True). Actually integer \textgreater{}= 0 \textless{}= 254 1 byte do not use 255
 
 \item {} 
-’int8’ integer \textgreater{}= -127 \textless{}= 127 1 byte do not use -128
+”int8” integer \textgreater{}= -127 \textless{}= 127 1 byte do not use -128
 
 \item {} 
-’uint8’ integer \textgreater{}= 0 \textless{}= 254 1 byte do not use 255
+”uint8” integer \textgreater{}= 0 \textless{}= 254 1 byte do not use 255
 
 \item {} 
-’int16’ integer \textgreater{}= -32767 \textless{}= 32767 2 bytes do not use -32768
+”int16” integer \textgreater{}= -32767 \textless{}= 32767 2 bytes do not use -32768
 
 \item {} 
-’uint16’ integer \textgreater{}= 0 \textless{}= 65534 2 bytes do not use 65535
+”uint16” integer \textgreater{}= 0 \textless{}= 65534 2 bytes do not use 65535
 
 \item {} 
-’int32’ integer \textgreater{}= -2147483647 \textless{}= 2147483647 4 bytes do not use -2147483648
+”int32” integer \textgreater{}= -2147483647 \textless{}= 2147483647 4 bytes do not use -2147483648
 
 \item {} 
-’uint32’ integer \textgreater{}= 0 \textless{}= 4294967294 4 bytes do not use 4294967295
+”uint32” integer \textgreater{}= 0 \textless{}= 4294967294 4 bytes do not use 4294967295
 
 \item {} 
-’int64’ integer \textgreater{}= -9223372036854775807 \textless{}= 9223372036854775807 8 bytes do not use -9223372036854775808
+”int64” integer \textgreater{}= -9223372036854775807 \textless{}= 9223372036854775807 8 bytes do not use -9223372036854775808
 
 \item {} 
-’uint64’ integer \textgreater{}= 0 \textless{}= 18446744073709551614 8 bytes do not use 18446744073709551615
+”uint64” integer \textgreater{}= 0 \textless{}= 18446744073709551614 8 bytes do not use 18446744073709551615
 
 \item {} 
-’float’ float 8 bytes do not use -inf
+”float” float 8 bytes do not use -inf
 
 \end{itemize}
 
@@ -14250,7 +14285,7 @@ get value of the state
 
 \sphinxstylestrong{value of the state} \textendash{} Instead of this method, the state can also be called directly, like 
 
-level = sim.State(‘level’) 
+level = sim.State(“level”) 
 … 
 print(level()) 
 print(level.get())  \# identical 
@@ -14700,7 +14735,7 @@ Reseeds a randomstream
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
 \sphinxstyleliteralstrong{seed} (\sphinxstyleliteralemphasis{hashable object}\sphinxstyleliteralemphasis{, }\sphinxstyleliteralemphasis{usually int}) \textendash{} the seed for random, equivalent to random.seed() 
-if None or ‘*’, a purely random value (based on the current time) will be used
+if None or “*”, a purely random value (based on the current time) will be used
 (not reproducable) 
 
 \item {} 
@@ -14775,7 +14810,7 @@ convert an image specification to an image
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode
 \sphinxstyleliteralstrong{image} (\sphinxstyleliteralemphasis{str}\sphinxstyleliteralemphasis{ or }\sphinxstyleliteralemphasis{PIL.Image.Image}) \textendash{} if str: filename of file to be loaded 
-if ‘’: dummy image will be returned 
+if null string: dummy image will be returned 
 if PIL.Image.Image: return this image untranslated
 
 \item[{Returns}] \leavevmode
@@ -14795,36 +14830,38 @@ PIL.Image.Image
 
 \section{Who is behind salabim?}
 \label{\detokenize{About:who-is-behind-salabim}}
-I, Ruud van der Ham, am the sole developer of salabim. I have a long history in simulation, both in
+Ruud van der Ham is the core developer of salabim. He has a long history in simulation, both in
 applications and tool building.
 
 It all started in the mid 70’s when modeling container terminals in Prosim, a package
 in PL/1 that was inspired by Simula and run on big IBM 360/370 mainframes. 
-In the eighties, Prosim was ported to smaller computers, but at the same time I
+In the eighties, Prosim was ported to smaller computers, but at the same time he
 developed a discrete event simulation tool called Must to run on CP/M machines, later
 on MSDOS machines, again under PL/1. A bit later, Must was ported to Pascal and was
 used in many projects. Must was never ported to Windows. Instead, Hans Veeke (Delft University)
 came with Tomas, a package that is still available and runs under Delphi. 
-End 2016, I wanted an easy to use and open source package for a project, preferably
-in Python. Unfortunately, Simpy (particularly version 3) does not support the essential
-process interaction methods activate, hold, passivate and standby. First I tried to
+End 2016, an easy to use and open source package for a project, preferably
+in Python, was wanted. Unfortunately, the other Python DES package Simpy (particularly version 3) does not support
+the essential
+process interaction methods activate, hold, passivate and standby. First he tried to
 build a wrapper around Simpy 3, but that didn’t work too well.
 
 That was the start of a new package, called salabim.
 One of the key features of salabim is the powerful animation engine that is heavily
-inspired by some more creative projects where every animation object can change position,
+inspired by some of my creative projects where every animation object can change position,
 shape, colour, orientation over time. Although rarely used in normal simulation models,
 all that functionality is available in salabim. 
-Over the year 2017, a lot of functionality was added as well bugs were fixed. During that year
-the package became available on PyPI and GitHub and the documentation was made available. 
-Large parts of salabim were actually developed on an iPad on the excellent Pythonista platform. The full
+Then, gradually, a lot of functionality was added as well bugs were fixed. Also, the package became
+available on PyPI and GitHub and the documentation was made available. 
+Large parts of salabim were actually developed on an iPad on the excellent Pythonista platform. Pratically the full
 functionality is thus available under iOS as well.
 
 
 \section{Why is the package called salabim?}
 \label{\detokenize{About:why-is-the-package-called-salabim}}
-The name is derived from the magic words ‘Sim Salabim’,
+The name is derived from the magic words \sphinxtitleref{Sim Salabim},
 where Sim is actually short for simulation !
+
 Note that the name should be written in all lowercase, unless it is at the start of a sentence, like a
 normal noun.
 
@@ -14833,8 +14870,6 @@ normal noun.
 \label{\detokenize{About:contributing-and-reporting-issues}}
 It is very much appreciated to contribute to the salabim, by issuing a pull request or issue on GitHub.
 
-Also, issues can be reported this way.
-
 Alternatively, the Google group can be used for this.
 
 
@@ -14842,9 +14877,9 @@ Alternatively, the Google group can be used for this.
 \label{\detokenize{About:support}}
 Ruud van der Ham is able and willing to help users with issues with the package or modelling in general.
 
-He is also available for consultancy and or trainings.
+He is also available for code and model reviews, consultancy, training.
 
-Contact him or other users via the Google group or \sphinxhref{mailto:info@salabim.org}{info@salabim.org}.
+Contact him or other users via the Google group or \sphinxhref{mailto:ruud@salabim.org}{ruud@salabim.org}.
 
 
 \section{License}
@@ -14873,7 +14908,7 @@ SOFTWARE.
 
 
 \chapter{Indices and tables}
-\label{\detokenize{Indices::doc}}\label{\detokenize{Indices:indices-and-tables}}\begin{itemize}
+\label{\detokenize{Indices:indices-and-tables}}\label{\detokenize{Indices::doc}}\begin{itemize}
 \item {} 
 \DUrole{xref,std,std-ref}{genindex}
 
