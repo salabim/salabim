@@ -1,6 +1,6 @@
 ![Logo](http://www.salabim.org/salabim_logo_red_black_with_payoff_300px_wide.png)
 
-Fully object oriented simulation, similar to must and Tomas.
+Object oriented discrete event simulation and animation in Python.
 
 Includes process control features, resources, queues, monitors. statistical distributions.
 
