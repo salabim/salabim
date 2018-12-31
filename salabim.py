@@ -1,8 +1,8 @@
-"""          _         _      _               ____      _  _       ____
- ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \    | || |     |___ \
-/ __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |   | || |_      __) |
-\__ \| (_| || || (_| || |_) || || | | | | |   / __/  _ |__   _| _  / __/
-|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|(_)   |_|  (_)|_____|
+"""          _         _      _               _   ___       ___       ___
+ ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \     / _ \
+/ __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |   | | | |
+\__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _ | |_| |
+|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_) \___/
 Discrete event simulation in Python
 
 see www.salabim.org for more information, the documentation and license information
@@ -11,7 +11,7 @@ see www.salabim.org for more information, the documentation and license informat
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "2.4.2"
+__version__ = "19.0.0"
 
 import heapq
 import random
@@ -31,6 +31,7 @@ import logging
 import types
 import bisect
 import operator
+import string
 
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
@@ -2182,8 +2183,13 @@ if Pythonista:
                 scene.image(ims, 0, 0, *capture_image.size)
                 scene.unload_image(ims)
                 if env._video and (not env.paused):
-                    if env._video_out == "gif":  # just to be sure
+                    if env._video_out == "gif":
                         env._images.append(capture_image.convert("RGB"))
+                    elif env._video_out == "snapshots":
+                        capture_image.save(env._video_name)
+                        env._video_name = incstr(env._video_name)
+                    else:
+                        pass  # this should never occur
                 for uio in env.ui_objects:
                     ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True)
                     uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True)
@@ -2284,6 +2290,7 @@ class Qmember:
             if not q._isinternal:
                 q.env.print_trace("", "", c.name(), "enter " + q.name())
         q.length.tally(q._length)
+        q.number_of_arrivals += 1
 
 
 class Queue(object):
@@ -2334,6 +2341,8 @@ class Queue(object):
         self._iter_sequence = 0
         self._iter_touched = {}
         self._isinternal = False
+        self.arrival_rate(reset=True)
+        self.departure_rate(reset=True)
         self.length = Monitor(
             "Length of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="uint32", env=self.env
         )
@@ -2437,6 +2446,58 @@ class Queue(object):
         """
         self.length.reset(monitor=monitor)
         self.length_of_stay.reset(monitor=monitor)
+
+    def arrival_rate(self, reset=False):
+        """
+        returns the arrival rate |n|
+        When the queue is created, the registration is reset.
+
+        Parameters
+        ----------
+        reset : bool
+            if True, number_of_arrivals is set to 0 since last reset and the time of the last reset to now |n|
+            default: False ==> no reset
+
+        Returns
+        -------
+        arrival rate :  float
+            number of arrivals since last reset / duration since last reset |n|
+            nan if duration is zero
+        """
+        if reset:
+            self.number_of_arrivals = 0
+            self.number_of_arrivals_t0 = self.env._now
+        duration = self.env._now - self.number_of_arrivals_t0
+        if duration == 0:
+            return nan
+        else:
+            return self.number_of_arrivals / duration
+
+    def departure_rate(self, reset=False):
+        """
+        returns the departure rate |n|
+        When the queue is created, the registration is reset.
+
+        Parameters
+        ----------
+        reset : bool
+            if True, number_of_departures is set to 0 since last reset and the time of the last reset to now |n|
+            default: False ==> no reset
+
+        Returns
+        -------
+        departure rate :  float
+            number of departures since last reset / duration since last reset |n|
+            nan if duration is zero
+        """
+        if reset:
+            self.number_of_departures = 0
+            self.number_of_departures_t0 = self.env._now
+        duration = self.env._now - self.number_of_departures_t0
+        if duration == 0:
+            return nan
+        else:
+            return self.number_of_departures / duration
 
     def monitor(self, value):
         """
@@ -3795,7 +3856,10 @@ class Environment(object):
             if video is not omitted, a video with the name video
             will be created. |n|
             Normally, use .mp4 as extension. |n|
-            If the video extension is not .gif, a codec may be added
+            If the extension is .gif, an animated gif file will be written |n|
+            If the extension is .jpg, .png, .bmp or .tiff, individual frames will be written with
+            a six digit sequence added to the file name.
+            If the video extension is not .gif, .jpg, .png, .bmp or .tiff, a codec may be added
             by appending a plus sign and the four letter code name,
             like "myvideo.avi+DIVX". |n|
             If no codec is given, MP4V will be used as codec.
@@ -3919,12 +3983,20 @@ class Environment(object):
 
                 if video:
                     video_opened = True
-                    extension = os.path.splitext(video)[1].lower()
-                    if extension == ".gif":
+                    filename, extension = splitext(video)  # os.path.splitext does not support null fileparts
+                    if extension.lower() == ".gif":
+                        if filename == "":
+                            raise ValueError("incorrect video name " + video)
                         self._video_name = video
                         can_animate(try_only=False)
                         self._video_out = "gif"
                         self._images = []
+                    elif extension.lower() in (".jpg", ".png", ".bmp", ".tiff"):
+                        self.delete_video(video)
+                        self._video_name = filename + "000000" + extension
+                        can_animate(try_only=False)
+                        self._video_out = "snapshots"
+
                     else:
                         if len(video.split("+")) == 2:
                             self._video_name, codec = video.split("+")
@@ -3942,7 +4014,7 @@ class Environment(object):
                 raise ValueError("width changed while recording video.")
             if height_changed:
                 raise ValueError("height changed while recording video.")
-            if fps_changed and self._video_out != "gif":
+            if fps_changed and self._video_out not in ("gif", "snapshots"):
                 raise ValueError("fps changed while recording video.")
 
         if self._video:
@@ -3985,6 +4057,31 @@ class Environment(object):
 
         self._animate = animate
 
+    def delete_video(self, video):
+        """
+        deletes video file(s), if any |n|
+        
+        Parameters
+        ----------
+        video : str
+            name of video to be deleted |n|
+            if the extension is .jpg, .png, .bmp or .tiff, all autonumbered files will be deleted, if any. |n|
+            otherwise, the function is equivalent to os.remove() if the file exists, otherwise no action is taken
+        """
+        filename, extension = splitext(video)  # os.path.splitext does not support null fileparts
+        if extension.lower() in (".jpg", ".png", ".bmp", ".tiff"):
+            for file in glob.glob(filename + "??????" + extension):
+                filepart = file[: -len(extension)]
+                digits_only = True
+                for c in filepart[len(filename) - 6 : len(filename)]:
+                    if c not in string.digits:
+                        digits_only = False
+                if digits_only:
+                    os.remove(file)
+        else:
+            if os.path.isfile(video):
+                os.remove(video)
+
     def video_close(self):
         """
         closes the current animation video recording, if any.
@@ -4009,6 +4106,8 @@ class Environment(object):
                             duration=1000 / self._fps,
                         )
                     self._images = []  # release memory
+            elif self._video_out == "snapshots":
+                pass
             else:
                 self._video_out.release()
             self._video_out = None
@@ -4761,6 +4860,9 @@ class Environment(object):
             if self._video and (not self.paused):
                 if self._video_out == "gif":
                     self._images.append(capture_image)
+                elif self._video_out == "snapshots":
+                    capture_image.save(self._video_name)
+                    self._video_name = incstr(self._video_name)
                 else:
                     open_cv_image = cv2.cvtColor(np.array(capture_image), cv2.COLOR_RGB2BGR)
                     self._video_out.write(open_cv_image)
@@ -4784,7 +4886,7 @@ class Environment(object):
         ----------
         filename : str
             file to save the current animated frame to. |n|
-            The following formats are accepted: .PNG, .JPG, .BMP, .GIF and .TIFF are supported.
+            The following formats are accepted: .png, .jpg, .bmp, .gif and .tiff are supported.
             Other formats are not possible.
             Note that, apart from .JPG files. the background may be semi transparent by setting
             the alpha value to something else than 255.
@@ -11251,6 +11353,7 @@ class Component(object):
         length_of_stay = self.env._now - mx.enter_time
         q.length_of_stay.tally(length_of_stay)
         q.length.tally(q._length)
+        q.number_of_departures += 1
         return self
 
     def priority(self, q, priority=None):
@@ -14769,6 +14872,67 @@ def fn(x, l, d):
     return ("{:" + str(l) + "." + str(d) + "f}").format(x)
 
 
+def incstr(s):
+    """
+    increments the digits in the string by one.
+    used for auto numbering files
+    
+    Parameters
+    ----------
+    s :  string
+        string to be incremented (auto numbered)
+    
+    Returns
+    -------
+    s incremented by one : str
+    """
+
+    result = ""
+    carryover = 1
+    for c in s[::-1]:
+        if c in string.digits:
+            if carryover:
+                if c == "9":
+                    c = "0"
+                    carryover = 1
+                else:
+                    c = chr(ord(c) + carryover)
+                    carryover = 0
+        result = c + result
+
+    return result
+
+
+def splitext(filename):
+    """
+    same as os.path.splitext, but does not ignore leading dots in the basename.
+    
+    filename         splitext(filename)    os.path.splitext(filename)
+    ---------------- --------------------- --------------------------
+    '.txt'           ('','.txt')           ('.txt','')
+    'e:/test/.txt'   ('e:/test/','.txt')   ('e:/test/.txt','')
+    
+    This is used for auto numbering video snapshots, such as 000000.jpg, ...
+    
+    Arguments
+    ---------
+    filename : str
+        filename to be split
+        
+    Returns:
+        filepart, extpart : tuple
+    """
+
+    splitted = filename.split(".")
+    if len(splitted) == 1:
+        filepart = splitted[0]
+        extpart = "."
+    else:
+        filepart = ".".join(splitted[:-1])
+        extpart = "." + splitted[-1]
+    return (filepart, extpart)
+
+
 def _checkrandomstream(randomstream):
     if not isinstance(randomstream, random.Random):
         raise TypeError("Type randomstream or random.Random expected, got " + str(type(randomstream)))
@@ -14815,7 +14979,6 @@ def list_to_array(l):
 
 
 def deep_flatten(l):
-
     if hasattr(l, "__iter__") and not isinstance(l, str):
         for x in l:
             #  the two following lines are equivalent to 'yield from deep_flatten(x)' (not supported in Python 2.7)
@@ -14841,11 +15004,7 @@ def merge_blanks(*l):
 
 
 def normalize(s):
-    res = ""
-    for c in s.upper():
-        if c.isalpha() or c.isdigit():
-            res = res + c
-    return res
+    return "".join(c for c in s.upper() if c.isalpha() or c.isdigit())
 
 
 def _urgenttxt(urgent):
@@ -14896,10 +15055,9 @@ def _call(c, t, self):
         nargs = c.__code__.co_argcount
         if nargs == 0:
             return c()
-        elif nargs == 1:
+        if nargs == 1:
             return c(t)
-        else:
-            return c(self, t)
+        return c(self, t)
     if inspect.ismethod(c):
         return c(t)
     return c
