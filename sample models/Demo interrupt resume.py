@@ -17,7 +17,8 @@ Have a close look at the trace output to see what is going on.
 
 class Machine(sim.Component):
     def setup(self):
-        [Part(name="part " + str(self.sequence_number()) + ".", machine=self) for _ in range(3)]
+        for _ in range(3):
+            Part(name="part " + str(self.sequence_number()) + ".", machine=self)
 
     def process(self):
         while True:
@@ -32,18 +33,19 @@ class Part(sim.Component):
 
     def process(self):
         while True:
-            yield self.hold(mtbf())
+            yield self.hold(ttf())
             self.machine.interrupt()
-            yield self.hold(mttr())
+            yield self.hold(ttr())
             self.machine.resume()
 
 
 env = sim.Environment(trace=True)
-mtbf = sim.Uniform(10, 20)
-mttr = sim.Uniform(3, 6)
+ttf = sim.Uniform(10, 20)  # time to failure distribution
+ttr = sim.Uniform(3, 6)  # time to repair distribution
 
 res = sim.Resource()
 
-[Machine() for _ in range(2)]
+for _ in range(2):
+    Machine()
 
 env.run(400)
