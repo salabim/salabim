@@ -1,17 +1,7 @@
-"""          _         _      _               _   ___       ___       ___
- ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \     / _ \
-/ __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |   | | | |
-\__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _ | |_| |
-|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_) \___/
-Discrete event simulation in Python
-
-see www.salabim.org for more information, the documentation and license information
-"""
-
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "19.0.0"
+__version__ = "19.0.1"
 
 import heapq
 import random
@@ -1579,7 +1569,7 @@ class Monitor(object):
                             n = int(perc * scale)
                             ncum = int(cumperc * scale) + 1
                             s = ("*" * n) + (" " * (scale - n))
-                            s = s[: ncum - 1] + "|" + s[ncum + 1 :]  # NOQA
+                            s = s[: ncum - 1] + "|" + s[ncum + 1 :]
 
                         result.append(
                             "{} {}{}{} {}".format(
@@ -2719,6 +2709,7 @@ class Queue(object):
         This method is equivalent to append()
         """
         component.enter(self)
+        return self
 
     def append(self, component):
         """
@@ -2738,6 +2729,7 @@ class Queue(object):
         This method is equivalent to add()
         """
         component.enter(self)
+        return self
 
     def add_at_head(self, component):
         """
@@ -2757,6 +2749,7 @@ class Queue(object):
         or 0 if queue is empty
         """
         component.enter_at_head(self)
+        return self
 
     def add_in_front_of(self, component, poscomponent):
         """
@@ -2777,6 +2770,7 @@ class Queue(object):
         the priority of component will be set to the priority of poscomponent
         """
         component.enter_in_front_of(self, poscomponent)
+        return self
 
     def insert(self, index, component):
         """
@@ -2810,6 +2804,7 @@ class Queue(object):
             mx = mx.successor
         priority = mx.priority
         Qmember().insert_in_front_of(mx, component, self, priority)
+        return self
 
     def add_behind(self, component, poscomponent):
         """
@@ -2831,6 +2826,7 @@ class Queue(object):
 
         """
         component.enter_behind(self, poscomponent)
+        return self
 
     def add_sorted(self, component, priority):
         """
@@ -2850,6 +2846,7 @@ class Queue(object):
         The component is placed just before the first component with a priority > given priority
         """
         component.enter_sorted(self, priority)
+        return self
 
     def remove(self, component=None):
         """
@@ -2869,6 +2866,7 @@ class Queue(object):
             self.clear()
         else:
             component.leave(self)
+        return self
 
     def head(self):
         """
@@ -3165,6 +3163,7 @@ class Queue(object):
             if c not in self:
                 c.enter(q)
         self.env._trace = savetrace
+        return self
 
     def as_set(self):
         return {c for c in self}
@@ -4060,7 +4059,7 @@ class Environment(object):
     def delete_video(self, video):
         """
         deletes video file(s), if any |n|
-        
+
         Parameters
         ----------
         video : str
@@ -14876,12 +14875,12 @@ def incstr(s):
     """
     increments the digits in the string by one.
     used for auto numbering files
-    
+
     Parameters
     ----------
     s :  string
         string to be incremented (auto numbered)
-    
+
     Returns
     -------
     s incremented by one : str
@@ -14906,19 +14905,19 @@ def incstr(s):
 def splitext(filename):
     """
     same as os.path.splitext, but does not ignore leading dots in the basename.
-    
+
     filename         splitext(filename)    os.path.splitext(filename)
     ---------------- --------------------- --------------------------
     '.txt'           ('','.txt')           ('.txt','')
     'e:/test/.txt'   ('e:/test/','.txt')   ('e:/test/.txt','')
-    
+
     This is used for auto numbering video snapshots, such as 000000.jpg, ...
-    
+
     Arguments
     ---------
     filename : str
         filename to be split
-        
+
     Returns:
         filepart, extpart : tuple
     """

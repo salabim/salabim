@@ -1,5 +1,28 @@
 salabim  changelog
 
+version 19.0.1 2019-03-02
+=========================
+Added functionality
+-----------------
+The methods Queue.add, Queue.append, Queue.add_at_head, Queue.add_sorted, Queue.add_in_front_of,
+Queue.add_behind, Queue.insert, Queue.remove now return the the queue itself (self), in order
+to allow chaining,like
+    waitingline.add(car1).add(car2)
+
+
+Documentation update
+--------------------
+The documentation has been enhanced.
+A section on using monitors in other packages, like matplotlib has been added.
+This includes a hint to use
+    plt.plot(*waitingline.length.tx(), drawstyle="steps-post") 
+to generate a plot from a level monitor.
+
+    
+Bug fixes
+---------
+Minor error in run without a duration or till parameter fixed.
+
 version 19.0.0 2019-01-01
 =========================
 New functionality
@@ -45,7 +68,7 @@ If this method is used with any other file type, like .mp4, the file does not ne
 
 Announcements
 -------------
-From this version, salabim uses the CalVer (see www.calver.org) standard for the version number.
+From this version, salabim uses the CalVer (see www.calver.org) standard for version numbering.
 This means that versions are numbered YY.major.minor, where
   YY is the year of the release minus 2000
   major is the major version number (0 based)
