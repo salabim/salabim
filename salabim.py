@@ -3161,7 +3161,7 @@ class Queue(object):
         self.env._trace = False
         for c in q:
             if c not in self:
-                c.enter(q)
+                c.enter(self)
         self.env._trace = savetrace
         return self
 
