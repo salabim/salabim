@@ -1,7 +1,17 @@
+"""          _         _      _               _   ___       ___      ____
+ ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \    |___ \
+/ __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |     __) |
+\__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _  / __/
+|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_)|_____|
+Discrete event simulation in Python
+
+see www.salabim.org for more information, the documentation and license information
+"""
+
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "19.0.1"
+__version__ = "19.0.2"
 
 import heapq
 import random
@@ -309,6 +319,23 @@ class Monitor(object):
             return self
         else:
             return self.merge(other)
+
+    def __mul__(self, other):
+        try:
+            other = float(other)
+        except Exception:
+            return NotImplemented
+        return self.multiply(other)
+
+    def __rmul__(self, other):
+        return self * other
+
+    def __truediv__(self, other):
+        try:
+            other = float(other)
+        except Exception:
+            return NotImplemented
+        return self * (1 / other)
 
     def merge(self, *monitors, **kwargs):
         """
@@ -773,6 +800,244 @@ class Monitor(object):
         else:
             self._x.append(self.off)
             self._t.append(t)
+
+    def to_years(self, name=None):
+        """
+        makes a monitor with all x-values converted to years
+
+        Parameters
+        ----------
+        name : str
+            name of the converted monitor |n|
+            default: name of this monitor
+
+        Returns
+        -------
+        converted monitor : Monitor
+
+        Note
+        ----
+        Only non level monitors with type float can be converted. |n|
+        It is required that a time_unit is defined for the environment.
+        """
+        self.env._check_time_unit_na()
+        return self.to_time_unit("years", name=name)
+
+    def to_weeks(self, name=None):
+        """
+        makes a monitor with all x-values converted to weeks
+
+        Parameters
+        ----------
+        name : str
+            name of the converted monitor |n|
+            default: name of this monitor
+
+        Returns
+        -------
+        converted monitor : Monitor
+
+        Note
+        ----
+        Only non level monitors with type float can be converted. |n|
+        It is required that a time_unit is defined for the environment.
+        """
+        self.env._check_time_unit_na()
+        return self.to_time_unit("weeks", name=name)
+
+    def to_days(self, name=None):
+        """
+        makes a monitor with all x-values converted to days
+
+        Parameters
+        ----------
+        name : str
+            name of the converted monitor |n|
+            default: name of this monitor
+
+        Returns
+        -------
+        converted monitor : Monitor
+
+        Note
+        ----
+        Only non level monitors with type float can be converted. |n|
+        It is required that a time_unit is defined for the environment.
+        """
+        self.env._check_time_unit_na()
+        return self.to_time_unit("days", name=name)
+
+    def to_hours(self, name=None):
+        """
+        makes a monitor with all x-values converted to hours
+
+        Parameters
+        ----------
+        name : str
+            name of the converted monitor |n|
+            default: name of this monitor
+
+        Returns
+        -------
+        converted monitor : Monitor
+
+        Note
+        ----
+        Only non level monitors with type float can be converted. |n|
+        It is required that a time_unit is defined for the environment.
+        """
+        self.env._check_time_unit_na()
+        return self.to_time_unit("hours", name=name)
+
+    def to_minutes(self, name=None):
+        """
+        makes a monitor with all x-values converted to minutes
+
+        Parameters
+        ----------
+        name : str
+            name of the converted monitor |n|
+            default: name of this monitor
+
+        Returns
+        -------
+        converted monitor : Monitor
+
+        Note
+        ----
+        Only non level monitors with type float can be converted. |n|
+        It is required that a time_unit is defined for the environment.
+        """
+        self.env._check_time_unit_na()
+        return self.to_time_unit("minutes", name=name)
+
+    def to_seconds(self, name=None):
+        """
+        makes a monitor with all x-values converted to seconds
+
+        Parameters
+        ----------
+        name : str
+            name of the converted monitor |n|
+            default: name of this monitor
+
+        Returns
+        -------
+        converted monitor : Monitor
+
+        Note
+        ----
+        Only non level monitors with type float can be converted. |n|
+        It is required that a time_unit is defined for the environment.
+        """
+        self.env._check_time_unit_na()
+        return self.to_time_unit("seconds", name=name)
+
+    def to_milliseconds(self, name=None):
+        """
+        makes a monitor with all x-values converted to milliseconds
+
+        Parameters
+        ----------
+        name : str
+            name of the converted monitor |n|
+            default: name of this monitor
+
+        Returns
+        -------
+        converted monitor : Monitor
+
+        Note
+        ----
+        Only non level monitors with type float can be converted. |n|
+        It is required that a time_unit is defined for the environment.
+        """
+        self.env._check_time_unit_na()
+        return self.to_time_unit("milliseconds", name=name)
+
+    def to_microseconds(self, name=None):
+        """
+        makes a monitor with all x-values converted to microseconds
+
+        Parameters
+        ----------
+        name : str
+            name of the converted monitor |n|
+            default: name of this monitor
+
+        Returns
+        -------
+        converted monitor : Monitor
+
+        Note
+        ----
+        Only non level monitors with type float can be converted. |n|
+        It is required that a time_unit is defined for the environment.
+        """
+        self.env._check_time_unit_na()
+        return self.to_time_unit("microseconds", name=name)
+
+    def to_time_unit(self, time_unit, name=None):
+        """
+        makes a monitor with all x-values converted to the specified time unit
+
+        Parameters
+        ----------
+        time_unit : str
+            Supported time_units: |n|
+            "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
+
+        name : str
+            name of the converted monitor |n|
+            default: name of this monitor
+
+        Returns
+        -------
+        converted monitor : Monitor
+
+        Note
+        ----
+        Only non level monitors with type float can be converted. |n|
+        It is required that a time_unit is defined for the environment.
+        """
+        self.env._check_time_unit_na()
+        return self.multiply(_time_unit_lookup(time_unit) / self.env._time_unit, name=name)
+
+    def multiply(self, scale=1, name=None):
+        """
+        makes a monitor with all x-values multiplied with scale
+
+        Parameters
+        ----------
+        scale : float
+           scale to be applied
+
+        name : str
+            name of the multiplied monitor |n|
+            default: name of this monitor
+
+        Returns
+        -------
+        multiplied monitor : Monitor
+
+        Note
+        ----
+        Only non level monitors with type float can be multiplied |n|
+        """
+        if self._level:
+            raise ValueError("level monitors can't be multiplied")
+
+        if self.xtype == "float":
+            if name is None:
+                name = self.name()
+            new = Monitor(name=name, monitor=False, type="float", level=False)
+            new.isgenerated = True
+            new._x = [x * scale for x in self._x]
+            new._t = 1  # self._t[]
+            return new
+
+        else:
+            raise ValueError("type", self.xtype, " monitors can't be multiplied (only float)")
 
     def name(self, value=None):
         """
@@ -3161,7 +3426,7 @@ class Queue(object):
         self.env._trace = False
         for c in q:
             if c not in self:
-                c.enter(q)
+                c.enter(self)
         self.env._trace = savetrace
         return self
 
@@ -3427,7 +3692,7 @@ class Queue(object):
             c = mx.component
             mx = mx.successor
             c.leave(self)
-        self._trace = savetrace
+        self.env._trace = savetrace
         if self.env._trace:
             self.env.print_trace("", "", self.name() + " clear")
 
@@ -4718,7 +4983,7 @@ class Environment(object):
         if till is None:
             if duration is None:
                 scheduled_time = inf
-                self.end_on_empty_eventlist = False
+                self.end_on_empty_eventlist = True
                 extra = "*"
             else:
                 if duration == inf:
@@ -5656,6 +5921,25 @@ class Environment(object):
         self._check_time_unit_na()
         return t * 1e-6 * self._time_unit
 
+    def to_time_unit(self, time_unit, t):
+        """
+        convert time t to the time_unit specified
+
+        Parameters
+        ----------
+        time_unit : str
+            Supported time_units: |n|
+            "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
+
+        t : time
+
+        Returns
+        -------
+        Time t converted to the time_unit specified : float
+        """
+        self._check_time_unit_na()
+        return t * _time_unit_lookup(time_unit) / self.env._time_unit
+
     def to_years(self, t):
         """
         convert time t to years
@@ -5668,8 +5952,7 @@ class Environment(object):
         -------
         Time t converted to years : float
         """
-        self._check_time_unit_na()
-        return t / (86400 * 365 * self._time_unit)
+        return self.to_time_unit("years", t)
 
     def to_weeks(self, t):
         """
@@ -5683,8 +5966,7 @@ class Environment(object):
         -------
         Time t converted to weeks : float
         """
-        self._check_time_unit_na()
-        return t / (86400 * 7 * self._time_unit)
+        return self.to_time_unit("weeks", t)
 
     def to_days(self, t):
         """
@@ -5698,8 +5980,7 @@ class Environment(object):
         -------
         Time t converted to days : float
         """
-        self._check_time_unit_na()
-        return t / (86400 * self._time_unit)
+        return self.to_time_unit("days", t)
 
     def to_hours(self, t):
         """
@@ -5713,8 +5994,7 @@ class Environment(object):
         -------
         Time t converted to hours : float
         """
-        self._check_time_unit_na()
-        return t / (3600 * self._time_unit)
+        return self.to_time_unit("hours", t)
 
     def to_minutes(self, t):
         """
@@ -5728,8 +6008,7 @@ class Environment(object):
         -------
         Time t converted to minutes : float
         """
-        self._check_time_unit_na()
-        return t / (60 * self._time_unit)
+        return self.to_time_unit("minutes", t)
 
     def to_seconds(self, t):
         """
@@ -5743,8 +6022,7 @@ class Environment(object):
         -------
         Time t converted to seconds : float
         """
-        self._check_time_unit_na()
-        return t / (self._time_unit)
+        return self.to_time_unit("seconds", t)
 
     def to_milliseconds(self, t):
         """
@@ -5758,8 +6036,7 @@ class Environment(object):
         -------
         Time t converted to milliseconds : float
         """
-        self._check_time_unit_na()
-        return t / (1e-3 * self._time_unit)
+        return self.to_time_unit("milliseconds", t)
 
     def to_microseconds(self, t):
         """
@@ -5773,8 +6050,7 @@ class Environment(object):
         -------
         Time t converted to microseconds : float
         """
-        self._check_time_unit_na()
-        return t / (1e-6 * self._time_unit)
+        return self.to_time_unit("microseconds", t)
 
     def _check_time_unit_na(self):
         if self._time_unit is None:
@@ -11494,7 +11770,7 @@ class Component(object):
 
         Note
         ----
-        This method is usefu for interrupting a process and then resuming it,
+        This method is useful for interrupting a process and then resuming it,
         after some (breakdown) time
         """
         if value is not None:
@@ -14420,7 +14696,7 @@ class Resource(object):
 
         Note
         ----
-        quantity may not be specified for a non-anomymous resoure
+        quantity may not be specified for a non-anonymous resoure
         """
 
         if self._anonymous:
