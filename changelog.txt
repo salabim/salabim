@@ -1,5 +1,50 @@
 salabim  changelog
 
+version 19.0.2
+=========================
+
+New functionality
+-----------------
+It is now possible to scale the output of non level monitor, which is most useful for the automatically
+registered length_of_stay monitor of queues. For instance, if the time unit of the simulation is days,
+the duration in the queue (q) is registered in days. Buf if a histogram in minutes is more appropriate,
+it is possible to say
+    q.length_of_stay.to_hours().print_histogram()
+Equivalent methods are available for year, weeks, days, minutes, seconds, milliseconds and microseconds.
+Alternatively the method Monitor.to_time_unit() might be used as in
+    q.length_of_stay.to_time_unit('minutes').print_histogram()
+Finally, a monitor may be scaled with a given factor, e.g.
+    q.length_of_stay.multiply(24 * 60).print_histogram()
+or even
+    (q.length_of_stay * 24 * 60).print_histogram()
+
+Here is a list of all the new Monitor methods:
+
+Monitor.multiply()
+Monitor.to_years()
+Monitor.to_weeks()
+Monitor.to_days()
+Monitor.to_hours()
+Monitor.to_minutes()
+Monitor.to_seconds()
+Monitor.to_milliseconds()
+Monitor.to_microseconds()
+Monitor.to_time_unit()
+
+On top of Environment.to_years, Environment.to_weeks, etc., there is now a generic method
+    Environment.to_time_unit()
+For instance,
+    env.to_minutes(env.now)
+is equivalent to
+    env._to_time_unit('minutes', env.now)
+    
+
+Bug fixes
+---------
+Minor error in run without a duration or till parameter fixed (was not correctly fixed in version 19.0.1)
+Bug in Queue.extend() fixed. 
+Bug in Queue.clear() fixed.
+
 version 19.0.1 2019-03-02
 =========================
 Added functionality
