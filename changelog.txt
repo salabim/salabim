@@ -1,7 +1,101 @@
 salabim  changelog
 
-version 19.0.2
-=========================
+version 19.0.3  2019-04-21
+==========================
+New methods (0)
+---------------
+Monitor.rename() can be used to rename a monitor in a chained way.
+This is particularly useful when merging with the + operator, merging with sum or slicing with [],
+multiplication and division as well as the unit conversion methods (to_years, ...),
+because the resulting monitors get automatically a name, that might not be appropriate.
+The Monitor.rename() method is essentially the same as Monitor.name(), but will return the monitor itself.
+Examples:
+    (mon0 + mon1 + mon2 + mon3).rename('mon0 - mon3').print_histogram()
+    sum(mon for mon in (mon0, mon1, mon2, mon3)).rename('mon0 - mon3').print_histogram()
+    mon0[1000:2000].rename('mon0 between t=1000 and t=2000').print_statistics()
+    mon0.to_years().rename('mon0 in hours').print_statistics()
+
+    
+New methods (1)
+---------------
+Queue.rename() can be used to rename a queue in a chained way.
+This particularly useful when the queues are combined with +, -, |, & and ^ operator or the sum function,
+because the resulting queue get automatically a name, that might not be appropriate.
+The Queue.rename() method is essentially the same as Queue.name(), but will return the queue itself.
+Examples:
+    (q0 + q1 + q2 + q3).rename('q0 - q3').print_statistics()
+    (q1 - q0).rename('difference of q1 and q0)').print_histograms()
+    
+
+New functionality
+-----------------
+It is now possible to get the union of several queues by means of the sum function.
+Example:
+    rows = [Queue('row.') for _ in range(10)]
+    ...
+    sum(rows).print_info()
+
+
+Improved functionality (0)
+--------------------------
+When animating a large number of objects, it was possible that tkinter crashed because there were too many tkinter
+bitmaps aka canvas objects, sometimes by issuing a 'Fail to allocate bitmap', sometimes without any message.
+From this version on, salabim limits the number of bitmap automatically by combining animation objects
+in one aggregated bitmap if the number of bitmaps exceeds a given maximum.
+Unfortunately it is not possible to detect this 'Fail to allocate bitmap', so it may take some experimentation to
+find a workable maximum (maybe going as low as 1000).
+By default, salabim sets the maximum number of bitmaps to 4000, but may be changed with the
+Environment.maximum_number_of_bitmaps() method, or the maximum_number_of_bitmaps parameter of
+Environment.animation_parameters().
+Choosing a too low maximum (particularly 0), may result in a performance degradation.
+The bitmap aggregation process is transparent to the user, but improves the usability of salabim.
+Note that does this not apply to the Pythonista implementation, where bitmaps are always aggregated.
+
+
+Improved functionality (1)
+--------------------------
+When using the new style Animate classes (AnimateLine, AnimateRectangle, ...), texts are optional. Up to
+this version, even a blank text (which is the default), resulted in a small 'empty' bitmap to be 'displayed'.
+From this version, these blank texts are ignored automatically , which is transparent to the user but can result
+in better performance and reduces the probability of a tkinter crash.
+
+
+Changed functionality (0)
+-------------------------
+The method Environment.animation_parameters() does no longer automatically enable animate, but 
+instead leaves the animate status unchanged. So, if the user now wants to start the animation as
+well when specifying other parameters, it is necessary to add animate=True.
+Or, better yet, specify the various parameters with their corresponding method and use
+env.animate(True).
+E.g. instead of
+    env.animation_parameters(x0=100, modelname="My model")
+use now
+   env.animation_parameters(x0=100, modelname="My model", animate=True)
+or
+   env.x0(100)
+   env.modelname("My model")
+   env.animate(True)
+
+
+Changed functionality (1)
+-------------------------
+When creating an animated video, the default codec is now mp4v instead of MP4V.
+If this causes a problem in an appication, just add +MP4V to the filename, like
+    env.video("my_video.mp4+MP4V")
+
+
+Changed functionality (2)
+-------------------------
+The function random_seed is defined in a slightly different way and is now in line with
+the random_seed parameter of Environment().
+The docstring and the documentation have been updated accordingly.
+
+Bug fixes
+---------
+Minor error in AnimateMonitor and Monitor.animate() for non level monitors fixed.
+
+version 19.0.2  2019-03-25
+==========================
 
 New functionality
 -----------------

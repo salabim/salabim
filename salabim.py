@@ -1,8 +1,8 @@
-"""          _         _      _               _   ___       ___      ____
- ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \    |___ \
-/ __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |     __) |
-\__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _  / __/
-|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_)|_____|
+"""          _         _      _               _   ___       ___      _____
+ ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \    |___ /
+/ __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |     |_ \
+\__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _  ___) |
+|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_)|____/
 Discrete event simulation in Python
 
 see www.salabim.org for more information, the documentation and license information
@@ -11,7 +11,7 @@ see www.salabim.org for more information, the documentation and license informat
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "19.0.2"
+__version__ = "19.0.3"
 
 import heapq
 import random
@@ -272,7 +272,7 @@ class Monitor(object):
         weight_legend=None,
         env=None,
         *args,
-        **kwargs
+        **kwargs,
     ):
         if env is None:
             self.env = g.default_env
@@ -309,16 +309,16 @@ class Monitor(object):
         self.setup(*args, **kwargs)
 
     def __add__(self, other):
-        if other == 0:  # to be able to use sum
-            return self
-        else:
-            return self.merge(other)
+        if not isinstance(other, Monitor):
+            return NotImplemented        
+        return self.merge(other)
 
     def __radd__(self, other):
         if other == 0:  # to be able to use sum
             return self
-        else:
-            return self.merge(other)
+        if not isinstance(other, Monitor):
+            return NotImplemented        
+        return self.merge(other)
 
     def __mul__(self, other):
         try:
@@ -1058,6 +1058,28 @@ class Monitor(object):
         if value is not None:
             self._name = value
         return self._name
+        
+    def rename(self, value=None):
+        """
+        Parameters
+        ----------
+        value : str
+            new name of the monitor
+            if omitted, no change
+
+        Returns
+        -------
+        self : monitor
+
+        Note
+        ----
+        in contrast to name(), this method returns itself, so can used to chain, e.g. |n|
+        (m0 + m1 + m2+ m3).rename('m0-m3').print_histograms() |n|
+        m0[1000 : 2000].rename('m between t=1000 and t=2000').print_histograms() |n|        
+        """
+        self.name(value)
+        return self
+        
 
     def base_name(self):
         """
@@ -2421,9 +2443,8 @@ if Pythonista:
 
                 env.an_objects.sort(key=lambda obj: (-obj.layer(env.t), obj.sequence))
                 touchvalues = self.touches.values()
-
                 capture_image = Image.new("RGB", (env._width, env._height), env.colorspec_to_tuple("bg"))
-
+#                capture_image = Image.new("RGBA", (env._width, env._height), (0,0,0,0))
                 env.animation_pre_tick(env.t)
                 env.animation_pre_tick_sys(env.t)
                 for ao in env.an_objects:
@@ -2433,10 +2454,10 @@ if Pythonista:
                             ao._image, (int(ao._image_x), int(env._height - ao._image_y - ao._image.size[1])), ao._image
                         )
                 env.animation_post_tick(env.t)
-
                 ims = scene.load_pil_image(capture_image)
                 scene.image(ims, 0, 0, *capture_image.size)
-                scene.unload_image(ims)
+                scene.unload_image(ims)                
+
                 if env._video and (not env.paused):
                     if env._video_out == "gif":
                         env._images.append(capture_image.convert("RGB"))
@@ -2935,6 +2956,28 @@ class Queue(object):
             self.length.name("Length of " + self.name())
             self.length_of_stay.name("Length of stay of " + self.name())
         return self._name
+        
+
+    def rename(self, value=None):
+        """
+        Parameters
+        ----------
+        value : str
+            new name of the queue
+            if omitted, no change
+
+        Returns
+        -------
+        self : queue
+
+        Note
+        ----
+        in contrast to name(), this method returns itself, so can used to chain, e.g. |n|
+        (q0 + q1 + q2 + q3).rename('q0 - q3').print_statistics() |n|
+        (q1 - q0).rename('difference of q1 and q0)').print_histograms()
+        """
+        self.name(value)
+        return self
 
     def base_name(self):
         """
@@ -3308,20 +3351,37 @@ class Queue(object):
 
         del self._iter_touched[iter_sequence]
 
-    def __add__(self, q):
-        return self.union(q)
+    def __add__(self, other):
+        if not isinstance(other, Queue):
+            return NotImplemented
+        return self.union(other)
 
-    def __or__(self, q):
-        return self.union(q)
+    def __radd__(self, other):
+        if other == 0:  # to be able to use sum
+            return self
+        if not isinstance(other, Queue):
+            return NotImplemented
+        return self.union(other)
+            
+    def __or__(self, other):
+        if not isinstance(other, Queue):
+            return NotImplemented
+        return self.union(other)
 
-    def __sub__(self, q):
-        return self.difference(q)
+    def __sub__(self, other):
+        if not isinstance(other, Queue):
+            return NotImplemented
+        return self.difference(other)
 
-    def __and__(self, q):
-        return self.intersection(q)
+    def __and__(self, other):
+        if not isinstance(other, Queue):
+            return NotImplemented
+        return self.intersection(other)
 
-    def __xor__(self, q):
-        return self.symmetric_difference(q)
+    def __xor__(self, other):
+        if not isinstance(other, Queue):
+            return NotImplemented
+        return self.symmetric_difference(other)
 
     def count(self, component):
         """
@@ -3620,7 +3680,7 @@ class Queue(object):
 
     def copy(self, name=None, monitor=monitor):
         """
-        returns a copy of two queues
+        returns a copy of a queue
 
         Parameters
         ----------
@@ -3758,7 +3818,7 @@ class Environment(object):
         print_trace_header=True,
         isdefault_env=True,
         *args,
-        **kwargs
+        **kwargs,
     ):
         if isdefault_env:
             g.default_env = self
@@ -3769,7 +3829,7 @@ class Environment(object):
         self._source_files = {inspect.getframeinfo(_get_caller_frame()).filename: 0}
         if random_seed != "":
             if random_seed is None:
-                random_seed = 1234567
+                random_seed = 1_234_567
             elif random_seed == "*":
                 random_seed = None
             random.seed(random_seed)
@@ -3813,6 +3873,7 @@ class Environment(object):
         self._speed = 1
         self._animate = False
         self.running = False
+        self._maximum_number_of_bitmaps = 4000
         self.t = 0
         self.video_t = 0
         self._synced = True
@@ -4036,6 +4097,7 @@ class Environment(object):
         use_toplevel=None,
         show_fps=None,
         show_time=None,
+        maximum_number_of_bitmaps=None,
         video=None,
         video_repeat=None,
         video_pingpong=None,
@@ -4048,6 +4110,7 @@ class Environment(object):
         animate : bool
             animate indicator |n|
             if not specified, set animate on |n|
+            if None, no change in the animate indicator
 
         synced : bool
             specifies whether animation is synced |n|
@@ -4115,6 +4178,9 @@ class Environment(object):
         show_time: bool
             if True, show the time (default)  |n|
             if False, do not show the time
+            
+        maximum_number_of_bitmaps : int
+            maximum number of tkinter bitmaps (default 4000)
 
         video : str
             if video is not omitted, a video with the name video
@@ -4126,7 +4192,7 @@ class Environment(object):
             If the video extension is not .gif, .jpg, .png, .bmp or .tiff, a codec may be added
             by appending a plus sign and the four letter code name,
             like "myvideo.avi+DIVX". |n|
-            If no codec is given, MP4V will be used as codec.
+            If no codec is given, mp4v will be used as codec.
 
         video_repeat : int
             number of times gif should be repeated |n|
@@ -4153,11 +4219,13 @@ class Environment(object):
             self.set_start_animation()
 
         if show_fps is not None:
-            if show_fps != show_fps:
-                self._show_fps = show_fps
+            self._show_fps = show_fps
 
         if show_time is not None:
             self._show_time = show_time
+
+        if maximum_number_of_bitmaps is not None:
+            self._maximum_number_of_bitmaps = maximum_number_of_bitmaps
 
         if synced is not None:
             self._synced = synced
@@ -4266,7 +4334,7 @@ class Environment(object):
                             self._video_name, codec = video.split("+")
                         else:
                             self._video_name = video
-                            codec = "MP4V"
+                            codec = "mp4v"
                         can_video(try_only=False)
                         fourcc = cv2.VideoWriter_fourcc(*codec)
                         self._video_out = cv2.VideoWriter(
@@ -4314,6 +4382,7 @@ class Environment(object):
                     g.canvas.configure(background=self.colorspec_to_hex("bg", False))
                     g.canvas.pack()
                     g.canvas_objects = []
+                    g.canvas_object_overflow_image = None
 
                 self.uninstall_uios()  # this causes all ui objects to be (re)installed
 
@@ -4790,6 +4859,24 @@ class Environment(object):
             self.animation_parameters(show_fps=value, animate=None)
         return self._show_fps
 
+    def maximum_number_of_bitmaps(self, value=None):
+        """
+        maximum number of bitmaps (applies to animation with tkinter only)
+
+        Parameters
+        ----------
+        value : bool
+            new maximum_number_of_bitmaps |n|
+            if not specified, no change
+
+        Returns
+        -------
+        show_fps : bool
+        """
+        if value is not None:
+            self.animation_parameters(maximum_number_of_bitmaps=value, animate=None)
+        return self._maximum_number_of_bitmaps
+
     def synced(self, value=None):
         """
         synced
@@ -5024,7 +5111,7 @@ class Environment(object):
 
     def simulate_and_animate_loop(self):
 
-        while True:
+        while True:  # to be changed
             tick_start = time.time()
 
             if self._synced or self._video:  # video forces synced
@@ -5061,22 +5148,32 @@ class Environment(object):
                 self.frametimes.append(time.time())
 
             self.an_objects.sort(key=lambda obj: (-obj.layer(self.t), obj.sequence))
-
             canvas_objects_iter = iter(g.canvas_objects[:])
             co = next(canvas_objects_iter, None)
             self.animation_pre_tick(self.t)
             self.animation_pre_tick_sys(self.t)
+            overflow_image = None
             for ao in self.an_objects:
                 ao.make_pil_image(self.t)
 
                 if ao._image_visible:
                     if co is None:
-                        ao.im = ImageTk.PhotoImage(ao._image)
-                        co1 = g.canvas.create_image(
-                            ao._image_x, self._height - ao._image_y, image=ao.im, anchor=tkinter.SW
-                        )
-                        g.canvas_objects.append(co1)
-                        ao.canvas_object = co1
+                        if len(g.canvas_objects) >= self._maximum_number_of_bitmaps:
+                            if overflow_image is None:
+                                overflow_image = Image.new("RGBA", (self._width, self._height), (0, 0, 0, 0))
+                            overflow_image.paste(
+                                ao._image,
+                                (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])),
+                                ao._image,
+                            )
+                            ao.canvas_object = None
+                        else:
+                            ao.im = ImageTk.PhotoImage(ao._image)
+                            co1 = g.canvas.create_image(
+                                ao._image_x, self._height - ao._image_y, image=ao.im, anchor=tkinter.SW
+                            )
+                            g.canvas_objects.append(co1)
+                            ao.canvas_object = co1
 
                     else:
                         if ao.canvas_object == co:
@@ -5102,6 +5199,18 @@ class Environment(object):
                         )
                 else:
                     ao.canvas_object = None
+
+            if overflow_image is None:
+                if g.canvas_object_overflow_image is not None:
+                    g.canvas.delete(g.canvas_object_overflow_image)
+                    g.canvas_object_overflow_image = None
+
+            else:
+                im = ImageTk.PhotoImage(overflow_image)
+                if g.canvas_object_overflow_image is None:
+                    g.canvas_object_overflow_image = g.canvas.create_image(0, self._height, image=im, anchor=tkinter.SW)
+                else:
+                    g.canvas.itemconfig(g.canvas_object_overflow_image, image=im)
 
             self.animation_post_tick(self.t)
 
@@ -5131,7 +5240,6 @@ class Environment(object):
                     open_cv_image = cv2.cvtColor(np.array(capture_image), cv2.COLOR_RGB2BGR)
                     self._video_out.write(open_cv_image)
 
-            g.canvas.update()
             if self._video:
                 if not self.paused:
                     self.video_t += self._speed / self._fps
@@ -5141,6 +5249,8 @@ class Environment(object):
                     if tick_duration < 1 / self._fps:
                         time.sleep(((1 / self._fps) - tick_duration) * 0.8)
                         # 0.8 compensation because of clock inaccuracy
+
+            g.canvas.update()
 
     def snapshot(self, filename):
         """
@@ -6503,6 +6613,7 @@ class Animate(object):
         self._image_x = 0
         self._image_y = 0
         self.canvas_object = None
+        self.canvas_object_overflow_image = None
 
         self.type = self.settype(circle0, line0, polygon0, rectangle0, points0, image, text)
         if self.type == "":
@@ -7669,6 +7780,10 @@ class Animate(object):
                 self._image_y = qy + ey - imrheight / 2
 
             elif self.type == "text":
+                text = self.text(t)
+                if text.strip() == "":
+                    self._image_visible = False
+                    return
                 textcolor = self.env.colorspec_to_tuple(self.textcolor(t))
                 fontsize = self.fontsize(t)
                 angle = self.angle(t)
@@ -7677,7 +7792,6 @@ class Animate(object):
                     fontsize = fontsize * self.env._scale
                     offsetx = offsetx * self.env._scale
                     offsety = offsety * self.env._scale
-                text = self.text(t)
                 text_anchor = self.text_anchor(t)
 
                 if hasattr(self, "dependent"):
@@ -9579,6 +9693,7 @@ class AnimateCircle(_Vis):
             self.layer = layer
         self.arg = self if arg is None else arg
         ao0 = _AnimateVis(circle0=(), vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+
         ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
@@ -9922,6 +10037,9 @@ class _Animate_t_x_Line(Animate):
             result.append(self.t_to_x(t))
             result.append(self.value_to_y(value))
             if self.done:
+                if not self.as_level:
+                    result.pop()  # remove the last outlier x
+                    result.pop()  # remove the last outlier y
                 break
             lastt = t
         return result
@@ -10028,7 +10146,7 @@ class Component(object):
         skip_standby=False,
         mode=None,
         env=None,
-        **kwargs
+        **kwargs,
     ):
         if env is None:
             self.env = g.default_env
@@ -15230,10 +15348,10 @@ def type_to_typecode_off(type):
         "uint8": ("B", 255),
         "int16": ("h", -32768),
         "uint16": ("H", 65535),
-        "int32": ("i", -2147483648),
-        "uint32": ("I", 4294967295),
-        "int64": ("l", -9223372036854775808),
-        "uint64": ("L", 18446744073709551615),
+        "int32": ("i", -2_147_483_648),
+        "uint32": ("I", 4_294_967_295),
+        "int64": ("l", -9_223_372_036_854_775_808),
+        "uint64": ("L", 18_446_744_073_709_551_615),
         "float": ("d", -inf),
         "double": ("d", -inf),
         "any": ("", -inf),
@@ -15382,7 +15500,7 @@ def waiting():
     return "waiting"
 
 
-def random_seed(seed, randomstream=None):
+def random_seed(seed=None, randomstream=None):
     """
     Reseeds a randomstream
 
@@ -15390,8 +15508,10 @@ def random_seed(seed, randomstream=None):
     ----------
     seed : hashable object, usually int
         the seed for random, equivalent to random.seed() |n|
-        if None or "*", a purely random value (based on the current time) will be used
+        if "*", a purely random value (based on the current time) will be used
         (not reproducable) |n|
+        if the null string, no action on random is taken |n|
+        if None (the default), 1234567 will be used.
 
     randomstream: randomstream
         randomstream to be used |n|
@@ -15399,9 +15519,13 @@ def random_seed(seed, randomstream=None):
     """
     if randomstream is None:
         randomstream = random
-    if seed == "*":
-        seed = None
     randomstream.seed(seed)
+    if seed != "":
+        if seed is None:
+            seed = 1_234_567
+        elif seed == "*":
+            seed = None
+        random.seed(seed)
 
 
 def _std_fonts():
