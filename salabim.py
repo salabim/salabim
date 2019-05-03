@@ -1,8 +1,8 @@
-"""          _         _      _               _   ___       ___      _____
- ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \    |___ /
-/ __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |     |_ \
-\__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _  ___) |
-|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_)|____/
+"""          _         _      _               _   ___       ___      _  _
+ ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \    | || |
+/ __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |   | || |_
+\__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _ |__   _|
+|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_)   |_|
 Discrete event simulation in Python
 
 see www.salabim.org for more information, the documentation and license information
@@ -11,7 +11,7 @@ see www.salabim.org for more information, the documentation and license informat
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "19.0.3"
+__version__ = "19.0.4"
 
 import heapq
 import random
@@ -255,6 +255,10 @@ class Monitor(object):
         used in print_statistics and print_histogram to indicate the dimension of weight or duration (for
         level monitors, e.g. minutes. Default: weight for non level monitors, duration for level monitors.
 
+    fill : list or tuple
+        can be used to fill the tallied values (all at time now). |n|
+        fill is only available for non level monitors.
+
     env : Environment
         environment where the monitor is defined |n|
         if omitted, default_env will be used
@@ -270,9 +274,10 @@ class Monitor(object):
         initial_tally=None,
         type=None,
         weight_legend=None,
+        fill=None,
         env=None,
         *args,
-        **kwargs,
+        **kwargs
     ):
         if env is None:
             self.env = g.default_env
@@ -306,18 +311,24 @@ class Monitor(object):
             raise ValueError("type '" + type + "' not recognized")
         self.xtype = type
         self.reset(monitor)
+        if fill is not None:
+            if self._level:
+                raise ValueError("fill is not supported for level monitors")
+            self._x.extend(fill)
+            self._t.extend(len(fill) * [self.env._now])
+
         self.setup(*args, **kwargs)
 
     def __add__(self, other):
         if not isinstance(other, Monitor):
-            return NotImplemented        
+            return NotImplemented
         return self.merge(other)
 
     def __radd__(self, other):
         if other == 0:  # to be able to use sum
             return self
         if not isinstance(other, Monitor):
-            return NotImplemented        
+            return NotImplemented
         return self.merge(other)
 
     def __mul__(self, other):
@@ -1058,7 +1069,7 @@ class Monitor(object):
         if value is not None:
             self._name = value
         return self._name
-        
+
     def rename(self, value=None):
         """
         Parameters
@@ -1075,11 +1086,10 @@ class Monitor(object):
         ----
         in contrast to name(), this method returns itself, so can used to chain, e.g. |n|
         (m0 + m1 + m2+ m3).rename('m0-m3').print_histograms() |n|
-        m0[1000 : 2000].rename('m between t=1000 and t=2000').print_histograms() |n|        
+        m0[1000 : 2000].rename('m between t=1000 and t=2000').print_histograms() |n|
         """
         self.name(value)
         return self
-        
 
     def base_name(self):
         """
@@ -1652,6 +1662,7 @@ class Monitor(object):
         -------
         bin_width, lowerbound, number_of_bins : tuple
         """
+
         xmax = self.maximum(ex0=ex0)
         xmin = self.minimum(ex0=ex0)
 
@@ -1823,7 +1834,22 @@ class Monitor(object):
                         else:
                             result.append(pad(str(value), 20) + rpad(str(count), 7) + fn(perc * 100, 6, 1) + " " + s)
             else:
-                bin_width, lowerbound, number_of_bins = self.histogram_autoscale()
+                auto_scale = True
+                if bin_width is None:
+                    bin_width = 1
+                else:
+                    auto_scale = False
+                if lowerbound is None:
+                    lowerbound = 0
+                else:
+                    auto_scale = False
+                if number_of_bins is None:
+                    number_of_bins = 30
+                else:
+                    auto_scale = False
+
+                if auto_scale:
+                    bin_width, lowerbound, number_of_bins = self.histogram_autoscale()
                 result.append(self.print_statistics(show_header=False, show_legend=True, do_indent=False, as_str=True))
                 if number_of_bins >= 0:
                     result.append("")
@@ -2444,7 +2470,7 @@ if Pythonista:
                 env.an_objects.sort(key=lambda obj: (-obj.layer(env.t), obj.sequence))
                 touchvalues = self.touches.values()
                 capture_image = Image.new("RGB", (env._width, env._height), env.colorspec_to_tuple("bg"))
-#                capture_image = Image.new("RGBA", (env._width, env._height), (0,0,0,0))
+                #                capture_image = Image.new("RGBA", (env._width, env._height), (0,0,0,0))
                 env.animation_pre_tick(env.t)
                 env.animation_pre_tick_sys(env.t)
                 for ao in env.an_objects:
@@ -2456,7 +2482,7 @@ if Pythonista:
                 env.animation_post_tick(env.t)
                 ims = scene.load_pil_image(capture_image)
                 scene.image(ims, 0, 0, *capture_image.size)
-                scene.unload_image(ims)                
+                scene.unload_image(ims)
 
                 if env._video and (not env.paused):
                     if env._video_out == "gif":
@@ -2956,7 +2982,6 @@ class Queue(object):
             self.length.name("Length of " + self.name())
             self.length_of_stay.name("Length of stay of " + self.name())
         return self._name
-        
 
     def rename(self, value=None):
         """
@@ -3362,7 +3387,7 @@ class Queue(object):
         if not isinstance(other, Queue):
             return NotImplemented
         return self.union(other)
-            
+
     def __or__(self, other):
         if not isinstance(other, Queue):
             return NotImplemented
@@ -3470,24 +3495,42 @@ class Queue(object):
 
         del self._iter_touched[iter_sequence]
 
-    def extend(self, q):
+    def extend(self, source, clear_source=False):
         """
-        extends the queue with components of q that are not already in self
+        extends the queue with components of source that are not already in self (at the end of self)
 
         Parameters
         ----------
-        q : queue, list or tuple
+        source : queue, list or tuple
+
+        clear_source : bool
+            if False (default), the elements will remain in source |n|
+            if True, source will be cleared, so effectively moving all elements in source to self. If source is
+            not a queue, but a list or tuple, the clear_source flag may not be set.
 
         Note
         ----
-        The components added to the queue will get the priority of the tail of self.
+        The components in source added to the queue will get the priority of the tail of self.
         """
         savetrace = self.env._trace
+        count = 0
         self.env._trace = False
-        for c in q:
+        for c in source:
             if c not in self:
                 c.enter(self)
+                count += 1
         self.env._trace = savetrace
+        if self.env._trace:
+            self.env.print_trace(
+                "",
+                "",
+                self.name() + " extend from " + (source.name() if isinstance(source, Queue) else "instance of " + str(type(source)))+ ' (' + str(count) + ' components)',
+            )
+        if clear_source:
+            if isinstance(source, Queue):
+                source.clear()
+            else:
+                raise TypeError("clear_source cannot be applied to instances of type" + str(type(source)))
         return self
 
     def as_set(self):
@@ -3818,7 +3861,7 @@ class Environment(object):
         print_trace_header=True,
         isdefault_env=True,
         *args,
-        **kwargs,
+        **kwargs
     ):
         if isdefault_env:
             g.default_env = self
@@ -3829,7 +3872,7 @@ class Environment(object):
         self._source_files = {inspect.getframeinfo(_get_caller_frame()).filename: 0}
         if random_seed != "":
             if random_seed is None:
-                random_seed = 1_234_567
+                random_seed = 1234567
             elif random_seed == "*":
                 random_seed = None
             random.seed(random_seed)
@@ -4178,7 +4221,7 @@ class Environment(object):
         show_time: bool
             if True, show the time (default)  |n|
             if False, do not show the time
-            
+
         maximum_number_of_bitmaps : int
             maximum number of tkinter bitmaps (default 4000)
 
@@ -10146,7 +10189,7 @@ class Component(object):
         skip_standby=False,
         mode=None,
         env=None,
-        **kwargs,
+        **kwargs
     ):
         if env is None:
             self.env = g.default_env
@@ -14981,7 +15024,7 @@ class PeriodMonitor(object):
         removes the period monitor
         """
         self.pc.cancel()
-        del (self.periods)
+        del self.periods
         self.m.period_monitors.remove(self)
 
     def __init__(self, parent_monitor, periods=None, period_monitor_names=None):
@@ -15348,10 +15391,10 @@ def type_to_typecode_off(type):
         "uint8": ("B", 255),
         "int16": ("h", -32768),
         "uint16": ("H", 65535),
-        "int32": ("i", -2_147_483_648),
-        "uint32": ("I", 4_294_967_295),
-        "int64": ("l", -9_223_372_036_854_775_808),
-        "uint64": ("L", 18_446_744_073_709_551_615),
+        "int32": ("i", -2147483648),
+        "uint32": ("I", 4294967295),
+        "int64": ("l", -9223372036854775808),
+        "uint64": ("L", 18446744073709551615),
         "float": ("d", -inf),
         "double": ("d", -inf),
         "any": ("", -inf),
@@ -15522,7 +15565,7 @@ def random_seed(seed=None, randomstream=None):
     randomstream.seed(seed)
     if seed != "":
         if seed is None:
-            seed = 1_234_567
+            seed = 1234567
         elif seed == "*":
             seed = None
         random.seed(seed)

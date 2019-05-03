@@ -1,9 +1,41 @@
 salabim  changelog
 
+
+version 19.0.4  2019-05-03
+==========================
+New functionality (0)
+---------------------
+Queue.extend() has an extra parameter, clear_source. If clear_source = True, the given source will be cleared
+after copying the elements to self.
+This means that
+    q0.extend(q1, clear_source=True)
+effectively transfers all elements of q1 into q0, prior to emptying q1.
+Note that clear_source cannot be applied if source is a list or a tuple.
+
+New functionality (1)
+---------------------
+Non level monitors can now be filled from a list or tuple, like
+    m = Monitor("my monitor", level=False, fill=(1,2,5,7,2,3))
+which is functionally equivalent to
+    m = Monitor("my monitor", level=False)
+    for el in (1,2,5,7,2,3):
+        m.tally(el)
+
+Bug fix (0)
+-----------
+Autoscaling of histograms was incorrectly always enabled.
+Now histograms are autoscaled only if neither number_of_bins, nor lowerbound nor bin_width is specified.
+
+Bug fix (1)
+-----------
+Due to a problem with the Black formatter, version 19.0.3 did not run under Python versions prior to 3.6.
+This is fixed with this release.
+
+
 version 19.0.3  2019-04-21
 ==========================
-New methods (0)
----------------
+New method (0)
+--------------
 Monitor.rename() can be used to rename a monitor in a chained way.
 This is particularly useful when merging with the + operator, merging with sum or slicing with [],
 multiplication and division as well as the unit conversion methods (to_years, ...),
@@ -16,8 +48,8 @@ Examples:
     mon0.to_years().rename('mon0 in hours').print_statistics()
 
     
-New methods (1)
----------------
+New method (1)
+--------------
 Queue.rename() can be used to rename a queue in a chained way.
 This particularly useful when the queues are combined with +, -, |, & and ^ operator or the sum function,
 because the resulting queue get automatically a name, that might not be appropriate.
