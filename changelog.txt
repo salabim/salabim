@@ -1,6 +1,117 @@
 salabim  changelog
 
 
+version 19.0.5  2019-06-16
+==========================
+New functionality (0)
+---------------------
+Level monitors have two new properties:
+- value, which can be used to get the current value of a monitor, i.e
+    a = m.value is equivalent to a = m.get() and a = m()
+  value can also be used to tally a value, i.e.
+    m.value = 10 is equivalent to m.tally(10)
+  Combining the getter and the setter is useful in constructs like
+    m.value += 100, which is equivalent to m.tally(m.get() + 100)
+- t, which can be used to get the time the last value was tallied.
+
+Combining these two is for instance useful to calculate the cost of storage over a period, such as
+  costs += (env.now() - inventory.t) * inventory.value * cost_per_day
+  inventory.value -= consume
+Both value and t are available can be used even if the monitor is turned off.
+
+Note that these two properties are only available for level monitors.
+
+Note that this functionality is also available for the capacity of a resource, which means that increasing
+the capacity of a resource by 1 can now be done with
+    res.set_capacity(res.capacity() + 1)
+or
+    res.capacity.value += 1
+    
+The following standard salabim level monitors do support only *getting* the value and (for obvious reasons) 
+not *setting* the value:
+- Queue.length()
+- Resource.available_quantity()
+- Resource.claimed_quantity()
+- Resource.occupancy()
+- State.value()
+
+
+New functionality (1)
+---------------------
+Anonymous resources can now request for a negative quantity. In that case, the request gets honoured if
+the claimed quantity is greater than or equal to minus the requested quantity.
+In case of these anonymous resources, it might be easier to think in terms of get and put, like in
+SimPy.Container. Therefore, salabim introduces to new methods:
+- Component.get(), which is equivalent to Component.request
+- Component.put(), which is equivalent to Component.request, but where the quantity of anonymous resources
+  is negated.
+  Thus yield self.request((r, -5)) is the same as yield self.put((r, 5)) if r is defined as
+  r = sim.Resource(name='r', anonymous=True)
+Note that in the trace, the text 'request honor' will be shown even for get or request calls.
+Also, isrequesting() will be True if a component is waiting for a get or put honor.
+The Gas station model in sample models illustrates the get/put functionality.
+
+Note that you can still 'refill' an anonymous resource without checking for exceeding the capacity, with a call to Resource.release(). In many cases that will be sufficient.
+
+
+New functionality (2)
+---------------------
+On Windows and Pythonista platforms, an audio track (usually an mp3 file) may be played during animation.
+This particularly during the development of lip synchronized videos.
+Therefore, a new method Environment.audio() has been introduced.
+Alternatively, the new parameter audio of Environment.animation_parameters() can be used to specify which
+mp3 to be played.
+It is recommended not to use variable bit rate (vbr) mp3 files, as the length can't be detected correctly.
+Note that audio is only played when the animation speed is equal to audio_speed, which is 1 by default.
+The audio_speed may be changed with Environment.audio_speed() or the new parameter audio_speed of 
+Environment.animation_parameters().
+On other platforms than Windows or Pythonista, the audio functions are ignored.
+
+The duration of an audio file (usually an mp3 file) can be retrieved with sim.audio_duration(filename).
+On other platforms than Windows or Pythonista, a length of zero will be returned when sim.audio_duration() is called.
+
+New functionality (3)
+---------------------
+On Windows platforms, an audio track can now be added to a video animation.
+The audio is controlled by Environment.audio() commands (see above).
+In order to add audio to a video, ffmpeg must be installed and included in the environment path.
+See www.ffmpeg.org for download and installation instructions.
+
+
+New functionality (4)
+---------------------
+When animating images, the alpha (transparency channel) can now be specified.
+Therefore, Animation() and Animation.update() have two extra arguments: alpha0 and alpha1.
+AnimateImage() has an extra parameter alpha.
+The alpha value should be between 0 (fully transparent) and 255 (not transparent).
+Note that if an image has alpha values other than 255, these are scaled accordingly.
+Images with an alpha values of less than 255 are rendered quicker when numpy is installed.
+
+
+Improved performance (0)
+------------------------
+Animation objects that are completely out of the frame are suppressed now. This results in better
+performance when many animation objects are not visible anyway. 
+
+
+Improved performance (1)
+------------------------
+Rendering speed of animated text improved, particularly when numpy is installed.
+
+
+Experimental functionality (0)
+------------------------------
+Experimental support for retina screens on supported iOS devices (Pythonista only).
+By adding retina=True to the Environment() call, iOS devices will double the number of pixels, both
+in height and width. As of now, buttons and sliders are not shown in retina mode.
+
+
+Bug fixes (0)
+-------------
+In some Ubuntu environments, install.py could not install salabim correctly.
+This has been fixed with this release.
+
+
 version 19.0.4  2019-05-03
 ==========================
 New functionality (0)

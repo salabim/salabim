@@ -1,8 +1,8 @@
-"""          _         _      _               _   ___       ___      _  _
- ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \    | || |
-/ __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |   | || |_
-\__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _ |__   _|
-|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_)   |_|
+"""          _         _      _               _   ___       ___      ____
+ ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \    | ___|
+/ __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |   |___ \
+\__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _  ___) |
+|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_)|____/
 Discrete event simulation in Python
 
 see www.salabim.org for more information, the documentation and license information
@@ -11,7 +11,7 @@ see www.salabim.org for more information, the documentation and license informat
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "19.0.4"
+__version__ = "19.0.5"
 
 import heapq
 import random
@@ -32,6 +32,10 @@ import types
 import bisect
 import operator
 import string
+import ctypes
+import shutil
+import subprocess
+import tempfile
 
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
@@ -295,6 +299,7 @@ class Monitor(object):
                 self._tally = 0
             else:
                 self._tally = initial_tally
+            self._ttally = self.env._now
         else:
             if initial_tally is not None:
                 raise TypeError("initial_tally not available for non level monitors")
@@ -391,7 +396,7 @@ class Monitor(object):
             else:
                 name = self.name() + ".merged"
 
-        new = Monitor(name=name, type=self.xtype, level=self._level)
+        new = _SystemMonitor(name=name, type=self.xtype, level=self._level)
 
         merge = [self] + list(monitors)
 
@@ -485,10 +490,10 @@ class Monitor(object):
         -------
         sliced monitor : Monitor
         """
-        new = Monitor(name="slice", type=self.xtype, level=self._level)
+        new = _SystemMonitor(name="slice", type=self.xtype, level=self._level)
         if name is None:
             name = self.name() + ".sliced"
-        new = Monitor(level=self._level, type=self.xtype, name=name)
+        new = _SystemMonitor(level=self._level, type=self.xtype, name=name)
         actions = []
         if modulo is None:
             if start is None:
@@ -665,6 +670,8 @@ class Monitor(object):
 
     def get(self, t=None):
         """
+        get the value of a monitor
+
         Parameters
         ----------
         t : float
@@ -686,7 +693,51 @@ class Monitor(object):
         ----
         If the value is not available, self.off will be returned.
         """
-        self.__call__(t)
+        return self.__call__(t)
+
+    @property
+    def value(self):
+        """
+        get/set the value of a level monitor
+
+        :getter:
+            gets the last tallied value : any (often float)
+
+        :setter:
+            equivalent to m.tally()
+
+        Note
+        ----
+        value is only available for level monitors |n|
+        value is available even if the monitor is turned off
+        """
+        if self._level:
+            return self._tally
+        raise TypeError("non level monitors are not supported")
+
+    @value.setter
+    def value(self, value):
+        if self._level:
+            self.tally(value)
+        else:
+            raise TypeError("non level monitors are not supported")
+
+    @property
+    def t(self):
+        """
+        get the time of last tally of a level monitor
+
+        :getter:
+            gets the last tallied value : any (often float)
+
+        Note
+        ----
+        t is only available for level monitors |n|
+        t is available even if the monitor is turned off
+        """
+        if self._level:
+            return self._ttally
+        raise TypeError("non level monitors are not supported")
 
     def reset_monitors(self, monitor=None):
         """
@@ -785,6 +836,8 @@ class Monitor(object):
             if value == self.off:
                 raise ValueError("not allowed to tally " + str(self.off) + " (off)")
             self._tally = value
+            self._ttally = self.env._now
+
             if self._monitor:
                 t = self.env._now
                 if self._t[-1] == t:
@@ -1041,7 +1094,7 @@ class Monitor(object):
         if self.xtype == "float":
             if name is None:
                 name = self.name()
-            new = Monitor(name=name, monitor=False, type="float", level=False)
+            new = _SystemMonitor(name=name, monitor=False, type="float", level=False)
             new.isgenerated = True
             new._x = [x * scale for x in self._x]
             new._t = 1  # self._t[]
@@ -2082,7 +2135,8 @@ class Monitor(object):
         add_now : bool
             if True (default), the last tallied x-value and the current time is added to the result |n|
             if False, the result ends with the last tallied value and the time that was tallied |n|
-            non level monitors will never add now
+            non level monitors will never add now |n|
+            if now is <= last tallied value, nothing will be added, even if add_now is True
 
         Returns
         -------
@@ -2214,6 +2268,22 @@ class Monitor(object):
 
         Monitor.cached_xweight[(ex0, force_numeric)] = (thishash, xweight)
         return xweight
+
+
+class _CapacityMonitor(Monitor):
+    @property
+    def value(self):
+        return self._tally
+
+    @value.setter
+    def value(self, value):
+        self.resource.set_capacity(value)
+
+
+class _SystemMonitor(Monitor):
+    @property
+    def value(self):
+        return self._tally
 
 
 class AnimateMonitor(object):
@@ -2419,14 +2489,15 @@ if Pythonista:
             scene.Scene.__init__(self, *args, **kwargs)
 
         def setup(self):
-            pass
+            if g.animation_env.retina:
+                self.bg = None
 
         def touch_ended(self, touch):
             env = g.animation_env
             if env is not None:
                 for uio in env.ui_objects:
-                    ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True)
-                    uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True)
+                    ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True, retina_scale=True)
+                    uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True, retina_scale=True)
                     if uio.type == "button":
                         if touch.location in scene.Rect(ux - 2, uy - 2, uio.width + 2, uio.height + 2):
                             uio.action()
@@ -2467,7 +2538,7 @@ if Pythonista:
                 if not env.paused:
                     env.frametimes.append(time.time())
 
-                env.an_objects.sort(key=lambda obj: (-obj.layer(env.t), obj.sequence))
+                env.an_objects[:].sort(key=lambda obj: (-obj.layer(env.t), obj.sequence))
                 touchvalues = self.touches.values()
                 capture_image = Image.new("RGB", (env._width, env._height), env.colorspec_to_tuple("bg"))
                 #                capture_image = Image.new("RGBA", (env._width, env._height), (0,0,0,0))
@@ -2480,9 +2551,21 @@ if Pythonista:
                             ao._image, (int(ao._image_x), int(env._height - ao._image_y - ao._image.size[1])), ao._image
                         )
                 env.animation_post_tick(env.t)
-                ims = scene.load_pil_image(capture_image)
-                scene.image(ims, 0, 0, *capture_image.size)
-                scene.unload_image(ims)
+                if g.animation_env.retina:
+                    with io.BytesIO() as fp:
+                        capture_image.save(fp, "BMP")
+                        img = ui.Image.from_data(fp.getvalue(), scene.get_screen_scale())
+                    if self.bg is None:
+                        self.bg = scene.SpriteNode(scene.Texture(img))
+                        self.add_child(self.bg)
+                        self.bg.position = self.size / 2
+                        self.bg.z_position = 10000
+                    else:
+                        self.bg.texture = scene.Texture(img)
+                else:
+                    ims = scene.load_pil_image(capture_image)
+                    scene.image(ims, 0, 0, *capture_image.size)
+                    scene.unload_image(ims)
 
                 if env._video and (not env.paused):
                     if env._video_out == "gif":
@@ -2493,8 +2576,8 @@ if Pythonista:
                     else:
                         pass  # this should never occur
                 for uio in env.ui_objects:
-                    ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True)
-                    uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True)
+                    ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True, retina_scale=True)
+                    uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True, retina_scale=True)
 
                     if uio.type == "entry":
                         raise NotImplementedError("AnimateEntry not supported on Pythonista")
@@ -2645,7 +2728,7 @@ class Queue(object):
         self._isinternal = False
         self.arrival_rate(reset=True)
         self.departure_rate(reset=True)
-        self.length = Monitor(
+        self.length = _SystemMonitor(
             "Length of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="uint32", env=self.env
         )
         self.length_of_stay = Monitor("Length of stay in " + self.name(), monitor=monitor, type="float")
@@ -3524,7 +3607,12 @@ class Queue(object):
             self.env.print_trace(
                 "",
                 "",
-                self.name() + " extend from " + (source.name() if isinstance(source, Queue) else "instance of " + str(type(source)))+ ' (' + str(count) + ' components)',
+                self.name()
+                + " extend from "
+                + (source.name() if isinstance(source, Queue) else "instance of " + str(type(source)))
+                + " ("
+                + str(count)
+                + " components)",
             )
         if clear_source:
             if isinstance(source, Queue):
@@ -3860,6 +3948,7 @@ class Environment(object):
         name=None,
         print_trace_header=True,
         isdefault_env=True,
+        retina=False,
         *args,
         **kwargs
     ):
@@ -3919,14 +4008,24 @@ class Environment(object):
         self._maximum_number_of_bitmaps = 4000
         self.t = 0
         self.video_t = 0
+        self.frame_number = 0
+        self._audio = None
+        self._audio_speed = 1
         self._synced = True
         self._step_pressed = False
         self.stopped = False
+        self.paused = False
         self.last_s0 = ""
         if Pythonista:
             self._width, self._height = ui.get_screen_size()
-            self._width = int(self._width)
-            self._height = int(self._height)
+            if retina:
+                self._width = int(self._width) * 2
+                self._height = int(self._height) * 2
+                self.retina = True
+            else:
+                self._width = int(self._width)
+                self._height = int(self._height)
+                self.retina = False
         else:
             self._width = 1024
             self._height = 768
@@ -4125,7 +4224,7 @@ class Environment(object):
 
     def animation_parameters(
         self,
-        animate=True,
+        animate=None,
         synced=None,
         speed=None,
         width=None,
@@ -4144,6 +4243,8 @@ class Environment(object):
         video=None,
         video_repeat=None,
         video_pingpong=None,
+        audio=None,
+        audio_speed=None,
     ):
         """
         set animation parameters
@@ -4152,8 +4253,8 @@ class Environment(object):
         ----------
         animate : bool
             animate indicator |n|
-            if not specified, set animate on |n|
-            if None, no change in the animate indicator
+            new animate indicator |n|
+            if not specified, no change
 
         synced : bool
             specifies whether animation is synced |n|
@@ -4248,6 +4349,12 @@ class Environment(object):
             at init of the environment video_pingpong is False |n|
             this only applies to gif files production.
 
+    `   audio : str
+            name of file to be played (mp3 or wav files) |n|
+            if "", the audio will be stopped |n|
+            default: no change |n|
+            for more information, see Environment.audio()
+
         Note
         ----
         The y-coordinate of the upper right corner is determined automatically
@@ -4326,11 +4433,67 @@ class Environment(object):
         if use_toplevel is not None:
             self.use_toplevel = use_toplevel
 
-        if animate is None:
-            animate = self._animate  # no change
-        else:
+        if audio_speed is not None:
+            if self._audio_speed != audio_speed:
+                self._audio_speed = audio_speed
+                if audio_speed != self._speed:
+                    if self._audio is not None:
+                        if Pythonista:
+                            self._audio.player.pause()
+                        if Windows:
+                            self._audio.stop()
+                self.set_start_animation()
+
+        if audio is not None:
+            if (self._audio is None and audio != "") or (self.audio is not None and self._audio.filename != audio):
+                if self._audio is not None:
+                    if Pythonista:
+                        self._audio.player.pause()
+                    if Windows:
+                        self._audio.stop()
+                    if self._video_out is not None:
+                        self.audio_segments[-1].t1 = self.frame_number / self._fps
+                if audio == "":
+                    self._audio = None
+                else:
+                    if ">" not in audio:
+                        audio = audio + ">0"
+                    audio_filename, startstr = audio.split(">")
+                    if not os.path.isfile(audio_filename):
+                        raise FileNotFoundError(audio_filename)
+                    if Pythonista:
+                        import sound
+
+                        class Play(object):
+                            def __init__(self, s, repeat=-1):
+                                self.player = sound.Player(s)
+                                self.player.number_of_loops = repeat
+
+                        self._audio = Play(audio_filename, repeat=0)
+                        self._audio.duration = self._audio.player.duration
+                        self._audio.player.play()
+                        self._audio.player.current_time = 0
+
+                    else:
+                        self._audio = AudioClip(audio_filename)
+
+                    self._audio.start = float(startstr)
+
+                    self._audio.t0 = self.t
+
+                    self._audio.filename = audio_filename
+
+                    if (
+                        self._video_out is not None
+                    ):  # if video ist started here as well, the audio_segment is created later
+                        self._audio.t0 = self.frame_number / self._fps
+                        self.audio_segments.append(self._audio)
+                    self.set_start_animation()
+
+        if animate is not None:
             if animate != self._animate:
                 frame_changed = True
+                self._animate = animate
 
         self._scale = self._width / (self._x1 - self._x0)
         self._y1 = self._y0 + self._height / self._scale
@@ -4338,7 +4501,7 @@ class Environment(object):
         if g.animation_env is not self:
             if g.animation_env is not None:
                 g.animation_env.video_close()
-            if animate:
+            if self._animate:
                 frame_changed = True
             else:
                 frame_changed = False  # no animation required, so leave running animation_env untouched
@@ -4383,6 +4546,16 @@ class Environment(object):
                         self._video_out = cv2.VideoWriter(
                             self._video_name, fourcc, self._fps, (self._width, self._height)
                         )
+                        self.frame_number = 0
+                        self.audio_segments = []
+                        if self._audio is not None:
+                            self._audio.start += self.t - self._audio.t0
+                            self._audio.t0 = self.frame_number / self._fps
+                            self.audio_segments.append(self._audio)
+                            if Pythonista:
+                                self._audio.player.pause()
+                            if Windows:
+                                self._audio.stop()
 
         if self._video and (not video_opened):
             if width_changed:
@@ -4397,19 +4570,18 @@ class Environment(object):
 
         if frame_changed:
             if g.animation_env is not None:
-                g.animation_env._animate = animate
+                g.animation_env._animate = self._animate
                 if not Pythonista:
                     g.animation_env.root.destroy()
                 g.animation_env = None
 
-            if animate:
+            if self._animate:
                 can_animate(try_only=False)  # install modules
 
                 g.animation_env = self
                 self.t = self._now  # for the call to set_start_animation
-                self.set_start_animation()
-
                 self.paused = False
+                self.set_start_animation()
 
                 if Pythonista:
                     if g.animation_scene is None:
@@ -4430,8 +4602,6 @@ class Environment(object):
                 self.uninstall_uios()  # this causes all ui objects to be (re)installed
 
                 self.an_menu_buttons()
-
-        self._animate = animate
 
     def delete_video(self, video):
         """
@@ -4486,8 +4656,94 @@ class Environment(object):
                 pass
             else:
                 self._video_out.release()
+                if self.audio_segments:
+                    if self._audio:
+                        self.audio_segments[-1].t1 = self.frame_number / self.fps
+                    self.add_audio()
+
             self._video_out = None
             self._video = ""
+
+    def add_audio(self):
+        if not Windows:
+            return
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            last_t = 0
+            seq = 0
+            for audio_segment in self.audio_segments:
+                if hasattr(self, "debug_ffmpeg"):
+                    print(
+                        " audio_segment.filename = "
+                        + str(audio_segment.filename)
+                        + " .t0 = "
+                        + str(audio_segment.t0)
+                        + " .t1 = "
+                        + str(audio_segment.t1)
+                        + " .start = "
+                        + str(audio_segment.start)
+                    )
+                end = min(audio_segment.duration, audio_segment.t1 - audio_segment.t0 + audio_segment.start)
+                if end > audio_segment.start:
+                    if audio_segment.t0 - last_t > 0:
+                        command = (
+                            "-f",
+                            "lavfi",
+                            "-i",
+                            "aevalsrc=0:0::duration=" + str(audio_segment.t0 - last_t),
+                            "-ab",
+                            "320k",
+                            tempdir + "\\temp" + str(seq) + ".mp3",
+                        )
+                        self.ffmpeg_execute(command)
+                        seq += 1
+                    command = (
+                        "-ss",
+                        str(audio_segment.start),
+                        "-i",
+                        audio_segment.filename,
+                        "-t",
+                        str(end - audio_segment.start),
+                        "-c",
+                        "copy",
+                        tempdir + "\\temp" + str(seq) + ".mp3",
+                    )
+                    self.ffmpeg_execute(command)
+                    seq += 1
+                    last_t = audio_segment.t1
+
+            if seq > 0:
+                temp_filename = tempdir + "\\temp" + os.path.splitext(self._video_name)[1]
+                shutil.copyfile(self._video_name, temp_filename)
+
+                with open(tempdir + "\\temp.txt", "w") as f:
+                    f.write("\n".join("file '" + tempdir + "\\temp" + str(i) + ".mp3'" for i in range(seq)))
+
+                command = (
+                    "-i",
+                    temp_filename,
+                    "-f",
+                    "concat",
+                    "-i",
+                    tempdir + "\\temp.txt",
+                    "-map",
+                    "0:v",
+                    "-map",
+                    "1:a",
+                    "-c",
+                    "copy",
+                    self._video_name,
+                )
+                self.ffmpeg_execute(command)
+
+    def ffmpeg_execute(self, command):
+        command = ("ffmpeg", "-y") + command + ("-loglevel", "quiet")
+        if hasattr(self, "debug_ffmpeg"):
+            print("command=" + str(command))
+        try:
+            subprocess.call(command, shell=False)
+        except FileNotFoundError:
+            raise FileNotFoundError("ffmpeg could not be loaded (refer to install procedure).")
 
     def uninstall_uios(self):
         for uio in self.ui_objects:
@@ -4780,6 +5036,52 @@ class Environment(object):
         if value is not None:
             self.animation_parameters(modelname=value, animate=None)
         return self._modelname
+
+    def audio(self, filename):
+        """
+        Play audio during animation
+
+        Parameters
+        ----------
+        filename : str
+            name of file to be played (mp3 or wav files) |n|
+            if "", the audio will be stopped |n|
+            optionaly, a start time in seconds  may be given by appending the filename a > followed
+            by the start time, like 'mytune.mp3>12.5'
+            if not specified (None), no change
+
+        Returns
+        -------
+        filename being played ("" if nothing is being played): str
+
+        Note
+        ----
+        Only supported on Windows and Pythonista platforms. On other platforms, no effect. |n|
+        Variable bit rate mp3 files may be played incorrectly on Windows platforms.
+        Try and use fixed bit rates (e.g. 128 or 320 kbps)
+        """
+        self.animation_parameters(audio=filename, animate=None)
+        if self._audio:
+            return self._audio.filename
+        return ""
+
+    def audio_speed(self, speed):
+        """
+        Play audio during animation
+
+        Parameters
+        ----------
+        speed : float
+            animation speed at which the audio should be played |n|
+            default: no change |n|
+            initially: 1
+
+        Returns
+        -------
+        speed being played: int
+        """
+        self.animation_parameters(audio_speed=speed, animate=None)
+        return self._audio_speed
 
     def video(self, value=None):
         """
@@ -5280,12 +5582,13 @@ class Environment(object):
                     capture_image.save(self._video_name)
                     self._video_name = incstr(self._video_name)
                 else:
-                    open_cv_image = cv2.cvtColor(np.array(capture_image), cv2.COLOR_RGB2BGR)
+                    open_cv_image = cv2.cvtColor(numpy.array(capture_image), cv2.COLOR_RGB2BGR)
                     self._video_out.write(open_cv_image)
 
             if self._video:
                 if not self.paused:
                     self.video_t += self._speed / self._fps
+                    self.frame_number += 1
             else:
                 if self._synced:
                     tick_duration = time.time() - tick_start
@@ -5673,46 +5976,68 @@ class Environment(object):
         self.frametimes = collections.deque(maxlen=30)
         self.start_animation_time = self.t
         self.start_animation_clocktime = time.time()
+        if self._audio:
+            start_time = self.t - self._audio.t0 + self._audio.start
+            if Pythonista:
+                if self._animate and self._synced and (not self._video):
+                    if self.paused:
+                        self._audio.player.pause()
+                    else:
+                        if self._speed == self._audio_speed:
+                            self._audio.player.current_time = start_time
+                            self._audio.player.play()
+            if Windows:
+                if self._animate and self._synced and (not self._video):
+                    if self.paused:
+                        self._audio.pause()
+                    else:
+                        if self._speed == self._audio_speed:
+                            if start_time < self._audio.duration:
+                                self._audio.play(start=start_time)
 
-    def xy_anchor_to_x(self, xy_anchor, screen_coordinates):
+    def xy_anchor_to_x(self, xy_anchor, screen_coordinates, retina_scale=False):
+        scale = 2 if (retina_scale and self.retina) else 1
+
         if xy_anchor in ("nw", "w", "sw"):
             if screen_coordinates:
                 return 0
             else:
-                return self._x0
+                return self._x0 / scale
 
         if xy_anchor in ("n", "c", "center", "s"):
             if screen_coordinates:
-                return self._width / 2
+                return (self._width / 2) / scale
             else:
-                return (self._x0 + self._x1) / 2
+                return ((self._x0 + self._x1) / 2) / scale
 
         if xy_anchor in ("ne", "e", "se", ""):
             if screen_coordinates:
-                return self._width
+                return self._width / scale
             else:
-                return self._x1
+                return self._x1 / scale
 
         raise ValueError("incorrect xy_anchor", xy_anchor)
 
-    def xy_anchor_to_y(self, xy_anchor, screen_coordinates):
+    def xy_anchor_to_y(self, xy_anchor, screen_coordinates, retina_scale=False):
+        scale = 2 if (retina_scale and self.retina) else 1
+
         if xy_anchor in ("nw", "n", "ne"):
             if screen_coordinates:
-                return self._height
+                return self._height / scale
             else:
-                return self._y1
+                return self._y1 / scale
 
         if xy_anchor in ("w", "c", "center", "e"):
             if screen_coordinates:
-                return self._height / 2
+                return (self._height / 2) / scale
             else:
-                return (self._y0 + self._y1) / 2
+                return ((self._y0 + self._y1) / 2) / scale
 
         if xy_anchor in ("sw", "s", "se", ""):
             if screen_coordinates:
                 return 0
             else:
-                return self._y0
+                return self._y0 / scale
 
         raise ValueError("incorrect xy_anchor", xy_anchor)
 
@@ -6341,7 +6666,7 @@ class Environment(object):
             try:
                 import winsound
 
-                winsound.PlaySound(
+                winsound.Playaudio(
                     os.environ["WINDIR"] + r"\media\Windows Ding.wav", winsound.SND_FILENAME | winsound.SND_ASYNC
                 )
             except Exception:
@@ -6477,6 +6802,9 @@ class Animate(object):
     angle0 : float
         angle of the polygon at time t0 (in degrees) (default 0)
 
+    alpha0 : float
+        alpha of the image at time t0 (0-255) (default 255)
+
     fontsize0 : float
         fontsize of text at time t0 (default 20)
 
@@ -6533,6 +6861,9 @@ class Animate(object):
 
     angle1 : float
         angle of the polygon at time t1 (in degrees) (default angle0)
+
+    alpha1 : float
+        alpha of the image at time t1 (0-255) (default alpha0)
 
     fontsize1 : float
         fontsize of text at time t1 (default: fontsize0)
@@ -6591,6 +6922,7 @@ class Animate(object):
     linecolor0,linecolor1    -                  -         -         -
     textcolor0,textcolor1                                                     -
     angle0,angle1                     -         -         -         -         -
+    alpha0,alpha1                     -
     as_points                                   -         -         -
     font                                                                      -
     fontsize0,fontsize1                                                       -
@@ -6627,6 +6959,7 @@ class Animate(object):
         linecolor0="fg",
         textcolor0="fg",
         angle0=0,
+        alpha0=255,
         fontsize0=20,
         width0=None,
         t1=None,
@@ -6644,6 +6977,7 @@ class Animate(object):
         linecolor1=None,
         textcolor1=None,
         angle1=None,
+        alpha1=None,
         fontsize1=None,
         width1=None,
         xy_anchor="",
@@ -6722,6 +7056,7 @@ class Animate(object):
         else:
             self.linewidth0 = linewidth0
         self.angle0 = angle0
+        self.alpha0 = alpha0
         self.fontsize0 = fontsize0
 
         self.t0 = self.env._now if t0 is None else t0
@@ -6741,6 +7076,7 @@ class Animate(object):
         self.textcolor1 = self.textcolor0 if textcolor1 is None else textcolor1
         self.linewidth1 = self.linewidth0 if linewidth1 is None else linewidth1
         self.angle1 = self.angle0 if angle1 is None else angle1
+        self.alpha1 = self.alpha0 if alpha1 is None else alpha1
         self.fontsize1 = self.fontsize0 if fontsize1 is None else fontsize1
         self.width1 = self.width0 if width1 is None else width1
 
@@ -6774,6 +7110,7 @@ class Animate(object):
         linecolor0=None,
         textcolor0=None,
         angle0=None,
+        alpha0=None,
         fontsize0=None,
         width0=None,
         as_points=None,
@@ -6792,6 +7129,7 @@ class Animate(object):
         linecolor1=None,
         textcolor1=None,
         angle1=None,
+        alpha1=None,
         fontsize1=None,
         width1=None,
         xy_anchor=None,
@@ -7019,6 +7357,7 @@ class Animate(object):
         self.textcolor0 = self.textcolor(t) if textcolor0 is None else textcolor0
         self.linewidth0 = self.linewidth(t) if linewidth0 is None else linewidth0
         self.angle0 = self.angle(t) if angle0 is None else angle0
+        self.alpha0 = self.alpha(t) if alpha0 is None else alpha0
         self.fontsize0 = self.fontsize(t) if fontsize0 is None else fontsize0
         self.t0 = self.env._now if t0 is None else t0
 
@@ -7037,6 +7376,7 @@ class Animate(object):
         self.textcolor1 = self.textcolor0 if textcolor1 is None else textcolor1
         self.linewidth1 = self.linewidth0 if linewidth1 is None else linewidth1
         self.angle1 = self.angle0 if angle1 is None else angle1
+        self.alpha1 = self.alpha0 if alpha1 is None else alpha1
         self.fontsize1 = self.fontsize0 if fontsize1 is None else fontsize1
         self.width1 = self.width0 if width1 is None else width1
 
@@ -7137,6 +7477,22 @@ class Animate(object):
             default behaviour: linear interpolation between self.angle0 and self.angle1
         """
         return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.angle0, self.angle1)
+
+    def alpha(self, t=None):
+        """
+        alpha of an animate object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        alpha : float
+            default behaviour: linear interpolation between self.alpha0 and self.alpha1
+        """
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.alpha0, self.alpha1)
 
     def linewidth(self, t=None):
         """
@@ -7526,7 +7882,6 @@ class Animate(object):
         visible = self.visible(t)
 
         if (t >= self.t0) and ((t <= self.t1) or self.keep) and visible:
-            self._image_visible = True
             self._image_x_prev = self._image_x
             self._image_y_prev = self._image_y
             self._image_ident_prev = self._image_ident
@@ -7787,12 +8142,24 @@ class Animate(object):
                     offsetx = offsetx * self.env._scale
                     offsety = offsety * self.env._scale
 
-                self._image_ident = (image, width, height, angle)
+                alpha = int(self.alpha(t))
+                self._image_ident = (image, width, height, angle, alpha)
                 if self._image_ident != self._image_ident_prev:
                     im1 = image.resize((int(width), int(height)), Image.ANTIALIAS)
                     self.imwidth, self.imheight = im1.size
+                    if alpha != 255:
+                        if has_numpy():
+                            arr = numpy.asarray(im1).copy()
+                            arr_alpha = arr[:, :, 3]
+                            arr[:, :, 3] = arr_alpha * (alpha / 255)
+                            im1 = Image.fromarray(numpy.uint8(arr))
+                        else:
+                            pix = im1.load()
+                            for x in range(self.imwidth):
+                                for y in range(self.imheight):
+                                    c = pix[x, y]
+                                    pix[x, y] = (c[0], c[1], c[2], int(c[3] * alpha / 255))
                     self._image = im1.rotate(angle, expand=1)
-
                 anchor_to_dis = {
                     "ne": (-0.5, -0.5),
                     "n": (0, -0.5),
@@ -7903,13 +8270,19 @@ class Animate(object):
                         # this code is to correct a bug in the rendering of text,
                         # leaving a kind of shadow around the text
                         del draw
-                        textcolor3 = textcolor[0:3]
-                        if textcolor3 != (0, 0, 0):  # black is ok
-                            for y in range(imheight):
-                                for x in range(imwidth):
-                                    c = im.getpixel((x, y))
-                                    if not c[0:3] in (textcolor3, (0, 0, 0)):
-                                        im.putpixel((x, y), (textcolor3[0], textcolor3[1], textcolor3[2], c[3]))
+                        if textcolor[:3] != (0, 0, 0):  # black is ok
+                            if has_numpy():
+                                arr = numpy.asarray(im).copy()
+                                arr[:, :, 0] = textcolor[0]
+                                arr[:, :, 1] = textcolor[1]
+                                arr[:, :, 2] = textcolor[2]
+                                im = Image.fromarray(numpy.uint8(arr))
+                            else:
+                                pix = im.load()
+                                for y in range(imheight):
+                                    for x in range(imwidth):
+                                        pix[x, y] = (textcolor[0], textcolor[1], textcolor[2], pix[x, y][3])
+
                         # end of code to correct bug
 
                     self.imwidth, self.imheight = im.size
@@ -7941,8 +8314,13 @@ class Animate(object):
                 self._image_x = qx + ex - imrwidth / 2
                 self._image_y = qy + ey - imrheight / 2
             else:
-                self._image_visible = False  # should never occur
-
+                raise ValueError("Internal error: animate type" + self.type + "not recognized.")
+            self._image_visible = (
+                (self._image_x <= self.env._width)
+                and (self._image_y <= self.env._height)
+                and (self._image_x + self._image.size[0] >= 0)
+                and (self._image_y + self._image.size[1] >= 0)
+            )
         else:
             self._image_visible = False
 
@@ -9785,8 +10163,10 @@ class AnimateImage(_Vis):
         offsets the y-coordinate of the circle (default 0)
 
     angle : float
-        angle of the text (in degrees) |n|
-        default: 0
+        angle of the image (in degrees) (default 0)
+
+    alpha : float
+        alpha of the image (0-255) (default 255)
 
     text : str, tuple or list
         the text to be displayed |n|
@@ -9857,6 +10237,7 @@ class AnimateImage(_Vis):
         textcolor="bg",
         font="",
         angle=0,
+        alpha=255,
         xy_anchor="",
         layer=0,
         max_lines=0,
@@ -9901,6 +10282,8 @@ class AnimateImage(_Vis):
             self.text_anchor = text_anchor
         if not hasattr(self, "angle"):
             self.angle = angle
+        if not hasattr(self, "alpha"):
+            self.alpha = alpha
         if not hasattr(self, "anchor"):
             self.anchor = anchor
         if not hasattr(self, "font"):
@@ -9992,6 +10375,9 @@ class _AnimateVis(Animate):
 
     def angle(self, t):
         return _call(self.vis.angle, t, self.vis.arg)
+
+    def alpha(self, t):
+        return _call(self.vis.alpha, t, self.vis.arg)
 
     def width(self, t):
         return _call(self.vis.width, t, self.vis.arg)
@@ -10954,8 +11340,9 @@ class Component(object):
         fail_at = kwargs.pop("fail_at", None)
         fail_delay = kwargs.pop("fail_delay", None)
         mode = kwargs.pop("mode", None)
+        called_from = kwargs.pop("called_from", "request")
         if kwargs:
-            raise TypeError("request() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
+            raise TypeError(called_from + "() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
         if self._status != current:
             self._checkisnotdata()
@@ -10996,9 +11383,20 @@ class Component(object):
             else:
                 raise TypeError("incorrect specifier", arg)
 
-            if q <= 0:
-                raise ValueError("quantity " + str(q) + " <=0")
+            if called_from == "put":
+                q = -q
+
+            if q < 0 and not r._anonymous:
+                raise ValueError("quantity " + str(q) + " <0")
+
             self._requests[r] += q  # is same resource is specified several times, just add them up
+            if called_from == "request":
+                req_text = "request " + str(q) + " from "
+            elif called_from == "put":
+                req_text = "put (request) " + str(-q) + " to "
+            elif called_from == "get":
+                req_text = "get (request) " + str(q) + " from "
+
             addstring = ""
             if priority is None:
                 self.enter(r._requesters)
@@ -11006,12 +11404,7 @@ class Component(object):
                 addstring = addstring + " priority=" + str(priority)
                 self.enter_sorted(r._requesters, priority)
             if self.env._trace:
-                self.env.print_trace(
-                    "",
-                    "",
-                    self.name(),
-                    "request for " + str(q) + " from " + r.name() + addstring + " " + _modetxt(self._mode),
-                )
+                self.env.print_trace("", "", self.name(), req_text + r.name() + addstring + " " + _modetxt(self._mode))
 
         for r, q in self._requests.items():
             if q < r._minq:
@@ -11022,20 +11415,41 @@ class Component(object):
         if self._requests:
             self._reschedule(scheduled_time, False, "request")
 
-    def _tryrequest(self):
+    def get(self, *args, **kwargs):
+        """
+        equivalent to request
+        """
+        return self.request(*args, **kwargs, called_from="get")
+
+    def put(self, *args, **kwargs):
+        """
+        equivalent to request, but anonymous quantities are negated
+        """
+        return self.request(*args, **kwargs, called_from="put")
+
+    def _tryrequest(self):  # this is Component._tryrequest
         if self._status == interrupted:
             return False
         honored = True
         for r in self._requests:
-            if self._requests[r] > (r._capacity - r._claimed_quantity + 1e-8):
-                honored = False
-                break
+            if self._requests[r] > 0:
+                if self._requests[r] > (r._capacity - r._claimed_quantity + 1e-8):
+                    honored = False
+                    break
+            else:
+                if -self._requests[r] > r._claimed_quantity + 1e-8:
+                    honored = False
+                    break
+
         if honored:
+            anonymous_resources = []
             for r in list(self._requests):
                 r._claimed_quantity += self._requests[r]
 
                 self.leave(r._requesters)
-                if not r._anonymous:
+                if r._anonymous:
+                    anonymous_resources.append(r)
+                else:
                     self._claims[r] += self._requests[r]
                     mx = self._member(r._claimers)
                     if mx is None:
@@ -11048,6 +11462,9 @@ class Component(object):
             self._requests = collections.defaultdict(int)
             self._remove()
             self._reschedule(self.env._now, False, "request honor", s0=self.env.last_s0)
+            for r in anonymous_resources:
+                r._tryrequest()
+
         return honored
 
     def _release(self, r, q=None, s0=None):
@@ -14154,7 +14571,7 @@ class State(object):
         self._waiters = Queue(name="waiters of " + self.name(), monitor=monitor, env=self.env)
         self._waiters._isinternal = True
         self.env._trace = savetrace
-        self.value = Monitor(
+        self.value = _SystemMonitor(
             name="Value of " + self.name(), level=True, initial_tally=value, monitor=monitor, type=type, env=self.env
         )
         if animation_objects is not None:
@@ -14577,7 +14994,8 @@ class Resource(object):
         self._claimed_quantity = 0
         self._anonymous = anonymous
         self._minq = inf
-        self.capacity = Monitor(
+        self._trying = False
+        self.capacity = _CapacityMonitor(
             "Capacity of " + self.name(),
             level=True,
             initial_tally=capacity,
@@ -14585,7 +15003,8 @@ class Resource(object):
             type="float",
             env=self.env,
         )
-        self.claimed_quantity = Monitor(
+        self.capacity.resource = self
+        self.claimed_quantity = _SystemMonitor(
             "Claimed quantity of " + self.name(),
             level=True,
             initial_tally=0,
@@ -14593,7 +15012,7 @@ class Resource(object):
             type="float",
             env=self.env,
         )
-        self.available_quantity = Monitor(
+        self.available_quantity = _SystemMonitor(
             "Available quantity of " + self.name(),
             level=True,
             initial_tally=capacity,
@@ -14601,7 +15020,7 @@ class Resource(object):
             type="float",
             env=self.env,
         )
-        self.occupancy = Monitor(
+        self.occupancy = _SystemMonitor(
             "Occupancy of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="float", env=self.env
         )
         if self.env._trace:
@@ -14834,14 +15253,26 @@ class Resource(object):
                     result.append("    " + pad(c.name(), 20) + " quantity=" + str(c._claims[self]))
         return return_or_print(result, as_str, file)
 
-    def _tryrequest(self):
-        mx = self._requesters._head.successor
-        while mx != self._requesters._tail:
-            if self._minq > (self._capacity - self._claimed_quantity + 1e-8):
-                break  # inpossible to honor any more requests
-            c = mx.component
-            mx = mx.successor
-            c._tryrequest()
+    def _tryrequest(self):  # this is Resource._tryrequest
+        if self._anonymous:
+            if not self._trying:
+                self._trying = True
+                mx = self._requesters._head.successor
+                while mx != self._requesters._tail:
+                    c = mx.component
+                    mx = mx.successor
+                    c._tryrequest()
+                    if not c in self._requesters:
+                        mx = self._requesters._head.successor  # start again
+                self._trying = False
+        else:
+            mx = self._requesters._head.successor
+            while mx != self._requesters._tail:
+                if self._minq > (self._capacity - self._claimed_quantity + 1e-8):
+                    break  # inpossible to honor any more requests
+                c = mx.component
+                mx = mx.successor
+                c._tryrequest()
 
     def release(self, quantity=None):
         """
@@ -15062,6 +15493,129 @@ class PeriodMonitor(object):
             ]
 
 
+class AudioClip(object):
+    @staticmethod
+    def send(command):
+        buffer = ctypes.c_buffer(255)
+        errorcode = ctypes.windll.winmm.mciSendStringA(str(command).encode(), buffer, 254, 0)
+        if errorcode:
+            return errorcode, AudioClip.get_error(errorcode)
+        else:
+            return errorcode, buffer.value
+
+    @staticmethod
+    def get_error(error):
+        error = int(error)
+        buffer = ctypes.c_buffer(255)
+        ctypes.windll.winmm.mciGetErrorStringA(error, buffer, 254)
+        return buffer.value
+
+    @staticmethod
+    def directsend(*args):
+        command = " ".join(str(arg) for arg in args)
+        (err, buf) = AudioClip.send(command)
+        if err != 0:
+            print("Error " + str(err) + " for" + command + " : " + str(buf))
+        return (err, buf)
+
+    seq = 1
+
+    def __init__(self, filename):
+        filename = filename.replace("/", "\\")
+        if not os.path.isfile(filename):
+            raise FileNotFoundError(filename)
+
+        if not Windows:
+            self.duration = 0
+            self._alias = 0  # signal to dummy all methods`
+            return  # on Unix and MacOS this is just dummy
+
+        self._alias = str(AudioClip.seq)
+        AudioClip.seq += 1
+
+        AudioClip.directsend("open", '"' + filename + '"', "alias", self._alias)
+        AudioClip.directsend("set", self._alias, "time format milliseconds")
+
+        err, buf = AudioClip.directsend("status", self._alias, "length")
+        self.duration = int(buf) / 1000
+
+    def volume(self, level):
+        """Sets the volume between 0 and 100."""
+        if self._alias:
+            AudioClip.directsend("setaudio", self._alias, "volume to ", level * 10)
+
+    def play(self, start=None, end=None):
+        if self._alias:
+            start_ms = (0 if start is None else min(start, self.duration)) * 1000
+            end_ms = (self.duration if end is None else min(end, self.duration)) * 1000
+            err, buf = AudioClip.directsend("play", self._alias, "from", int(start_ms), "to", int(end_ms))
+
+    def isplaying(self):
+        return self._mode() == "playing"
+
+    def _mode(self):
+        if self._alias:
+            err, buf = AudioClip.directsend("status", self._alias, "mode")
+            return buf
+        return "?"
+
+    def pause(self):
+        if self._alias:
+            AudioClip.directsend("pause", self._alias)
+
+    def unpause(self):
+        if self._alias:
+            AudioClip.directsend("resume", self._alias)
+
+    def ispaused(self):
+        return self._mode() == "paused"
+
+    def stop(self):
+        if self._alias:
+            AudioClip.directsend("stop", self._alias)
+            AudioClip.directsend("seek", self._alias, "to start")
+
+    # TODO: this closes the file even if we're still playing.
+    # no good.  detect isplaying(), and don't die till then!
+
+
+#    def __del__(self):
+#        AudioClip.directsend(f"close {self._alias}")
+
+
+def audio_duration(filename):
+    """
+    duration of a audio file (usually mp3)
+
+    Parameters
+    ----------
+    filename : str
+        must be a valid audio file (usually mp3)
+
+    Returns
+    -------
+    duration in seconds : float
+
+    Note
+    ----
+    Only supported on Windows and Pythonista. On other platform returns 0
+    """
+    if Pythonista:
+        import sound
+
+        return sound.Player(filename).duration
+    audioclip = AudioClip(filename)
+    return audioclip.duration
+
+
+class AudioSegment:
+    def __init__(self, start, t0, filename, duration):
+        self.start = start
+        self.t0 = t0
+        self.filename = filename
+        self.duration = duration
+
+
 def colornames():
     """
     available colornames
@@ -15261,30 +15815,20 @@ def _set_name(name, _nameserialize, object):
 
     if name in _nameserialize:
         sequence_number = _nameserialize[name] + 1
-        _nameserialize[name] = sequence_number
-
     else:
         if name.endswith(","):
-            _nameserialize[name] = 1
             sequence_number = 1
         else:
-            _nameserialize[name] = 0
             sequence_number = 0
 
+    _nameserialize[name] = sequence_number
     if name.endswith("."):
         object._name = name + str(sequence_number)
-    elif name.endswith(","):
+    elif name.endswith("."):
         object._name = name[:-1] + "." + str(sequence_number)
     else:
         object._name = name
     object._sequence_number = sequence_number
-
-
-def _decode_name(name):
-    if isinstance(name, tuple):
-        return name[0] + name[1].name()
-    else:
-        return name
 
 
 def pad(txt, n):
@@ -15458,7 +16002,7 @@ def _modetxt(mode):
 
 
 def object_to_str(object, quoted=False):
-    add = "'" if quoted else ""
+    add = '"' if quoted else ""
     return add + type(object).__name__ + add
 
 
@@ -15832,7 +16376,7 @@ def can_video(try_only=True):
     True, if required modules could be imported, False otherwise : bool
     """
     global cv2
-    global np
+    global numpy
     if Pythonista:
         if try_only:
             return False
@@ -15840,7 +16384,7 @@ def can_video(try_only=True):
     else:
         try:
             import cv2
-            import numpy as np
+            import numpy
         except ImportError:
             if try_only:
                 return False
@@ -15849,6 +16393,25 @@ def can_video(try_only=True):
             else:
                 raise ImportError("cv2 required for video production. Install with pip install opencv-python")
     return True
+
+
+def has_numpy():
+    """
+    Tests whether numpy is installed. If so, the global numpy is set accordingly.
+    If not, the global numpy is set to False.
+
+    Returns
+    -------
+    True, if numpy is installed. False otherwise.
+    """
+    global numpy
+    try:
+        return bool(numpy)
+    except NameError:
+        try:
+            import numpy
+        except ModuleNotFoundError:
+            numpy = False  # we now know numpy doesn't exist
 
 
 def default_env():
