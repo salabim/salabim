@@ -1,8 +1,8 @@
-"""          _         _      _               _   ___       ___      ____
- ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \    | ___|
-/ __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |   |___ \
-\__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _  ___) |
-|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_)|____/
+"""          _         _      _               _   ___       ___      _____
+ ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \    |___  |
+/ __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |      / /
+\__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _   / /
+|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_) /_/
 Discrete event simulation in Python
 
 see www.salabim.org for more information, the documentation and license information
@@ -11,7 +11,7 @@ see www.salabim.org for more information, the documentation and license informat
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "19.0.5"
+__version__ = "19.0.7"
 
 import heapq
 import random
@@ -36,6 +36,7 @@ import ctypes
 import shutil
 import subprocess
 import tempfile
+import traceback
 
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
@@ -116,7 +117,7 @@ class ItemFile(object):
 
     def read_item_int(self):
         """
-        read next field from the ItemFile as int.
+        read next field from the ItemFile as int.h
 
         if the end of file is reached, EOFError is raised
         """
@@ -490,7 +491,6 @@ class Monitor(object):
         -------
         sliced monitor : Monitor
         """
-        new = _SystemMonitor(name="slice", type=self.xtype, level=self._level)
         if name is None:
             name = self.name() + ".sliced"
         new = _SystemMonitor(level=self._level, type=self.xtype, name=name)
@@ -661,6 +661,7 @@ class Monitor(object):
             raise TypeError("get not available for non level monitors")
         if t is None:
             return self._tally
+        t += self.env._offset
         if t < self._t[0] or t > self.env._now:
             return self.off
         if t == self.env._now:
@@ -670,7 +671,7 @@ class Monitor(object):
 
     def get(self, t=None):
         """
-        get the value of a monitor
+        get the value of a level monitor
 
         Parameters
         ----------
@@ -691,7 +692,8 @@ class Monitor(object):
 
         Note
         ----
-        If the value is not available, self.off will be returned.
+        If the value is not available, self.off will be returned. |n|
+        Only available for level monitors
         """
         return self.__call__(t)
 
@@ -1097,7 +1099,7 @@ class Monitor(object):
             new = _SystemMonitor(name=name, monitor=False, type="float", level=False)
             new.isgenerated = True
             new._x = [x * scale for x in self._x]
-            new._t = 1  # self._t[]
+            new._t = [t for t in self._t]
             return new
 
         else:
@@ -1630,7 +1632,7 @@ class Monitor(object):
             if True, return a string containing the statistics
 
         file: file
-            if Noneb(default), all output is directed to stdout |n|
+            if None (default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
         Returns
@@ -1951,7 +1953,7 @@ class Monitor(object):
             x2 = ""
         except ValueError:
             x1 = math.inf
-            x2 = x
+            x2 = str(x)
         return (x1, x2)
 
     def animate(self, *args, **kwargs):
@@ -1964,7 +1966,7 @@ class Monitor(object):
             color of the line or points (default foreground color)
 
         linewidth : int
-            width of the line or points (default 1 for line, 3 for points)
+            width of the line or points (default 1 for level, 3 for non level monitors)
 
         fillcolor : colorspec
             color of the panel (default transparent)
@@ -1996,6 +1998,15 @@ class Monitor(object):
 
         y : int
             y-coordinate of panel, relative to xy_anchor. default 0
+
+        offsetx : float
+            offsets the x-coordinate of the panel (default 0)
+
+        offsety : float
+            offsets the y-coordinate of the panel (default 0)
+
+        angle : float
+            rotation angle in degrees, default 0
 
         xy_anchor : str
             specifies where x and y are relative to |n|
@@ -2296,7 +2307,7 @@ class AnimateMonitor(object):
         color of the line or points (default foreground color)
 
     linewidth : int
-        width of the line or points (default 1 for line, 3 for points)
+        width of the line or points (default 1 for level, 3 for non level monitors)
 
     fillcolor : colorspec
         color of the panel (default transparent)
@@ -2328,6 +2339,15 @@ class AnimateMonitor(object):
 
     y : int
         y-coordinate of panel, relative to xy_anchor. default 0
+
+    offsetx : float
+        offsets the x-coordinate of the panel (default 0)
+
+    offsety : float
+        offsets the y-coordinate of the panel (default 0)
+
+    angle : float
+        rotation angle in degrees, default 0
 
     xy_anchor : str
         specifies where x and y are relative to |n|
@@ -2382,6 +2402,9 @@ class AnimateMonitor(object):
         title=None,
         x=0,
         y=0,
+        offsetx=0,
+        offsety=0,
+        angle=0,
         vertical_offset=2,
         parent=None,
         vertical_scale=5,
@@ -2403,8 +2426,8 @@ class AnimateMonitor(object):
         if horizontal_scale is None:
             horizontal_scale = 1
 
-        xll = x + monitor.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True)
-        yll = y + monitor.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True)
+        offsetx += monitor.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True)
+        offsety += monitor.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True)
 
         self.aos = []
         self.parent = parent
@@ -2412,8 +2435,11 @@ class AnimateMonitor(object):
         self.aos.append(
             AnimateRectangle(
                 spec=(0, 0, width, height),
-                offsetx=xll,
-                offsety=yll,
+                x=x,
+                y=y,
+                offsetx=offsetx,
+                offsety=offsety,
+                angle=angle,
                 fillcolor=fillcolor,
                 linewidth=borderlinewidth,
                 linecolor=bordercolor,
@@ -2425,8 +2451,11 @@ class AnimateMonitor(object):
             AnimateText(
                 text=title,
                 textcolor=titlecolor,
-                offsetx=xll,
-                offsety=yll + height + titlefontsize * 0.15,
+                x=x,
+                y=y,
+                offsetx=offsetx,
+                offsety=offsety + height + titlefontsize * 0.15,
+                angle=angle,
                 text_anchor="sw",
                 screen_coordinates=True,
                 fontsize=titlefontsize,
@@ -2444,8 +2473,11 @@ class AnimateMonitor(object):
                 height=height,
                 t_scale=horizontal_scale,
                 layer=layer,
-                offsetx0=xll,
-                offsety0=yll,
+                x0=x,
+                y0=y,
+                offsetx0=offsetx,
+                offsety0=offsety,
+                angle0=angle,
                 screen_coordinates=True,
             )
         )
@@ -2457,8 +2489,11 @@ class AnimateMonitor(object):
                 linewidth0=linewidth,
                 as_points=not monitor._level,
                 screen_coordinates=True,
-                offsetx0=xll,
-                offsety0=yll,
+                x0=x,
+                y0=y,
+                offsetx0=offsetx,
+                offsety0=offsety,
+                angle0=angle,
                 width=width,
                 height=height,
                 value_offsety=vertical_offset,
@@ -2538,13 +2573,15 @@ if Pythonista:
                 if not env.paused:
                     env.frametimes.append(time.time())
 
-                env.an_objects[:].sort(key=lambda obj: (-obj.layer(env.t), obj.sequence))
+                an_objects = sorted(
+                    env.an_objects, key=lambda obj: (-obj.layer(env.t), obj.sequence)
+                )  # has to be a copy!
                 touchvalues = self.touches.values()
                 capture_image = Image.new("RGB", (env._width, env._height), env.colorspec_to_tuple("bg"))
                 #                capture_image = Image.new("RGBA", (env._width, env._height), (0,0,0,0))
                 env.animation_pre_tick(env.t)
                 env.animation_pre_tick_sys(env.t)
-                for ao in env.an_objects:
+                for ao in an_objects:
                     ao.make_pil_image(env.t)
                     if ao._image_visible:
                         capture_image.paste(
@@ -4127,66 +4164,71 @@ class Environment(object):
 
         for advanced use with animation / GUI loops
         """
-        if not self._current_component._skip_standby:
-            if len(self.env._pendingstandbylist) > 0:
-                c = self.env._pendingstandbylist.pop(0)
-                if c._status == standby:  # skip cancelled components
-                    c._status = current
-                    c._scheduled_time = inf
-                    self.env._current_component = c
-                    if self._trace:
-                        self.print_trace(
-                            self.time_to_str(self._now - self.env._offset),
-                            c.name(),
-                            "current (standby)",
-                            s0=c.lineno_txt(),
-                            _optional=self._suppress_trace_standby,
-                        )
-                    try:
-                        next(c._process)
-                        return
-                    except TypeError:
-                        c._process(**c._process_kwargs)
-                        self._terminate(c)
-                        return
-                    except StopIteration:
-                        self._terminate(c)
-                        return
+        try:
+            if not self._current_component._skip_standby:
+                if len(self.env._pendingstandbylist) > 0:
+                    c = self.env._pendingstandbylist.pop(0)
+                    if c._status == standby:  # skip cancelled components
+                        c._status = current
+                        c._scheduled_time = inf
+                        self.env._current_component = c
+                        if self._trace:
+                            self.print_trace(
+                                self.time_to_str(self._now - self.env._offset),
+                                c.name(),
+                                "current (standby)",
+                                s0=c.lineno_txt(),
+                                _optional=self._suppress_trace_standby,
+                            )
+                        try:
+                            next(c._process)
+                            return
+                        except TypeError:
+                            c._process(**c._process_kwargs)
+                            self._terminate(c)
+                            return
+                        except StopIteration:
+                            self._terminate(c)
+                            return
 
-        if len(self.env._standbylist) > 0:
-            self._pendingstandbylist = list(self.env._standbylist)
-            self._standbylist = []
+            if len(self.env._standbylist) > 0:
+                self._pendingstandbylist = list(self.env._standbylist)
+                self._standbylist = []
 
-        if self._event_list:
-            (t, _, c) = heapq.heappop(self._event_list)
-        else:
-            c = self._main
-            if self.end_on_empty_eventlist:
-                t = self.env._now
-                self.print_trace("", "", "run ended", "no events left", s0=c.lineno_txt())
+            if self._event_list:
+                (t, _, c) = heapq.heappop(self._event_list)
             else:
-                t = inf
-        c._on_event_list = False
-        self.env._now = t
+                c = self._main
+                if self.end_on_empty_eventlist:
+                    t = self.env._now
+                    self.print_trace("", "", "run ended", "no events left", s0=c.lineno_txt())
+                else:
+                    t = inf
+            c._on_event_list = False
+            self.env._now = t
 
-        self._current_component = c
+            self._current_component = c
 
-        c._status = current
-        c._scheduled_time = inf
-        if self._trace:
-            self.print_trace(self.time_to_str(self._now - self._offset), c.name(), "current", s0=c.lineno_txt())
-        if c == self._main:
-            self.running = False
-            return
-        c._check_fail()
-        if c._process_isgenerator:
-            try:
-                next(c._process)
-            except StopIteration:
+            c._status = current
+            c._scheduled_time = inf
+            if self._trace:
+                self.print_trace(self.time_to_str(self._now - self._offset), c.name(), "current", s0=c.lineno_txt())
+            if c == self._main:
+                self.running = False
+                return
+            c._check_fail()
+            if c._process_isgenerator:
+                try:
+                    next(c._process)
+                except StopIteration:
+                    self._terminate(c)
+            else:
+                c._process(**c._process_kwargs)
                 self._terminate(c)
-        else:
-            c._process(**c._process_kwargs)
-            self._terminate(c)
+        except Exception as e:
+            self._animate = False
+            traceback.print_exc()
+            sys.exit()
 
     def _terminate(self, c):
         if c._process_isgenerator:
@@ -4658,7 +4700,7 @@ class Environment(object):
                 self._video_out.release()
                 if self.audio_segments:
                     if self._audio:
-                        self.audio_segments[-1].t1 = self.frame_number / self.fps
+                        self.audio_segments[-1].t1 = self.frame_number / self._fps
                     self.add_audio()
 
             self._video_out = None
@@ -5455,7 +5497,6 @@ class Environment(object):
             self.root.mainloop()
 
     def simulate_and_animate_loop(self):
-
         while True:  # to be changed
             tick_start = time.time()
 
@@ -6557,8 +6598,10 @@ class Environment(object):
                 self.print_trace("", "", s, (os.path.basename(fullfilename)), "")
                 break
 
-    def _frame_to_lineno(self, frame):
+    def _frame_to_lineno(self, frame, add_filename=False):
         frameinfo = inspect.getframeinfo(frame)
+        if add_filename:
+            return str(frameinfo.lineno) + " in " + os.path.basename(frameinfo.filename)
         return self.filename_lineno_to_str(frameinfo.filename, frameinfo.lineno)
 
     def filename_lineno_to_str(self, filename, lineno):
@@ -7081,7 +7124,7 @@ class Animate(object):
         self.width1 = self.width0 if width1 is None else width1
 
         self.t1 = inf if t1 is None else t1
-
+        self.caller = self.env._frame_to_lineno(_get_caller_frame(), add_filename=True)
         self.env.an_objects.append(self)
 
     def update(
@@ -7878,451 +7921,461 @@ class Animate(object):
         return t
 
     def make_pil_image(self, t):
+        try:
+            visible = self.visible(t)
 
-        visible = self.visible(t)
+            if (t >= self.t0) and ((t <= self.t1) or self.keep) and visible:
+                self._image_x_prev = self._image_x
+                self._image_y_prev = self._image_y
+                self._image_ident_prev = self._image_ident
 
-        if (t >= self.t0) and ((t <= self.t1) or self.keep) and visible:
-            self._image_x_prev = self._image_x
-            self._image_y_prev = self._image_y
-            self._image_ident_prev = self._image_ident
+                x = self.x(t)
+                y = self.y(t)
+                xy_anchor = self.xy_anchor(t)
+                if xy_anchor:
+                    x += self.env.xy_anchor_to_x(xy_anchor, screen_coordinates=self.screen_coordinates)
+                    y += self.env.xy_anchor_to_y(xy_anchor, screen_coordinates=self.screen_coordinates)
 
-            x = self.x(t)
-            y = self.y(t)
-            xy_anchor = self.xy_anchor(t)
-            if xy_anchor:
-                x += self.env.xy_anchor_to_x(xy_anchor, screen_coordinates=self.screen_coordinates)
-                y += self.env.xy_anchor_to_y(xy_anchor, screen_coordinates=self.screen_coordinates)
+                offsetx = self.offsetx(t)
+                offsety = self.offsety(t)
+                angle = self.angle(t)
+                as_points = self.as_points(t)
 
-            offsetx = self.offsetx(t)
-            offsety = self.offsety(t)
-            angle = self.angle(t)
-            as_points = self.as_points(t)
-
-            if self.type in ("polygon", "rectangle", "line", "circle"):
-                if self.screen_coordinates:
-                    linewidth = self.linewidth(t)
-                else:
-                    linewidth = self.linewidth(t) * self.env._scale
-
-                linecolor = self.env.colorspec_to_tuple(self.linecolor(t))
-                fillcolor = self.env.colorspec_to_tuple(self.fillcolor(t))
-
-                cosa = math.cos(angle * math.pi / 180)
-                sina = math.sin(angle * math.pi / 180)
-                if self.screen_coordinates:
-                    qx = x
-                    qy = y
-                else:
-                    qx = (x - self.env._x0) * self.env._scale
-                    qy = (y - self.env._y0) * self.env._scale
-
-                if self.type == "rectangle":
-                    rectangle = tuple(self.rectangle(t))
-                    self._image_ident = (
-                        tuple(rectangle),
-                        linewidth,
-                        linecolor,
-                        fillcolor,
-                        as_points,
-                        angle,
-                        self.screen_coordinates,
-                    )
-                elif self.type == "line":
-                    line = tuple(self.line(t))
-                    fillcolor = (0, 0, 0, 0)
-                    self._image_ident = (tuple(line), linewidth, linecolor, as_points, angle, self.screen_coordinates)
-                elif self.type == "polygon":
-                    polygon = tuple(self.polygon(t))
-                    self._image_ident = (
-                        tuple(polygon),
-                        linewidth,
-                        linecolor,
-                        fillcolor,
-                        as_points,
-                        angle,
-                        self.screen_coordinates,
-                    )
-                elif self.type == "circle":
-                    circle = self.circle(t)
-                    if isinstance(circle, list):
-                        circle = tuple(circle)
-                    self._image_ident = (circle, linewidth, linecolor, fillcolor, angle, self.screen_coordinates)
-
-                if self._image_ident != self._image_ident_prev:
-                    if self.type == "rectangle":
-                        p = [
-                            rectangle[0],
-                            rectangle[1],
-                            rectangle[2],
-                            rectangle[1],
-                            rectangle[2],
-                            rectangle[3],
-                            rectangle[0],
-                            rectangle[3],
-                            rectangle[0],
-                            rectangle[1],
-                        ]
-
-                    elif self.type == "line":
-                        p = line
-
-                    elif self.type == "polygon":
-                        p = list(polygon)
-                        if p[0:1] != p[-2:-1]:
-                            p.append(p[0])  # close the polygon
-                            p.append(p[1])
-
-                    elif self.type == "circle":
-                        arc_angle0 = 0
-                        arc_angle1 = 360
-                        draw_arc = False
-                        if isinstance(circle, (list, tuple)):
-                            radius0 = radius1 = circle[0]
-                            if len(circle) > 1:
-                                if circle[1] is not None:
-                                    radius1 = circle[1]
-                            if len(circle) > 3:
-                                arc_angle0 = circle[2]
-                                arc_angle1 = circle[3]
-                            if len(circle) > 4:
-                                draw_arc = bool(circle[4])
-                        else:
-                            radius0 = radius1 = circle
-                        if arc_angle0 > arc_angle1:
-                            arc_angle0, arc_angle1 = arc_angle1, arc_angle0
-                        arc_angle1 = min(arc_angle1, arc_angle0 + 360)
-
-                        if self.screen_coordinates:
-                            nsteps = int(math.sqrt(max(radius0, radius1)) * 6)
-                        else:
-                            nsteps = int(math.sqrt(max(radius0 * self.env._scale, radius1 * self.env._scale)) * 6)
-                        tarc_angle = 360 / nsteps
-                        p = [0, 0]
-
-                        arc_angle = arc_angle0
-                        ended = False
-                        while True:
-                            arc_angle_radians = math.pi * arc_angle / 180
-                            sint = math.sin(arc_angle_radians)
-                            cost = math.cos(arc_angle_radians)
-                            x, y = (radius0 * cost, radius1 * sint)
-                            p.append(x)
-                            p.append(y)
-                            if ended:
-                                break
-                            arc_angle += tarc_angle
-                            if arc_angle >= arc_angle1:
-                                arc_angle = arc_angle1
-                                ended = True
-                        p.append(0)
-                        p.append(0)
-
-                    r = []
-                    minpx = inf
-                    minpy = inf
-                    maxpx = -inf
-                    maxpy = -inf
-                    minrx = inf
-                    minry = inf
-                    maxrx = -inf
-                    maxry = -inf
-                    for i in range(0, len(p), 2):
-                        px = p[i]
-                        py = p[i + 1]
-                        if not self.screen_coordinates:
-                            px *= self.env._scale
-                            py *= self.env._scale
-                        rx = px * cosa - py * sina
-                        ry = px * sina + py * cosa
-                        minpx = min(minpx, px)
-                        maxpx = max(maxpx, px)
-                        minpy = min(minpy, py)
-                        maxpy = max(maxpy, py)
-                        minrx = min(minrx, rx)
-                        maxrx = max(maxrx, rx)
-                        minry = min(minry, ry)
-                        maxry = max(maxry, ry)
-                        r.append(rx)
-                        r.append(ry)
-                    if maxrx == -inf:
-                        maxpx = 0
-                        minpx = 0
-                        maxpy = 0
-                        minpy = 0
-                        maxrx = 0
-                        minrx = 0
-                        maxry = 0
-                        minry = 0
-
-                    rscaled = []
-                    for i in range(0, len(r), 2):
-                        rscaled.append(r[i] - minrx + linewidth)
-                        rscaled.append(maxry - r[i + 1] + linewidth)
-                    rscaled = tuple(rscaled)  # to make it hashable
-
-                    if as_points:
-                        self._image = Image.new(
-                            "RGBA",
-                            (int(maxrx - minrx + 2 * linewidth), int(maxry - minry + 2 * linewidth)),
-                            (0, 0, 0, 0),
-                        )
-                        point_image = Image.new("RGBA", (int(linewidth), int(linewidth)), linecolor)
-
-                        for i in range(0, len(r), 2):
-                            rx = rscaled[i]
-                            ry = rscaled[i + 1]
-                            self._image.paste(
-                                point_image, (int(rx - 0.5 * linewidth), int(ry - 0.5 * linewidth)), point_image
-                            )
-
+                if self.type in ("polygon", "rectangle", "line", "circle"):
+                    if self.screen_coordinates:
+                        linewidth = self.linewidth(t)
                     else:
-                        self._image = Image.new(
-                            "RGBA",
-                            (int(maxrx - minrx + 2 * linewidth), int(maxry - minry + 2 * linewidth)),
-                            (0, 0, 0, 0),
-                        )
-                        draw = ImageDraw.Draw(self._image)
-                        if fillcolor[3] != 0:
-                            draw.polygon(rscaled, fill=fillcolor)
-                        if (round(linewidth) > 0) and (linecolor[3] != 0):
-                            if self.type == "circle" and not draw_arc:
-                                draw.line(rscaled[2:-2], fill=linecolor, width=int(linewidth))
-                                # get rid of the first and last point (=center)
-                            else:
-                                draw.line(rscaled, fill=linecolor, width=int(round(linewidth)))
-                        del draw
-                    self.minrx = minrx
-                    self.minry = minry
-                    self.maxrx = maxrx
-                    self.maxry = maxry
-                    self.minpx = minpx
-                    self.minpy = minpy
-                    self.maxpx = maxpx
-                    self.maxpy = maxpy
-                    if self.type == "circle":
-                        self.radius0 = radius0
-                        self.radius1 = radius1
+                        linewidth = self.linewidth(t) * self.env._scale
 
-                if self.type == "circle":
-                    self.env._centerx = qx
-                    self.env._centery = qy
-                    self.env._dimx = 2 * self.radius0
-                    self.env._dimy = 2 * self.radius1
-                else:
-                    self.env._centerx = qx + (self.minrx + self.maxrx) / 2
-                    self.env._centery = qy + (self.minry + self.maxry) / 2
-                    self.env._dimx = self.maxpx - self.minpx
-                    self.env._dimy = self.maxpy - self.minpy
+                    linecolor = self.env.colorspec_to_tuple(self.linecolor(t))
+                    fillcolor = self.env.colorspec_to_tuple(self.fillcolor(t))
 
-                self._image_x = qx + self.minrx - linewidth + (offsetx * cosa - offsety * sina)
-                self._image_y = qy + self.minry - linewidth + (offsetx * sina + offsety * cosa)
-
-            elif self.type == "image":
-                image = self.image(t)
-                if isinstance(image, (tuple, list)):
-                    image = image[0]  # ignore serial number (for compatibility with pre 2.2.9 versions)
-                width = self.width(t)
-                if width is None:
-                    width = image.size[0]
-
-                height = width * image.size[1] / image.size[0]
-                if not self.screen_coordinates:
-                    width *= self.env._scale
-                    height *= self.env._scale
-
-                angle = self.angle(t)
-
-                anchor = self.anchor(t)
-                if self.screen_coordinates:
-                    qx = x
-                    qy = y
-                else:
-                    qx = (x - self.env._x0) * self.env._scale
-                    qy = (y - self.env._y0) * self.env._scale
-                    offsetx = offsetx * self.env._scale
-                    offsety = offsety * self.env._scale
-
-                alpha = int(self.alpha(t))
-                self._image_ident = (image, width, height, angle, alpha)
-                if self._image_ident != self._image_ident_prev:
-                    im1 = image.resize((int(width), int(height)), Image.ANTIALIAS)
-                    self.imwidth, self.imheight = im1.size
-                    if alpha != 255:
-                        if has_numpy():
-                            arr = numpy.asarray(im1).copy()
-                            arr_alpha = arr[:, :, 3]
-                            arr[:, :, 3] = arr_alpha * (alpha / 255)
-                            im1 = Image.fromarray(numpy.uint8(arr))
-                        else:
-                            pix = im1.load()
-                            for x in range(self.imwidth):
-                                for y in range(self.imheight):
-                                    c = pix[x, y]
-                                    pix[x, y] = (c[0], c[1], c[2], int(c[3] * alpha / 255))
-                    self._image = im1.rotate(angle, expand=1)
-                anchor_to_dis = {
-                    "ne": (-0.5, -0.5),
-                    "n": (0, -0.5),
-                    "nw": (0.5, -0.5),
-                    "e": (-0.5, 0),
-                    "center": (0, 0),
-                    "c": (0, 0),
-                    "w": (0.5, 0),
-                    "se": (-0.5, 0.5),
-                    "s": (0, 0.5),
-                    "sw": (0.5, 0.5),
-                }
-                dx, dy = anchor_to_dis[anchor.lower()]
-                dx = dx * self.imwidth + offsetx
-                dy = dy * self.imheight + offsety
-                cosa = math.cos(angle * math.pi / 180)
-                sina = math.sin(angle * math.pi / 180)
-                ex = dx * cosa - dy * sina
-                ey = dx * sina + dy * cosa
-                imrwidth, imrheight = self._image.size
-
-                self.env._centerx = qx + ex
-                self.env._centery = qy + ey
-                self.env._dimx = width
-                self.env._dimy = height
-
-                self._image_x = qx + ex - imrwidth / 2
-                self._image_y = qy + ey - imrheight / 2
-
-            elif self.type == "text":
-                text = self.text(t)
-                if text.strip() == "":
-                    self._image_visible = False
-                    return
-                textcolor = self.env.colorspec_to_tuple(self.textcolor(t))
-                fontsize = self.fontsize(t)
-                angle = self.angle(t)
-                fontname = self.font(t)
-                if not self.screen_coordinates:
-                    fontsize = fontsize * self.env._scale
-                    offsetx = offsetx * self.env._scale
-                    offsety = offsety * self.env._scale
-                text_anchor = self.text_anchor(t)
-
-                if hasattr(self, "dependent"):
-                    text_offsetx = self.text_offsetx(t)
-                    text_offsety = self.text_offsety(t)
-                    if not self.screen_coordinates:
-                        text_offsetx = text_offsetx * self.env._scale
-                        text_offsety = text_offsety * self.env._scale
-                    qx = self.env._centerx
-                    qy = self.env._centery
-                    anchor_to_dis = {
-                        "ne": (0.5, 0.5),
-                        "n": (0, 0.5),
-                        "nw": (-0.5, 0.5),
-                        "e": (0.5, 0),
-                        "center": (0, 0),
-                        "c": (0, 0),
-                        "w": (-0.5, 0),
-                        "se": (0.5, -0.5),
-                        "s": (0, -0.5),
-                        "sw": (-0.5, -0.5),
-                    }
-                    dis = anchor_to_dis[text_anchor.lower()]
-                    offsetx += text_offsetx + dis[0] * self.env._dimx - dis[0] * 4  # 2 extra at east or west
-                    offsety += text_offsety + dis[1] * self.env._dimy - (2 if dis[1] > 0 else 0)  # 2 extra at north
-                else:
+                    cosa = math.cos(angle * math.pi / 180)
+                    sina = math.sin(angle * math.pi / 180)
                     if self.screen_coordinates:
                         qx = x
                         qy = y
                     else:
                         qx = (x - self.env._x0) * self.env._scale
                         qy = (y - self.env._y0) * self.env._scale
-                max_lines = self.max_lines(t)
-                self._image_ident = (text, fontname, fontsize, angle, textcolor, max_lines)
-                if self._image_ident != self._image_ident_prev:
-                    font, heightA = getfont(fontname, fontsize)
-                    if text == "" or text is None:  # this code is a workaround for a bug in PIL >= 4.2.1
-                        im = Image.new("RGBA", (0, 0), (0, 0, 0, 0))
-                    else:
-                        lines = []
-                        for item in deep_flatten(text):
-                            for line in item.splitlines():
-                                lines.append(line.rstrip())
 
-                        if max_lines <= 0:  # 0 is all
-                            lines = lines[max_lines:]
-                        else:
-                            lines = lines[:max_lines]
+                    if self.type == "rectangle":
+                        rectangle = tuple(de_none(self.rectangle(t)))
+                        self._image_ident = (
+                            tuple(rectangle),
+                            linewidth,
+                            linecolor,
+                            fillcolor,
+                            as_points,
+                            angle,
+                            self.screen_coordinates,
+                        )
+                    elif self.type == "line":
+                        line = tuple(de_none(self.line(t)))
+                        fillcolor = (0, 0, 0, 0)
+                        self._image_ident = (
+                            tuple(line),
+                            linewidth,
+                            linecolor,
+                            as_points,
+                            angle,
+                            self.screen_coordinates,
+                        )
+                    elif self.type == "polygon":
+                        polygon = tuple(de_none(self.polygon(t)))
+                        self._image_ident = (
+                            tuple(polygon),
+                            linewidth,
+                            linecolor,
+                            fillcolor,
+                            as_points,
+                            angle,
+                            self.screen_coordinates,
+                        )
+                    elif self.type == "circle":
+                        circle = self.circle(t)
+                        if isinstance(circle, list):
+                            circle = tuple(circle)
+                        self._image_ident = (circle, linewidth, linecolor, fillcolor, angle, self.screen_coordinates)
 
-                        widths = [(font.getsize(line)[0] if line else 0) for line in lines]
-                        if widths:
-                            totwidth = max(widths)
-                        else:
-                            totwidth = 0
-                        number_of_lines = len(lines)
-                        lineheight = font.getsize("Ap")[1]
-                        totheight = number_of_lines * lineheight
-                        im = Image.new("RGBA", (int(totwidth + 0.1 * fontsize), int(totheight)), (0, 0, 0, 0))
-                        imwidth, imheight = im.size
-                        draw = ImageDraw.Draw(im)
-                        pos = 0
-                        for line, width in zip(lines, widths):
-                            if line:
-                                draw.text(xy=(0.1 * fontsize, pos), text=line, font=font, fill=textcolor)
-                            pos += lineheight
-                        # this code is to correct a bug in the rendering of text,
-                        # leaving a kind of shadow around the text
-                        del draw
-                        if textcolor[:3] != (0, 0, 0):  # black is ok
-                            if has_numpy():
-                                arr = numpy.asarray(im).copy()
-                                arr[:, :, 0] = textcolor[0]
-                                arr[:, :, 1] = textcolor[1]
-                                arr[:, :, 2] = textcolor[2]
-                                im = Image.fromarray(numpy.uint8(arr))
+                    if self._image_ident != self._image_ident_prev:
+                        if self.type == "rectangle":
+                            p = [
+                                rectangle[0],
+                                rectangle[1],
+                                rectangle[2],
+                                rectangle[1],
+                                rectangle[2],
+                                rectangle[3],
+                                rectangle[0],
+                                rectangle[3],
+                                rectangle[0],
+                                rectangle[1],
+                            ]
+
+                        elif self.type == "line":
+                            p = line
+
+                        elif self.type == "polygon":
+                            p = list(polygon)
+                            if p[0:1] != p[-2:-1]:
+                                p.append(p[0])  # close the polygon
+                                p.append(p[1])
+
+                        elif self.type == "circle":
+                            arc_angle0 = 0
+                            arc_angle1 = 360
+                            draw_arc = False
+                            if isinstance(circle, (list, tuple)):
+                                radius0 = radius1 = circle[0]
+                                if len(circle) > 1:
+                                    if circle[1] is not None:
+                                        radius1 = circle[1]
+                                if len(circle) > 3:
+                                    arc_angle0 = circle[2]
+                                    arc_angle1 = circle[3]
+                                if len(circle) > 4:
+                                    draw_arc = bool(circle[4])
                             else:
-                                pix = im.load()
-                                for y in range(imheight):
-                                    for x in range(imwidth):
-                                        pix[x, y] = (textcolor[0], textcolor[1], textcolor[2], pix[x, y][3])
+                                radius0 = radius1 = circle
+                            if arc_angle0 > arc_angle1:
+                                arc_angle0, arc_angle1 = arc_angle1, arc_angle0
+                            arc_angle1 = min(arc_angle1, arc_angle0 + 360)
 
-                        # end of code to correct bug
+                            if self.screen_coordinates:
+                                nsteps = int(math.sqrt(max(radius0, radius1)) * 6)
+                            else:
+                                nsteps = int(math.sqrt(max(radius0 * self.env._scale, radius1 * self.env._scale)) * 6)
+                            tarc_angle = 360 / nsteps
+                            p = [0, 0]
 
-                    self.imwidth, self.imheight = im.size
-                    self.heightA = heightA
+                            arc_angle = arc_angle0
+                            ended = False
+                            while True:
+                                arc_angle_radians = math.pi * arc_angle / 180
+                                sint = math.sin(arc_angle_radians)
+                                cost = math.cos(arc_angle_radians)
+                                x, y = (radius0 * cost, radius1 * sint)
+                                p.append(x)
+                                p.append(y)
+                                if ended:
+                                    break
+                                arc_angle += tarc_angle
+                                if arc_angle >= arc_angle1:
+                                    arc_angle = arc_angle1
+                                    ended = True
+                            p.append(0)
+                            p.append(0)
 
-                    self._image = im.rotate(angle, expand=1)
+                        r = []
+                        minpx = inf
+                        minpy = inf
+                        maxpx = -inf
+                        maxpy = -inf
+                        minrx = inf
+                        minry = inf
+                        maxrx = -inf
+                        maxry = -inf
+                        for i in range(0, len(p), 2):
+                            px = p[i]
+                            py = p[i + 1]
+                            if not self.screen_coordinates:
+                                px *= self.env._scale
+                                py *= self.env._scale
+                            rx = px * cosa - py * sina
+                            ry = px * sina + py * cosa
+                            minpx = min(minpx, px)
+                            maxpx = max(maxpx, px)
+                            minpy = min(minpy, py)
+                            maxpy = max(maxpy, py)
+                            minrx = min(minrx, rx)
+                            maxrx = max(maxrx, rx)
+                            minry = min(minry, ry)
+                            maxry = max(maxry, ry)
+                            r.append(rx)
+                            r.append(ry)
+                        if maxrx == -inf:
+                            maxpx = 0
+                            minpx = 0
+                            maxpy = 0
+                            minpy = 0
+                            maxrx = 0
+                            minrx = 0
+                            maxry = 0
+                            minry = 0
 
-                anchor_to_dis = {
-                    "ne": (-0.5, -0.5),
-                    "n": (0, -0.5),
-                    "nw": (0.5, -0.5),
-                    "e": (-0.5, 0),
-                    "center": (0, 0),
-                    "c": (0, 0),
-                    "w": (0.5, 0),
-                    "se": (-0.5, 0.5),
-                    "s": (0, 0.5),
-                    "sw": (0.5, 0.5),
-                }
-                dx, dy = anchor_to_dis[text_anchor.lower()]
-                dx = dx * self.imwidth + offsetx - 0.1 * fontsize
+                        rscaled = []
+                        for i in range(0, len(r), 2):
+                            rscaled.append(r[i] - minrx + linewidth)
+                            rscaled.append(maxry - r[i + 1] + linewidth)
+                        rscaled = tuple(rscaled)  # to make it hashable
 
-                dy = dy * self.imheight + offsety
-                cosa = math.cos(angle * math.pi / 180)
-                sina = math.sin(angle * math.pi / 180)
-                ex = dx * cosa - dy * sina
-                ey = dx * sina + dy * cosa
-                imrwidth, imrheight = self._image.size
-                self._image_x = qx + ex - imrwidth / 2
-                self._image_y = qy + ey - imrheight / 2
+                        if as_points:
+                            self._image = Image.new(
+                                "RGBA",
+                                (int(maxrx - minrx + 2 * linewidth), int(maxry - minry + 2 * linewidth)),
+                                (0, 0, 0, 0),
+                            )
+                            point_image = Image.new("RGBA", (int(linewidth), int(linewidth)), linecolor)
+
+                            for i in range(0, len(r), 2):
+                                rx = rscaled[i]
+                                ry = rscaled[i + 1]
+                                self._image.paste(
+                                    point_image, (int(rx - 0.5 * linewidth), int(ry - 0.5 * linewidth)), point_image
+                                )
+
+                        else:
+                            self._image = Image.new(
+                                "RGBA",
+                                (int(maxrx - minrx + 2 * linewidth), int(maxry - minry + 2 * linewidth)),
+                                (0, 0, 0, 0),
+                            )
+                            draw = ImageDraw.Draw(self._image)
+                            if fillcolor[3] != 0:
+                                draw.polygon(rscaled, fill=fillcolor)
+                            if (round(linewidth) > 0) and (linecolor[3] != 0):
+                                if self.type == "circle" and not draw_arc:
+                                    draw.line(rscaled[2:-2], fill=linecolor, width=int(linewidth))
+                                    # get rid of the first and last point (=center)
+                                else:
+                                    draw.line(rscaled, fill=linecolor, width=int(round(linewidth)))
+                            del draw
+                        self.minrx = minrx
+                        self.minry = minry
+                        self.maxrx = maxrx
+                        self.maxry = maxry
+                        self.minpx = minpx
+                        self.minpy = minpy
+                        self.maxpx = maxpx
+                        self.maxpy = maxpy
+                        if self.type == "circle":
+                            self.radius0 = radius0
+                            self.radius1 = radius1
+
+                    if self.type == "circle":
+                        self.env._centerx = qx
+                        self.env._centery = qy
+                        self.env._dimx = 2 * self.radius0
+                        self.env._dimy = 2 * self.radius1
+                    else:
+                        self.env._centerx = qx + (self.minrx + self.maxrx) / 2
+                        self.env._centery = qy + (self.minry + self.maxry) / 2
+                        self.env._dimx = self.maxpx - self.minpx
+                        self.env._dimy = self.maxpy - self.minpy
+
+                    self._image_x = qx + self.minrx - linewidth + (offsetx * cosa - offsety * sina)
+                    self._image_y = qy + self.minry - linewidth + (offsetx * sina + offsety * cosa)
+
+                elif self.type == "image":
+                    image = self.image(t)
+                    if isinstance(image, (tuple, list)):
+                        image = image[0]  # ignore serial number (for compatibility with pre 2.2.9 versions)
+                    width = self.width(t)
+                    if width is None:
+                        width = image.size[0]
+
+                    height = width * image.size[1] / image.size[0]
+                    if not self.screen_coordinates:
+                        width *= self.env._scale
+                        height *= self.env._scale
+
+                    angle = self.angle(t)
+
+                    anchor = self.anchor(t)
+                    if self.screen_coordinates:
+                        qx = x
+                        qy = y
+                    else:
+                        qx = (x - self.env._x0) * self.env._scale
+                        qy = (y - self.env._y0) * self.env._scale
+                        offsetx = offsetx * self.env._scale
+                        offsety = offsety * self.env._scale
+
+                    alpha = int(self.alpha(t))
+                    self._image_ident = (image, width, height, angle, alpha)
+                    if self._image_ident != self._image_ident_prev:
+                        im1 = image.resize((int(width), int(height)), Image.ANTIALIAS)
+                        self.imwidth, self.imheight = im1.size
+                        if alpha != 255:
+                            if has_numpy():
+                                arr = numpy.asarray(im1).copy()
+                                arr_alpha = arr[:, :, 3]
+                                arr[:, :, 3] = arr_alpha * (alpha / 255)
+                                im1 = Image.fromarray(numpy.uint8(arr))
+                            else:
+                                pix = im1.load()
+                                for x in range(self.imwidth):
+                                    for y in range(self.imheight):
+                                        c = pix[x, y]
+                                        pix[x, y] = (c[0], c[1], c[2], int(c[3] * alpha / 255))
+                        self._image = im1.rotate(angle, expand=1)
+                    anchor_to_dis = {
+                        "ne": (-0.5, -0.5),
+                        "n": (0, -0.5),
+                        "nw": (0.5, -0.5),
+                        "e": (-0.5, 0),
+                        "center": (0, 0),
+                        "c": (0, 0),
+                        "w": (0.5, 0),
+                        "se": (-0.5, 0.5),
+                        "s": (0, 0.5),
+                        "sw": (0.5, 0.5),
+                    }
+                    dx, dy = anchor_to_dis[anchor.lower()]
+                    dx = dx * self.imwidth + offsetx
+                    dy = dy * self.imheight + offsety
+                    cosa = math.cos(angle * math.pi / 180)
+                    sina = math.sin(angle * math.pi / 180)
+                    ex = dx * cosa - dy * sina
+                    ey = dx * sina + dy * cosa
+                    imrwidth, imrheight = self._image.size
+
+                    self.env._centerx = qx + ex
+                    self.env._centery = qy + ey
+                    self.env._dimx = width
+                    self.env._dimy = height
+
+                    self._image_x = qx + ex - imrwidth / 2
+                    self._image_y = qy + ey - imrheight / 2
+
+                elif self.type == "text":
+                    text = self.text(t)
+                    if text.strip() == "":
+                        self._image_visible = False
+                        return
+                    textcolor = self.env.colorspec_to_tuple(self.textcolor(t))
+                    fontsize = self.fontsize(t)
+                    angle = self.angle(t)
+                    fontname = self.font(t)
+                    if not self.screen_coordinates:
+                        fontsize = fontsize * self.env._scale
+                        offsetx = offsetx * self.env._scale
+                        offsety = offsety * self.env._scale
+                    text_anchor = self.text_anchor(t)
+
+                    if hasattr(self, "dependent"):
+                        text_offsetx = self.text_offsetx(t)
+                        text_offsety = self.text_offsety(t)
+                        if not self.screen_coordinates:
+                            text_offsetx = text_offsetx * self.env._scale
+                            text_offsety = text_offsety * self.env._scale
+                        qx = self.env._centerx
+                        qy = self.env._centery
+                        anchor_to_dis = {
+                            "ne": (0.5, 0.5),
+                            "n": (0, 0.5),
+                            "nw": (-0.5, 0.5),
+                            "e": (0.5, 0),
+                            "center": (0, 0),
+                            "c": (0, 0),
+                            "w": (-0.5, 0),
+                            "se": (0.5, -0.5),
+                            "s": (0, -0.5),
+                            "sw": (-0.5, -0.5),
+                        }
+                        dis = anchor_to_dis[text_anchor.lower()]
+                        offsetx += text_offsetx + dis[0] * self.env._dimx - dis[0] * 4  # 2 extra at east or west
+                        offsety += text_offsety + dis[1] * self.env._dimy - (2 if dis[1] > 0 else 0)  # 2 extra at north
+                    else:
+                        if self.screen_coordinates:
+                            qx = x
+                            qy = y
+                        else:
+                            qx = (x - self.env._x0) * self.env._scale
+                            qy = (y - self.env._y0) * self.env._scale
+                    max_lines = self.max_lines(t)
+                    self._image_ident = (text, fontname, fontsize, angle, textcolor, max_lines)
+                    if self._image_ident != self._image_ident_prev:
+                        font, heightA = getfont(fontname, fontsize)
+                        if text == "" or text is None:  # this code is a workaround for a bug in PIL >= 4.2.1
+                            im = Image.new("RGBA", (0, 0), (0, 0, 0, 0))
+                        else:
+                            lines = []
+                            for item in deep_flatten(text):
+                                for line in item.splitlines():
+                                    lines.append(line.rstrip())
+
+                            if max_lines <= 0:  # 0 is all
+                                lines = lines[max_lines:]
+                            else:
+                                lines = lines[:max_lines]
+
+                            widths = [(font.getsize(line)[0] if line else 0) for line in lines]
+                            if widths:
+                                totwidth = max(widths)
+                            else:
+                                totwidth = 0
+                            number_of_lines = len(lines)
+                            lineheight = font.getsize("Ap")[1]
+                            totheight = number_of_lines * lineheight
+                            im = Image.new("RGBA", (int(totwidth + 0.1 * fontsize), int(totheight)), (0, 0, 0, 0))
+                            imwidth, imheight = im.size
+                            draw = ImageDraw.Draw(im)
+                            pos = 0
+                            for line, width in zip(lines, widths):
+                                if line:
+                                    draw.text(xy=(0.1 * fontsize, pos), text=line, font=font, fill=textcolor)
+                                pos += lineheight
+                            # this code is to correct a bug in the rendering of text,
+                            # leaving a kind of shadow around the text
+                            del draw
+                            if textcolor[:3] != (0, 0, 0):  # black is ok
+                                if has_numpy():
+                                    arr = numpy.asarray(im).copy()
+                                    arr[:, :, 0] = textcolor[0]
+                                    arr[:, :, 1] = textcolor[1]
+                                    arr[:, :, 2] = textcolor[2]
+                                    im = Image.fromarray(numpy.uint8(arr))
+                                else:
+                                    pix = im.load()
+                                    for y in range(imheight):
+                                        for x in range(imwidth):
+                                            pix[x, y] = (textcolor[0], textcolor[1], textcolor[2], pix[x, y][3])
+
+                            # end of code to correct bug
+
+                        self.imwidth, self.imheight = im.size
+                        self.heightA = heightA
+
+                        self._image = im.rotate(angle, expand=1)
+
+                    anchor_to_dis = {
+                        "ne": (-0.5, -0.5),
+                        "n": (0, -0.5),
+                        "nw": (0.5, -0.5),
+                        "e": (-0.5, 0),
+                        "center": (0, 0),
+                        "c": (0, 0),
+                        "w": (0.5, 0),
+                        "se": (-0.5, 0.5),
+                        "s": (0, 0.5),
+                        "sw": (0.5, 0.5),
+                    }
+                    dx, dy = anchor_to_dis[text_anchor.lower()]
+                    dx = dx * self.imwidth + offsetx - 0.1 * fontsize
+
+                    dy = dy * self.imheight + offsety
+                    cosa = math.cos(angle * math.pi / 180)
+                    sina = math.sin(angle * math.pi / 180)
+                    ex = dx * cosa - dy * sina
+                    ey = dx * sina + dy * cosa
+                    imrwidth, imrheight = self._image.size
+                    self._image_x = qx + ex - imrwidth / 2
+                    self._image_y = qy + ey - imrheight / 2
+                else:
+                    raise ValueError("Internal error: animate type" + self.type + "not recognized.")
+                self._image_visible = (
+                    (self._image_x <= self.env._width)
+                    and (self._image_y <= self.env._height)
+                    and (self._image_x + self._image.size[0] >= 0)
+                    and (self._image_y + self._image.size[1] >= 0)
+                )
             else:
-                raise ValueError("Internal error: animate type" + self.type + "not recognized.")
-            self._image_visible = (
-                (self._image_x <= self.env._width)
-                and (self._image_y <= self.env._height)
-                and (self._image_x + self._image.size[0] >= 0)
-                and (self._image_y + self._image.size[1] >= 0)
-            )
-        else:
-            self._image_visible = False
+                self._image_visible = False
+        except Exception as e:
+            self.env._animate = False
+            raise type(e)(str(e) + " [from " + self.type + " animation object created in line " + self.caller + "]")
 
     def remove_background(self, im):
         pixels = im.load()
@@ -10610,7 +10663,7 @@ class Component(object):
             else:
                 p = None
         else:
-            if process is "":
+            if process == "":
                 p = None
             else:
                 try:
@@ -11419,13 +11472,13 @@ class Component(object):
         """
         equivalent to request
         """
-        return self.request(*args, **kwargs, called_from="get")
+        return self.request(*args, called_from="get", **kwargs)
 
     def put(self, *args, **kwargs):
         """
         equivalent to request, but anonymous quantities are negated
         """
-        return self.request(*args, **kwargs, called_from="put")
+        return self.request(*args, called_from="put", **kwargs)
 
     def _tryrequest(self):  # this is Component._tryrequest
         if self._status == interrupted:
@@ -15262,7 +15315,7 @@ class Resource(object):
                     c = mx.component
                     mx = mx.successor
                     c._tryrequest()
-                    if not c in self._requesters:
+                    if c not in self._requesters:
                         mx = self._requesters._head.successor  # start again
                 self._trying = False
         else:
@@ -16043,13 +16096,14 @@ def _call(c, t, self):
     return c
 
 
-def de_none(l):
-    if l is None:
+def de_none(lst):
+    if lst is None:
         return None
-    result = []
-    for index, item in enumerate(l):
+    lst = list(lst)  # it is necessary to convert to list, because input maybe a tuple or even a deque
+    result = lst[:2]
+    for item in lst[2:]:
         if item is None:
-            result.append(l[index - 2])
+            result.append(result[-2])
         else:
             result.append(item)
     return result

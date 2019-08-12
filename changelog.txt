@@ -1,7 +1,69 @@
 salabim  changelog
 
+version 19.0.7  2019-
+==========================
 
-version 19.0.5  2019-06-16
+Bug fix (0)
+-----------
+Error in multiplication of monitors fixed.
+
+version 19.0.6  2019-07-09
+==========================
+Improved functionality (0)
+--------------------------
+AnimateMonitor and Monitor.animate() now allow rotation of an animated monitor.
+This is particularly useful for animating a monitor from top to bottom (angle = 270),
+instead of from left to right (angle=0)
+The rotation angle is specified with the angle parameter, which defaults to 0.
+Also, offsetx and offsety are now supported for AnimateMonitor and Monitor.animate().
+
+Improved functionality (1)
+--------------------------
+The spec parameter of AnimateLine, AnimatePoints, AnimateRectangle and AnimatePolygon can now use None to repeat
+a previous x or y-coordinate.
+The same holds for the line0/line1, rectangle0/rectangle1, polygon0/polygon1 parameters of Animate and
+Animate.update().
+From now on it is therefore possible to say for instance:
+    sim.AnimateLine(spec=(100, 0, 900, None, None, 600))
+which is equivalent to
+    sim.AnimateLine(spec=(100, 0, 900, 0, 900, 600))
+And it even possible to say:
+    sim.AnimatePoints(spec=100, 400, 150, None, 200, None, 300, None)
+which is equivalent to
+    sim.AnimatePoints(spec=100, 400, 150, 400, 200, 400, 300, 400)
+    
+Improved functionality (2)
+--------------------------
+Applications can now retrieve the salabim version consistenty with sim.__version__.
+Previously, this had to be done with
+- sim.__version__ if salabim.py is in the current directory
+- sim.salabim.__version__ if salabim.py is not in the current directory
+Techinal note: This change is actually in the __init__.py file rather than in salabim.py.
+For comparisons of versions, distutils.version.StrictVersion() is recommended.
+
+Improved functionality (3)
+--------------------------
+If an error occured in the make_pil_image method during an animation, it was sometimes difficult to
+find out the reason for that error. From this version on, the line number (and the filename)
+where the animation object was created will be added to the error message, which makes debugging
+hopefully easier.
+
+Bug fix (0)
+-----------
+Creating a video with audio did crash sometimes. Fixed.
+
+Bug fix (1)
+-----------
+Under Pythonista (iOS), animation objects were not properly sorted, thus causing layer values sometimes to be
+ignored. Fixed.
+
+Bug fix (2)
+-----------
+When querying a tallied value from a level monitor, either with mon.get(t) or mon(t), the values were not correct
+when a Environment.reset_time() was applied. Fixed.
+
+
+version 19.0.5  2019-06-20
 ==========================
 New functionality (0)
 ---------------------
