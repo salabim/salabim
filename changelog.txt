@@ -1,11 +1,121 @@
 salabim  changelog
 
-version 19.0.7  2019-
+version 19.0.8  2019-09-17
 ==========================
+New functionality (0)
+---------------------
+The time related parameters of the methods methods mentioned below can now be called with a
+distribution instead of a float value ('auto sampling ').
 
+Method                    parameters that can be auto sampled
+------------------------  -----------------------------------
+sim.Component             at, delay
+Component.activate        at, delay
+Component.hold            duration, till
+Component.request         fail_at, fail_delay
+Component.wait            fail_at, fail_delay
+Environment.run           duration, till
+Environment.reset_now     new_now
+Environment.years, ...    t
+Environment.to_time_unit  t
+Environment.to_years, ... t
+
+If a distribution is given, the distribution will be sampled.
+So,
+    car = Car(delay=sim.Normal(100,10))
+is equivalent to
+    car = Car(delay=sim.Normal(100,10).sample())
+and
+    car = Car(delay=sim.Normal(100,10)())
+    
+This makes it possible to intermix floats/ints and distributions, without having to worry about sampling, e.g.
+    set_up_time = 6
+    processing_time = Normal(10, 1)
+    reaction_time = sim.Constant(10)
+    ...
+    yield self.hold(set_up_time)
+    yield self.hold(processing_time)
+    yield self.hold(env.hours(reaction_time))    
+    
+Note that salabim also supports basic expressions for distributions, so it is even possible to do something like
+    yield self.hold(2 * setup_time + processing_time)
+    
+New functionality (1)
+---------------------
+Introduced a new distribution, External, that makes it possible to specify an 'external' statistical
+distribution from the modules
+* random
+* numpy.random
+* scipy.stats
+as were it a salabim distribution.
+The class takes at least one parameter (dis) that specifies the distribution to use, like
+* random.uniform
+* numpy.random.uniform
+* scipy.stats.uniform
+Next, all postional and keyword parameters are used for sampling. In case of random and numpy.random by calling
+the method itself, in case of a scipy.stats distribution by calling rvs().
+
+Examples:
+    d = sim.External(random.lognormvariate, mu=5, sigma=1)
+    d = sim.External(numpy.random.laplace, loc=5, scale=1)
+    d = sim.SciPyDis(SciPy.beta, a=1, loc=4, scale=1)
+Then sampling with 
+    d.sample()
+or 
+    d()
+    
+If the size is given (only for numpy.random and scipy.stats distributions), salabim will return the sampled values successively. This can be useful to increase performance.
+
+The mean() method returns the proper mean for scipy.stats distributions, nan otherwise.
+
+If a time_unit parameter is given, the sampled values will be multiplied by the applicable factor, e.g.
+    env = sim.Environment(time_unit='seconds')
+    d = sim.ScyPyDis(SciPy.norm, loc=2, time_unit='minutes')
+    print(d.mean())
+will print out
+    120 
+
+New functionality (2)
+---------------------
+Bounded distribution now has a time_unit parameter to specify the lowerbound or upperbound.
+
+New functionality (3)
+---------------------
+IntUniform distribution now also supports a time_unit. If used, the returned value will be scaled accordingly.
+E.g.
+    env = sim.Environment('seconds')
+    d = sim.IntUniform(1, 2, time_unit='minutes')
+    print(d.sample())
+will print either 60 or 120.
+
+Improvement (0)
+---------------
+When trying to animate text for a None object, salabim issued an error, about absence of .strip().
+Now, None will be handled as the null string ("")
+
+Improvement (1)
+---------------
+When a distribution with a time unit was specified without an Environment was instantiated, a rather obscure error 
+message was shown. Now, a clear error message will be shown, in that case.
+
+Implementation note (0)
+-----------------------
+Provided numpy is installed, now numpy.random is seeded at init of Environment() and when calling random_seed,
+unless the set_numpy_random_seed parameter is False.
+This is particularly useful when using External distributions with
+numpy.random or scypi.stats distributions. Therefore, unless explicitely overriden, also those
+distribution sampling will be reproducable.
+Related to this is an internal change in the way Environment seeds random.
+
+Implementation note (1)
+-----------------------
+Change in the way time_units are handled internally. 
+
+version 19.0.7  2019-08-12
+==========================
 Bug fix (0)
 -----------
-Error in multiplication of monitors fixed.
+Rare error in multiplication of monitors (and thus Monitor.to_hours, etc) fixed.
 
 version 19.0.6  2019-07-09
 ==========================

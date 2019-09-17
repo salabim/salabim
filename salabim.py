@@ -1,17 +1,16 @@
-"""          _         _      _               _   ___       ___      _____
- ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \    |___  |
-/ __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |      / /
-\__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _   / /
-|___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_) /_/
-Discrete event simulation in Python
-
-see www.salabim.org for more information, the documentation and license information
-"""
+#               _         _      _               _   ___       ___       ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \     ( _ )
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |    / _ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _ | (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_) \___/
+#  Discrete event simulation in Python
+#
+#  see www.salabim.org for more information, the documentation and license information
 
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "19.0.7"
+__version__ = "19.0.8"
 
 import heapq
 import random
@@ -3981,6 +3980,7 @@ class Environment(object):
         self,
         trace=False,
         random_seed=None,
+        set_numpy_random_seed=True,
         time_unit="n/a",
         name=None,
         print_trace_header=True,
@@ -3996,12 +3996,7 @@ class Environment(object):
                 name = "default environment"
         self._trace = trace
         self._source_files = {inspect.getframeinfo(_get_caller_frame()).filename: 0}
-        if random_seed != "":
-            if random_seed is None:
-                random_seed = 1234567
-            elif random_seed == "*":
-                random_seed = None
-            random.seed(random_seed)
+        _random_seed(random_seed, set_numpy_random_seed=set_numpy_random_seed)
 
         self._time_unit = _time_unit_lookup(time_unit)
         self._time_unit_name = time_unit
@@ -4288,6 +4283,7 @@ class Environment(object):
         audio=None,
         audio_speed=None,
     ):
+
         """
         set animation parameters
 
@@ -4391,16 +4387,17 @@ class Environment(object):
             at init of the environment video_pingpong is False |n|
             this only applies to gif files production.
 
-    `   audio : str
+        audio : str
             name of file to be played (mp3 or wav files) |n|
-            if "", the audio will be stopped |n|
+            if the none string, the audio will be stopped |n|
             default: no change |n|
             for more information, see Environment.audio()
 
         Note
         ----
         The y-coordinate of the upper right corner is determined automatically
-        in such a way that the x and scaling are the same. |n|
+        in such a way that the x and y scaling are the same.
+
         """
         frame_changed = False
         width_changed = False
@@ -5339,9 +5336,10 @@ class Environment(object):
 
         Parameters
         ----------
-        new_now : float
+        new_now : float or distribution
             now will be set to new_now |n|
-            default: 0
+            default: 0 |n|
+            if distribution, the distribution is sampled
 
         Note
         ----
@@ -5352,6 +5350,8 @@ class Environment(object):
         This is only relevant when using the time value in Monitor.xt() or Monitor.tx().
         """
         offset_before = self._offset
+        if isinstance(new_now, _Distribution):
+            new_now = new_now()
         self._offset = self._now - new_now
 
         if self._trace:
@@ -5427,13 +5427,15 @@ class Environment(object):
 
         Parameters
         ----------
-        duration : float
+        duration : float or distribution
             schedule with a delay of duration |n|
-            if 0, now is used
+            if 0, now is used |n|
+            if distribution, the distribution is sampled
 
-        till : float
+        till : float or distribution
             schedule time |n|
-            if omitted, inf is assumed. See also not below
+            if omitted, inf is assumed. See also note below |n|
+            if distribution, the distribution is sampled
 
         urgent : bool
             urgency indicator |n|
@@ -5463,8 +5465,12 @@ class Environment(object):
                 if duration == inf:
                     scheduled_time = inf
                 else:
+                    if isinstance(duration, _Distribution):
+                        duration = duration()
                     scheduled_time = self.env._now + duration
         else:
+            if isinstance(till, _Distribution):
+                till = till()
             if duration is None:
                 scheduled_time = till + self.env._offset
             else:
@@ -6318,14 +6324,17 @@ class Environment(object):
 
         Parameters
         ----------
-        t : float
-            time in years
+        t : float or distribution
+            time in years |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
         time in years, converted to the current time_unit : float
         """
         self._check_time_unit_na()
+        if isinstance(t, _Distribution):
+            t = t()
         return t * 86400 * 365 * self._time_unit
 
     def weeks(self, t):
@@ -6334,14 +6343,17 @@ class Environment(object):
 
         Parameters
         ----------
-        t : float
-            time in weeks
+        t : float or distribution
+            time in weeks |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
         time in weeks, converted to the current time_unit : float
         """
         self._check_time_unit_na()
+        if isinstance(t, _Distribution):
+            t = t()
         return t * 86400 * 7 * self._time_unit
 
     def days(self, t):
@@ -6350,14 +6362,17 @@ class Environment(object):
 
         Parameters
         ----------
-        t : float
-            time in days
+        t : float or distribution
+            time in days |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
         time in days, converted to the current time_unit : float
         """
         self._check_time_unit_na()
+        if isinstance(t, _Distribution):
+            t = t()
         return t * 86400 * self._time_unit
 
     def hours(self, t):
@@ -6366,14 +6381,17 @@ class Environment(object):
 
         Parameters
         ----------
-        t : float
-            time in hours
+        t : float or distribution
+            time in hours |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
         time in hours, converted to the current time_unit : float
         """
         self._check_time_unit_na()
+        if isinstance(t, _Distribution):
+            t = t()
         return t * 3600 * self._time_unit
 
     def minutes(self, t):
@@ -6382,14 +6400,17 @@ class Environment(object):
 
         Parameters
         ----------
-        t : float
-            time in minutes
+        t : float or distribution
+            time in minutes |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
         time in minutes, converted to the current time_unit : float
         """
         self._check_time_unit_na()
+        if isinstance(t, _Distribution):
+            t = t()
         return t * 60 * self._time_unit
 
     def seconds(self, t):
@@ -6398,14 +6419,17 @@ class Environment(object):
 
         Parameters
         ----------
-        t : float
-            time in seconds
+        t : float or distribution
+            time in seconds |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
         time in secoonds, converted to the current time_unit : float
         """
         self._check_time_unit_na()
+        if isinstance(t, _Distribution):
+            t = t()
         return t * self._time_unit
 
     def milliseconds(self, t):
@@ -6414,14 +6438,17 @@ class Environment(object):
 
         Parameters
         ----------
-        t : float
-            time in milliseconds
+        t : float or distribution
+            time in milliseconds |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
         time in milliseconds, converted to the current time_unit : float
         """
         self._check_time_unit_na()
+        if isinstance(t, _Distribution):
+            t = t()
         return t * 1e-3 * self._time_unit
 
     def microseconds(self, t):
@@ -6430,14 +6457,17 @@ class Environment(object):
 
         Parameters
         ----------
-        t : float
-            time in microseconds
+        t : float or distribution
+            time in microseconds |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
         time in microseconds, converted to the current time_unit : float
         """
         self._check_time_unit_na()
+        if isinstance(t, _Distribution):
+            t = t()
         return t * 1e-6 * self._time_unit
 
     def to_time_unit(self, time_unit, t):
@@ -6450,13 +6480,17 @@ class Environment(object):
             Supported time_units: |n|
             "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
 
-        t : time
+        t : float or distribution
+            time to be converted |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
         Time t converted to the time_unit specified : float
         """
         self._check_time_unit_na()
+        if isinstance(t, _Distribution):
+            t = t()
         return t * _time_unit_lookup(time_unit) / self.env._time_unit
 
     def to_years(self, t):
@@ -6465,7 +6499,9 @@ class Environment(object):
 
         Parameters
         ----------
-        t : time
+        t : float or distribution
+            time to be converted |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
@@ -6479,7 +6515,9 @@ class Environment(object):
 
         Parameters
         ----------
-        t : time
+        t : float or distribution
+            time to be converted |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
@@ -6493,7 +6531,9 @@ class Environment(object):
 
         Parameters
         ----------
-        t : time
+        t : float or distribution
+            time to be converted |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
@@ -6507,7 +6547,9 @@ class Environment(object):
 
         Parameters
         ----------
-        t : time
+        t : float or distribution
+            time to be converted |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
@@ -6521,7 +6563,9 @@ class Environment(object):
 
         Parameters
         ----------
-        t : time
+        t : float or distribution
+            time to be converted |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
@@ -6535,7 +6579,9 @@ class Environment(object):
 
         Parameters
         ----------
-        t : time
+        t : float or distribution
+            time to be converted |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
@@ -6549,7 +6595,9 @@ class Environment(object):
 
         Parameters
         ----------
-        t : time in milliseconds
+        t : float or distribution
+            time to be converted |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
@@ -6563,7 +6611,9 @@ class Environment(object):
 
         Parameters
         ----------
-        t : time in microseconds
+        t : float or distribution
+            time to be converted |n|
+            if distribution, the distribution is sampled
 
         Returns
         -------
@@ -8241,7 +8291,7 @@ class Animate(object):
 
                 elif self.type == "text":
                     text = self.text(t)
-                    if text.strip() == "":
+                    if (text is None) or (text.strip() == ""):
                         self._image_visible = False
                         return
                     textcolor = self.env.colorspec_to_tuple(self.textcolor(t))
@@ -10562,13 +10612,15 @@ class Component(object):
         if omitted, the name will be derived from the class
         it is defined in (lowercased)
 
-    at : float
+    at : float or distribution
         schedule time |n|
-        if omitted, now is used
+        if omitted, now is used |n|
+        if distribution, the distribution is sampled
 
-    delay : float
+    delay : float or distributiom
         schedule with a delay |n|
-        if omitted, no delay
+        if omitted, no delay |n|
+        if distribution, the distribution is sampled
 
     urgent : bool
         urgency indicator |n|
@@ -10712,9 +10764,13 @@ class Component(object):
                 urgent = False
             if delay is None:
                 delay = 0
+            elif isinstance(delay, _Distribution):
+                delay = delay()
             if at is None:
                 scheduled_time = self.env._now + delay
             else:
+                if isinstance(at, _Distribution):
+                    at = at()
                 scheduled_time = at + self.env._offset + delay
 
             self._reschedule(scheduled_time, urgent, "activate", extra=extra)
@@ -10959,14 +11015,16 @@ class Component(object):
 
         Parameters
         ----------
-        at : float
-           schedule time |n|
-           if omitted, now is used |n|
-           inf is allowed
+        at : float or distribution
+            schedule time |n|
+            if omitted, now is used |n|
+            inf is allowed |n|
+            if distribution, the distribution is sampled
 
-        delay : float
-           schedule with a delay |n|
-           if omitted, no delay
+        delay : float or distribution
+            schedule with a delay |n|
+            if omitted, no delay |n|
+            if distribution, the distribution is sampled
 
         urgent : bool
             urgency indicator |n|
@@ -11057,9 +11115,14 @@ class Component(object):
             self._mode = mode
             self._mode_time = self.env._now
 
+        if isinstance(delay, _Distribution):
+            delay = delay()
+
         if at is None:
             scheduled_time = self.env._now + delay
         else:
+            if isinstance(at, _Distribution):
+                at = at()
             scheduled_time = at + self.env._offset + delay
 
         self._reschedule(scheduled_time, urgent, "activate", extra=extra)
@@ -11070,15 +11133,17 @@ class Component(object):
 
         Parameters
         ----------
-        duration : float
-           specifies the duration |n|
-           if omitted, 0 is used |n|
-           inf is allowed
+        duration : float or distribution
+            specifies the duration |n|
+            if omitted, 0 is used |n|
+            inf is allowed |n|
+            if distribution, the distribution is sampled
 
-        till : float
-           specifies at what time the component will become current |n|
-           if omitted, now is used |n|
-           inf is allowed
+        till : float or distribution
+            specifies at what time the component will become current |n|
+            if omitted, now is used |n|
+            inf is allowed |n|
+            if distribution, the distribution is sampled
 
         urgent : bool
             urgency indicator |n|
@@ -11115,9 +11180,13 @@ class Component(object):
             if duration is None:
                 scheduled_time = self.env._now
             else:
+                if isinstance(duration, _Distribution):
+                    duration = duration()
                 scheduled_time = self.env._now + duration
         else:
             if duration is None:
+                if isinstance(till, _Distribution):
+                    till = till()
                 scheduled_time = till + self.env._offset
             else:
                 raise ValueError("both duration and till specified")
@@ -11345,19 +11414,21 @@ class Component(object):
                 for the resource be added to the tail of
                 the requesters queue |n|
 
-        fail_at : float
+        fail_at : float or distribution
             time out |n|
             if the request is not honored before fail_at,
             the request will be cancelled and the
             parameter failed will be set. |n|
-            if not specified, the request will not time out.
+            if not specified, the request will not time out. |n|
+            if distribution, the distribution is sampled
 
-        fail_delay : float
+        fail_delay : float or distribution
             time out |n|
             if the request is not honored before now+fail_delay,
             the request will be cancelled and the
             parameter failed will be set. |n|
-            if not specified, the request will not time out.
+            if not specified, the request will not time out. |n|
+            if distribution, the distribution is sampled
 
         mode : str preferred
             mode |n|
@@ -11409,9 +11480,13 @@ class Component(object):
                 if fail_delay == inf:
                     scheduled_time = inf
                 else:
+                    if isinstance(fail_delay, _Distribution):
+                        fail_delay = fail_delay()
                     scheduled_time = self.env._now + fail_delay
         else:
             if fail_delay is None:
+                if isinstance(fail_at, _Distribution):
+                    fail_at = fail_at()
                 scheduled_time = fail_at + self.env._offset
             else:
                 raise ValueError("both fail_at and fail_delay specified")
@@ -11604,19 +11679,21 @@ class Component(object):
                 be added to the tail of
                 the waiters queue |n|
 
-        fail_at : float
+        fail_at : float or distribution
             time out |n|
             if the wait is not honored before fail_at,
             the wait will be cancelled and the
             parameter failed will be set. |n|
-            if not specified, the wait will not time out.
+            if not specified, the wait will not time out. |n|
+            if distribution, the distribution is sampled
 
-        fail_delay : float
+        fail_delay : float or distribution
             time out |n|
             if the wait is not honored before now+fail_delay,
             the request will be cancelled and the
             parameter failed will be set. |n|
-            if not specified, the wait will not time out.
+            if not specified, the wait will not time out. |n|
+            if distribution, the distribution is sampled
 
         all : bool
             if False (default), continue, if any of the given state/values is met |n|
@@ -11695,9 +11772,13 @@ class Component(object):
                 if fail_delay == inf:
                     scheduled_time = inf
                 else:
+                    if isinstance(fail_delay, _Distribution):
+                        fail_delay = fail_delay()
                     scheduled_time = self.env._now + fail_delay
         else:
             if fail_delay is None:
+                if isinstance(fail_at, _Distribution):
+                    fail_at = fail_at()
                 scheduled_time = fail_at + self.env._offset
             else:
                 raise ValueError("both fail_at and fail_delay specified")
@@ -12634,6 +12715,10 @@ class _Distribution:
     def __rpow__(self, other):
         return _Expression(other, self, operator.pow)
 
+    def register_time_unit(self, time_unit, env):
+        self.time_unit = "" if time_unit is None else time_unit
+        self.time_unit_factor = _time_unit_factor(time_unit, env)
+
 
 class _Expression(_Distribution):
     """
@@ -12771,6 +12856,11 @@ class Bounded(_Distribution):
         if True (default), the upperbound may be included.
         if False, the upperbound will be excluded.
 
+    time_unit : str
+        specifies the time unit of the lowerbound or upperbound|n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+        default : no conversion |n|
+
     Note
     ----
     If, after number_of_tries retries, the sampled value is still not within the given bounds,
@@ -12788,10 +12878,12 @@ class Bounded(_Distribution):
         number_of_retries=None,
         include_lowerbound=None,
         include_upperbound=None,
+        time_unit=None,
+        env=None,
     ):
-
-        self.lowerbound = -inf if lowerbound is None else lowerbound
-        self.upperbound = inf if upperbound is None else upperbound
+        self.register_time_unit(time_unit, env)
+        self.lowerbound = -inf if lowerbound is None else lowerbound * self.time_unit_factor
+        self.upperbound = inf if upperbound is None else upperbound * self.time_unit_factor
 
         if self.lowerbound > self.upperbound:
             raise ValueError("lowerbound > upperbound")
@@ -12896,6 +12988,7 @@ class Exponential(_Distribution):
     """
 
     def __init__(self, mean=None, time_unit=None, rate=None, randomstream=None, env=None):
+        self.register_time_unit(time_unit, env)
         if mean is None:
             if rate is None:
                 raise TypeError("neither mean nor rate are specified")
@@ -12910,8 +13003,6 @@ class Exponential(_Distribution):
                 self._mean = mean
             else:
                 raise TypeError("both mean and rate are specified")
-
-        self._mean *= _time_unit_factor(time_unit, env)
 
         if randomstream is None:
             self.randomstream = random
@@ -12942,8 +13033,10 @@ class Exponential(_Distribution):
         """
         result = []
         result.append("Exponential distribution " + hex(id(self)))
-        result.append("  mean=" + str(self._mean))
-        result.append("  rate (lambda)=" + str(1 / self._mean))
+        result.append("  mean=" + str(self._mean) + " " + self.time_unit)
+        result.append(
+            "  rate (lambda)=" + str(1 / self._mean) + (" " if self.time_unit == "" else " /" + self.time_unit)
+        )
         result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
@@ -12953,7 +13046,7 @@ class Exponential(_Distribution):
         -------
         Sample of the distribution : float
         """
-        return self.randomstream.expovariate(1 / (self._mean))
+        return self.randomstream.expovariate(1 / (self._mean)) * self.time_unit_factor
 
     def mean(self):
         """
@@ -12961,7 +13054,7 @@ class Exponential(_Distribution):
         -------
         Mean of the distribution : float
         """
-        return self._mean
+        return self._mean * self.time_unit_factor
 
 
 class Normal(_Distribution):
@@ -12991,6 +13084,11 @@ class Normal(_Distribution):
         the documentation for random states that the gauss method should be slightly faster,
         although that statement is doubtful.
 
+    time_unit : str
+        specifies the time unit |n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+        default : no conversion |n|
+
     randomstream: randomstream
         randomstream to be used |n|
         if omitted, random will be used |n|
@@ -13012,6 +13110,7 @@ class Normal(_Distribution):
         randomstream=None,
         env=None,
     ):
+        self.register_time_unit(time_unit, env)
         self._use_gauss = use_gauss
         self._mean = mean
         if standard_deviation is None:
@@ -13033,8 +13132,6 @@ class Normal(_Distribution):
         else:
             _checkrandomstream(randomstream)
             self.randomstream = randomstream
-        self._mean *= _time_unit_factor(time_unit, env)
-        self._standard_deviation *= _time_unit_factor(time_unit, env)
 
     def __repr__(self):
         return "Normal"
@@ -13059,8 +13156,8 @@ class Normal(_Distribution):
         """
         result = []
         result.append("Normal distribution " + hex(id(self)))
-        result.append("  mean=" + str(self._mean))
-        result.append("  standard_deviation=" + str(self._standard_deviation))
+        result.append("  mean=" + str(self._mean) + " " + self.time_unit)
+        result.append("  standard_deviation=" + str(self._standard_deviation) + " " + self.time_unit)
         if self._mean == 0:
             result.append("  coefficient of variation= N/A")
         else:
@@ -13077,9 +13174,9 @@ class Normal(_Distribution):
         Sample of the distribution : float
         """
         if self._use_gauss:
-            return self.randomstream.gauss(self._mean, self._standard_deviation)
+            return self.randomstream.gauss(self._mean, self._standard_deviation) * self.time_unit_factor
         else:
-            return self.randomstream.normalvariate(self._mean, self._standard_deviation)
+            return self.randomstream.normalvariate(self._mean, self._standard_deviation) * self.time_unit_factor
 
     def mean(self):
         """
@@ -13087,7 +13184,7 @@ class Normal(_Distribution):
         -------
         Mean of the distribution : float
         """
-        return self._mean
+        return self._mean * self.time_unit_factor
 
 
 class IntUniform(_Distribution):
@@ -13104,11 +13201,20 @@ class IntUniform(_Distribution):
         if omitted, lowerbound will be used |n|
         must be >= lowerbound
 
+    time_unit : str
+        specifies the time unit. the sampled integer value will be multiplied by the appropriate factor |n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+        default : no conversion |n|
+
     randomstream: randomstream
         randomstream to be used |n|
         if omitted, random will be used |n|
         if used as random.Random(12299)
         it assigns a new stream with the specified seed
+
+    env : Environment
+        environment where the distribution is defined |n|
+        if omitted, default_env will be used
 
     Note
     ----
@@ -13123,7 +13229,8 @@ class IntUniform(_Distribution):
     This will print 10 throws of a die.
     """
 
-    def __init__(self, lowerbound, upperbound=None, randomstream=None):
+    def __init__(self, lowerbound, upperbound=None, randomstream=None, time_unit=None, env=None):
+        self.register_time_unit(time_unit, env)
         self._lowerbound = lowerbound
         if upperbound is None:
             self._upperbound = lowerbound
@@ -13166,8 +13273,8 @@ class IntUniform(_Distribution):
         """
         result = []
         result.append("IntUniform distribution " + hex(id(self)))
-        result.append("  lowerbound=" + str(self._lowerbound))
-        result.append("  upperbound=" + str(self._upperbound))
+        result.append("  lowerbound=" + str(self._lowerbound) + " " + self.time_unit)
+        result.append("  upperbound=" + str(self._upperbound) + " " + self.time_unit)
         result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
@@ -13177,7 +13284,7 @@ class IntUniform(_Distribution):
         -------
         Sample of the distribution: int
         """
-        return self.randomstream.randint(self._lowerbound, self._upperbound)
+        return self.randomstream.randint(self._lowerbound, self._upperbound) * self.time_unit_factor
 
     def mean(self):
         """
@@ -13185,7 +13292,7 @@ class IntUniform(_Distribution):
         -------
         Mean of the distribution : float
         """
-        return self._mean
+        return self._mean * self.time_unit_factor
 
 
 class Uniform(_Distribution):
@@ -13219,6 +13326,7 @@ class Uniform(_Distribution):
     """
 
     def __init__(self, lowerbound, upperbound=None, time_unit=None, randomstream=None, env=None):
+        self.register_time_unit(time_unit, env)
         self._lowerbound = lowerbound
         if upperbound is None:
             self._upperbound = lowerbound
@@ -13231,8 +13339,6 @@ class Uniform(_Distribution):
         else:
             _checkrandomstream(randomstream)
             self.randomstream = randomstream
-        self._lowerbound *= _time_unit_factor(time_unit, env)
-        self._upperbound *= _time_unit_factor(time_unit, env)
         self._mean = (self._lowerbound + self._upperbound) / 2
 
     def __repr__(self):
@@ -13258,8 +13364,8 @@ class Uniform(_Distribution):
         """
         result = []
         result.append("Uniform distribution " + hex(id(self)))
-        result.append("  lowerbound=" + str(self._lowerbound))
-        result.append("  upperbound=" + str(self._upperbound))
+        result.append("  lowerbound=" + str(self._lowerbound) + " " + self.time_unit)
+        result.append("  upperbound=" + str(self._upperbound) + " " + self.time_unit)
         result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
@@ -13269,7 +13375,7 @@ class Uniform(_Distribution):
         -------
         Sample of the distribution: float
         """
-        return self.randomstream.uniform(self._lowerbound, self._upperbound)
+        return self.randomstream.uniform(self._lowerbound, self._upperbound) * self.time_unit_factor
 
     def mean(self):
         """
@@ -13277,7 +13383,7 @@ class Uniform(_Distribution):
         -------
         Mean of the distribution : float
         """
-        return self._mean
+        return self._mean * self.time_unit_factor
 
 
 class Triangular(_Distribution):
@@ -13316,6 +13422,7 @@ class Triangular(_Distribution):
     """
 
     def __init__(self, low, high=None, mode=None, time_unit=None, randomstream=None, env=None):
+        self.register_time_unit(time_unit, env)
         self._low = low
         if high is None:
             self._high = low
@@ -13336,9 +13443,6 @@ class Triangular(_Distribution):
         else:
             _checkrandomstream(randomstream)
             self.randomstream = randomstream
-        self._low *= _time_unit_factor(time_unit, env)
-        self._high *= _time_unit_factor(time_unit, env)
-        self._mode *= _time_unit_factor(time_unit, env)
         self._mean = (self._low + self._mode + self._high) / 3
 
     def __repr__(self):
@@ -13364,9 +13468,9 @@ class Triangular(_Distribution):
         """
         result = []
         result.append("Triangular distribution " + hex(id(self)))
-        result.append("  low=" + str(self._low))
-        result.append("  high=" + str(self._high))
-        result.append("  mode=" + str(self._mode))
+        result.append("  low=" + str(self._low) + " " + self.time_unit)
+        result.append("  high=" + str(self._high) + " " + self.time_unit)
+        result.append("  mode=" + str(self._mode) + " " + self.time_unit)
         result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
@@ -13376,7 +13480,7 @@ class Triangular(_Distribution):
         -------
         Sample of the distribtion : float
         """
-        return self.randomstream.triangular(self._low, self._high, self._mode)
+        return self.randomstream.triangular(self._low, self._high, self._mode) * self.time_unit_factor
 
     def mean(self):
         """
@@ -13384,7 +13488,7 @@ class Triangular(_Distribution):
         -------
         Mean of the distribution : float
         """
-        return self._mean
+        return self._mean * self.time_unit_factor
 
 
 class Constant(_Distribution):
@@ -13414,6 +13518,7 @@ class Constant(_Distribution):
     """
 
     def __init__(self, value, time_unit=None, randomstream=None, env=None):
+        self.register_time_unit(time_unit, env)
         self._value = value
         if randomstream is None:
             self.randomstream = random
@@ -13421,7 +13526,7 @@ class Constant(_Distribution):
             _checkrandomstream(randomstream)
             self.randomstream = randomstream
         self._mean = value
-        self._mean *= _time_unit_factor(time_unit, env)
+        self._mean *= self.time_unit_factor
 
     def __repr__(self):
         return "Constant"
@@ -13446,7 +13551,7 @@ class Constant(_Distribution):
         """
         result = []
         result.append("Constant distribution " + hex(id(self)))
-        result.append("  value=" + str(self._value))
+        result.append("  value=" + str(self._value) + " " + self.time_unit)
         result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
@@ -13456,7 +13561,7 @@ class Constant(_Distribution):
         -------
         sample of the distribution (= the specified constant) : float
         """
-        return self._value
+        return self._value * self.time_unit_factor
 
     def mean(self):
         """
@@ -13464,7 +13569,7 @@ class Constant(_Distribution):
         -------
         mean of the distribution (= the specified constant) : float
         """
-        return self._mean
+        return self._mean * self.time_unit_factor
 
 
 class Poisson(_Distribution):
@@ -13586,6 +13691,7 @@ class Weibull(_Distribution):
     """
 
     def __init__(self, scale, shape, time_unit=None, randomstream=None, env=None):
+        self.register_time_unit(time_unit, env)
         self._scale = scale
         if shape <= 0:
             raise ValueError("shape<=0")
@@ -13596,7 +13702,6 @@ class Weibull(_Distribution):
         else:
             _checkrandomstream(randomstream)
             self.randomstream = randomstream
-        self._scale *= _time_unit_factor(time_unit, env)
         self._mean = self._scale * math.gamma((1 / self._shape) + 1)
 
     def __repr__(self):
@@ -13622,7 +13727,7 @@ class Weibull(_Distribution):
         """
         result = []
         result.append("Weibull distribution " + hex(id(self)))
-        result.append("  scale (alpha or k)=" + str(self._scale))
+        result.append("  scale (alpha or k)=" + str(self._scale) + " " + self.time_unit)
         result.append("  shape (beta or lambda)=" + str(self._shape))
         result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
@@ -13633,7 +13738,7 @@ class Weibull(_Distribution):
         -------
         Sample of the distribution : float
         """
-        return self.randomstream.weibullvariate(self._scale, self._shape)
+        return self.randomstream.weibullvariate(self._scale, self._shape) * self.time_unit_factor
 
     def mean(self):
         """
@@ -13641,7 +13746,7 @@ class Weibull(_Distribution):
         -------
         Mean of the distribution : float
         """
-        return self._mean
+        return self._mean * self.time_unit_factor
 
 
 class Gamma(_Distribution):
@@ -13684,6 +13789,7 @@ class Gamma(_Distribution):
     """
 
     def __init__(self, shape, scale=None, time_unit=None, rate=None, randomstream=None, env=None):
+        self.register_time_unit(time_unit, env)
         if shape <= 0:
             raise ValueError("shape<=0")
         self._shape = shape
@@ -13701,8 +13807,6 @@ class Gamma(_Distribution):
                 self._scale = 1 / rate
             else:
                 raise TypeError("both scale and rate specified")
-
-        self._scale *= _time_unit_factor(time_unit, env)
 
         if randomstream is None:
             self.randomstream = random
@@ -13736,8 +13840,8 @@ class Gamma(_Distribution):
         result = []
         result.append("Gamma distribution " + hex(id(self)))
         result.append("  shape (k)=" + str(self._shape))
-        result.append("  scale (teta)=" + str(self._scale))
-        result.append("  rate (beta)=" + str(1 / self._scale))
+        result.append("  scale (teta)=" + str(self._scale) + " " + self.time_unit)
+        result.append("  rate (beta)=" + str(1 / self._scale) + ("" if self.time_unit == "" else " /" + self.time_unit))
         result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
@@ -13747,7 +13851,7 @@ class Gamma(_Distribution):
         -------
         Sample of the distribution : float
         """
-        return self.randomstream.gammavariate(self._shape, self._scale)
+        return self.randomstream.gammavariate(self._shape, self._scale) * self.time_unit_factor
 
     def mean(self):
         """
@@ -13755,7 +13859,7 @@ class Gamma(_Distribution):
         -------
         Mean of the distribution : float
         """
-        return self._mean
+        return self._mean * self.time_unit_factor
 
 
 class Beta(_Distribution):
@@ -13881,6 +13985,7 @@ class Erlang(_Distribution):
     """
 
     def __init__(self, shape, rate=None, time_unit=None, scale=None, randomstream=None, env=None):
+        self.register_time_unit(time_unit, env)
         if int(shape) != shape:
             raise TypeError("shape not integer")
         if shape <= 0:
@@ -13900,8 +14005,6 @@ class Erlang(_Distribution):
                 self._rate = rate
             else:
                 raise ValueError("both rate and scale specified")
-
-        self._rate /= _time_unit_factor(time_unit, env)
 
         if randomstream is None:
             self.randomstream = random
@@ -13935,7 +14038,7 @@ class Erlang(_Distribution):
         result = []
         result.append("Erlang distribution " + hex(id(self)))
         result.append("  shape (k)=" + str(self._shape))
-        result.append("  rate (lambda)=" + str(self._rate))
+        result.append("  rate (lambda)=" + str(self._rate) + ("" if self.time_unit == "" else " /" + self.time_unit))
         result.append("  scale (mu)=" + str(1 / self._rate))
         result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
@@ -13946,7 +14049,7 @@ class Erlang(_Distribution):
         -------
         Sample of the distribution : float
         """
-        return self.randomstream.gammavariate(self._shape, 1 / self._rate)
+        return self.randomstream.gammavariate(self._shape, 1 / self._rate) / self.time_unit_factor
 
     def mean(self):
         """
@@ -13954,7 +14057,7 @@ class Erlang(_Distribution):
         -------
         Mean of the distribution : float
         """
-        return self._mean
+        return self._mean / self.time_unit_factor
 
 
 class Cdf(_Distribution):
@@ -13991,6 +14094,7 @@ class Cdf(_Distribution):
     """
 
     def __init__(self, spec, time_unit=None, randomstream=None, env=None):
+        self.register_time_unit(time_unit, env)
         self._x = []
         self._cum = []
         if randomstream is None:
@@ -14007,7 +14111,7 @@ class Cdf(_Distribution):
         if spec[1] != 0:
             raise ValueError("first cumulative value should be 0")
         while len(spec) > 0:
-            x = spec.pop(0) * _time_unit_factor(time_unit, env)
+            x = spec.pop(0) * self.time_unit_factor
             if not spec:
                 raise ValueError("uneven number of parameters specified")
             if x < lastx:
@@ -14120,6 +14224,7 @@ class Pdf(_Distribution):
     """
 
     def __init__(self, spec, probabilities=None, time_unit=None, randomstream=None, env=None):
+        self.register_time_unit(time_unit, env)
         self._x = []
         self._cum = []
         if randomstream is None:
@@ -14155,7 +14260,7 @@ class Pdf(_Distribution):
                 if isinstance(x, _Distribution):
                     raise TypeError("time_unit can't be combined with distribution value")
                 try:
-                    x = float(x) * _time_unit_factor(time_unit, env)
+                    x = float(x) * self.time_unit_factor
                 except (ValueError, TypeError):
                     raise TypeError("time_unit can't be combined with non numeric value")
 
@@ -14165,7 +14270,7 @@ class Pdf(_Distribution):
             if isinstance(x, _Distribution):
                 x = x._mean
             try:
-                sumxp += float(x) * p * _time_unit_factor(time_unit, env)
+                sumxp += float(x) * p
             except (ValueError, TypeError):
                 hasmean = False
 
@@ -14298,6 +14403,7 @@ class CumPdf(_Distribution):
     """
 
     def __init__(self, spec, cumprobabilities=None, time_unit=None, randomstream=None, env=None):
+        self.register_time_unit(time_unit, env)
         self._x = []
         self._cum = []
         if randomstream is None:
@@ -14331,7 +14437,7 @@ class CumPdf(_Distribution):
                 if isinstance(x, _Distribution):
                     raise TypeError("time_unit can't be combined with distribution value")
                 try:
-                    x = float(x) * _time_unit_factor(time_unit, env)
+                    x = float(x) * self.time_unit_factor
                 except (ValueError, TypeError):
                     raise TypeError("time_unit can't be combined with non numeric value")
             self._x.append(x)
@@ -14404,6 +14510,130 @@ class CumPdf(_Distribution):
             nan will be returned.
         """
         return self._mean
+
+
+class External(_Distribution):
+    """
+    External distribution function
+
+    This distribution allows distributions from other modules, notably random, numpy.random and scipy.stats
+    to be used as were they salabim distributions.
+
+    Parameters
+    ----------
+    dis : external distribution
+        either
+
+        -   random.xxx |n|
+        -   numpy.random.xxx|n|
+        -   scipy.stats.xxx
+
+    *args : any
+        positional argumenens to be passed to the dis distribution
+
+    **kwargs : any
+        keyword arguments to be passes to the dis distribution
+
+    time_unit : str
+        specifies the time unit |n|
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+        default : no conversion |n|
+
+    env : Environment
+        environment where the distribution is defined |n|
+        if omitted, default_env will be used
+    """
+
+    def __init__(self, dis, *args, **kwargs):
+        self.dis_is_scipy = False
+        if "scipy" in sys.modules:
+            import scipy
+
+            self.dis_is_scipy = isinstance(dis, (scipy.stats.rv_continuous, scipy.stats.rv_discrete))
+        self.dis = dis
+        self.time_unit = None
+        time_unit = None
+        env = None
+        for kwarg in list(kwargs.keys()):
+            if kwarg == "time_unit":
+                time_unit = kwargs[kwarg]
+                del kwargs[kwarg]
+            if kwarg == "env":
+                env = kwargs[kwarg]
+                del kwargs[kwarg]
+        self.args = args
+        self.kwargs = kwargs
+        self.register_time_unit(time_unit, env)
+        self.samples = []
+        if self.dis_is_scipy:
+            self._mean = self.dis.mean(**{k: v for k, v in self.kwargs.items() if k not in ("size", "random_state")})
+        else:
+            self._mean = nan
+
+    def sample(self):
+        """
+        Returns
+        -------
+        Sample of the distribution via external distribution method : any (usually float)
+        """
+        if not self.samples:
+            if self.dis_is_scipy:
+                samples = self.dis.rvs(*self.args, **self.kwargs)
+            else:
+                samples = self.dis(*self.args, **self.kwargs)
+            if has_numpy() and isinstance(samples, numpy.ndarray):
+                self.samples = samples.tolist()
+            else:
+                self.samples = [samples]
+        return self.samples.pop() * self.time_unit_factor
+
+    def mean(self):
+        """
+        Returns
+        -------
+        mean of the distribution : float
+            only available for scipy.stats distribution. Otherwise nan will be returned.
+        """
+        return self._mean * self.time_unit_factor
+
+    def __repr__(self):
+        try:
+            descr = self.dis.__name__
+        except AttributeError:
+            descr = self.dis.name  # for scipy.stats distributions
+        return "External(" + descr + ")"
+
+    def print_info(self, as_str=False, file=None):
+        """
+        prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        file: file
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
+        Returns
+        -------
+        info (if as_str is True) : str
+        """
+        result = []
+        try:
+            descr = [self.dis.__name__]
+        except AttributeError:
+            descr = [self.dis.name]  # for scipy.stats distributions
+        for arg in self.args:
+            descr.append(repr(arg))
+        for kwarg in self.kwargs:
+            descr.append(kwarg + "=" + repr(self.kwargs[kwarg]))
+        if self.time_unit != "":
+            descr.append("time_unit=" + repr(self.time_unit))
+        result.append("External(" + ", ".join(descr) + ") distribution " + hex(id(self)))
+        return return_or_print(result, as_str, file)
 
 
 class Distribution(_Distribution):
@@ -14493,12 +14723,12 @@ class Distribution(_Distribution):
                 "Beta",
                 "IntUniform",
                 "Poisson",
+                "External",
             ):
                 if pre == distype.upper()[: len(pre)]:
                     sp[0] = distype
                     spec = "(".join(sp)
                     break
-
         d = eval(spec)
 
         if randomstream is None:
@@ -15787,7 +16017,7 @@ def _time_unit_factor(time_unit, env):
         env = g.default_env
     if time_unit is None:
         return 1
-    if env._time_unit is None:
+    if (env is None) or (env._time_unit is None):
         raise AttributeError("time unit not set.")
 
     return env._time_unit / _time_unit_lookup(time_unit)
@@ -16141,7 +16371,7 @@ def waiting():
     return "waiting"
 
 
-def random_seed(seed=None, randomstream=None):
+def random_seed(seed=None, randomstream=None, set_numpy_random_seed=True):
     """
     Reseeds a randomstream
 
@@ -16160,13 +16390,18 @@ def random_seed(seed=None, randomstream=None):
     """
     if randomstream is None:
         randomstream = random
-    randomstream.seed(seed)
     if seed != "":
         if seed is None:
             seed = 1234567
         elif seed == "*":
             seed = None
         random.seed(seed)
+        print("seed")
+        if set_numpy_random_seed and has_numpy():
+            numpy.random.seed(seed)
+
+
+_random_seed = random_seed  # used by Environment.__init__
 
 
 def _std_fonts():
@@ -16464,8 +16699,11 @@ def has_numpy():
     except NameError:
         try:
             import numpy
+
+            return True
         except ModuleNotFoundError:
             numpy = False  # we now know numpy doesn't exist
+            return False
 
 
 def default_env():
@@ -16501,9 +16739,9 @@ reset()
 if __name__ == "__main__":
     try:
         import salabim_test
-    except Exception as e:
+    except Exception:
         print("salabim_test.py not found or ?")
-        raise e
+        raise
         quit()
 
     try:
