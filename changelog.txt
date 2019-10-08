@@ -1,4 +1,155 @@
-salabim  changelog
+salabim changelog
+
+version 19.0.9  2019-10-08
+==========================
+New functionality (0)
+---------------------
+Introduced preemptive resources
+
+It is now possible to specify that a resource is to preemptive, by adding preemptive=True when the resource
+is created.
+If a component requests from a preemptive resource, it may bump component(s) that are claiming from
+the resource, provided these have a lower priority = higher value).
+If component is bumped, it releases the resource and is the activated, thus essentially stopping the current
+action (usually hold or passivate).
+Therefore, it is necessary that a component claiming from a preemptive resource should check
+whether the component is bumped or still claiming at any point where they can be bumped.
+This can be done with the method Component.isclaiming which is True if the component is claiming from the resource,
+or the opposite (Component.isbumped) which is True is the component is not claiming from te resource.
+
+E.g. if the component has to start all over again (hold(1)) if it is bumped:
+    def process(self):
+        prio = sim.Pdf((1,2,3), 1)
+        while True:
+            yield self.request((preemptive_resource, 1, prio)
+            yield self.hold(1)
+            if self.isclaiming(preemptive_resource):
+                break
+        self.release(preemptive_resource)
+                
+E.g. if the component just has to 'complete' the hold time:
+    def process(self):
+        prio = sim.Pdf((1,2,3), 1)
+        remaining = 1
+        while True:
+            yield self.request((preemptive_resource, 1, prio)
+            yield self.hold(remaining, mode='')
+            if self.isclaiming(preemptive_resource):
+                break
+            remaining -= (env.now() - self.mode_time())
+        self.release(preemptive_resource)
+
+Note that a component that hasn't requested at all from a resource, it is considered as bumped, therefore the above
+example can be rewritten as:
+    def process(self):
+        prio = sim.Pdf((1,2,3), 1)
+        remaining = 1
+        while isbumped(preemptive_resource):
+            yield self.request((preemptive_resource, 1, prio)
+            yield self.hold(remaining, mode='')
+            remaining -= (env.now() - self.modetime())
+        self.release(preemptive_resource)
+        
+Finally, if the component is dealing with just one preemptive resource (which is very likely), the isbumped()
+and isclaiming() methods can be used without an argument:
+        prio = sim.Pdf((1,2,3), 1)
+        remaining = 1
+        while isbumped():
+            yield self.request((preemptive_resource, 1, prio)
+            yield self.hold(remaining, mode='')
+            remaining -= (env.now() - self.modetime())
+        self.release(preemptive_resource)
+                
+If a request for a preemptive resource is made, it is not possible to combine that request with any other
+resource.
+
+The method Resource.ispreemptive() can be used to check the whether a resource is preemptive.
+
+There is an animated demo showing nicely the difference between preemptive and non preemptive resources
+See salabim./sample models/Demo preemptive resources animated.py.
+
+New functionality (1)
+---------------------
+In the trace, the time of rescheduling of Component initialization, activate, hold, request, wait and run
+the time was always shown in the information field of the trace as 'scheduled for xxx'.
+From this version, also the delta time (if not 0 of inf) is shown as +xxx behind the action, e.g.
+
+   75+      1.000 main                 current                              
+   76                                  client.0 create                      
+   76                                  client.0 activate                    scheduled for      1.000 @   59  process=process
+   77                                  client.1 create                      
+   77                                  client.1 activate +1.000             scheduled for      2.000 @   59  process=process
+   78                                  client.2 create                      
+   78                                  client.2 activate +3.000             scheduled for      4.000 @   59  process=process
+
+New functionality (2)
+---------------------
+The trace parameter in Environment() and Environment.trace() can now be a file handle.
+If so, the trace output will be directed to the file given, provided it is opened for output.
+When the trace parameter is not an 'open for write' file handle, but is 'Truethy' (usually True),
+the trace output is sent to stdout, as before.
+When the parameter is 'Falsy', no trace output will be generated, as before.
+
+Example:
+    import salabim as sim
+    
+    class X(sim.Component):
+        pass
+    
+    out = open('output.txt', 'w') as out:
+    env = sim.Environment(trace=out)
+    
+    env.trace(True)
+    X()
+    env.trace(False)
+    X()
+    env.trace(out)
+    X()
+    env.trace(False)
+    out.close()
+    
+After execution, the file output.txt contains:
+    line#        time current component    action                               information
+    ------ ---------- -------------------- -----------------------------------  -------------------------------
+                                           line numbers refers to               test.py
+        8                                  default environment initialize       
+        8                                  main create                          
+        8       0.000 main                 current                              
+        9                                  x.0 create data component            
+
+And the following output is generated:
+       12                                  x.1 create data component       
+       
+Note that by issueing env.trace(False), the file is not closed, so that has to be done explicitely or with
+a context manager.
+       
+  
+Changed functionality (0)
+-------------------------
+The default priority of a requested resource is now inf, which means the lowest possible priority.
+In practice, this will hardly ever make a difference with the former behaviour that if no priority was given, it was
+added to the tail of the requesters 
+
+When a request is honoured, the component now enters the claimers queue with priority as it had in the requesters
+queue. Again, in practice this will hardly make any difference.
+
+Bug fix (0)
+-----------
+A bug with autonumbering components, queues, etc. by ending the name with a comma, like
+    for _ in range(3):
+        Car(name='car,')
+fixed.
+Now, the cars are correctly named car.1, car.2 and car.3 .
+
+Bug fix (1)
+-----------
+On some platforms PIL does not accept a new image a width or height of 0. Therefore, salabim now
+sets the dimensions for a dummy image to (1, 1).
+
+Bug fix (2)
+-----------
+As a left over from a test, the seed was printed when an Environment was created. Removed.
+
 
 version 19.0.8  2019-09-17
 ==========================

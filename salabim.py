@@ -1,8 +1,8 @@
 #               _         _      _               _   ___       ___       ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \     ( _ )
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |    / _ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _ | (_) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_) \___/
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \     / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |   | (_) |
+#  \__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _  \__, |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_)   /_/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
@@ -10,7 +10,7 @@
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "19.0.8"
+__version__ = "19.0.9"
 
 import heapq
 import random
@@ -3930,8 +3930,9 @@ class Environment(object):
 
     Parameters
     ----------
-    trace : bool
+    trace : bool or file handle
         defines whether to trace or not |n|
+        if this a file handle (open for write), the trace output will be sent to this file. |n|
         if omitted, False
 
     random_seed : hashable object, usually int
@@ -3964,6 +3965,13 @@ class Environment(object):
         if False, this environment will not be the default environment |n|
         if omitted, this environment becomes the default environment |n|
 
+
+    set_numpy_random_seed : bool
+        if True (default), numpy.random.seed() will be called with the given seed. |n|
+        This is particularly useful when using External distributions. |n|
+        If numpy is not installed, this parameter is ignored |n|
+        if False, numpy.random.seed is not called.
+
     Note
     ----
     The trace may be switched on/off later with trace |n|
@@ -3994,7 +4002,7 @@ class Environment(object):
         if name is None:
             if isdefault_env:
                 name = "default environment"
-        self._trace = trace
+        self.trace(trace)
         self._source_files = {inspect.getframeinfo(_get_caller_frame()).filename: 0}
         _random_seed(random_seed, set_numpy_random_seed=set_numpy_random_seed)
 
@@ -4002,7 +4010,6 @@ class Environment(object):
         self._time_unit_name = time_unit
 
         _set_name(name, Environment._nameserialize, self)
-        self._buffered_trace = False
         self._suppress_trace_standby = True
         if self._trace:
             if print_trace_header:
@@ -4239,7 +4246,6 @@ class Environment(object):
                 s0 = self.filename_lineno_to_str(c._process.__code__.co_filename, len(gs[0]) + gs[1] - 1) + "+"
             else:
                 s0 = None
-
         for r in list(c._claims):
             c._release(r, s0=s0)
         if self._trace:
@@ -5368,13 +5374,15 @@ class Environment(object):
 
         Parameters
         ----------
-        value : bool
+        value : bool of file handle
             new trace status |n|
+            defines whether to trace or not |n|
+            if this a file handle (open for write), the trace output will be sent to this file. |n|
             if omitted, no change
 
         Returns
         -------
-        trace status : bool
+        trace status : bool or file handle
 
         Note
         ----
@@ -6719,10 +6727,16 @@ class Environment(object):
                     self._buffered_trace = line
                 else:
                     if self._buffered_trace:
-                        print(self._buffered_trace)
+                        if hasattr(self._trace, "write"):
+                            print(self._buffered_trace, file=self._trace)
+                        else:
+                            print(self._buffered_trace)
                         logging.debug(self._buffered_trace)
                         self._buffered_trace = False
-                    print(line)
+                    if hasattr(self._trace, "write"):
+                        print(line, file=self._trace)
+                    else:
+                        print(line)
                     logging.debug(line)
 
     def time_to_str_format(self, format=None):
@@ -8338,52 +8352,49 @@ class Animate(object):
                     self._image_ident = (text, fontname, fontsize, angle, textcolor, max_lines)
                     if self._image_ident != self._image_ident_prev:
                         font, heightA = getfont(fontname, fontsize)
-                        if text == "" or text is None:  # this code is a workaround for a bug in PIL >= 4.2.1
-                            im = Image.new("RGBA", (0, 0), (0, 0, 0, 0))
+                        lines = []
+                        for item in deep_flatten(text):
+                            for line in item.splitlines():
+                                lines.append(line.rstrip())
+
+                        if max_lines <= 0:  # 0 is all
+                            lines = lines[max_lines:]
                         else:
-                            lines = []
-                            for item in deep_flatten(text):
-                                for line in item.splitlines():
-                                    lines.append(line.rstrip())
+                            lines = lines[:max_lines]
 
-                            if max_lines <= 0:  # 0 is all
-                                lines = lines[max_lines:]
+                        widths = [(font.getsize(line)[0] if line else 0) for line in lines]
+                        if widths:
+                            totwidth = max(widths)
+                        else:
+                            totwidth = 0
+                        number_of_lines = len(lines)
+                        lineheight = font.getsize("Ap")[1]
+                        totheight = number_of_lines * lineheight
+                        im = Image.new("RGBA", (int(totwidth + 0.1 * fontsize), int(totheight)), (0, 0, 0, 0))
+                        imwidth, imheight = im.size
+                        draw = ImageDraw.Draw(im)
+                        pos = 0
+                        for line, width in zip(lines, widths):
+                            if line:
+                                draw.text(xy=(0.1 * fontsize, pos), text=line, font=font, fill=textcolor)
+                            pos += lineheight
+                        # this code is to correct a bug in the rendering of text,
+                        # leaving a kind of shadow around the text
+                        del draw
+                        if textcolor[:3] != (0, 0, 0):  # black is ok
+                            if has_numpy():
+                                arr = numpy.asarray(im).copy()
+                                arr[:, :, 0] = textcolor[0]
+                                arr[:, :, 1] = textcolor[1]
+                                arr[:, :, 2] = textcolor[2]
+                                im = Image.fromarray(numpy.uint8(arr))
                             else:
-                                lines = lines[:max_lines]
+                                pix = im.load()
+                                for y in range(imheight):
+                                    for x in range(imwidth):
+                                        pix[x, y] = (textcolor[0], textcolor[1], textcolor[2], pix[x, y][3])
 
-                            widths = [(font.getsize(line)[0] if line else 0) for line in lines]
-                            if widths:
-                                totwidth = max(widths)
-                            else:
-                                totwidth = 0
-                            number_of_lines = len(lines)
-                            lineheight = font.getsize("Ap")[1]
-                            totheight = number_of_lines * lineheight
-                            im = Image.new("RGBA", (int(totwidth + 0.1 * fontsize), int(totheight)), (0, 0, 0, 0))
-                            imwidth, imheight = im.size
-                            draw = ImageDraw.Draw(im)
-                            pos = 0
-                            for line, width in zip(lines, widths):
-                                if line:
-                                    draw.text(xy=(0.1 * fontsize, pos), text=line, font=font, fill=textcolor)
-                                pos += lineheight
-                            # this code is to correct a bug in the rendering of text,
-                            # leaving a kind of shadow around the text
-                            del draw
-                            if textcolor[:3] != (0, 0, 0):  # black is ok
-                                if has_numpy():
-                                    arr = numpy.asarray(im).copy()
-                                    arr[:, :, 0] = textcolor[0]
-                                    arr[:, :, 1] = textcolor[1]
-                                    arr[:, :, 2] = textcolor[2]
-                                    im = Image.fromarray(numpy.uint8(arr))
-                                else:
-                                    pix = im.load()
-                                    for y in range(imheight):
-                                        for x in range(imwidth):
-                                            pix[x, y] = (textcolor[0], textcolor[1], textcolor[2], pix[x, y][3])
-
-                            # end of code to correct bug
+                        # end of code to correct bug
 
                         self.imwidth, self.imheight = im.size
                         self.heightA = heightA
@@ -9078,7 +9089,6 @@ class AnimateQueue(object):
             self.vanchor = "sw"
             self.vangle = 0
 
-        factor_x, factor_y = {"w": (-1, 0), "n": (0, 1), "e": (1, 0), "s": (0, -1)}[direction.lower()]
         n = 0
         for c in reversed(self._queue) if reverse else self._queue:
             if (max_length is not None) and n >= max_length:
@@ -9101,8 +9111,14 @@ class AnimateQueue(object):
                 else:
                     ao.x0 = x
                     ao.y0 = y
-            x += factor_x * dimx
-            y += factor_y * dimy
+            if direction.lower() == "w":
+                x -= dimx
+            if direction.lower() == "s":
+                y -= dimy
+            if direction.lower() == "e":
+                x += dimx
+            if direction.lower() == "n":
+                y += dimy
             n += 1
 
         for animation_objects in prev_aos.values():
@@ -10997,10 +11013,14 @@ class Component(object):
                 extra = " "
             else:
                 scheduled_time_str = "scheduled for " + self.env.time_to_str(scheduled_time - self.env._offset)
+            if (scheduled_time == self.env._now) or (scheduled_time == inf):
+                delta = ""
+            else:
+                delta = " +" + self.env.time_to_str(scheduled_time - self.env._now).strip()
             self.env.print_trace(
                 "",
                 "",
-                self.name() + " " + caller,
+                self.name() + " " + caller + delta,
                 merge_blanks(
                     scheduled_time_str + _urgenttxt(urgent) + "@" + self.lineno_txt(), _modetxt(self._mode), extra
                 ),
@@ -11496,10 +11516,9 @@ class Component(object):
             self._mode_time = self.env._now
 
         self._failed = False
-
         for arg in args:
             q = 1
-            priority = None
+            priority = inf
             if isinstance(arg, Resource):
                 r = arg
             elif isinstance(arg, (tuple, list)):
@@ -11510,6 +11529,10 @@ class Component(object):
                     priority = arg[2]
             else:
                 raise TypeError("incorrect specifier", arg)
+
+            if r._preemptive:
+                if len(args) > 1:
+                    raise ValueError("preemptive resources do not support multiple resource requests")
 
             if called_from == "put":
                 q = -q
@@ -11526,14 +11549,28 @@ class Component(object):
                 req_text = "get (request) " + str(q) + " from "
 
             addstring = ""
-            if priority is None:
-                self.enter(r._requesters)
-            else:
-                addstring = addstring + " priority=" + str(priority)
-                self.enter_sorted(r._requesters, priority)
+            addstring += " priority=" + str(priority)
+
+            self.enter_sorted(r._requesters, priority)
             if self.env._trace:
                 self.env.print_trace("", "", self.name(), req_text + r.name() + addstring + " " + _modetxt(self._mode))
 
+            if r._preemptive:
+                av = r.available_quantity()
+                this_claimers = r.claimers()
+                bump_candidates = []
+                for c in reversed(r.claimers()):
+
+                    if av >= q:
+                        break
+                    if priority >= c.priority(this_claimers):
+                        break
+                    av += c.claimed_quantity(this_claimers)
+                    bump_candidates.append(c)
+                if av >= 0:
+                    for c in bump_candidates:
+                        c._release(r, bumped_by=self)
+                        c.activate()
         for r, q in self._requests.items():
             if q < r._minq:
                 r._minq = q
@@ -11542,6 +11579,46 @@ class Component(object):
 
         if self._requests:
             self._reschedule(scheduled_time, False, "request")
+
+    def isbumped(self, resource=None):
+        """
+        check whether component is bumped from resource
+
+        Parameters
+        ----------
+        resource : Resource
+            resource to be checked
+            if omitted, checks whether component belongs to any resource claimers
+
+        Returns
+        -------
+        True if this component is not in the resource claimers : bool
+            False otherwise
+        """
+        return not self.isclaiming(resource)
+
+    def isclaiming(self, resource=None):
+        """
+        check whether component is claiming from resource
+
+        Parameters
+        ----------
+        resource : Resource
+            resource to be checked
+            if omitted, checks whether component is in any resource claimers
+
+        Returns
+        -------
+        True if this component is in the resource claimers : bool
+            False otherwise
+        """
+        if resource is None:
+            for q in self._qmembers:
+                if hasattr(q, "_isclaimers"):
+                    return True
+            return False
+        else:
+            return self in resource.claimers()
 
     def get(self, *args, **kwargs):
         """
@@ -11573,6 +11650,7 @@ class Component(object):
             anonymous_resources = []
             for r in list(self._requests):
                 r._claimed_quantity += self._requests[r]
+                this_prio = self.priority(r._requesters)
 
                 self.leave(r._requesters)
                 if r._anonymous:
@@ -11581,7 +11659,7 @@ class Component(object):
                     self._claims[r] += self._requests[r]
                     mx = self._member(r._claimers)
                     if mx is None:
-                        self.enter(r._claimers)
+                        self.enter_sorted(r._claimers, this_prio)
                 if r._requesters._length == 0:
                     r._minq = inf
                 r.claimed_quantity.tally(r._claimed_quantity)
@@ -11595,7 +11673,7 @@ class Component(object):
 
         return honored
 
-    def _release(self, r, q=None, s0=None):
+    def _release(self, r, q=None, s0=None, bumped_by=None):
         if r not in self._claims:
             raise ValueError(self.name() + " not claiming from resource " + r.name())
         if q is None:
@@ -11612,9 +11690,20 @@ class Component(object):
         r.claimed_quantity.tally(r._claimed_quantity)
         r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
         r.available_quantity.tally(r._capacity - r._claimed_quantity)
+        extra = " bumped by " + bumped_by.name() if bumped_by else ""
         if self.env._trace:
-            self.env.print_trace("", "", self.name(), "release " + str(q) + " from " + r.name(), s0=s0)
-        r._tryrequest()
+            if bumped_by:
+                self.env.print_trace(
+                    "",
+                    "",
+                    self.name(),
+                    "bumped from " + r.name() + " by " + bumped_by.name() + " (release " + str(q) + ")",
+                    s0=s0,
+                )
+            else:
+                self.env.print_trace("", "", self.name(), "release " + str(q) + " from " + r.name() + extra, s0=s0)
+        if not bumped_by:
+            r._tryrequest()
 
     def release(self, *args):
         """
@@ -14525,14 +14614,14 @@ class External(_Distribution):
         either
 
         -   random.xxx |n|
-        -   numpy.random.xxx|n|
+        -   numpy.random.xxx |n|
         -   scipy.stats.xxx
 
     *args : any
-        positional argumenens to be passed to the dis distribution
+        positional arguments to be passed to the dis distribution
 
     **kwargs : any
-        keyword arguments to be passes to the dis distribution
+        keyword arguments to be passed to the dis distribution
 
     time_unit : str
         specifies the time unit |n|
@@ -15260,7 +15349,9 @@ class Resource(object):
         if omitted, default_env is used
     """
 
-    def __init__(self, name=None, capacity=1, anonymous=False, monitor=True, env=None, *args, **kwargs):
+    def __init__(
+        self, name=None, capacity=1, anonymous=False, preemptive=False, monitor=True, env=None, *args, **kwargs
+    ):
         if env is None:
             self.env = g.default_env
         else:
@@ -15273,11 +15364,14 @@ class Resource(object):
         self._requesters._isinternal = True
         self._claimers = Queue(name="claimers of " + self.name(), monitor=monitor, env=self.env)
         self._claimers._isinternal = True
+        self._claimers._isclaimers = True  # used by Component.isbumped()
         self.env._trace = savetrace
         self._claimed_quantity = 0
         self._anonymous = anonymous
+        self._preemptive = preemptive
         self._minq = inf
         self._trying = False
+
         self.capacity = _CapacityMonitor(
             "Capacity of " + self.name(),
             level=True,
@@ -15314,6 +15408,15 @@ class Resource(object):
                 "capacity=" + str(self._capacity) + (" anonymous" if self._anonymous else ""),
             )
         self.setup(*args, **kwargs)
+
+    def ispreemptive(self):
+        """
+        Returns
+        -------
+        True if preemptive, False otherwise : bool
+        """
+
+        return self._preemptive
 
     def setup(self):
         """
@@ -15982,7 +16085,7 @@ def spec_to_image(spec):
     if isinstance(spec, str):
         if can_animate(try_only=True):
             if spec == "":
-                im = Image.new("RGBA", (0, 0), (0, 0, 0, 0))
+                im = Image.new("RGBA", (1, 1), (0, 0, 0, 0))  # (0, 0) raises an error on some platforms
             else:
                 im = Image.open(spec)
                 im = im.convert("RGBA")
@@ -16107,7 +16210,7 @@ def _set_name(name, _nameserialize, object):
     _nameserialize[name] = sequence_number
     if name.endswith("."):
         object._name = name + str(sequence_number)
-    elif name.endswith("."):
+    elif name.endswith(","):
         object._name = name[:-1] + "." + str(sequence_number)
     else:
         object._name = name
@@ -16384,6 +16487,12 @@ def random_seed(seed=None, randomstream=None, set_numpy_random_seed=True):
         if the null string, no action on random is taken |n|
         if None (the default), 1234567 will be used.
 
+    set_numpy_random_seed : bool
+        if True (default), numpy.random.seed() will be called with the given seed. |n|
+        This is particularly useful when using External distributions. |n|
+        If numpy is not installed, this parameter is ignored |n|
+        if False, numpy.random.seed is not called.
+
     randomstream: randomstream
         randomstream to be used |n|
         if omitted, random will be used |n|
@@ -16396,7 +16505,6 @@ def random_seed(seed=None, randomstream=None, set_numpy_random_seed=True):
         elif seed == "*":
             seed = None
         random.seed(seed)
-        print("seed")
         if set_numpy_random_seed and has_numpy():
             numpy.random.seed(seed)
 
