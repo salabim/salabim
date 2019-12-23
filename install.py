@@ -1,59 +1,84 @@
-import os
+"""
+install.py
+
+This program makes it possible to install a single file Python package to the site-packages folder,
+without having to use PyPI.
+So, then the single file package can be used from anywhere.
+
+The program will copy the single file as well as optional include files.
+
+The tuple packages should contain one or more packages to be installed, each in their own site-packages subfolder.
+-
+The includes tuple may contain additional files to be copied to the site_packages subfolder(s).
+
+Note that the program automatically makes the required __init__.py file(s).
+If a __version__ = statement is found in the source file, the __version__ will be included in the __init__.py file.
+"""
+
 import shutil
 import glob
 import sys
 import site
 import fnmatch
 
-includes = ("salabim.py", "changelog.txt", "license.txt", "*.ttf")
-mainfile = "salabim.py"
-package = "salabim"
+includes = "changelog.txt license.txt *.ttf".split()
+packages = "salabim".split()
 
 Pythonista = sys.platform == "ios"
 
 
-def main():
+def copy_package(package):
+    sourcefile = package + ".py"
+    if not os.path.isfile(sourcefile):
+        return False
+
+    with open(sourcefile, "r") as f:
+        lines = f.read().splitlines()
+
+    version = None
+    for line in lines:
+        a = line.split("__version__ =")
+        if len(a) > 1:
+            version = a[-1].strip().strip('"').strip("'")
+            break
 
     if Pythonista:
-        documents = "/Documents"
+        documents = os.sep + "Documents"
         sp = os.getcwd().split(documents)
         if len(sp) != 2:
             print("unable to install")
             exit()
-        path = f"{sp[0]}{documents}/site-packages/{package}"
+        path = sp[0] + documents + os.sep + "site-packages" + os.sep + package
 
     else:
-        path = f"{site.getsitepackages()[-1]}{os.sep}{package}"
+        path = site.getsitepackages()[-1] + os.sep + package
 
     if not os.path.isdir(path):
         os.makedirs(path)
 
+    shutil.copy(sourcefile, path + os.sep + sourcefile)
+
     files = glob.iglob("*.*")
 
-    ok = False
     for file in files:
         if any(fnmatch.fnmatch(file, include) for include in includes):
-            if file == mainfile:
-                ok = True
-            shutil.copy(file, f"{path}{os.sep}{file}")
-    if not ok:
-        print(f"couldn't find {mainfile} in current directory")
-        return
+            shutil.copy(file, path + os.sep + file)
 
-    with open(mainfile, "r") as f:
-        lines = f.read().splitlines()
+    with open(path + os.sep + "__init__.py", "w") as initfile:
+        initfile.write("from ." + package + " import *\n")
+        if version is not None:
+            initfile.write("from ." + package + " import __version__\n")
+    print(package + " " + ("?" if version is None else version) + " successfully installed")
+    return True
 
-    realversion = "?"
-    for line in lines:
-        a = line.split("__version__ = ")
-        if len(a) > 1:
-            realversion = a[1].replace("'", "").replace('"', "")
-            break
 
-    with open(f"{path}{os.sep}__init__.py", "w") as initfile:
-        initfile.write(f"from .{package} import *\n")
-        initfile.write(f"from .{package} import __version__\n")
-    print(f"{package} {realversion} successfully installed")
+def main():
+    number_installed = 0
+    for package in packages:
+        if copy_package(package):
+            number_installed += 1
+    if number_installed == 0:
+        print("No packages installed")
 
 
 main()

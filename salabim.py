@@ -1,8 +1,8 @@
-#               _         _      _               _   ___       ___       ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \     / _ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |   | (_) |
-#  \__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _  \__, |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_)   /_/
+#               _         _      _               _   ___       ___      _   ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \    / | / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |   | || | | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _ | || |_| |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_)|_| \___/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
@@ -10,7 +10,7 @@
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "19.0.9"
+__version__ = "19.0.10"
 
 import heapq
 import random
@@ -729,7 +729,7 @@ class Monitor(object):
         get the time of last tally of a level monitor
 
         :getter:
-            gets the last tallied value : any (often float)
+            gets the time of the last tallied value : float
 
         Note
         ----
@@ -2587,7 +2587,7 @@ if Pythonista:
                             ao._image, (int(ao._image_x), int(env._height - ao._image_y - ao._image.size[1])), ao._image
                         )
                 env.animation_post_tick(env.t)
-                if g.animation_env.retina:
+                if env.retina:
                     with io.BytesIO() as fp:
                         capture_image.save(fp, "BMP")
                         img = ui.Image.from_data(fp.getvalue(), scene.get_screen_scale())
@@ -3965,12 +3965,16 @@ class Environment(object):
         if False, this environment will not be the default environment |n|
         if omitted, this environment becomes the default environment |n|
 
-
     set_numpy_random_seed : bool
         if True (default), numpy.random.seed() will be called with the given seed. |n|
         This is particularly useful when using External distributions. |n|
         If numpy is not installed, this parameter is ignored |n|
         if False, numpy.random.seed is not called.
+
+    reset : bool
+        if True, reset the simulation environment |n|
+        if False, do not reset the simulation environment |n|
+        if None (default), reset the simulation environment when run under Pythonista, otherwise no reset*
 
     Note
     ----
@@ -3994,9 +3998,15 @@ class Environment(object):
         print_trace_header=True,
         isdefault_env=True,
         retina=False,
+        do_reset=None,
         *args,
         **kwargs
     ):
+        if do_reset is None:
+            do_reset = Pythonista
+        if do_reset:
+            reset()
+
         if isdefault_env:
             g.default_env = self
         if name is None:
@@ -4050,6 +4060,7 @@ class Environment(object):
         self.frame_number = 0
         self._audio = None
         self._audio_speed = 1
+        self._animate_debug = False
         self._synced = True
         self._step_pressed = False
         self.stopped = False
@@ -4288,6 +4299,7 @@ class Environment(object):
         video_pingpong=None,
         audio=None,
         audio_speed=None,
+        animate_debug=None,
     ):
 
         """
@@ -4477,6 +4489,9 @@ class Environment(object):
 
         if use_toplevel is not None:
             self.use_toplevel = use_toplevel
+
+        if animate_debug is not None:
+            self._animate_debug = animate_debug
 
         if audio_speed is not None:
             if self._audio_speed != audio_speed:
@@ -5110,13 +5125,13 @@ class Environment(object):
             return self._audio.filename
         return ""
 
-    def audio_speed(self, speed):
+    def audio_speed(self, value=None):
         """
         Play audio during animation
 
         Parameters
         ----------
-        speed : float
+        value : float
             animation speed at which the audio should be played |n|
             default: no change |n|
             initially: 1
@@ -5125,8 +5140,27 @@ class Environment(object):
         -------
         speed being played: int
         """
-        self.animation_parameters(audio_speed=speed, animate=None)
+        self.animation_parameters(audio_speed=value, animate=None)
         return self._audio_speed
+
+    def animate_debug(self, value=None):
+        """
+        ***
+        Animate debug
+
+        Parameters
+        ----------
+        value : bool
+            animate_debug |n|
+            default: no change |n|
+            initially: False
+
+        Returns
+        -------
+        animate_debug : bool
+        """
+        self.animation_parameters(animate_debug=value, animate=None)
+        return self._animate_debug
 
     def video(self, value=None):
         """
@@ -7188,7 +7222,10 @@ class Animate(object):
         self.width1 = self.width0 if width1 is None else width1
 
         self.t1 = inf if t1 is None else t1
-        self.caller = self.env._frame_to_lineno(_get_caller_frame(), add_filename=True)
+        if self.env._animate_debug:
+            self.caller = self.env._frame_to_lineno(_get_caller_frame(), add_filename=True)
+        else:
+            self.caller = "?. use env.animate_debug(True) to get the originating Animate location"
         self.env.an_objects.append(self)
 
     def update(
@@ -9131,6 +9168,73 @@ class AnimateQueue(object):
                 ao.remove()
         self.aotitle.remove()
         self.env.sys_objects.remove(self)
+
+
+class AnimateCombined(collections.UserList):
+    """
+    Combines several Animate? objects
+
+    Parameters
+    ----------
+    initial_contents : list
+        list of Animate? objets
+
+    Notes
+    -----
+    The AnimateCombined class acts as a list, where objects can be added or deleted with all usual list methods. |n|
+    When an attribute of an AnimateCombined is assigned, it will propagate to all members. |n|
+    When an attribute of an AnimateCombined is queried, the value if the first member will be returned |n|
+    """
+
+    def __setattr__(self, key, value):
+        if key == "data":
+            super().__setattr__(key, value)
+        else:
+            for item in self.data:
+                if not hasattr(item, key):
+                    raise AttributeError(repr(item) + " has no attribute " + key)
+                setattr(item, key, value)
+
+    def __getattr__(self, key):
+        if self.data:
+            for item in self.data:
+                if not hasattr(item, key):
+                    raise AttributeError(repr(item) + " has no attribute " + key)
+            return getattr(self.data[0], key)
+        else:
+            raise AttributeError("no items in " + repr(self))
+
+    def __setitem__(self, key, value):
+        if not isinstance(value, (_Vis, AnimateCombined)):
+            raise ValueError(str(value) + " not Animatexxx")
+        super().__setitem__(key, value)
+
+    def append(self, value):
+        if not isinstance(value, (_Vis, AnimateCombined)):
+            raise ValueError(str(value) + " not Animatexxx")
+        super().append(value)
+
+    def extend(self, values):
+        for value in values:
+            self.append(value)
+
+    def __add__(self, other):
+        if not isinstance(other, (_Vis, AnimateCombined)):
+            return NotImplemented
+        return AnimateCombined(self.data + [other])
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def remove(self):
+        """
+        remove all members
+        """
+        for item in self.data:
+            item.remove()
+
+    def __repr__(self):
+        return self.__class__.__name__ + " (" + str(len(self.data)) + " items)"
 
 
 class _Vis(object):
@@ -12759,8 +12863,8 @@ class _Distribution:
             self, lowerbound, upperbound, fail_value, number_of_retries, include_lowerbound, include_upperbound
         ).sample()
 
-    def __call__(self, *args):
-        return self.sample(*args)
+    def __call__(self, *args, **kwargs):
+        return self.sample(*args, **kwargs)
 
     def __pos__(self):
         return _Expression(self, 0, operator.add)
@@ -12912,6 +13016,37 @@ class _Expression(_Distribution):
         result.append("_Expression " + hex(id(self)))
         result.append("  mean=" + str(self.mean()))
         return return_or_print(result, as_str, file)
+
+
+class Map(_Distribution):
+    """
+    Parameters
+    ----------
+    dis : distribution
+        distribution to be mapped
+
+    function : function
+        function to be applied on each sampled value
+
+    Examples
+    --------
+    d = sim.Map(sim.Normal(10,3), lambda x: x if x > 0 else 0)  # map negative samples to zero
+    d = sim.Map(sim.Uniform(1,7), int)  # die simulator
+    """
+
+    def __init__(self, dis, function):
+        self.dis = dis
+        self.function = function
+
+    def sample(self):
+        sample = self.dis.sample()
+        return self.function(sample)
+
+    def mean(self):
+        return nan
+
+    def __repr__(self):
+        return "Map " + self.dis.__repr__()
 
 
 class Bounded(_Distribution):
