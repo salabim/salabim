@@ -20,6 +20,7 @@ import glob
 import sys
 import site
 import fnmatch
+import os
 
 includes = "changelog.txt license.txt *.ttf".split()
 packages = "salabim".split()
@@ -57,18 +58,18 @@ def copy_package(package):
         os.makedirs(path)
 
     shutil.copy(sourcefile, path + os.sep + sourcefile)
-
+    print("copy", sourcefile)
     files = glob.iglob("*.*")
 
     for file in files:
         if any(fnmatch.fnmatch(file, include) for include in includes):
             shutil.copy(file, path + os.sep + file)
-
+            print("copy", file)
     with open(path + os.sep + "__init__.py", "w") as initfile:
         initfile.write("from ." + package + " import *\n")
         if version is not None:
             initfile.write("from ." + package + " import __version__\n")
-    print(package + " " + ("?" if version is None else version) + " successfully installed")
+    print(package + " " + ("?" if version is None else version) + " successfully installed in " + path)
     return True
 
 

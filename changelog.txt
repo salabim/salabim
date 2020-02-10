@@ -1,10 +1,65 @@
 salabim changelog
 
+version 20.0.0  2020-02-0
+==========================
+Announcement (0)
+----------------
+Salabim now runs fully also on Android platforms under the excellent Pydroid3 app
+    <https://play.google.com/store/apps/details?id=ru.iiec.pydroid3&hl=en>.
+In order to use animation on that platform, it is required to import tkinter in the main program
+, otherwise you will get a salabim error message if you try and start an animation.
+
+With the PyDroid3 Premium version, your can also produce animation videos, albeit only .avi files.
+
+AnimateButton does not properly yet and therefore the animation navigation buttons are not
+placed correctly and in fact not usable. We plan a fix for this in a future version of salabim.
+    
+
+New functionality (0)
+---------------------
+An AnimateQueue object now has a queue() method that returns the queue it refers to.
+This is useful in animation_objects() that want to check the queue (in the id parameter).
+
+
+Improved functionality (0)
+--------------------------
+Normal video production (i.e. not .gif, .jpg, .bmp, .tiff, .png) is now done via a temporary file.
+That has the effect that if the video production is not closed properly, the video is not written at all,
+thus making the production process more stable.
+It is necessary to always close the video production with 
+    env.video("")
+    
+
+Changed functionality (0)
+-------------------------
+If a video name with extension .avi is to be produced (with env.video()), the default codec is now MJPG.
+For all other extensions, the default codec remains MP4V.
+
+
+Utility update (0)
+------------------
+The install.py utility is changed internally. Also, it shows now the location where salabim was installed.
+
+      
+Documentation (0)
+-----------------
+The width parameter of AnimateImage was not documented. Fixed.
+
+
+Documentation (1)
+-----------------
+Closing a video is now documented (see also above).
+
+
+Bug fix (0)
+-----------
+Minor bug in video production, when animation was turned off and on during the simulation. Fixed.
+
 version 19.0.10  2019-12-18
 ===========================
 New functionality (0)
 ---------------------
-Map distribution allows sampled values from a distrbution to be mapped to
+Map distribution allows sampled values from a distribution to be mapped to
 a given function. E.g.
     round_normal = sim.Map(sim.Normal(10, 4), lambda x: round(x))
 or, equivalently:
@@ -44,21 +99,21 @@ The remove method applied to AnimateCombined objects will remove all the include
 Changed functionality (0
 --------------------------
 In version 19.0.6 the following functionality was introduced:
-    If an error occured in the make_pil_image method during an animation, it was sometimes difficult to
+    If an error occurred in the make_pil_image method during an animation, it was sometimes difficult to
     find out the reason for that error. From this version on, the line number (and the filename)
     where the animation object was created will be added to the error message, which makes debugging
     hopefully easier.
 However, this feature sometimes appears to significantly slow down animations.
-Therefore, this feauture is now disabled by default.
+Therefore, this feature is now disabled by default.
 If required (particularly when finding a complicated error), it is possible to enable the source location
-tracking. The method Environment.animation_parameters() has therefore now an new parameter: animate_debug,
+tracking. The method Environment.animation_parameters() has therefore now a new parameter: animate_debug,
 which is False by default.
-Alternatively, the method Enviroment.animate_debug() can be used.
+Alternatively, the method Environment.animate_debug() can be used.
 
 Changed functionality (1) 
 -------------------------
 sim.Environment() now automatically resets the simulation environment when run under Pythonista.
-A parameter do_reset to sim.Environment() allows the user to force a reset as well, or to indicate
+A parameter 'do_reset' to sim.Environment() allows the user to force a reset as well, or to indicate
 that no reset should be executed under Pythonista.
 
 Internal change (0)

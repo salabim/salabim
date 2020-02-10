@@ -1,8 +1,8 @@
-#               _         _      _               _   ___       ___      _   ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    / | / _ \     / _ \    / | / _ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \   | || (_) |   | | | |   | || | | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |  | | \__, | _ | |_| | _ | || |_| |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_|   /_/ (_) \___/ (_)|_| \___/
+#               _         _      _               ____    ___       ___       ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \     / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |   | | | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _ | |_| |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_) \___/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
@@ -10,7 +10,7 @@
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "19.0.10"
+__version__ = "20.0.0"
 
 import heapq
 import random
@@ -39,6 +39,7 @@ import traceback
 
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
+PyDroid = sys.platform == "linux" and any("pydroid" in v for v in os.environ.values())
 
 
 class g:
@@ -509,9 +510,9 @@ class Monitor(object):
             actions.append((stop, "b", 0, 0))  # non inclusive
         else:
             if start is None:
-                raise TypeError("Modulo specified, but no start specified. ")
+                raise TypeError("modulo specified, but no start specified. ")
             if stop is None:
-                raise TypeError("Module specified, but no stop specified")
+                raise TypeError("modulo specified, but no stop specified")
             if stop <= start:
                 raise ValueError("stop must be > start")
             if stop - start >= modulo:
@@ -1180,7 +1181,7 @@ class Monitor(object):
 
         Note
         ----
-        For weighs are applied , the weighted mean is returned
+        If weights are applied , the weighted mean is returned
         """
         x, weight = self._xweight(ex0=ex0)
         sumweight = sum(weight)
@@ -1204,7 +1205,7 @@ class Monitor(object):
 
         Note
         ----
-        For weights are applied, the weighted standard deviation is returned
+        If weights are applied, the weighted standard deviation is returned
         """
         x, weight = self._xweight(ex0=ex0)
         sumweight = sum(weight)
@@ -1269,7 +1270,7 @@ class Monitor(object):
 
         Note
         ----
-        If weight are applied, the weighted median is returned
+        If weights are applied, the weighted median is returned
         """
         return self.percentile(50, ex0=ex0)
 
@@ -4006,7 +4007,6 @@ class Environment(object):
             do_reset = Pythonista
         if do_reset:
             reset()
-
         if isdefault_env:
             g.default_env = self
         if name is None:
@@ -4066,6 +4066,10 @@ class Environment(object):
         self.stopped = False
         self.paused = False
         self.last_s0 = ""
+        if PyDroid:
+            if g.tkinter_loaded == "?":
+                g.tkinter_loaded = "tkinter" in sys.modules
+
         if Pythonista:
             self._width, self._height = ui.get_screen_size()
             if retina:
@@ -4096,6 +4100,7 @@ class Environment(object):
         self._video_repeat = 1
         self._video_pingpong = False
         self.an_modelname()
+
         self.an_clocktext()
 
         self.setup(*args, **kwargs)
@@ -4238,7 +4243,7 @@ class Environment(object):
             else:
                 c._process(**c._process_kwargs)
                 self._terminate(c)
-        except Exception as e:
+        except Exception:
             self._animate = False
             traceback.print_exc()
             sys.exit()
@@ -4392,7 +4397,8 @@ class Environment(object):
             If the video extension is not .gif, .jpg, .png, .bmp or .tiff, a codec may be added
             by appending a plus sign and the four letter code name,
             like "myvideo.avi+DIVX". |n|
-            If no codec is given, mp4v will be used as codec.
+            If no codec is given, MJPG will be used for .avi files, otherwise .mp4v |n|
+            Under PyDroid only .avi files are supported.
 
         video_repeat : int
             number of times gif should be repeated |n|
@@ -4579,7 +4585,7 @@ class Environment(object):
                     self.video_close()
                 self._video = video
 
-                if video:
+                if video != "":
                     video_opened = True
                     filename, extension = splitext(video)  # os.path.splitext does not support null fileparts
                     if extension.lower() == ".gif":
@@ -4596,15 +4602,21 @@ class Environment(object):
                         self._video_out = "snapshots"
 
                     else:
-                        if len(video.split("+")) == 2:
-                            self._video_name, codec = video.split("+")
+                        if "+" in extension:
+                            extension, codec = extension.split("+")
                         else:
-                            self._video_name = video
-                            codec = "mp4v"
+                            codec = "MJPG" if extension.lower() == ".avi" else "mp4v"
+                        if PyDroid and extension.lower() != ".avi":
+                            raise ValueError("PyDroid can only produce .avi videos, not " + extension)
+
+                        self._video_name = filename + extension
                         can_video(try_only=False)
                         fourcc = cv2.VideoWriter_fourcc(*codec)
+                        if os.path.exists(self._video_name):
+                            os.remove(self._video_name)
+                        self._video_name_temp = tempfile.NamedTemporaryFile(suffix=extension, delete=False).name
                         self._video_out = cv2.VideoWriter(
-                            self._video_name, fourcc, self._fps, (self._width, self._height)
+                            self._video_name_temp, fourcc, self._fps, (self._width, self._height)
                         )
                         self.frame_number = 0
                         self.audio_segments = []
@@ -4617,7 +4629,7 @@ class Environment(object):
                             if Windows:
                                 self._audio.stop()
 
-        if self._video and (not video_opened):
+        if (self._video != "") and (not video_opened):
             if width_changed:
                 raise ValueError("width changed while recording video.")
             if height_changed:
@@ -4625,8 +4637,8 @@ class Environment(object):
             if fps_changed and self._video_out not in ("gif", "snapshots"):
                 raise ValueError("fps changed while recording video.")
 
-        if self._video:
-            self.video_t = self.t
+        if self._video != "":
+            self.video_t = self._now
 
         if frame_changed:
             if g.animation_env is not None:
@@ -4720,6 +4732,7 @@ class Environment(object):
                     if self._audio:
                         self.audio_segments[-1].t1 = self.frame_number / self._fps
                     self.add_audio()
+                shutil.move(self._video_name_temp, self._video_name)
 
             self._video_out = None
             self._video = ""
@@ -4774,7 +4787,7 @@ class Environment(object):
 
             if seq > 0:
                 temp_filename = tempdir + "\\temp" + os.path.splitext(self._video_name)[1]
-                shutil.copyfile(self._video_name, temp_filename)
+                shutil.copyfile(self._video_name_temp, temp_filename)
 
                 with open(tempdir + "\\temp.txt", "w") as f:
                     f.write("\n".join("file '" + tempdir + "\\temp" + str(i) + ".mp3'" for i in range(seq)))
@@ -4792,7 +4805,7 @@ class Environment(object):
                     "1:a",
                     "-c",
                     "copy",
-                    self._video_name,
+                    self._video_name_temp,
                 )
                 self.ffmpeg_execute(command)
 
@@ -5145,7 +5158,6 @@ class Environment(object):
 
     def animate_debug(self, value=None):
         """
-        ***
         Animate debug
 
         Parameters
@@ -9162,6 +9174,14 @@ class AnimateQueue(object):
             for ao in animation_objects[2:]:
                 ao.remove()
 
+    def queue(self):
+        """
+        Returns
+        -------
+        the queue this object refers to. Can be useful in Component.animation_objects: queue
+        """
+        return self._queue
+
     def remove(self):
         for animation_objects in self.current_aos.values():
             for ao in animation_objects[2:]:
@@ -10390,6 +10410,9 @@ class AnimateImage(_Vis):
 
     alpha : float
         alpha of the image (0-255) (default 255)
+
+    width : float
+       width of the image (default: None = no scaling) |n|
 
     text : str, tuple or list
         the text to be displayed |n|
@@ -16881,6 +16904,12 @@ def can_animate(try_only=True):
         raise ImportError("PIL is required for animation. Install with pip install Pillow or see salabim manual")
 
     if not Pythonista:
+        if PyDroid:
+
+            if not g.tkinter_loaded:
+                if try_only:
+                    return False
+                raise ImportError("PyDroid animation requires that the main program imports tkinter")
         try:
             import tkinter
         except ImportError:
@@ -16890,6 +16919,7 @@ def can_animate(try_only=True):
                 if try_only:
                     return False
                 raise ImportError("tkinter is required for animation")
+
     return True
 
 
@@ -16975,6 +17005,7 @@ def reset():
     g.animation_env = None
     g.animation_scene = None
     g.in_draw = False
+    g.tkinter_loaded = "?"
 
 
 reset()
