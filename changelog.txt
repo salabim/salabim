@@ -1,6 +1,47 @@
 salabim changelog
 
-version 20.0.0  2020-02-0
+version 20.0.1  2020-02-27
+==========================
+New functionality (0)
+---------------------
+A new class ComponentGenerator is introduced.
+With this, components can be generated according to a given inter arrival time (distribution) or a random spread
+over a given interval.
+
+Examples:
+    sim.ComponentGenerator(Car, iat=sim.Exponential(2))
+    # generates Cars according to a Poisson arrival
+    
+    sim.ComponentGenerator(Car, iat=sim.Exponential(2), at=10, till=30, number=10)
+    # generates maximum 10 Cars according to a Poisson arrival from t=10 to t=30
+    
+    sim.ComponentGenerator(Car, iat=sim.Exponential(2), at=10, till=30, number=10, force_at=True)
+    # generates maximum 10 Cars according to a Poisson arrival from t=10 to t=30, first arrival at t=10
+    
+    sim.ComponentGenerator(sim.Pdf((Car, 0.7, Bus, 0.3)), iat=sim.Uniform(20,40), number=20)
+    # generates maximum 20 vehicles (70% Car, 30% Bus) according to a uniform inter arrival time
+        
+    sim.ComponentGenerator(Car, duration=100, n=20)
+    # generates exactly 20 Cars, random spread over t=now and t=now+100
+    
+ComponentGenerator is a subclass of Component and therefore has all the normal properties and methods of an
+ordinary component, although it is not recommended to use any the process methods, apart from cancel.
+
+Added functionality (0)
+-----------------------
+It is now possible to suppress line numbers in the trace.
+Particularly when the trace output is written to a file, this can result in dramatic (up to 50 times!) 
+performance increase, because the calculation of line numbers is very demanding.
+Now, therefore a method Environment.suppress_trace_linenumbers() has been introduced.
+Like:
+    env = sim.Environment(trace=True)
+    env.suppress_trace_linenumbers(True)
+By default, line numbers are not suppressed in the trace.
+The current status can be queried with
+    print(env.suppress_trace_linenumbers())
+
+
+version 20.0.0  2020-02-10
 ==========================
 Announcement (0)
 ----------------

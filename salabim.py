@@ -1,8 +1,8 @@
-#               _         _      _               ____    ___       ___       ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \     / _ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |   | | | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _ | |_| |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_) \___/
+#               _         _      _               ____    ___       ___      _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \    / |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |   | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _ | |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|_|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
@@ -10,7 +10,7 @@
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "20.0.0"
+__version__ = "20.0.1"
 
 import heapq
 import random
@@ -4021,6 +4021,7 @@ class Environment(object):
 
         _set_name(name, Environment._nameserialize, self)
         self._suppress_trace_standby = True
+        self._suppress_trace_linenumbers = False
         if self._trace:
             if print_trace_header:
                 self.print_trace_header()
@@ -4230,7 +4231,12 @@ class Environment(object):
             c._status = current
             c._scheduled_time = inf
             if self._trace:
-                self.print_trace(self.time_to_str(self._now - self._offset), c.name(), "current", s0=c.lineno_txt())
+                if c.overridden_lineno:
+                    self.print_trace(
+                        self.time_to_str(self._now - self._offset), c.name(), "current", s0=c.overridden_lineno
+                    )
+                else:
+                    self.print_trace(self.time_to_str(self._now - self._offset), c.name(), "current", s0=c.lineno_txt())
             if c == self._main:
                 self.running = False
                 return
@@ -4250,14 +4256,14 @@ class Environment(object):
 
     def _terminate(self, c):
         if c._process_isgenerator:
-            if self._trace:
+            if self._trace and not self.suppress_trace_linenumbers:
                 gi_code = c._process.gi_code
                 gs = inspect.getsourcelines(gi_code)
                 s0 = self.filename_lineno_to_str(gi_code.co_filename, len(gs[0]) + gs[1] - 1) + "+"
             else:
                 s0 = None
         else:
-            if self._trace:
+            if self._trace and not self.suppress_trace_linenumbers:
                 gs = inspect.getsourcelines(c._process)
                 s0 = self.filename_lineno_to_str(c._process.__code__.co_filename, len(gs[0]) + gs[1] - 1) + "+"
             else:
@@ -4265,6 +4271,8 @@ class Environment(object):
         for r in list(c._claims):
             c._release(r, s0=s0)
         if self._trace:
+            if c.overridden_lineno:
+                s0 = c.overridden_lineno
             self.print_trace("", "", c.name() + " ended", s0=s0)
         c._status = data
         c._scheduled_time = inf
@@ -5402,7 +5410,7 @@ class Environment(object):
         This is only relevant when using the time value in Monitor.xt() or Monitor.tx().
         """
         offset_before = self._offset
-        if isinstance(new_now, _Distribution):
+        if callable(new_now):
             new_now = new_now()
         self._offset = self._now - new_now
 
@@ -5441,6 +5449,29 @@ class Environment(object):
             self._trace = value
             self._buffered_trace = False
         return self._trace
+
+    def suppress_trace_linenumbers(self, value=None):
+        """
+        indicates whether line numbers should be suppressed (False by default)
+
+        Parameters
+        ----------
+        value : bool
+            new suppress_trace_linenumbers status |n|
+            if omitted, no change
+
+        Returns
+        -------
+        suppress_trace_linenumbers status : bool
+
+        Note
+        ----
+        By default, suppress_trace_linenumbers is False, meaning that line numbers are shown in the trace.
+        In order to improve performance, line numbers can be suppressed.
+        """
+        if value is not None:
+            self._suppress_trace_linenumbers = value
+        return self._suppress_trace_linenumbers
 
     def suppress_trace_standby(self, value=None):
         """
@@ -5519,11 +5550,11 @@ class Environment(object):
                 if duration == inf:
                     scheduled_time = inf
                 else:
-                    if isinstance(duration, _Distribution):
+                    if callable(duration):
                         duration = duration()
                     scheduled_time = self.env._now + duration
         else:
-            if isinstance(till, _Distribution):
+            if callable(till):
                 till = till()
             if duration is None:
                 scheduled_time = till + self.env._offset
@@ -6387,7 +6418,7 @@ class Environment(object):
         time in years, converted to the current time_unit : float
         """
         self._check_time_unit_na()
-        if isinstance(t, _Distribution):
+        if callable(t):
             t = t()
         return t * 86400 * 365 * self._time_unit
 
@@ -6406,7 +6437,7 @@ class Environment(object):
         time in weeks, converted to the current time_unit : float
         """
         self._check_time_unit_na()
-        if isinstance(t, _Distribution):
+        if callable(t):
             t = t()
         return t * 86400 * 7 * self._time_unit
 
@@ -6425,7 +6456,7 @@ class Environment(object):
         time in days, converted to the current time_unit : float
         """
         self._check_time_unit_na()
-        if isinstance(t, _Distribution):
+        if callable(t):
             t = t()
         return t * 86400 * self._time_unit
 
@@ -6444,7 +6475,7 @@ class Environment(object):
         time in hours, converted to the current time_unit : float
         """
         self._check_time_unit_na()
-        if isinstance(t, _Distribution):
+        if callable(t):
             t = t()
         return t * 3600 * self._time_unit
 
@@ -6463,7 +6494,7 @@ class Environment(object):
         time in minutes, converted to the current time_unit : float
         """
         self._check_time_unit_na()
-        if isinstance(t, _Distribution):
+        if callable(t):
             t = t()
         return t * 60 * self._time_unit
 
@@ -6482,7 +6513,7 @@ class Environment(object):
         time in secoonds, converted to the current time_unit : float
         """
         self._check_time_unit_na()
-        if isinstance(t, _Distribution):
+        if callable(t):
             t = t()
         return t * self._time_unit
 
@@ -6501,7 +6532,7 @@ class Environment(object):
         time in milliseconds, converted to the current time_unit : float
         """
         self._check_time_unit_na()
-        if isinstance(t, _Distribution):
+        if callable(t):
             t = t()
         return t * 1e-3 * self._time_unit
 
@@ -6520,7 +6551,7 @@ class Environment(object):
         time in microseconds, converted to the current time_unit : float
         """
         self._check_time_unit_na()
-        if isinstance(t, _Distribution):
+        if callable(t):
             t = t()
         return t * 1e-6 * self._time_unit
 
@@ -6543,7 +6574,7 @@ class Environment(object):
         Time t converted to the time_unit specified : float
         """
         self._check_time_unit_na()
-        if isinstance(t, _Distribution):
+        if callable(t):
             t = t()
         return t * _time_unit_lookup(time_unit) / self.env._time_unit
 
@@ -6759,14 +6790,17 @@ class Environment(object):
         if self._trace:
             if not (hasattr(self, "_current_component") and self._current_component._suppress_trace):
                 if s0 is None:
-                    stack = inspect.stack()
-                    filename0 = inspect.getframeinfo(stack[0][0]).filename
-                    for i in range(len(inspect.stack())):
-                        frame = stack[i][0]
-                        if filename0 != inspect.getframeinfo(frame).filename:
-                            break
+                    if self._suppress_trace_linenumbers:
+                        s0 = ""
+                    else:
+                        #                        stack = inspect.stack()
+                        #                        filename0 = inspect.getframeinfo(stack[0][0]).filename
+                        #                        for i in range(len(inspect.stack())):
+                        #                            frame = stack[i][0]
+                        #                            if filename0 != inspect.getframeinfo(frame).filename:
+                        #                                break
 
-                    s0 = self._frame_to_lineno(_get_caller_frame())
+                        s0 = self._frame_to_lineno(_get_caller_frame())
                 self.last_s0 = s0
                 line = pad(s0, 7) + pad(s1, 10) + " " + pad(s2, 20) + " " + pad(s3, max(len(s3), 36)) + " " + s4.strip()
                 if _optional:
@@ -10779,8 +10813,6 @@ class Component(object):
         if None (default), it will try to start self.process() |n|
         if null string, no process will be started even if self.process() exists,
         i.e. become a data component. |n|
-        note that the function *must* be a generator,
-        i.e. contains at least one yield.
 
     suppress_trace : bool
         suppress_trace indicator |n|
@@ -10810,6 +10842,8 @@ class Component(object):
         environment where the component is defined |n|
         if omitted, default_env will be used
     """
+
+    overridden_lineno = None
 
     def __init__(
         self,
@@ -10907,12 +10941,12 @@ class Component(object):
                 urgent = False
             if delay is None:
                 delay = 0
-            elif isinstance(delay, _Distribution):
+            elif callable(delay):
                 delay = delay()
             if at is None:
                 scheduled_time = self.env._now + delay
             else:
-                if isinstance(at, _Distribution):
+                if callable(at):
                     at = at()
                 scheduled_time = at + self.env._offset + delay
 
@@ -11144,13 +11178,15 @@ class Component(object):
                 delta = ""
             else:
                 delta = " +" + self.env.time_to_str(scheduled_time - self.env._now).strip()
+            if self.overridden_lineno:
+                lineno = ""
+            else:
+                lineno = self.lineno_txt(add_at=True)
             self.env.print_trace(
                 "",
                 "",
                 self.name() + " " + caller + delta,
-                merge_blanks(
-                    scheduled_time_str + _urgenttxt(urgent) + "@" + self.lineno_txt(), _modetxt(self._mode), extra
-                ),
+                merge_blanks(scheduled_time_str + _urgenttxt(urgent) + lineno, _modetxt(self._mode), extra),
                 s0=s0,
             )
 
@@ -11262,13 +11298,13 @@ class Component(object):
             self._mode = mode
             self._mode_time = self.env._now
 
-        if isinstance(delay, _Distribution):
+        if callable(delay):
             delay = delay()
 
         if at is None:
             scheduled_time = self.env._now + delay
         else:
-            if isinstance(at, _Distribution):
+            if callable(at):
                 at = at()
             scheduled_time = at + self.env._offset + delay
 
@@ -11327,12 +11363,12 @@ class Component(object):
             if duration is None:
                 scheduled_time = self.env._now
             else:
-                if isinstance(duration, _Distribution):
+                if callable(duration):
                     duration = duration()
                 scheduled_time = self.env._now + duration
         else:
             if duration is None:
-                if isinstance(till, _Distribution):
+                if callable(till):
                     till = till()
                 scheduled_time = till + self.env._offset
             else:
@@ -11627,12 +11663,12 @@ class Component(object):
                 if fail_delay == inf:
                     scheduled_time = inf
                 else:
-                    if isinstance(fail_delay, _Distribution):
+                    if callable(fail_delay):
                         fail_delay = fail_delay()
                     scheduled_time = self.env._now + fail_delay
         else:
             if fail_delay is None:
-                if isinstance(fail_at, _Distribution):
+                if callable(fail_at):
                     fail_at = fail_at()
                 scheduled_time = fail_at + self.env._offset
             else:
@@ -11988,12 +12024,12 @@ class Component(object):
                 if fail_delay == inf:
                     scheduled_time = inf
                 else:
-                    if isinstance(fail_delay, _Distribution):
+                    if callable(fail_delay):
                         fail_delay = fail_delay()
                     scheduled_time = self.env._now + fail_delay
         else:
             if fail_delay is None:
-                if isinstance(fail_at, _Distribution):
+                if callable(fail_at):
                     fail_at = fail_at()
                 scheduled_time = fail_at + self.env._offset
             else:
@@ -12804,7 +12840,9 @@ class Component(object):
         if self == self.env._main:
             raise ValueError(self.name() + " main component not allowed")
 
-    def lineno_txt(self):
+    def lineno_txt(self, add_at=False):
+        if self.env._suppress_trace_linenumbers:
+            return ""
         plus = "+"
         if self == self.env._main:
             frame = self.frame
@@ -12817,7 +12855,261 @@ class Component(object):
                 gs = inspect.getsourcelines(self._process)
                 s0 = self.env.filename_lineno_to_str(self._process.__code__.co_filename, gs[1]) + " "
                 return s0
-        return self.env._frame_to_lineno(frame) + plus
+        return ("@" if add_at else "") + self.env._frame_to_lineno(frame) + plus
+
+
+class ComponentGenerator(Component):
+    """Component generator object
+
+    A component generator can be used to genetate components |n|
+    There are two ways of generating components: |n|
+    - according to a given inter arrival time (iat) value or distribution
+    - random spread over a given time interval
+
+    Parameters
+    ----------
+    component_class : callable, usually a subclass of Component or Pdf or Cdf distribution
+        the type of components to be generated |n|
+        in case of a distribution, the Pdf or Cdf should return a subclass of Component
+        
+    name : str
+        name of the component generator. |n|
+        if the name ends with a period (.),
+        auto serializing will be applied |n|
+        if the name end with a comma,
+        auto serializing starting at 1 will be applied |n|
+        if omitted, the name will be derived from the name of the component_class, padded with '.generator'
+
+    at : float or distribution
+        time where the generator starts time |n|
+        if omitted, now is used |n|
+        if distribution, the distribution is sampled
+
+    delay : float or distribution
+        delay where the generator starts (at = now + delay) |n|
+        if omitted, no delay |n|
+        if distribution, the distribution is sampled
+
+    till : float or distribution
+        time up to which components should be generated |n|
+        if omitted, no end |n|
+        if distribution, the distribution is sampled
+
+    duration : float or distribution
+        duration to which components should be generated (till = now + duration) |n|
+        if omitted, no end |n|
+        if distribution, the distribution is sampled
+
+    number : int or distribution
+        (maximum) number of components to be generated |n|
+        if distribution, the distribution is sampled
+
+    iat : float or distribution
+        inter arrival time (distribution). |n|
+        if None (default), a random spread over the interval (at, till) will be used |n|
+
+    force_at : bool
+        for iat generation: |n|
+            if False (default), the first component will be generated at time = at + sample from the iat |n|
+            if True, the first component will be generated at time = at |n|
+        for random spread generation: |n|
+            if False (default), no force for time = at |n|
+            if True, force the first generation at time = at |n|
+
+    force_till : bool
+        only possible for random spread generation: |n|
+        if False (default), no force for time = till |n|
+        if True, force the last generated component at time = till |n|
+
+    suppress_pause_at_step : bool
+        suppress_pause_at_step indicator |n|
+        if True, if this component becomes current, do not pause when stepping |n|
+        If False (default), the component will be paused when stepping |n|
+        Can be queried or set later with the suppress_pause_at_step method.
+
+    skip_standby : bool
+        skip_standby indicator |n|
+        if True, after this component became current, do not activate standby components |n|
+        If False (default), after the component became current  activate standby components |n|
+        Can be queried or set later with the skip_standby method.
+
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
+        
+    Note
+    ----
+    For iat distributions: if till/duration and number are specified, the generation stops whichever condition
+    comes first.
+    """
+
+    def __init__(
+        self,
+        component_class,
+        name=None,
+        at=None,
+        delay=None,
+        till=None,
+        duration=None,
+        number=None,
+        iat=None,
+        force_at=False,
+        force_till=False,
+        suppress_trace=False,
+        suppress_pause_at_step=False,
+        env=None,
+    ):
+        if name is None:
+            name = str(component_class).split(".")[-1][:-2] + ".generator."
+        if env is None:
+            env = g.default_env
+        self.overridden_lineno = env._frame_to_lineno(_get_caller_frame())
+        if not isinstance(component_class, _Distribution) and not issubclass(component_class, Component):
+            raise ValueError("component_class must be a Component subclass or distribution")
+        self.component_class = component_class
+        self.iat = iat
+        if callable(at):
+            at = at()
+        if callable(delay):
+            delay = delay()
+        if delay is not None and at is not None:
+            raise ValueError("delay and at specified.")
+        if delay is None:
+            delay = 0
+        at = env._now + delay if at is None else at + env._offset
+        if callable(till):
+            till = till()
+        if callable(duration):
+            duration = duration()
+        if till is None:
+            if duration is None:
+                self.till = inf
+            else:
+                self.till = at + duration
+        else:
+            if duration is None:
+                self.till = till + env._offset
+            else:
+                raise ValueError("till and duration specified.")
+        if callable(number):
+            self.number = int(number())
+        else:
+            self.number = inf if number is None else int(number)
+        if self.till < at:
+            raise ValueError("at > till")
+        if self.number < 0:
+            raise ValueError("number < 0")
+        if self.number < 1:
+            at = None
+            process = ""
+        else:
+            if self.iat is None:
+                if till == inf or self.number == inf:
+                    raise ValueError("iat not specified --> till and number need to be specified")
+
+                samples = sorted([Uniform(at, till)() for _ in range(self.number)])
+                if force_at or force_till:
+                    if number == 1:
+                        if force_at and force_till:
+                            raise ValueError("force_at and force_till does not allow number=1")
+                        samples = [at] if force_at else _[till]
+                    else:
+                        v_at = at if force_at else samples[0]
+                        v_till = till if force_till else samples[-1]
+                        min_sample = samples[0]
+                        max_sample = samples[-1]
+                        print("vat, vtill", v_at, v_till)
+                        samples = [interpolate(sample, min_sample, max_sample, v_at, v_till) for sample in samples]
+                self.intervals = [t1 - t0 for t0, t1 in zip([0] + samples, samples)]
+                at = self.intervals.pop(0)
+                process = "do_spread"
+            else:
+                if force_till:
+                    raise ValueError("force_till is not allowed for iat generators")
+                if not force_at:
+                    if callable(self.iat):
+                        at += self.iat()
+                    else:
+                        at += +self.iat
+                if at > self.till:
+                    at = self.till
+                    process = "do_finalize"
+                else:
+                    process = "do_iat"
+
+        super().__init__(
+            name=name,
+            env=env,
+            process=process,
+            at=at,
+            suppress_trace=suppress_trace,
+            suppress_pause_at_step=suppress_pause_at_step,
+        )
+
+    def do_spread(self):
+        for interval in self.intervals:
+            yield self.hold(interval)
+            if isinstance(self.component_class, _Distribution):
+                self.component_class()()
+            else:
+                self.component_class()
+        self.env.print_trace("", "", "all components generated")
+
+    def do_iat(self):
+        n = 0
+        while True:
+            if isinstance(self.component_class, _Distribution):
+                self.component_class()()
+            else:
+                self.component_class()
+            n += 1
+            if n >= self.number:
+                self.env.print_trace("", "", str(n) + " components generated")
+                return
+            if callable(self.iat):
+                t = self.env._now + self.iat()
+            else:
+                t = self.env._now + self.iat
+            if t > self.till:
+                yield self.activate(process="do_finalize", at=self.till)
+
+            yield self.hold(till=t)
+
+    def do_finalize(self):
+        self.env.print_trace("", "", "till reached")
+
+    def print_info(self, as_str=False, file=None):
+        """
+        prints information about the component generator
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        file: file
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
+        Returns
+        -------
+        info (if as_str is True) : str
+        """
+        result = []
+        result.append(object_to_str(self) + " " + hex(id(self)))
+        result.append("  name=" + self.name())
+
+        result.append("  class of components=" + str(self.component_class).split(".")[-1][:-2])
+        result.append("  iat=" + repr(self.iat))
+        result.append("  suppress_trace=" + str(self._suppress_trace))
+        result.append("  suppress_pause_at_step=" + str(self._suppress_pause_at_step))
+        result.append("  status=" + self._status())
+        result.append("  mode=" + _modetxt(self._mode).strip())
+        result.append("  mode_time=" + self.env.time_to_str(self._mode_time))
+        result.append("  creation_time=" + self.env.time_to_str(self._creation_time))
+        result.append("  scheduled_time=" + self.env.time_to_str(self._scheduled_time))
+        return return_or_print(result, as_str, file)
 
 
 class Random(random.Random):
