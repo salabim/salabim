@@ -24,7 +24,6 @@ Changes in video production (0)
 -------------------------------
 With this version, animated PNGs are supported as well. In contrast to animated GIFs, the background
 can be transparent (i.e. have an alpha <255).
-In order to create animated PNGs, the pyAPNG library has to be installed.
 
 For the production of individual video frames in jpg, png, bmp, tiff or gif format, the filename
 now has to contain one asterisk (*), which will be replaced by a 6 digit zero-padded serial number
