@@ -1,33 +1,33 @@
 salabim changelog
 
-version 20.0.2  2020-04-30
+version 20.0.2  2020-05-18
 ==========================
 New functionality (0)
 ---------------------
 Component.request() has a new parameter 'oneof'.
-If oneof=True, the request has to be honored by just one of the given resources.
+If oneof=True, the request has to be honoured by just one of the given resources.
 So, this essentially an or condition.
-Note that the order of the mentioned resources is the order in which the request will be honored.
+Note that the order of the mentioned resources is the order in which the request will be honoured.
 It is possible to check which resource has claimed with Component.claimers()
 
 Example:
     c.request(r1, r2, r3, oneof=True)
-The request will be honored if either r1, r2 OR r3 has at least a quantity of one available.
+The request will be honoured if either r1, r2 OR r3 has at least a quantity of one available.
 This contrast to
     c.request(r1, r2, r3)
-, which will be honored if r1, r2 AND r3 have at least a quantity of one available.
+, which will be honoured if r1, r2 AND r3 have at least a quantity of one available.
 
-The trace of request and honoring request has been updated accordingly.     
+The trace of request and honouring request has been updated accordingly.     
 
 
 Changes in video production (0)
 -------------------------------
-With this version animated PNGs are supported as well. In contrast to animated GIFs, the background
+With this version, animated PNGs are supported as well. In contrast to animated GIFs, the background
 can be transparent (i.e. have an alpha <255).
 In order to create animated PNGs, the pyAPNG library has to be installed.
 
 For the production of individual video frames in jpg, png, bmp, tiff or gif format, the filename
-now has to contain one asteriks (*), which will be replaced by a 6 digit zero padded serialnumber
+now has to contain one asterisk (*), which will be replaced by a 6 digit zero-padded serial number
 at run time, for each frame.
 E.g.
     video('.\videos\car*.jpg)
@@ -66,32 +66,32 @@ Compatibility (0)
 From now on, only Python >=3.4 is supported, particularly because salabim now uses pathlib internally.
 
 
-Bug fix (0)
+Bugfix (0)
 -----------
 In a number of methods, e.g. Queue.__init__(), the environment of an implied Monitor was set to the
-default environent instead of the overruled environment.
+default environment instead of the overruled environment.
 
 
-Bug fix (1)
+Bugfix (1)
 -----------
 PeriodMonitor lacked an env parameter. Fixed. 
 
 
-Bug fix (2)
+Bugfix (2)
 -----------
-Under certain conditions an animated GIF was not written correctly as a result of a bug in the optimization
+Under certain conditions, an animated GIF was not written correctly as a result of a bug in the optimization
 of PIL save. From now on, salabim disables the optimization, possibly resulting in slightly larger
 .GIF files. This change does not apply to Pythonista, which uses another technique to save animated GIFs.
 
-Bug fix (3)
+Bugfix (3)
 -----------
 Under Pythonista, video production (animated gif only) did not start at the right time.
 Fixed.
 
 Internal changes (0)
 --------------------
-In order to support the new oneof parameter of request, the datastructure of _requests and _claims is now 
-collections.OrderedDictminstead of collections.defaultdict.
+In order to support the new oneof parameter of request, the data structure of _requests and _claims is now 
+collections.OrderedDict instead of collections.defaultdict.
 
 version 20.0.1  2020-02-27
 ==========================
