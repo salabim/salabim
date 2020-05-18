@@ -1,13 +1,105 @@
 salabim changelog
 
+version 20.0.2  2020-04-30
+==========================
+New functionality (0)
+---------------------
+Component.request() has a new parameter 'oneof'.
+If oneof=True, the request has to be honored by just one of the given resources.
+So, this essentially an or condition.
+Note that the order of the mentioned resources is the order in which the request will be honored.
+It is possible to check which resource has claimed with Component.claimers()
+
+Example:
+    c.request(r1, r2, r3, oneof=True)
+The request will be honored if either r1, r2 OR r3 has at least a quantity of one available.
+This contrast to
+    c.request(r1, r2, r3)
+, which will be honored if r1, r2 AND r3 have at least a quantity of one available.
+
+The trace of request and honoring request has been updated accordingly.     
+
+
+Changes in video production (0)
+-------------------------------
+With this version animated PNGs are supported as well. In contrast to animated GIFs, the background
+can be transparent (i.e. have an alpha <255).
+In order to create animated PNGs, the pyAPNG library has to be installed.
+
+For the production of individual video frames in jpg, png, bmp, tiff or gif format, the filename
+now has to contain one asteriks (*), which will be replaced by a 6 digit zero padded serialnumber
+at run time, for each frame.
+E.g.
+    video('.\videos\car*.jpg)
+Filenames without an asteriks are only allowed for real videos or animated gif/png files:
+    videos('.videos\car.png')
+Note that the directory is now automatically created.
+Because of the changes, the Environment.delete_video() is now deprecated.
+
+Internally, the video production is now more consistent and easier to maintain.
+
+Improved functionality (0)
+--------------------------
+Under Linux and Android many more fonts will be available because salabim now searches (recursively)
+in /usr/share/fonts and /system/fonts for .ttf files as well.
+As a reminder: it is possible to show all available fonts with
+    sim.show_fonts()
+
+
+Utility files (0)
+-----------------
+The utility 'install.py' is now called 'install salabim.py' and is now fully compatible with
+pip uninstall and pip update, because a salabim-<version>.dist-info directory is written correctly
+to the site-packages folder.
+
+New is 'install salabim from github.py' which installs salabim directly from github instead of PyPI.
+
+
+Support for iPadOS/iOS PyTo (0)
+-------------------------------
+When running under PyTo, a NotImplementedError was raised. Now, salabim can be run on this platform, albeit
+animation is not supported.
+
+
+Compatibility (0)
+-----------------
+From now on, only Python >=3.4 is supported, particularly because salabim now uses pathlib internally.
+
+
+Bug fix (0)
+-----------
+In a number of methods, e.g. Queue.__init__(), the environment of an implied Monitor was set to the
+default environent instead of the overruled environment.
+
+
+Bug fix (1)
+-----------
+PeriodMonitor lacked an env parameter. Fixed. 
+
+
+Bug fix (2)
+-----------
+Under certain conditions an animated GIF was not written correctly as a result of a bug in the optimization
+of PIL save. From now on, salabim disables the optimization, possibly resulting in slightly larger
+.GIF files. This change does not apply to Pythonista, which uses another technique to save animated GIFs.
+
+Bug fix (3)
+-----------
+Under Pythonista, video production (animated gif only) did not start at the right time.
+Fixed.
+
+Internal changes (0)
+--------------------
+In order to support the new oneof parameter of request, the datastructure of _requests and _claims is now 
+collections.OrderedDictminstead of collections.defaultdict.
+
 version 20.0.1  2020-02-27
 ==========================
 New functionality (0)
 ---------------------
 A new class ComponentGenerator is introduced.
-With this, components can be generated according to a given inter arrival time (distribution) or a random spread
+With this, component can be generated according to a given inter arrival time (distribution) or a random spread
 over a given interval.
-
 Examples:
     sim.ComponentGenerator(Car, iat=sim.Exponential(2))
     # generates Cars according to a Poisson arrival
@@ -25,7 +117,7 @@ Examples:
     # generates exactly 20 Cars, random spread over t=now and t=now+100
     
 ComponentGenerator is a subclass of Component and therefore has all the normal properties and methods of an
-ordinary component, although it is not recommended to use any the process methods, apart from cancel.
+ordinary component, altough it is not recommended to use any the process methods, apart from cancel.
 
 Added functionality (0)
 -----------------------

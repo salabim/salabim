@@ -1,8 +1,8 @@
-#               _         _      _               ____    ___       ___      _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \    / |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |   | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _ | |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|_|
+#               _         _      _               ____    ___       ___      ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \    |___ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |     __) |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _  / __/
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|_____|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
@@ -10,7 +10,7 @@
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "20.0.1"
+__version__ = "20.0.2"
 
 import heapq
 import random
@@ -18,7 +18,6 @@ import time
 import math
 import array
 import collections
-import glob
 import os
 import inspect
 import platform
@@ -36,6 +35,10 @@ import shutil
 import subprocess
 import tempfile
 import traceback
+import struct
+import binascii
+
+from pathlib import Path
 
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
@@ -47,9 +50,12 @@ class g:
 
 
 if Pythonista:
-    import scene
-    import ui
-    import objc_util
+    try:
+        import scene
+        import ui
+        import objc_util
+    except ModuleNotFoundError:
+        Pythonista = False  # for non Pythonista implementation on iOS
 
 inf = float("inf")
 nan = float("nan")
@@ -390,6 +396,8 @@ class Monitor(object):
                 raise TypeError("not possible to mix level monitor with non level monitor")
             if self.xtype != m.xtype:
                 raise TypeError("not possible to mix type '" + self.xtype + "' with type '" + m.xtype + "'")
+            if self.env != m.env:
+                raise TypeError("not possible to mix environments")
         if name is None:
             if self.name().endswith(".merged"):
                 # this to avoid multiple .merged (particularly when merging with the + operator)
@@ -397,7 +405,7 @@ class Monitor(object):
             else:
                 name = self.name() + ".merged"
 
-        new = _SystemMonitor(name=name, type=self.xtype, level=self._level)
+        new = _SystemMonitor(name=name, type=self.xtype, level=self._level, env=self.env)
 
         merge = [self] + list(monitors)
 
@@ -493,7 +501,7 @@ class Monitor(object):
         """
         if name is None:
             name = self.name() + ".sliced"
-        new = _SystemMonitor(level=self._level, type=self.xtype, name=name)
+        new = _SystemMonitor(level=self._level, type=self.xtype, name=name, env=self.env)
         actions = []
         if modulo is None:
             if start is None:
@@ -1096,7 +1104,7 @@ class Monitor(object):
         if self.xtype == "float":
             if name is None:
                 name = self.name()
-            new = _SystemMonitor(name=name, monitor=False, type="float", level=False)
+            new = _SystemMonitor(name=name, monitor=False, type="float", level=False, env=self.env)
             new.isgenerated = True
             new._x = [x * scale for x in self._x]
             new._t = [t for t in self._t]
@@ -2573,24 +2581,13 @@ if Pythonista:
                 if not env.paused:
                     env.frametimes.append(time.time())
 
-                an_objects = sorted(
-                    env.an_objects, key=lambda obj: (-obj.layer(env.t), obj.sequence)
-                )  # has to be a copy!
                 touchvalues = self.touches.values()
-                capture_image = Image.new("RGB", (env._width, env._height), env.colorspec_to_tuple("bg"))
-                #                capture_image = Image.new("RGBA", (env._width, env._height), (0,0,0,0))
                 env.animation_pre_tick(env.t)
                 env.animation_pre_tick_sys(env.t)
-                for ao in an_objects:
-                    ao.make_pil_image(env.t)
-                    if ao._image_visible:
-                        capture_image.paste(
-                            ao._image, (int(ao._image_x), int(env._height - ao._image_y - ao._image.size[1])), ao._image
-                        )
                 env.animation_post_tick(env.t)
                 if env.retina:
                     with io.BytesIO() as fp:
-                        capture_image.save(fp, "BMP")
+                        env.capture_image("RGB").save(fp, "BMP")
                         img = ui.Image.from_data(fp.getvalue(), scene.get_screen_scale())
                     if self.bg is None:
                         self.bg = scene.SpriteNode(scene.Texture(img))
@@ -2600,18 +2597,16 @@ if Pythonista:
                     else:
                         self.bg.texture = scene.Texture(img)
                 else:
+                    capture_image = env.capture_image("RGB")
                     ims = scene.load_pil_image(capture_image)
                     scene.image(ims, 0, 0, *capture_image.size)
                     scene.unload_image(ims)
 
                 if env._video and (not env.paused):
-                    if env._video_out == "gif":
-                        env._images.append(capture_image.convert("RGB"))
-                    elif env._video_out == "snapshots":
-                        capture_image.save(env._video_name)
-                        env._video_name = incstr(env._video_name)
-                    else:
-                        pass  # this should never occur
+                    env.save_frame()
+                    env.video_t += env._speed / env._fps
+                    env.frame_number += 1
+
                 for uio in env.ui_objects:
                     ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True, retina_scale=True)
                     uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True, retina_scale=True)
@@ -2683,10 +2678,6 @@ if Pythonista:
                 scene.text("salabim animation paused/stopped")
                 scene.pop_matrix()
                 scene.tint(1, 1, 1, 1)
-            if env is not None:
-                if env._video:
-                    if not env.paused:
-                        env.video_t += env._speed / env._fps
             g.in_draw = False
 
 
@@ -2768,7 +2759,7 @@ class Queue(object):
         self.length = _SystemMonitor(
             "Length of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="uint32", env=self.env
         )
-        self.length_of_stay = Monitor("Length of stay in " + self.name(), monitor=monitor, type="float")
+        self.length_of_stay = Monitor("Length of stay in " + self.name(), monitor=monitor, type="float", env=self.env)
         if fill is not None:
             savetrace = self.env._trace
             self.env._trace = False
@@ -4399,9 +4390,11 @@ class Environment(object):
             if video is not omitted, a video with the name video
             will be created. |n|
             Normally, use .mp4 as extension. |n|
-            If the extension is .gif, an animated gif file will be written |n|
-            If the extension is .jpg, .png, .bmp or .tiff, individual frames will be written with
-            a six digit sequence added to the file name.
+            If the extension is .gif or .png an animated gif / png file will be written, unless there
+            is a * in the filename |n|
+            If the extension is .gif, .jpg, .png, .bmp or .tiff and one * appears in the filename,
+            individual frames will be written with
+            a six digit sequence at the place of the asteriks in the file name.
             If the video extension is not .gif, .jpg, .png, .bmp or .tiff, a codec may be added
             by appending a plus sign and the four letter code name,
             like "myvideo.avi+DIVX". |n|
@@ -4409,15 +4402,15 @@ class Environment(object):
             Under PyDroid only .avi files are supported.
 
         video_repeat : int
-            number of times gif should be repeated |n|
+            number of times animated gif or png should be repeated |n|
             0 means inifinite |n|
             at init of the environment video_repeat is 1 |n|
-            this only applies to gif files production.
+            this only applies to gif and png files production.
 
         video_pingpong : bool
             if True, all frames will be added reversed at the end of the video (useful for smooth loops)
             at init of the environment video_pingpong is False |n|
-            this only applies to gif files production.
+            this only applies to gif and png files production.
 
         audio : str
             name of file to be played (mp3 or wav files) |n|
@@ -4593,20 +4586,31 @@ class Environment(object):
                     self.video_close()
                 self._video = video
 
-                if video != "":
+                if video:
+                    can_animate(try_only=False)
                     video_opened = True
-                    filename, extension = splitext(video)  # os.path.splitext does not support null fileparts
-                    if extension.lower() == ".gif":
-                        if filename == "":
-                            raise ValueError("incorrect video name " + video)
-                        self._video_name = video
-                        can_animate(try_only=False)
+                    video_path = Path(video)
+                    extension = video_path.suffix.lower()
+                    self._video_name = video
+                    video_path.parent.mkdir(parents=True, exist_ok=True)                                                          
+                    if extension == ".gif" and not ("*" in video_path.stem):
                         self._video_out = "gif"
                         self._images = []
-                    elif extension.lower() in (".jpg", ".png", ".bmp", ".tiff"):
-                        self.delete_video(video)
-                        self._video_name = filename + "000000" + extension
-                        can_animate(try_only=False)
+                    elif extension == ".png" and not ("*" in video_path.stem):
+                        self._video_out = "png"
+                        self._images = []
+                    elif extension.lower() in (".jpg", ".png", ".bmp", ".tiff", ".gif"):
+                        if '*' in video_path.stem:
+                            if video.count('*') > 1:
+                                raise ValueError('more than one * found in '+video)
+                            if '?' in video:
+                                raise ValueError('? found in '+video)                                                              
+                            self.video_name_format = video.replace("*", "{:06d}")
+                            for file in video_path.parent.glob(video_path.name.replace("*", "??????")):
+                                file.unlink()
+                        else:
+                            raise ValueError("incorrect video name (should contain a *) " + video)
+
                         self._video_out = "snapshots"
 
                     else:
@@ -4617,11 +4621,9 @@ class Environment(object):
                         if PyDroid and extension.lower() != ".avi":
                             raise ValueError("PyDroid can only produce .avi videos, not " + extension)
 
-                        self._video_name = filename + extension
-                        can_video(try_only=False)
                         fourcc = cv2.VideoWriter_fourcc(*codec)
-                        if os.path.exists(self._video_name):
-                            os.remove(self._video_name)
+                        if video_path.is_file():
+                            video_path.unlink()
                         self._video_name_temp = tempfile.NamedTemporaryFile(suffix=extension, delete=False).name
                         self._video_out = cv2.VideoWriter(
                             self._video_name_temp, fourcc, self._fps, (self._width, self._height)
@@ -4642,7 +4644,7 @@ class Environment(object):
                 raise ValueError("width changed while recording video.")
             if height_changed:
                 raise ValueError("height changed while recording video.")
-            if fps_changed and self._video_out not in ("gif", "snapshots"):
+            if fps_changed:
                 raise ValueError("fps changed while recording video.")
 
         if self._video != "":
@@ -4683,31 +4685,6 @@ class Environment(object):
 
                 self.an_menu_buttons()
 
-    def delete_video(self, video):
-        """
-        deletes video file(s), if any |n|
-
-        Parameters
-        ----------
-        video : str
-            name of video to be deleted |n|
-            if the extension is .jpg, .png, .bmp or .tiff, all autonumbered files will be deleted, if any. |n|
-            otherwise, the function is equivalent to os.remove() if the file exists, otherwise no action is taken
-        """
-        filename, extension = splitext(video)  # os.path.splitext does not support null fileparts
-        if extension.lower() in (".jpg", ".png", ".bmp", ".tiff"):
-            for file in glob.glob(filename + "??????" + extension):
-                filepart = file[: -len(extension)]
-                digits_only = True
-                for c in filepart[len(filename) - 6 : len(filename)]:
-                    if c not in string.digits:
-                        digits_only = False
-                if digits_only:
-                    os.remove(file)
-        else:
-            if os.path.isfile(video):
-                os.remove(video)
-
     def video_close(self):
         """
         closes the current animation video recording, if any.
@@ -4730,8 +4707,21 @@ class Environment(object):
                             append_images=self._images[1:],
                             loop=self._video_repeat,
                             duration=1000 / self._fps,
+                            optimize=False,
                         )
-                    self._images = []  # release memory
+                    del self._images
+            elif self._video_out == "png":
+
+                if self._video_pingpong:
+                    self._images.extend(self._images[::-1])
+                this_apng = _APNG(num_plays=self._video_repeat)
+                for image in self._images:
+                    with io.BytesIO() as png_file:
+                        image.save(png_file, "PNG", optimize=True)
+                        this_apng.append(_APNG.PNG.from_bytes(png_file.getvalue()), delay=1, delay_den=int(self.fps()))
+                this_apng.save(self._video_name)
+                del self._images
+
             elif self._video_out == "snapshots":
                 pass
             else:
@@ -4744,6 +4734,33 @@ class Environment(object):
 
             self._video_out = None
             self._video = ""
+
+    def capture_image(self, mode="RGBA"):
+        an_objects = sorted(self.an_objects, key=lambda obj: (-obj.layer(self.t), obj.sequence))  # has to be a copy!
+        this_image = Image.new(mode, (self._width, self._height), self.colorspec_to_tuple("bg"))
+        for ao in an_objects:
+            ao.make_pil_image(self.t)
+            if ao._image_visible:
+                this_image.paste(
+                    ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image
+                )
+        return this_image
+
+    def save_frame(self):
+        if self._video_out == "gif":
+            self._images.append(self.capture_image("RGB"))
+        elif self._video_out == "png":
+            self._images.append(self.capture_image("RGBA"))
+        elif self._video_out == "snapshots":
+            serialized_video_name = self.video_name_format.format(self.frame_number)
+            if self._video_name.lower().endswith(".jpg"):
+                self.capture_image("RGB").save(serialized_video_name)
+            else:
+                self.capture_image("RGBA").save(serialized_video_name)
+
+        else:
+            open_cv_image = cv2.cvtColor(numpy.array(self.capture_image("RGB")), cv2.COLOR_RGB2BGR)
+            self._video_out.write(open_cv_image)
 
     def add_audio(self):
         if not Windows:
@@ -5619,8 +5636,6 @@ class Environment(object):
                 self.root.quit()
                 return
 
-            if self._video:
-                capture_image = Image.new("RGB", (self._width, self._height), self.colorspec_to_tuple("bg"))
             if not self.paused:
                 self.frametimes.append(time.time())
 
@@ -5667,13 +5682,6 @@ class Environment(object):
                             g.canvas.itemconfig(ao.canvas_object, image=ao.im)
                             g.canvas.coords(ao.canvas_object, (ao._image_x, self._height - ao._image_y))
                     co = next(canvas_objects_iter, None)
-
-                    if self._video:
-                        capture_image.paste(
-                            ao._image,
-                            (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])),
-                            ao._image,
-                        )
                 else:
                     ao.canvas_object = None
 
@@ -5707,18 +5715,9 @@ class Environment(object):
                         uio.lasttext = thistext
                         uio.button.config(text=thistext)
 
-            if self._video and (not self.paused):
-                if self._video_out == "gif":
-                    self._images.append(capture_image)
-                elif self._video_out == "snapshots":
-                    capture_image.save(self._video_name)
-                    self._video_name = incstr(self._video_name)
-                else:
-                    open_cv_image = cv2.cvtColor(numpy.array(capture_image), cv2.COLOR_RGB2BGR)
-                    self._video_out.write(open_cv_image)
-
             if self._video:
                 if not self.paused:
+                    self.save_frame()
                     self.video_t += self._speed / self._fps
                     self.frame_number += 1
             else:
@@ -5744,24 +5743,16 @@ class Environment(object):
             the alpha value to something else than 255.
         """
         can_animate(try_only=False)
-        extension = os.path.splitext(filename)[1].lower()
+        filename_path = Path(filename)        
+        extension = filename_path.suffix.lower()
         if extension in (".png", ".gif", ".bmp", ".tiff"):
             mode = "RGBA"
         elif extension == ".jpg":
             mode = "RGB"
         else:
             raise ValueError("extension " + extension + "  not supported")
-        capture_image = Image.new(mode, (self._width, self._height), self.colorspec_to_tuple("bg"))
-        self.an_objects.sort(key=lambda obj: (-obj.layer(self.t), obj.sequence))
-        self.animation_pre_tick(self._now)
-        self.animation_pre_tick_sys(self._now)
-        for ao in self.an_objects:
-            ao.make_pil_image(self._now)
-            if ao._image_visible:
-                capture_image.paste(
-                    ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image
-                )
-        capture_image.save(filename)
+        filename_path.parent.mkdir(parents=True, exist_ok=True)                                                                  
+        self.capture_image(mode).save(filename)
 
     def modelname_width(self):
         if Environment.cached_modelname_width[0] != self._modelname:
@@ -10867,8 +10858,8 @@ class Component(object):
         self._qmembers = {}
         self._process = None
         self._status = data
-        self._requests = collections.defaultdict(int)
-        self._claims = collections.defaultdict(int)
+        self._requests = collections.OrderedDict()
+        self._claims = collections.OrderedDict()
         self._waits = []
         self._on_event_list = False
         self._scheduled_time = inf
@@ -11149,7 +11140,7 @@ class Component(object):
                 self.leave(r._requesters)
                 if r._requesters._length == 0:
                     r._minq = inf
-            self._requests = collections.defaultdict(int)
+            self._requests = collections.OrderedDict()
             self._failed = True
 
         if self._waits:
@@ -11613,6 +11604,11 @@ class Component(object):
             if not specified, the request will not time out. |n|
             if distribution, the distribution is sampled
 
+        oneof : bool
+            if oneof is True, just one of the requests has to be met (or condition),
+            where honoring follows the order given. |n|
+            if oneof is False (default), all requests have to be met to be honored
+
         mode : str preferred
             mode |n|
             will be used in trace and can be used in animations |n|
@@ -11643,10 +11639,13 @@ class Component(object):
         --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100 |n|
         ``yield self.request((r1,1),(r2,2))`` |n|
         --> requests 1 from r1, 2 from r2 |n|
+        ``yield self.request(r1, r2, r3, oneoff=True)`` |n|
+        --> requests 1 from r1, r2 or r3 |n|
         """
         fail_at = kwargs.pop("fail_at", None)
         fail_delay = kwargs.pop("fail_delay", None)
         mode = kwargs.pop("mode", None)
+        self.oneof_request = kwargs.pop("oneof", False)
         called_from = kwargs.pop("called_from", "request")
         if kwargs:
             raise TypeError(called_from + "() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
@@ -11702,8 +11701,10 @@ class Component(object):
 
             if q < 0 and not r._anonymous:
                 raise ValueError("quantity " + str(q) + " <0")
-
-            self._requests[r] += q  # is same resource is specified several times, just add them up
+            if r in self._requests:
+                self._requests[r] += q  # is same resource is specified several times, just add them up
+            else:
+                self._requests[r] = q
             if called_from == "request":
                 req_text = "request " + str(q) + " from "
             elif called_from == "put":
@@ -11714,9 +11715,12 @@ class Component(object):
             addstring = ""
             addstring += " priority=" + str(priority)
 
+            if self.oneof_request:
+                addstring += " (oneof)"
+
             self.enter_sorted(r._requesters, priority)
             if self.env._trace:
-                self.env.print_trace("", "", self.name(), req_text + r.name() + addstring + " " + _modetxt(self._mode))
+                self.env.print_trace("", "", self.name(), req_text + r.name() + addstring)
 
             if r._preemptive:
                 av = r.available_quantity()
@@ -11795,46 +11799,80 @@ class Component(object):
         """
         return self.request(*args, called_from="put", **kwargs)
 
-    def _tryrequest(self):  # this is Component._tryrequest
-        if self._status == interrupted:
-            return False
-        honored = True
+    def honor_all(self):
         for r in self._requests:
             if self._requests[r] > 0:
                 if self._requests[r] > (r._capacity - r._claimed_quantity + 1e-8):
-                    honored = False
+                    return []
                     break
             else:
                 if -self._requests[r] > r._claimed_quantity + 1e-8:
-                    honored = False
-                    break
+                    return []
+        return list(self._requests.keys())
 
-        if honored:
+    def honor_any(self):
+        for r in self._requests:
+            if self._requests[r] > 0:
+                if self._requests[r] <= (r._capacity - r._claimed_quantity + 1e-8):
+                    return [r]
+            else:
+                if -self._requests[r] <= r._claimed_quantity + 1e-8:
+                    return [r]
+        return []
+
+    def _tryrequest(self):  # this is Component._tryrequest
+        if self._status == interrupted:
+            return False
+
+        if self.oneof_request:
+            r_honor = self.honor_any()
+        else:
+            r_honor = self.honor_all()
+
+        if r_honor:
             anonymous_resources = []
             for r in list(self._requests):
-                r._claimed_quantity += self._requests[r]
-                this_prio = self.priority(r._requesters)
-
-                self.leave(r._requesters)
                 if r._anonymous:
                     anonymous_resources.append(r)
-                else:
-                    self._claims[r] += self._requests[r]
-                    mx = self._member(r._claimers)
-                    if mx is None:
-                        self.enter_sorted(r._claimers, this_prio)
+                if r in r_honor:
+                    r._claimed_quantity += self._requests[r]
+                    this_prio = self.priority(r._requesters)
+                    if not r._anonymous:
+                        if r in self._claims:
+                            self._claims[r] += self._requests[r]
+                        else:
+                            self._claims[r] = self._requests[r]
+                        mx = self._member(r._claimers)
+                        if mx is None:
+                            self.enter_sorted(r._claimers, this_prio)
+                        r.claimed_quantity.tally(r._claimed_quantity)
+                        r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
+                        r.available_quantity.tally(r._capacity - r._claimed_quantity)
+                        if self.env._trace:
+                            self.env.print_trace(
+                                "",
+                                "",
+                                self.name(),
+                                "claim "
+                                + str(r._claimed_quantity)
+                                + " from "
+                                + r.name()
+                                + " priority="
+                                + str(this_prio),
+                            )
+                self.leave(r._requesters)
                 if r._requesters._length == 0:
                     r._minq = inf
-                r.claimed_quantity.tally(r._claimed_quantity)
-                r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
-                r.available_quantity.tally(r._capacity - r._claimed_quantity)
-            self._requests = collections.defaultdict(int)
+
+            self._requests = collections.OrderedDict()
             self._remove()
-            self._reschedule(self.env._now, False, "request honor", s0=self.env.last_s0)
+            honoredstr = r_honor[0].name() + (len(r_honor) > 1) * " ++"
+            self._reschedule(self.env._now, False, "request honor " + honoredstr, s0=self.env.last_s0)
             for r in anonymous_resources:
                 r._tryrequest()
-
-        return honored
+            return True
+        else:
+            return False
 
     def _release(self, r, q=None, s0=None, bumped_by=None):
         if r not in self._claims:
@@ -12871,7 +12909,7 @@ class ComponentGenerator(Component):
     component_class : callable, usually a subclass of Component or Pdf or Cdf distribution
         the type of components to be generated |n|
         in case of a distribution, the Pdf or Cdf should return a subclass of Component
-        
+
     name : str
         name of the component generator. |n|
         if the name ends with a period (.),
@@ -12936,7 +12974,7 @@ class ComponentGenerator(Component):
     env : Environment
         environment where the component is defined |n|
         if omitted, default_env will be used
-        
+
     Note
     ----
     For iat distributions: if till/duration and number are specified, the generation stops whichever condition
@@ -13012,7 +13050,7 @@ class ComponentGenerator(Component):
                     if number == 1:
                         if force_at and force_till:
                             raise ValueError("force_at and force_till does not allow number=1")
-                        samples = [at] if force_at else _[till]
+                        samples = [at] if force_at else [till]
                     else:
                         v_at = at if force_at else samples[0]
                         v_till = till if force_till else samples[-1]
@@ -16294,8 +16332,12 @@ class PeriodMonitor(object):
         del self.periods
         self.m.period_monitors.remove(self)
 
-    def __init__(self, parent_monitor, periods=None, period_monitor_names=None):
+    def __init__(self, parent_monitor, periods=None, period_monitor_names=None, env=None):
         self.pc = _PeriodComponent(pm=self, skip_standby=True, suppress_trace=True)
+        if env is None:
+            self.env = g.default_env
+        else:
+            self.env = env
         if periods is None:
             periods = 24 * [1]
         self.periods = periods
@@ -16320,12 +16362,13 @@ class PeriodMonitor(object):
         self.iperiod = 0
         if self.m._level:
             self.perperiod = [
-                Monitor(name=period_monitor_name, level=True, monitor=False)
+                Monitor(name=period_monitor_name, level=True, monitor=False, env=self.env)
                 for period_monitor_name in period_monitor_names
             ]
         else:
             self.perperiod = [
-                Monitor(name=period_monitor_name, monitor=False) for period_monitor_name in period_monitor_names
+                Monitor(name=period_monitor_name, monitor=False, env=self.env)
+                for period_monitor_name in period_monitor_names
             ]
 
 
@@ -16450,6 +16493,157 @@ class AudioSegment:
         self.t0 = t0
         self.filename = filename
         self.duration = duration
+
+
+class _APNG:
+    # The  _APNG class is derived from (more or less an excerpt from the py_APNG module
+    class Chunk(collections.namedtuple("Chunk", ["type", "data"])):
+        pass
+
+    class PNG:
+        def __init__(self):
+            self.hdr = None
+            self.end = None
+            self.width = None
+            self.height = None
+            self.chunks = []
+
+        def init(self):
+            for type_, data in self.chunks:
+                if type_ == "IHDR":
+                    self.hdr = data
+                elif type_ == "IEND":
+                    self.end = data
+
+            if self.hdr:
+                # grab w, h info
+                self.width, self.height = struct.unpack("!II", self.hdr[8:16])
+
+        @staticmethod
+        def parse_chunks(b):
+            i = 8
+            while i < len(b):
+                data_len, = struct.unpack("!I", b[i : i + 4])
+                type_ = b[i + 4 : i + 8].decode("latin-1")
+                yield _APNG.Chunk(type_, b[i : i + data_len + 12])
+                i += data_len + 12
+
+        @classmethod
+        def from_bytes(cls, b):
+            im = cls()
+            im.chunks = list(cls.parse_chunks(b))
+            im.init()
+            return im
+
+    class FrameControl:
+        def __init__(
+            self, width=None, height=None, x_offset=0, y_offset=0, delay=100, delay_den=1000, depose_op=1, blend_op=0
+        ):
+            self.width = width
+            self.height = height
+            self.x_offset = x_offset
+            self.y_offset = y_offset
+            self.delay = delay
+            self.delay_den = delay_den
+            self.depose_op = depose_op
+            self.blend_op = blend_op
+
+        def to_bytes(self):
+            return struct.pack(
+                "!IIIIHHbb",
+                self.width,
+                self.height,
+                self.x_offset,
+                self.y_offset,
+                self.delay,
+                self.delay_den,
+                self.depose_op,
+                self.blend_op,
+            )
+
+    def __init__(self, num_plays=0):
+        self.frames = []
+        self.num_plays = num_plays
+
+    @staticmethod
+    def make_chunk(chunk_type, chunk_data):
+        out = struct.pack("!I", len(chunk_data))
+        chunk_data = chunk_type.encode("latin-1") + chunk_data
+        out += chunk_data + struct.pack("!I", binascii.crc32(chunk_data) & 0xFFFFFFFF)
+        return out
+
+    def append(self, png, **options):
+        if not isinstance(png, _APNG.PNG):
+            raise TypeError("Expect an instance of `PNG` but got `{}`".format(png))
+        control = _APNG.FrameControl(**options)
+        if control.width is None:
+            control.width = png.width
+        if control.height is None:
+            control.height = png.height
+        self.frames.append((png, control))
+
+    def to_bytes(self):
+        CHUNK_BEFORE_IDAT = {
+            "cHRM",
+            "gAMA",
+            "iCCP",
+            "sBIT",
+            "sRGB",
+            "bKGD",
+            "hIST",
+            "tRNS",
+            "pHYs",
+            "sPLT",
+            "tIME",
+            "PLTE",
+        }
+        PNG_SIGN = b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
+        out = [PNG_SIGN]
+        other_chunks = []
+        seq = 0
+        png, control = self.frames[0]
+        out.append(png.hdr)
+        out.append(self.make_chunk("acTL", struct.pack("!II", len(self.frames), self.num_plays)))
+        if control:
+            out.append(self.make_chunk("fcTL", struct.pack("!I", seq) + control.to_bytes()))
+            seq += 1
+        idat_chunks = []
+        for type_, data in png.chunks:
+            if type_ in ("IHDR", "IEND"):
+                continue
+            if type_ == "IDAT":
+                # put at last
+                idat_chunks.append(data)
+                continue
+            out.append(data)
+        out.extend(idat_chunks)
+        for png, control in self.frames[1:]:
+            out.append(self.make_chunk("fcTL", struct.pack("!I", seq) + control.to_bytes()))
+            seq += 1
+            for type_, data in png.chunks:
+                if type_ in ("IHDR", "IEND") or type_ in CHUNK_BEFORE_IDAT:
+                    continue
+
+                if type_ == "IDAT":
+                    out.append(self.make_chunk("fdAT", struct.pack("!I", seq) + data[8:-4]))
+                    seq += 1
+                else:
+                    other_chunks.append(data)
+
+        out.extend(other_chunks)
+        out.append(png.end)
+
+        return b"".join(out)
+
+    def save(self, file):
+        b = self.to_bytes()
+        if hasattr(file, "write_bytes"):
+            file.write_bytes(b)
+        elif hasattr(file, "write"):
+            file.write(b)
+        else:
+            with open(file, "wb") as f:
+                f.write(b)
 
 
 def colornames():
@@ -16719,36 +16913,6 @@ def incstr(s):
     return result
 
 
-def splitext(filename):
-    """
-    same as os.path.splitext, but does not ignore leading dots in the basename.
-
-    filename         splitext(filename)    os.path.splitext(filename)
-    ---------------- --------------------- --------------------------
-    '.txt'           ('','.txt')           ('.txt','')
-    'e:/test/.txt'   ('e:/test/','.txt')   ('e:/test/.txt','')
-
-    This is used for auto numbering video snapshots, such as 000000.jpg, ...
-
-    Arguments
-    ---------
-    filename : str
-        filename to be split
-
-    Returns:
-        filepart, extpart : tuple
-    """
-
-    splitted = filename.split(".")
-    if len(splitted) == 1:
-        filepart = splitted[0]
-        extpart = "."
-    else:
-        filepart = ".".join(splitted[:-1])
-        extpart = "." + splitted[-1]
-    return (filepart, extpart)
-
-
 def _checkrandomstream(randomstream):
     if not isinstance(randomstream, random.Random):
         raise TypeError("Type randomstream or random.Random expected, got " + str(type(randomstream)))
@@ -16988,21 +17152,28 @@ def fonts():
                     name = str(name)
                     fonts.font_list.append(((name,), name))
 
-        salabim_dir = os.path.dirname(__file__)
-        cur_dir = os.getcwd()
+        salabim_dir = Path(__file__).parent
+        cur_dir = Path.cwd()
         dirs = [salabim_dir]
         if cur_dir != salabim_dir:
             dirs.append(cur_dir)
         if Windows:
-            dirs.append(r"c:\windows\fonts")
+            dirs.append(Path("c:/windows/fonts"))
+        else:
+            dirs.append(Path("/usr/share/fonts"))  # for linux
+            dirs.append(Path("/system/fonts"))  # for android
 
         for dir in dirs:
-            for file in glob.glob(dir + os.sep + "*.ttf"):
+            for file_path in dir.glob("**/*.ttf"):
+                file = str(file_path)
                 fn = os.path.basename(file).split(".")[0]
                 if fn in _std_fonts():
                     fullname = _std_fonts()[fn]
                 else:
-                    f = ImageFont.truetype(file, 12)
+                    try:
+                        f = ImageFont.truetype(file, 12)
+                    except OSError:  # to avoid PyDroid problems
+                        continue
                     if f is None:
                         fullname = ""
                     else:
@@ -17075,6 +17246,7 @@ def show_fonts():
     """
     show (print) all available fonts on this machine
     """
+    can_animate(try_only=False)
     fontnames = []
     for fns, ifilename in fonts():
         for fn in fns:
