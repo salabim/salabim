@@ -1,5 +1,118 @@
 salabim changelog
 
+version 20.0.3  2020-08-06
+==========================
+New functionality (0)
+-----------------------
+The specification of sim.Distribution now also accepts a time_unit parameter.
+Note that if the specification string contains a time_unit parameter as well, the time_unit parameter
+of Distribution is ignored.
+Examples
+    d = sim.Distribution('uniform(1, 2)', time_unit='minutes'))  # 1-2 minutes
+    d = sim.Distribution('uniform(1, 2, time_unit='hours')'))  # 1-2 hours, same as before
+    d = sim.Distribution('uniform(1, 2, time_unit='hours')', time_unit='minutes'))  # 1-2 hours, ignore minutes
+
+New functionality (1)
+-----------------------
+Monitor.freeze() returns a 'frozen' monitor that can be used to store the results not
+depending on the current environment.
+This is particularly useful for pickling a monitor.
+E.g. use
+    with open("mon.pickle", "wb") as f:
+        pickle.dump(f, mon.freeze())
+to save the monitor mon, and
+    with open("mon.pickle", "rb") as f:
+        mon_retrieved = pickle.load(f)
+to retrieve the monitor, later.
+
+Both level and non level monitors are supported.
+Frozen monitors get the name of the original monitor padded with '.frozen' unless specified differently.  
+
+New functionality (2)
+---------------------
+All Component methods that support urgent to schedule a component now also support a priority parameter.
+With this it is possible to sort a component before or after other components, scheduled for the same time.
+Note that urgent only applies to components scheduled with the same time and same priority.
+The priority is 0 by default.
+This is particularly useful for race conditions. It is possible to change the priority of a component
+by cancelling it prior to activating it with another priority.
+
+The priority can be accessed with the new Component.scheduled_priority() method.
+ 
+Improved functionality (0)
+--------------------------
+Video production can now be done with a context manager, thus making an explicit final call to video_close
+obsolete:
+with env.video('myvideo.mp4'):
+    ...
+    env.run(10)
+    
+This will automatically close the file myvideo.mp4 upon leaving the with block. 
+
+Change in functionality (0)
+---------------------------
+In sim.reset(), which is always called at startup, random_seed() will be called without any parameters, causing
+the random_seed to be set to 1234567.
+That makes reproducibility even possible when calling
+   env = sim.Environment(random_seed="")  # no change in seed
+ 
+If 'real' random behaviour (dependent on clock ticks) is required, just do:
+    env = sim.Environment(random_seed="*")
+    
+Changes in functionality (1)
+----------------------------
+Queue.extend() does return None now instead of a copy of self, for consistency reasons.
+
+Now queues support all comparisons, i.e. ==, !=, <, <=, >, >=
+These comparsons are on membership only, i.e they ignore, the order, priorities and name.
+It is possible to compare a quueu with any object supporting the iter protocol, most notably
+sets, lists and tuples.
+
+Internal changes /change in functionality (0)
+---------------------------------------------
+Upon termination of a process, salabim did check a list to see whether there were any animation objects
+that had this component as it parent. Particularly with many animation objects defined that could take a long
+time, as reported by Hugo Huges.
+From this version on, a component itself has a set of its 'animation children'.
+Also changed is the moment the animation child is removed automatically. When a parent (component)
+is no longer accessible, it will remove all of its animation children if any.
+That means we now rely on the automatic garbage collection, which can be slightly delayed.
+This change means that an animation object with a parent that terminates its process is not
+necessarily removed, as it can be still in a queue, or even just referenced by a variable.
+If you use the parent parameter in an Animate, AnimateQueue or AnimateMonitor this might change the
+behaviour. 
+
+Added support files (0)
+-----------------------
+For the development there's is now a set of pytest files that will result in a more stable product. Indeed
+several bugs (see below) were detected during this test development.
+Future versions will include more test scripts.
+
+Bug fix (0)
+-----------
+Minor bug in 'install salabim from github.py' and 'install salabim.py' fixed.
+
+Bug fix (1)
+-----------
+Bug in Component.wait() fixed. Thank you, Alexander Kaiblinger, for detecting the bug and proposing the solution.
+   
+Bug fix (2)
+-----------
+Upon honouring an anonymous resource, the statistics of the available_quantity, claimed_quantity and occupancy
+were not updated. Bug fixed. Thank you, Lukas Hollenstein, for detecting the bug and proposing the solution.
+
+Bug fix (3)
+-----------
+The algorithm used to calculate weighted percentiles in Monitor.percentile() from a stackoverflow.com article
+was found to be incorrect, thus sometimes resulting in wrong percentiles.
+Bug fixed.
+
+Bug fix (4)
+-----------
+Minor changes in Queue.__iter__ and Queue.__reversed__ to make iterating when components are added or removed
+during the iteration more consistent.
+
+
 version 20.0.2  2020-05-18
 ==========================
 New functionality (0)
