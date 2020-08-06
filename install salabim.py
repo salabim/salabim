@@ -46,6 +46,9 @@ def _install(files, url=None):
 
     Version history
     ---------------
+    version 1.0.5  2020-06-24
+        Bug with removing the dist-info of packages starting with the same name fixed.
+
     version 1.0.4  2020-03-29
         Linux and ios versions now search in sys.path for site-packages,
         whereas other platforms now use site.getsitepackages().
@@ -167,7 +170,7 @@ def _install(files, url=None):
     else:
         for entry in sitepackages_path.glob("*"):
             if entry.is_dir():
-                if entry.stem.startswith(package) and entry.suffix == ".dist-info":
+                if entry.stem.startswith(package + "-") and entry.suffix == ".dist-info":
                     shutil.rmtree(entry)
         path_distinfo = Path(str(path) + "-" + version + ".dist-info")
         if not path_distinfo.is_dir():
@@ -210,7 +213,7 @@ def _install(files, url=None):
 
 if __name__ == "__main__":
     info = _install(
-        files="salabim.py !calibri.ttf !mplus-1m-regular.ttf !license.txt !DejaVuSansMono.ttf !changelog.txt".split(),
+        files="salabim.py !calibri.ttf !mplus-1m-regular.ttf !license.txt !DejaVuSansMono.ttf !changelog.txt".split()
     )
     print(info.package + " " + info.version + " successfully installed in " + info.path)
-    print("files copied: ", ', '.join(info.files_copied))
+    print("files copied: ", ", ".join(info.files_copied))

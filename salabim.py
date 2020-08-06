@@ -1,8 +1,8 @@
-#               _         _      _               ____    ___       ___      ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \    |___ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |     __) |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _  / __/
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|_____|
+#               _         _      _               ____    ___       ___      _____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \    |___ /
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |     |_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _  ___) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|____/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
@@ -10,7 +10,7 @@
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "20.0.2"
+__version__ = "20.0.3"
 
 import heapq
 import random
@@ -29,7 +29,6 @@ import logging
 import types
 import bisect
 import operator
-import string
 import ctypes
 import shutil
 import subprocess
@@ -37,6 +36,8 @@ import tempfile
 import traceback
 import struct
 import binascii
+import operator
+import copy
 
 from pathlib import Path
 
@@ -294,7 +295,10 @@ class Monitor(object):
             self.env = g.default_env
         else:
             self.env = env
-        _set_name(name, self.env._nameserializeMonitor, self)
+        if isinstance(self.env, Environment):
+            _set_name(name, self.env._nameserializeMonitor, self)
+        else:
+            self._name = name
         self._level = level
         self._weight_legend = ("duration" if self._level else "weight") if weight_legend is None else weight_legend
         if self._level:
@@ -322,6 +326,7 @@ class Monitor(object):
         except KeyError:
             raise ValueError("type '" + type + "' not recognized")
         self.xtype = type
+        self.isgenerated = False
         self.reset(monitor)
         if fill is not None:
             if self._level:
@@ -472,6 +477,36 @@ class Monitor(object):
         else:
             return self.slice(key)
 
+    def freeze(self, name=None):
+        """
+        freezes this monitor (particularly useful for pickling)
+
+        Parameters
+        ----------
+        name : str
+            name of the frozen monitor |n|
+            default: name of this monitor + ".frozen"
+
+        Returns
+        -------
+        frozen monitor : Monitor
+
+        Notes
+        -----
+        The env attribute will become a partial copy of the original environment, with the name
+        of the original environment, padded with '.copy.<serial number>'
+        """
+        self_env = self.env
+        self.env = Environment(to_freeze=True, name=self.env.name() + ".copy", time_unit=self.env.get_time_unit())
+        m = copy.deepcopy(self)
+        self.env = self_env
+        m.isgenerated = True
+        m._name = self.name() + ".frozen" if name is None else name
+        m.env._now = self.env._now
+        m.env._offset = self.env._offset
+        m.env.t = self.env.t
+        return m
+
     def slice(self, start=None, stop=None, modulo=None, name=None):
         """
         slices this monitor (creates a subset)
@@ -513,9 +548,9 @@ class Monitor(object):
                 stop = inf
             else:
                 stop += self.env._offset
-            stop = min(stop, self.env.now())
+            stop = min(stop, self.env._now - self.env._offset)  # not self.now() in order to support froze monitors
             actions.append((start, "a", 0, 0))
-            actions.append((stop, "b", 0, 0))  # non inclusive
+            actions.append((stop, "z", 0, 0))  # non inclusive
         else:
             if start is None:
                 raise TypeError("modulo specified, but no start specified. ")
@@ -565,7 +600,7 @@ class Monitor(object):
                         else:
                             new._t.append(t)
                             new._x.append(curx)
-                elif type == "b":
+                elif type == "z":
                     enabled = False
                     if new._t[-1] == t:
                         new._x[-1] = self.off
@@ -590,7 +625,7 @@ class Monitor(object):
             else:
                 if type == "a":
                     enabled = True
-                elif type == "b":
+                elif type == "z":
                     enabled = False
                 else:
                     if enabled:
@@ -665,6 +700,7 @@ class Monitor(object):
         return object_to_str(self) + ("[level]" if self._level else "") + " (" + self.name() + ")"
 
     def __call__(self, t=None):  # direct moneypatching __call__ doesn't work
+
         if not self._level:
             raise TypeError("get not available for non level monitors")
         if t is None:
@@ -777,6 +813,8 @@ class Monitor(object):
             if False, monitoring is disabled
             if omitted, no change of monitoring state
         """
+        if self.isgenerated:
+            raise TypeError("sliced, merged or frozen monitors cannot not be reset")
         if monitor is not None:
             self._monitor = monitor
 
@@ -795,8 +833,7 @@ class Monitor(object):
             self._t.append(self.env._now)
         else:
             self._weight = False  # weights are only stored if there is a non 1 weight
-        self.start = self.env.now()
-        self.isgenerated = False
+        self.start = self.env._now - self.env._offset  # not self.env.now() to support frozen monitors
         self.monitor(monitor)
         Monitor.cached_xweight = {
             (ex0, force_numeric): (0, 0) for ex0 in (False, True) for force_numeric in (False, True)
@@ -819,7 +856,7 @@ class Monitor(object):
         """
         if value is not None:
             if value and self.isgenerated:
-                raise TypeError("merged or sliced monitors cannot not be turned on")
+                raise TypeError("sliced, merged or frozen monitors cannot not be turned on")
             self._monitor = value
             if self._level:
                 if self._monitor:
@@ -839,6 +876,8 @@ class Monitor(object):
             weight to be tallied |n|
             default : 1 |n|
         """
+        if self.isgenerated:
+            raise TypeError("sliced, merged or frozen monitors cannot not be reset")
         if self._level:
             if weight != 1:
                 if self._level:
@@ -868,6 +907,8 @@ class Monitor(object):
                 self._t.append(self.env._now)
 
     def _tally_off(self):
+        if self.isgenerated:
+            raise TypeError("sliced, merged or frozen monitors cannot not be reset")
         t = self.env._now
         if self._t[-1] == t:
             self._x[-1] = self.off
@@ -1308,30 +1349,31 @@ class Monitor(object):
         """
         # algorithm based on
         # https://stats.stackexchange.com/questions/13169/defining-quantiles-over-a-weighted-sample
-        q = max(0, min(q, 100))
+        q = max(0, min(q, 100)) / 100
         x, weight = self._xweight(ex0=ex0)
 
         if len(x) == 1:
             return x[0]
         sumweight = sum(weight)
-        n = len(weight)
         if not sumweight:
             return nan
         xweight = sorted(zip(x, weight), key=lambda v: v[0])
-
+        n = len(xweight)
         x_sorted, weight_sorted = zip(*xweight)
 
         cum = 0
         s = []
         for k in range(n):
-            s.append((k * weight_sorted[k] + cum))
-            cum += (n - 1) * weight_sorted[k]
+            s.append((weight_sorted[k] + cum))
+            cum += weight_sorted[k]
 
-        for k in range(n - 1):
-            if s[k + 1] > s[n - 1] * q / 100:
+        for k in range(n):
+            s[k] = s[k] / cum
+
+        for k in range(n):
+            if s[k + 1] >= q:
                 break
-
-        return x_sorted[k] + (x_sorted[k + 1] - x_sorted[k]) * (q / 100 * s[n - 1] - s[k]) / (s[k + 1] - s[k])
+        return interpolate(q, s[k], s[k + 1], x_sorted[k], x_sorted[k + 1])
 
     def bin_number_of_entries(self, lowerbound, upperbound, ex0=False):
         """
@@ -2388,7 +2430,7 @@ class AnimateMonitor(object):
     parent : Component
         component where this animation object belongs to (default None) |n|
         if given, the animation object will be removed
-        automatically upon termination of the parent
+        automatically when the parent component is no longer accessible
 
     Note
     ----
@@ -2438,7 +2480,10 @@ class AnimateMonitor(object):
         offsety += monitor.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True)
 
         self.aos = []
-        self.parent = parent
+        if parent is not None:
+            if not isinstance(parent, Component):
+                raise ValueError(repr(parent) + " is not a component")
+            parent._animation_children.add(self)
         self.env = monitor.env
         self.aos.append(
             AnimateRectangle(
@@ -2522,6 +2567,7 @@ class AnimateMonitor(object):
         """
         for ao in self.aos:
             ao.remove()
+
         self.env.sys_objects.remove(self)
 
 
@@ -3469,7 +3515,7 @@ class Queue(object):
             iter_list.append(mx)
             mx = mx.predecessor
         iter_index = 0
-        while len(iter_list) > iter_index:
+        while len(iter_list) > iter_index or self._iter_touched[iter_sequence]:
             if self._iter_touched[iter_sequence]:
                 # place all taken qmembers on the list
                 iter_list = iter_list[:iter_index]
@@ -3477,7 +3523,7 @@ class Queue(object):
                 while mx != self._head:
                     if mx not in iter_list:
                         iter_list.append(mx)
-                    mx = mx.precessor
+                    mx = mx.predecessor
                 self._iter_touched[iter_sequence] = False
             else:
                 c = iter_list[iter_index].component
@@ -3518,6 +3564,32 @@ class Queue(object):
         if not isinstance(other, Queue):
             return NotImplemented
         return self.symmetric_difference(other)
+
+    def _operator(self, other, op):
+        if hasattr(other, "__iter__"):
+            return op(set(self), set(other))
+        return NotImplemented
+
+    def __hash__(self):
+        return id(self)
+
+    def __eq__(self, other):
+        return self._operator(other, operator.__eq__)
+
+    def __ne__(self, other):
+        return self._operator(other, operator.__ne__)
+
+    def __lt__(self, other):
+        return self._operator(other, operator.__lt__)
+
+    def __le__(self, other):
+        return self._operator(other, operator.__le__)
+
+    def __gt__(self, other):
+        return self._operator(other, operator.__gt__)
+
+    def __ge__(self, other):
+        return self._operator(other, operator.__ge__)
 
     def count(self, component):
         """
@@ -3588,7 +3660,7 @@ class Queue(object):
             iter_list.append(mx)
             mx = mx.successor
         iter_index = 0
-        while len(iter_list) > iter_index:
+        while len(iter_list) > iter_index or self._iter_touched[iter_sequence]:
             if self._iter_touched[iter_sequence]:
                 # place all taken qmembers on the list
                 iter_list = iter_list[:iter_index]
@@ -3619,6 +3691,10 @@ class Queue(object):
             if True, source will be cleared, so effectively moving all elements in source to self. If source is
             not a queue, but a list or tuple, the clear_source flag may not be set.
 
+        Returns
+        -------
+        None
+
         Note
         ----
         The components in source added to the queue will get the priority of the tail of self.
@@ -3647,7 +3723,6 @@ class Queue(object):
                 source.clear()
             else:
                 raise TypeError("clear_source cannot be applied to instances of type" + str(type(source)))
-        return self
 
     def as_set(self):
         return {c for c in self}
@@ -3936,7 +4011,8 @@ class Environment(object):
 
     time_unit : str
         Supported time_units: |n|
-        "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds", "n/a"
+        "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds", "n/a" |n|
+        default: "n/a"
 
     name : str
         name of the environment |n|
@@ -3994,23 +4070,25 @@ class Environment(object):
         *args,
         **kwargs
     ):
+        if name is None:
+            if isdefault_env:
+                name = "default environment"
+        _set_name(name, Environment._nameserialize, self)
+        self._nameserializeMonitor = {}  # required here for to_freeze functionality
+        self._time_unit = _time_unit_lookup(time_unit)
+        self._time_unit_name = time_unit
+        if "to_freeze" in kwargs:
+            self.isfrozen = True
+            return
         if do_reset is None:
             do_reset = Pythonista
         if do_reset:
             reset()
         if isdefault_env:
             g.default_env = self
-        if name is None:
-            if isdefault_env:
-                name = "default environment"
         self.trace(trace)
         self._source_files = {inspect.getframeinfo(_get_caller_frame()).filename: 0}
         _random_seed(random_seed, set_numpy_random_seed=set_numpy_random_seed)
-
-        self._time_unit = _time_unit_lookup(time_unit)
-        self._time_unit_name = time_unit
-
-        _set_name(name, Environment._nameserialize, self)
         self._suppress_trace_standby = True
         self._suppress_trace_linenumbers = False
         if self._trace:
@@ -4033,7 +4111,6 @@ class Environment(object):
         self._nameserializeComponent = {}
         self._nameserializeResource = {}
         self._nameserializeState = {}
-        self._nameserializeMonitor = {}
         self._seq = 0
         self._event_list = []
         self._standbylist = []
@@ -4206,7 +4283,7 @@ class Environment(object):
                 self._standbylist = []
 
             if self._event_list:
-                (t, _, c) = heapq.heappop(self._event_list)
+                (t, priority, seq, c) = heapq.heappop(self._event_list)
             else:
                 c = self._main
                 if self.end_on_empty_eventlist:
@@ -4268,17 +4345,11 @@ class Environment(object):
         c._status = data
         c._scheduled_time = inf
         c._process = None
-        for ao in self.an_objects[:]:
-            if ao.parent == c:
-                self.an_objects.remove(ao)
-        for so in self.sys_objects[:]:
-            if so.parent == c:
-                so.remove()
 
     def _print_event_list(self, s):
         print("eventlist ", s)
-        for (t, seq, comp) in self._event_list:
-            print(self.time_to_str(t, comp.name()))
+        for (t, priority, sequence, comp) in self._event_list:
+            print("    ", self.time_to_str(t), comp.name(), "priority", priority)
 
     def animation_parameters(
         self,
@@ -4592,7 +4663,7 @@ class Environment(object):
                     video_path = Path(video)
                     extension = video_path.suffix.lower()
                     self._video_name = video
-                    video_path.parent.mkdir(parents=True, exist_ok=True)                                                          
+                    video_path.parent.mkdir(parents=True, exist_ok=True)
                     if extension == ".gif" and not ("*" in video_path.stem):
                         self._video_out = "gif"
                         self._images = []
@@ -4600,11 +4671,11 @@ class Environment(object):
                         self._video_out = "png"
                         self._images = []
                     elif extension.lower() in (".jpg", ".png", ".bmp", ".tiff", ".gif"):
-                        if '*' in video_path.stem:
-                            if video.count('*') > 1:
-                                raise ValueError('more than one * found in '+video)
-                            if '?' in video:
-                                raise ValueError('? found in '+video)                                                              
+                        if "*" in video_path.stem:
+                            if video.count("*") > 1:
+                                raise ValueError("more than one * found in " + video)
+                            if "?" in video:
+                                raise ValueError("? found in " + video)
                             self.video_name_format = video.replace("*", "{:06d}")
                             for file in video_path.parent.glob(video_path.name.replace("*", "??????")):
                                 file.unlink()
@@ -4620,7 +4691,7 @@ class Environment(object):
                             codec = "MJPG" if extension.lower() == ".avi" else "mp4v"
                         if PyDroid and extension.lower() != ".avi":
                             raise ValueError("PyDroid can only produce .avi videos, not " + extension)
-
+                        can_video(try_only=False)
                         fourcc = cv2.VideoWriter_fourcc(*codec)
                         if video_path.is_file():
                             video_path.unlink()
@@ -4709,6 +4780,7 @@ class Environment(object):
                             duration=1000 / self._fps,
                             optimize=False,
                         )
+
                     del self._images
             elif self._video_out == "png":
 
@@ -4749,6 +4821,7 @@ class Environment(object):
     def save_frame(self):
         if self._video_out == "gif":
             self._images.append(self.capture_image("RGB"))
+
         elif self._video_out == "png":
             self._images.append(self.capture_image("RGBA"))
         elif self._video_out == "snapshots":
@@ -5199,6 +5272,16 @@ class Environment(object):
         self.animation_parameters(animate_debug=value, animate=None)
         return self._animate_debug
 
+    class _Video:
+        def __init__(self, env):
+            self.env = env
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, type, value, traceback):
+            self.env.video_close()
+
     def video(self, value=None):
         """
         video name
@@ -5220,7 +5303,7 @@ class Environment(object):
         """
         if value is not None:
             self.animation_parameters(video=value, animate=None)
-        return self._video
+        return self._Video(env=self)
 
     def video_repeat(self, value=None):
         """
@@ -5523,7 +5606,7 @@ class Environment(object):
         """
         return self._current_component
 
-    def run(self, duration=None, till=None, urgent=False):
+    def run(self, duration=None, till=None, priority=0, urgent=False):
         """
         start execution of the simulation
 
@@ -5539,14 +5622,19 @@ class Environment(object):
             if omitted, inf is assumed. See also note below |n|
             if distribution, the distribution is sampled
 
+        priority : float
+            priority |n|
+            default: 0 |n|
+            if a component has the same time on the event list, main is sorted accoring to
+            the priority.
+
         urgent : bool
             urgency indicator |n|
             if False (default), main will be scheduled
-            behind all other components scheduled
-            for the same time |n|
+            behind all other components scheduled with the same time and priority |n|
             if True, main will be scheduled
             in front of all components scheduled
-            for the same time
+            for the same time and priority
 
         Note
         ----
@@ -5579,7 +5667,7 @@ class Environment(object):
                 raise ValueError("both duration and till specified")
 
         self._main.frame = _get_caller_frame()
-        self._main._reschedule(scheduled_time, urgent, "run", extra=extra)
+        self._main._reschedule(scheduled_time, priority, urgent, "run", extra=extra)
 
         self.running = True
         while self.running:
@@ -5743,7 +5831,7 @@ class Environment(object):
             the alpha value to something else than 255.
         """
         can_animate(try_only=False)
-        filename_path = Path(filename)        
+        filename_path = Path(filename)
         extension = filename_path.suffix.lower()
         if extension in (".png", ".gif", ".bmp", ".tiff"):
             mode = "RGBA"
@@ -5751,7 +5839,7 @@ class Environment(object):
             mode = "RGB"
         else:
             raise ValueError("extension " + extension + "  not supported")
-        filename_path.parent.mkdir(parents=True, exist_ok=True)                                                                  
+        filename_path.parent.mkdir(parents=True, exist_ok=True)
         self.capture_image(mode).save(filename)
 
     def modelname_width(self):
@@ -6869,7 +6957,7 @@ class Animate(object):
     parent : Component
         component where this animation object belongs to (default None) |n|
         if given, the animation object will be removed
-        automatically upon termination of the parent
+        automatically when the parent component is no longer accessible
 
     layer : int
          layer value |n|
@@ -7178,7 +7266,10 @@ class Animate(object):
             raise TypeError("incompatible types: " + self.type + " and " + type1)
 
         self.layer0 = layer
-        self.parent = parent
+        if parent is not None:
+            if not isinstance(parent, Component):
+                raise ValueError(repr(parent) + " is not a component")
+            parent._animation_children.add(self)
         self.keep = keep
         self.visible0 = visible
         self.screen_coordinates = screen_coordinates
@@ -9050,7 +9141,7 @@ class AnimateQueue(object):
     parent : Component
         component where this animation object belongs to (default None) |n|
         if given, the animation object will be removed
-        automatically upon termination of the parent
+        automatically when the parent component is no longer accessible
 
     Note
     ----
@@ -9095,7 +9186,10 @@ class AnimateQueue(object):
         self.direction = direction
         self.reverse = reverse
         self.current_aos = {}
-        self.parent = parent
+        if parent is not None:
+            if not isinstance(parent, Component):
+                raise ValueError(repr(parent) + " is not a component")
+            parent._animation_children.add(self)
         self.env = queue.env
         self.vx = 0
         self.vy = 0
@@ -9355,7 +9449,7 @@ class AnimateText(_Vis):
     parent : Component
         component where this animation object belongs to (default None) |n|
         if given, the animation object will be removed
-        automatically upon termination of the parent
+        automatically when the parent component is no longer accessible
 
     Note
     ----
@@ -9523,7 +9617,7 @@ class AnimateRectangle(_Vis):
     parent : Component
         component where this animation object belongs to (default None) |n|
         if given, the animation object will be removed
-        automatically upon termination of the parent
+        automatically when the parent component is no longer accessible
 
     Note
     ----
@@ -9714,7 +9808,7 @@ class AnimatePolygon(_Vis):
     parent : Component
         component where this animation object belongs to (default None) |n|
         if given, the animation object will be removed
-        automatically upon termination of the parent
+        automatically when the parent component is no longer accessible
 
     Note
     ----
@@ -9900,7 +9994,7 @@ class AnimateLine(_Vis):
     parent : Component
         component where this animation object belongs to (default None) |n|
         if given, the animation object will be removed
-        automatically upon termination of the parent
+        automatically when the parent component is no longer accessible
 
     Note
     ----
@@ -10084,7 +10178,7 @@ class AnimatePoints(_Vis):
     parent : Component
         component where this animation object belongs to (default None) |n|
         if given, the animation object will be removed
-        automatically upon termination of the parent
+        automatically when the parent component is no longer accessible
 
     Note
     ----
@@ -10282,7 +10376,7 @@ class AnimateCircle(_Vis):
     parent : Component
         component where this animation object belongs to (default None) |n|
         if given, the animation object will be removed
-        automatically upon termination of the parent
+        automatically when the parent component is no longer accessible
 
     Note
     ----
@@ -10483,7 +10577,7 @@ class AnimateImage(_Vis):
     parent : Component
         component where this animation object belongs to (default None) |n|
         if given, the animation object will be removed
-        automatically upon termination of the parent
+        automatically when the parent component is no longer accessible
 
     Note
     ----
@@ -10790,6 +10884,12 @@ class Component(object):
         if omitted, no delay |n|
         if distribution, the distribution is sampled
 
+    priority : float
+        priority |n|
+        default: 0 |n|
+        if a component has the same time on the event list, this component is sorted accoring to
+        the priority.
+
     urgent : bool
         urgency indicator |n|
         if False (default), the component will be scheduled
@@ -10797,7 +10897,7 @@ class Component(object):
         for the same time |n|
         if True, the component will be scheduled
         in front of all components scheduled
-        for the same time
+        for the same time and priority
 
     process : str
         name of process to be started. |n|
@@ -10841,6 +10941,7 @@ class Component(object):
         name=None,
         at=None,
         delay=None,
+        priority=None,
         urgent=None,
         process=None,
         suppress_trace=False,
@@ -10871,6 +10972,7 @@ class Component(object):
         self._mode = mode
         self._mode_time = self.env._now
         self._aos = {}
+        self._animation_children = set()
 
         if mode is not None:
             self._mode = mode
@@ -10898,6 +11000,8 @@ class Component(object):
                 raise TypeError("delay is not allowed for a data component")
             if urgent is not None:
                 raise TypeError("urgent is not allowed for a data component")
+            if priority is not None:
+                raise TypeError("priority is not allowed for a data component")
             if self.env._trace:
                 if self._name == "main":
                     self.env.print_trace("", "", self.name() + " create", _modetxt(self._mode))
@@ -10928,8 +11032,10 @@ class Component(object):
 
             extra = "process=" + process_name
 
-            if urgent is None:
-                urgent = False
+            urgent = bool(urgent)
+            if priority is None:
+                priority = 0
+
             if delay is None:
                 delay = 0
             elif callable(delay):
@@ -10941,8 +11047,12 @@ class Component(object):
                     at = at()
                 scheduled_time = at + self.env._offset + delay
 
-            self._reschedule(scheduled_time, urgent, "activate", extra=extra)
+            self._reschedule(scheduled_time, priority, urgent, "activate", extra=extra)
         self.setup(**kwargs)
+
+    def __del__(self):
+        for ao in set(self._animation_children):  # copy required, because elements are removed
+            ao.remove()
 
     def animation_objects(self, id):
         """
@@ -11107,19 +11217,19 @@ class Component(object):
                 result.append("    " + pad(s.name(), 20) + " value=" + str(value))
         return return_or_print(result, as_str, file)
 
-    def _push(self, t, urgent):
+    def _push(self, t, priority, urgent):
         self.env._seq += 1
         if urgent:
             seq = -self.env._seq
         else:
             seq = self.env._seq
         self._on_event_list = True
-        heapq.heappush(self.env._event_list, (t, seq, self))
+        heapq.heappush(self.env._event_list, (t, priority, seq, self))
 
     def _remove(self):
         if self._on_event_list:
             for i in range(len(self.env._event_list)):
-                if self.env._event_list[i][2] == self:
+                if self.env._event_list[i][3] == self:
                     self.env._event_list[i] = self.env._event_list[0]
                     self.env._event_list.pop(0)
                     heapq.heapify(self.env._event_list)
@@ -11152,12 +11262,12 @@ class Component(object):
             self._waits = []
             self._failed = True
 
-    def _reschedule(self, scheduled_time, urgent, caller, extra="", s0=None):
+    def _reschedule(self, scheduled_time, priority, urgent, caller, extra="", s0=None):
         if scheduled_time < self.env._now:
             raise ValueError("scheduled time ({:0.3f}) before now ({:0.3f})".format(scheduled_time, self.env._now))
         self._scheduled_time = scheduled_time
         if scheduled_time != inf:
-            self._push(scheduled_time, urgent)
+            self._push(scheduled_time, priority, urgent)
         self._status = scheduled
         if self.env._trace:
             if extra == "*":
@@ -11177,12 +11287,25 @@ class Component(object):
                 "",
                 "",
                 self.name() + " " + caller + delta,
-                merge_blanks(scheduled_time_str + _urgenttxt(urgent) + lineno, _modetxt(self._mode), extra),
+                merge_blanks(
+                    scheduled_time_str + _prioritytxt(priority) + _urgenttxt(urgent) + lineno,
+                    _modetxt(self._mode),
+                    extra,
+                ),
                 s0=s0,
             )
 
     def activate(
-        self, at=None, delay=0, urgent=False, process=None, keep_request=False, keep_wait=False, mode=None, **kwargs
+        self,
+        at=None,
+        delay=0,
+        priority=0,
+        urgent=False,
+        process=None,
+        keep_request=False,
+        keep_wait=False,
+        mode=None,
+        **kwargs
     ):
         """
         activate component
@@ -11200,6 +11323,12 @@ class Component(object):
             if omitted, no delay |n|
             if distribution, the distribution is sampled
 
+        priority : float
+            priority |n|
+            default: 0 |n|
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+
         urgent : bool
             urgency indicator |n|
             if False (default), the component will be scheduled
@@ -11207,7 +11336,7 @@ class Component(object):
             for the same time |n|
             if True, the component will be scheduled
             in front of all components scheduled
-            for the same time
+            for the same time and priority
 
         process : str
             name of process to be started. |n|
@@ -11299,9 +11428,9 @@ class Component(object):
                 at = at()
             scheduled_time = at + self.env._offset + delay
 
-        self._reschedule(scheduled_time, urgent, "activate", extra=extra)
+        self._reschedule(scheduled_time, priority, urgent, "activate", extra=extra)
 
-    def hold(self, duration=None, till=None, urgent=False, mode=None):
+    def hold(self, duration=None, till=None, priority=0, urgent=False, mode=None):
         """
         hold the component
 
@@ -11319,6 +11448,12 @@ class Component(object):
             inf is allowed |n|
             if distribution, the distribution is sampled
 
+        priority : float
+            priority |n|
+            default: 0 |n|
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+
         urgent : bool
             urgency indicator |n|
             if False (default), the component will be scheduled
@@ -11326,7 +11461,7 @@ class Component(object):
             for the same time |n|
             if True, the component will be scheduled
             in front of all components scheduled
-            for the same time
+            for the same time and priority
 
         mode : str preferred
             mode |n|
@@ -11364,7 +11499,7 @@ class Component(object):
                 scheduled_time = till + self.env._offset
             else:
                 raise ValueError("both duration and till specified")
-        self._reschedule(scheduled_time, urgent, "hold")
+        self._reschedule(scheduled_time, priority, urgent, "hold")
 
     def passivate(self, mode=None):
         """
@@ -11433,7 +11568,7 @@ class Component(object):
                 extra = ""
             self.env.print_trace("", "", self.name() + " interrupt" + extra, merge_blanks(_modetxt(self._mode)))
 
-    def resume(self, all=False, mode=None, urgent=False):
+    def resume(self, all=False, mode=None, priority=0, urgent=False):
         """
         resumes an interrupted component
 
@@ -11450,6 +11585,13 @@ class Component(object):
             if nothing is specified, the mode will be unchanged. |n|
             also mode_time will be set to now, if mode is set.
 
+        priority : float
+            priority |n|
+            default: 0 |n|
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+
+
         urgent : bool
             urgency indicator |n|
             if False (default), the component will be scheduled
@@ -11457,7 +11599,7 @@ class Component(object):
             for the same time |n|
             if True, the component will be scheduled
             in front of all components scheduled
-            for the same time
+            for the same time and priority
 
         Note
         ----
@@ -11497,7 +11639,7 @@ class Component(object):
                         reason = "request"
                     else:
                         reason = "hold"
-                    self._reschedule(self.env._now + self._remaining_duration, urgent, reason)
+                    self._reschedule(self.env._now + self._remaining_duration, priority, urgent, reason)
                 else:
                     raise Exception(self.name() + " unexpected interrupted_status", self._status())
         else:
@@ -11531,12 +11673,6 @@ class Component(object):
         if self.env._trace:
             self.env.print_trace("", "", "cancel " + self.name() + " " + _modetxt(self._mode))
         self._status = data
-        for ao in self.env.an_objects[:]:
-            if ao.parent == self:
-                self.env.an_objects.remove(ao)
-        for so in self.env.sys_objects[:]:
-            if so.parent == self:
-                so.remove()
 
     def standby(self, mode=None):
         """
@@ -11745,7 +11881,7 @@ class Component(object):
         self._tryrequest()
 
         if self._requests:
-            self._reschedule(scheduled_time, False, "request")
+            self._reschedule(scheduled_time, 0, False, "request")
 
     def isbumped(self, resource=None):
         """
@@ -11837,7 +11973,9 @@ class Component(object):
                 if r in r_honor:
                     r._claimed_quantity += self._requests[r]
                     this_prio = self.priority(r._requesters)
-                    if not r._anonymous:
+                    if r._anonymous:
+                        prio_trace = ""
+                    else:
                         if r in self._claims:
                             self._claims[r] += self._requests[r]
                         else:
@@ -11845,21 +11983,14 @@ class Component(object):
                         mx = self._member(r._claimers)
                         if mx is None:
                             self.enter_sorted(r._claimers, this_prio)
-                        r.claimed_quantity.tally(r._claimed_quantity)
-                        r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
-                        r.available_quantity.tally(r._capacity - r._claimed_quantity)
-                        if self.env._trace:
-                            self.env.print_trace(
-                                "",
-                                "",
-                                self.name(),
-                                "claim "
-                                + str(r._claimed_quantity)
-                                + " from "
-                                + r.name()
-                                + " priority="
-                                + str(this_prio),
-                            )
+                        prio_trace = " priority=" + str(this_prio)
+                    r.claimed_quantity.tally(r._claimed_quantity)
+                    r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
+                    r.available_quantity.tally(r._capacity - r._claimed_quantity)
+                    if self.env._trace:
+                        self.env.print_trace(
+                            "", "", self.name(), "claim " + str(r._claimed_quantity) + " from " + r.name() + prio_trace
+                        )
                 self.leave(r._requesters)
                 if r._requesters._length == 0:
                     r._minq = inf
@@ -11867,7 +11998,7 @@ class Component(object):
             self._requests = collections.OrderedDict()
             self._remove()
             honoredstr = r_honor[0].name() + (len(r_honor) > 1) * " ++"
-            self._reschedule(self.env._now, False, "request honor " + honoredstr, s0=self.env.last_s0)
+            self._reschedule(self.env._now, 0, False, "request honor " + honoredstr, s0=self.env.last_s0)
             for r in anonymous_resources:
                 r._tryrequest()
             return True
@@ -12053,7 +12184,7 @@ class Component(object):
             self._check_fail()
 
         self._wait_all = all
-        self._fail = False
+        self._failed = False
 
         if fail_at is None:
             if fail_delay is None:
@@ -12111,7 +12242,7 @@ class Component(object):
         self._trywait()
 
         if self._waits:
-            self._reschedule(scheduled_time, False, "wait")
+            self._reschedule(scheduled_time, 0, False, "wait")
 
     def _trywait(self):
         if self._status == interrupted:
@@ -12154,7 +12285,7 @@ class Component(object):
                     self.leave(s._waiters)
             self._waits = []
             self._remove()
-            self._reschedule(self.env._now, False, "wait honor", s0=self.env.last_s0)
+            self._reschedule(self.env._now, 0, False, "wait honor", s0=self.env.last_s0)
 
         return honored
 
@@ -12740,7 +12871,23 @@ class Component(object):
         """
         return self._scheduled_time - self.env._offset
 
-    def remaining_duration(self, value=None, urgent=False):
+    def scheduled_priority(self):
+        """
+        Returns
+        -------
+        priority the component is scheduled with : float
+            returns None otherwise
+
+        Note
+        ----
+        The method has to traverse the event list, so performance may be an issue.
+        """
+        for t, priority, seq, component in self.env._event_list:
+            if component is self:
+                return priority
+        return None
+
+    def remaining_duration(self, value=None, priority=0, urgent=False):
         """
         Parameters
         ----------
@@ -12753,6 +12900,12 @@ class Component(object):
             - waiting or requesting: the fail_at is set according to the given value |n|
             - interrupted: the remaining_duration is updated according to the given value |n|
 
+        priority : float
+            priority |n|
+            default: 0 |n|
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+
         urgent : bool
             urgency indicator |n|
             if False (default), the component will be scheduled
@@ -12760,7 +12913,7 @@ class Component(object):
             for the same time |n|
             if True, the component will be scheduled
             in front of all components scheduled
-            for the same time
+            for the same time and priority
 
         Returns
         -------
@@ -12784,7 +12937,7 @@ class Component(object):
                 raise ValueError("setting remaining_duration not allowed for standby component (" + self.name() + ")")
             else:
                 self._remove()
-                self._reschedule(value + self.env._now, urgent, "set remaining_duration", extra="")
+                self._reschedule(value + self.env._now, priority, urgent, "set remaining_duration", extra="")
 
         if self._status in (passive, interrupted):
             return self._remaining_duration
@@ -12959,17 +13112,17 @@ class ComponentGenerator(Component):
         if False (default), no force for time = till |n|
         if True, force the last generated component at time = till |n|
 
+    suppress_trace : bool
+        suppress_trace indicator |n|
+        if True, the component generator events will be excluded from the trace |n|
+        If False (default), the component generator will be traced |n|
+        Can be queried or set later with the suppress_trace method.
+
     suppress_pause_at_step : bool
         suppress_pause_at_step indicator |n|
-        if True, if this component becomes current, do not pause when stepping |n|
-        If False (default), the component will be paused when stepping |n|
+        if True, if this component generator becomes current, do not pause when stepping |n|
+        If False (default), the component generator will be paused when stepping |n|
         Can be queried or set later with the suppress_pause_at_step method.
-
-    skip_standby : bool
-        skip_standby indicator |n|
-        if True, after this component became current, do not activate standby components |n|
-        If False (default), after the component became current  activate standby components |n|
-        Can be queried or set later with the skip_standby method.
 
     env : Environment
         environment where the component is defined |n|
@@ -13056,7 +13209,6 @@ class ComponentGenerator(Component):
                         v_till = till if force_till else samples[-1]
                         min_sample = samples[0]
                         max_sample = samples[-1]
-                        print("vat, vtill", v_at, v_till)
                         samples = [interpolate(sample, min_sample, max_sample, v_at, v_till) for sample in samples]
                 self.intervals = [t1 - t0 for t0, t1 in zip([0] + samples, samples)]
                 at = self.intervals.pop(0)
@@ -15230,6 +15382,11 @@ class Distribution(_Distribution):
         - string containing three floats, separated by commas (c1,c2,c3),
           resulting in a Triangular(c1,c2,c3)
 
+    time_unit : str
+        Supported time_units: |n|
+        "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+        if spec has a time_unit as well, this parameter is ignored
+
     randomstream : randomstream
         if omitted, random will be used |n|
         if used as random.Random(12299)
@@ -15257,7 +15414,7 @@ class Distribution(_Distribution):
     Er(2,3)      ==> Erlang(2,3)
     """
 
-    def __init__(self, spec, randomstream=None):
+    def __init__(self, spec, randomstream=None, time_unit=None):
 
         spec_orig = spec
 
@@ -15306,7 +15463,22 @@ class Distribution(_Distribution):
                     sp[0] = distype
                     spec = "(".join(sp)
                     break
-        d = eval(spec)
+        if time_unit is None:
+            d = eval(spec)
+        else:
+            try:
+                # try and add the time_unit=... parameter at the end
+                d = eval(spec.strip()[:-1] + ", time_unit=" + repr(time_unit) + ")")
+            except SyntaxError as e:
+                if str(e).startswith("keyword argument repeated"):
+                    d = eval(spec)
+                else:
+                    raise
+            except TypeError as e:
+                if "got multiple values" in str(e):
+                    d = eval(spec)
+                else:
+                    raise
 
         if randomstream is None:
             self.randomstream = random
@@ -16812,13 +16984,13 @@ def interpolate(t, t0, t1, v0, v1):
     if v0 == v1:
         return v0
 
+    if t0 > t1:
+        (t0, t1) = (t1, t0)
+        (v0, v1) = (v1, v0)
     if t1 == inf:
         return v0
     if t0 == t1:
         return v1
-    if t0 > t1:
-        (t0, t1) = (t1, t0)
-        (v0, v1) = (v1, v0)
     if t <= t0:
         return v0
     if t >= t1:
@@ -16872,45 +17044,14 @@ def rpad(txt, n):
     return txt.rjust(n)[:n]
 
 
-def fn(x, l, d):
+def fn(x, length, d):
     if math.isnan(x):
-        return ("{:" + str(l) + "s}").format("")
-    if x >= 10 ** (l - d - 1):
-        return ("{:" + str(l) + "." + str(l - d - 3) + "e}").format(x)
+        return ("{:" + str(length) + "s}").format("")
+    if x >= 10 ** (length - d - 1):
+        return ("{:" + str(length) + "." + str(length - d - 3) + "e}").format(x)
     if x == int(x):
-        return ("{:" + str(l - d - 1) + "d}{:" + str(d + 1) + "s}").format(int(x), "")
-    return ("{:" + str(l) + "." + str(d) + "f}").format(x)
-
-
-def incstr(s):
-    """
-    increments the digits in the string by one.
-    used for auto numbering files
-
-    Parameters
-    ----------
-    s :  string
-        string to be incremented (auto numbered)
-
-    Returns
-    -------
-    s incremented by one : str
-    """
-
-    result = ""
-    carryover = 1
-    for c in s[::-1]:
-        if c in string.digits:
-            if carryover:
-                if c == "9":
-                    c = "0"
-                    carryover = 1
-                else:
-                    c = chr(ord(c) + carryover)
-                    carryover = 0
-        result = c + result
-
-    return result
+        return ("{:" + str(length - d - 1) + "d}{:" + str(d + 1) + "s}").format(int(x), "")
+    return ("{:" + str(length) + "." + str(d) + "f}").format(x)
 
 
 def _checkrandomstream(randomstream):
@@ -16946,9 +17087,9 @@ def type_to_typecode_off(type):
     return lookup[type]
 
 
-def list_to_array(l):
+def list_to_array(arg):
     float_result = array.array("d")
-    for v in l:
+    for v in arg:
         try:
             vfloat = float(v)
         except (ValueError, TypeError):
@@ -16958,29 +17099,29 @@ def list_to_array(l):
     return float_result
 
 
-def deep_flatten(l):
-    if hasattr(l, "__iter__") and not isinstance(l, str):
-        for x in l:
+def deep_flatten(arg):
+    if hasattr(arg, "__iter__") and not isinstance(arg, str):
+        for x in arg:
             #  the two following lines are equivalent to 'yield from deep_flatten(x)' (not supported in Python 2.7)
             for xx in deep_flatten(x):
                 yield xx
     else:
-        yield l
+        yield arg
 
 
-def merge_blanks(*l):
+def merge_blanks(*arg):
     """
     merges all non blank elements of l, separated by a blank
 
     Parameters
     ----------
-    *l : elements to be merged : str
+    *arg : elements to be merged : str
 
     Returns
     -------
-    string with merged elements of l : str
+    string with merged elements of arg : str
     """
-    return " ".join(x for x in l if x)
+    return " ".join(x for x in arg if x)
 
 
 def normalize(s):
@@ -16992,6 +17133,10 @@ def _urgenttxt(urgent):
         return "!"
     else:
         return " "
+
+
+def _prioritytxt(priority):
+    return ""
 
 
 def _modetxt(mode):
@@ -17470,22 +17615,23 @@ def reset():
     g.animation_scene = None
     g.in_draw = False
     g.tkinter_loaded = "?"
+    random_seed()  # always start with seed 1234567
 
 
 reset()
 
 if __name__ == "__main__":
     try:
-        import salabim_test
+        import salabim_exp
     except Exception:
-        print("salabim_test.py not found or ?")
+        print("salabim_exp.py not found or ?")
         raise
         quit()
 
     try:
-        salabim_test.__dict__["test"]
+        salabim_exp.__dict__["exp"]
     except KeyError:
-        print("salabim_test.test() not found")
+        print("salabim_exp.exp() not found")
         quit()
 
-    salabim_test.test()
+    salabim_exp.exp()
