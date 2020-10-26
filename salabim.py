@@ -1,8 +1,8 @@
-#               _         _      _               ____    ___       ___      _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \    |___ /
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |     |_ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _  ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|____/
+#               _         _      _               ____    ___       ___      _  _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \    | || |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |   | || |_
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _ |__   _|
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)   |_|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
@@ -10,7 +10,7 @@
 from __future__ import print_function  # compatibility with Python 2.x
 from __future__ import division  # compatibility with Python 2.x
 
-__version__ = "20.0.3"
+__version__ = "20.0.4"
 
 import heapq
 import random
@@ -38,6 +38,7 @@ import struct
 import binascii
 import operator
 import copy
+import numbers
 
 from pathlib import Path
 
@@ -1481,13 +1482,16 @@ class Monitor(object):
         """
         if self._level:
             raise TypeError("value_number_of_entries not available for level monitors")
-        if isinstance(value, (list, tuple, set)):
-            value = [str(v) for v in value]
-        else:
-            value = [str(value)]
+        if isinstance(value, str):
+            value = [value]
+        try:
+            iter(value)  # iterable?
+            values = value
+        except TypeError:
+            values = [value]
 
         x = self._xweight(force_numeric=False)[0]
-        return sum(1 for vx in x if (str(vx).strip() in value))
+        return sum(1 for vx in x if (vx in values))
 
     def value_weight(self, value):
         """
@@ -1523,7 +1527,7 @@ class Monitor(object):
 
         Returns
         -------
-        total of duration of tallied values in value or equal to value : int
+        total of duration of tallied values in value or equal to value : float
 
         Note
         ----
@@ -1536,12 +1540,15 @@ class Monitor(object):
     def sys_value_weight(self, value):
         x, weight = self._xweight(force_numeric=False)
 
-        if isinstance(value, (list, tuple, set)):
-            value = [str(v) for v in value]
-        else:
-            value = [str(value)]
+        if isinstance(value, str):
+            value = [value]
+        try:
+            iter(value)  # iterable?
+            values = value
+        except TypeError:
+            values = [value]
 
-        return sum(vweight for (vx, vweight) in zip(x, weight) if (str(vx).strip() in value))
+        return sum(vweight for (vx, vweight) in zip(x, weight) if vx in values)
 
     def number_of_entries(self, ex0=False):
         """
@@ -1856,7 +1863,7 @@ class Monitor(object):
 
         values : bool
             if False (default), bins will be used |n|
-            if True, the individual values will be shown (in the right order).
+            if True, the individual values will be shown (in alphabetical order).
             in that case, no cumulative values will be given |n|
 
         ex0 : bool
@@ -1904,40 +1911,50 @@ class Monitor(object):
                         result.append("value                " + rpad(self.weight_legend, 13) + "     % entries     %")
                     else:
                         result.append("value               entries     %")
-                as_set = {str(x).strip() for x in set(x)}
 
-                values = sorted(list(as_set), key=self.key)
-
-                for value in values:
+                if isinstance(values, str):
+                    values = [values]                    
+                try:
+                    iter(values)  # iterable?
+                    values_label = list(values)
+                except TypeError:
+                    values_label = self.values(ex0=ex0)
+                values_condition = [{value} for value in values_label]  # guarantees same order as values_label
+                rest_values = set(self.values(ex0=ex0)) - set(values_label)
+                
+                if rest_values:
+                    values_condition.append(rest_values)
+                    values_label.append("<rest>")
+                    
+                for value_condition, value_label in zip(values_condition, values_label):
                     if self._level:
-                        count = self.value_duration(value)
+                        count = self.value_duration(value_condition)
                     else:
                         if self._weight:
-                            count = self.value_weight(value)
-                            count_entries = self.value_number_of_entries(value)
+                            count = self.value_weight(value_condition) 
+                            count_entries = self.value_number_of_entries(value_condition)
                         else:
-                            count = self.value_number_of_entries(value)
+                            count = self.value_number_of_entries(value_condition)
 
                     perc = count / weight_total
                     scale = 80
                     n = int(perc * scale)
-                    s = ("*" * n) + (" " * (scale - n))
+                    s = ("*" * n) 
 
                     if self._level:
-                        result.append(pad(str(value), 20) + fn(count, 14, 3) + fn(perc * 100, 6, 1) + " " + s)
+                        result.append(pad(str(value_label), 20) + fn(count, 14, 3) + fn(perc * 100, 6, 1) + " " + s)
                     else:
                         if self._weight:
                             result.append(
-                                pad(str(value), 20)
+                                pad(str(value_label), 20)
                                 + fn(count, 14, 3)
                                 + fn(perc * 100, 6, 1)
                                 + rpad(str(count_entries), 8)
                                 + fn(count_entries * 100 / nentries, 6, 1)
-                                + " "
-                                + s
+                                
                             )
                         else:
-                            result.append(pad(str(value), 20) + rpad(str(count), 7) + fn(perc * 100, 6, 1) + " " + s)
+                            result.append(pad(str(value_label), 20) + rpad(str(count), 7) + fn(perc * 100, 6, 1) + " " + s)
             else:
                 auto_scale = True
                 if bin_width is None:
@@ -1996,16 +2013,37 @@ class Monitor(object):
                         )
         result.append("")
         return return_or_print(result, as_str=as_str, file=file)
+        
+    def values(self, ex0=False, force_numeric=False):
+        """
+        values
 
-    def key(self, x):
-        try:
-            x1 = float(x)
-            x2 = ""
-        except ValueError:
-            x1 = math.inf
-            x2 = str(x)
-        return (x1, x2)
+        Parameters
+        ----------
+        ex0 : bool
+            if False (default), include zeroes. if True, exclude zeroes
 
+        force_numeric : bool
+            if True, convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
+            if False (default), do not interpret x-values, return as list if type is list
+
+        Returns
+        -------
+        all tallied values : array/list
+        """
+        x, _ = self._xweight(ex0, force_numeric)        
+        
+        def key(x):
+            try:
+                x1 = float(x)
+                x2 = ""
+            except ValueError:
+                x1 = math.inf
+                x2 = str(x).lower()
+            return (x1, x2)     
+            
+        return list(sorted(set(x), key=key))
+        
     def animate(self, *args, **kwargs):
         """
         animates the monitor in a panel
@@ -2217,7 +2255,7 @@ class Monitor(object):
             typecode = self.xtypecode
             off = self.off
         else:
-            x = list_to_array(self._x)
+            x = do_force_numeric(self._x)
             typecode = x.typecode
             off = -inf  # float
 
@@ -2284,10 +2322,9 @@ class Monitor(object):
 
         if self.xtypecode or (not force_numeric):
             x = self._x
-            typecode = self.xtypecode
         else:
-            x = list_to_array(self._x)
-            typecode = x.typecode
+            x = do_force_numeric(self._x)
+        typecode = self.xtypecode
 
         if self._level:
             weightall = array.array("d")
@@ -2307,8 +2344,9 @@ class Monitor(object):
 
             for vx, vweight in zip(x, weightall):
                 if vx != self.off:
-                    xx.append(vx)
-                    weight.append(vweight)
+                    if vx !=0  or not ex0:
+                        xx.append(vx)
+                        weight.append(vweight)
             xweight = (xx, weight)
         else:
 
@@ -2340,6 +2378,32 @@ class _CapacityMonitor(Monitor):
     def value(self, value):
         self.resource.set_capacity(value)
 
+class _ModeMonitor(Monitor):
+    def __init__(self, component, *args, **kwargs):
+        self.component = component
+        super().__init__(*args, **kwargs)
+        
+    @property
+    def value(self):
+        return self._tally
+
+    @value.setter
+    def value(self, value):
+        self.component._mode_time = self.env._now
+        self.tally(value)
+        
+class _StatusMonitor(Monitor):
+    @property
+    def value(self):
+        return self._tally
+        
+    @property
+    def _value(self):  # this is just defined to be able to make the setter
+        return self._tally
+
+    @_value.setter
+    def _value(self, value):  # as we don't want user to set (tally) the status
+        self.tally(value)    
 
 class _SystemMonitor(Monitor):
     @property
@@ -2424,6 +2488,45 @@ class AnimateMonitor(object):
     height : int
         height of the panel (default 75)
 
+    vertical_map : function
+        when a y-value has to be plotted it will be translated by this function |n|
+        default: value |n|
+        when the function results in a TypeError or ValueError, the value 0 is assumed |n|
+        when y-values are non numeric, it is advised to provide an approriate map function, like: |n|
+        vertical_map = "unknown red green blue yellow".split().index
+
+    labels : iterable
+        labels to be shown on the vertical axis (default: empty tuple) |n|
+        the placement of the labels is controlled by the map_value method
+
+    label_color : colorspec
+        color of labels (default: foreground color)
+
+    label_font : font
+        font of the labels (default null string)
+
+    label_fontsize : int
+        size of the font of the labels (default 15)
+    
+    label_anchor : str
+        specifies where the label coordinates (as returned by map_value) are relative to |n|
+        possible values are (default: sw): |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
+
+    label_offsetx : float
+        offsets the x-coordinate of the label (default 0)
+
+    label_offsety : float
+        offsets the y-coordinate of the label (default 0)
+
+    label_linewidth : int
+        width of the label line (default 1)
+
+    label_linecolor : colorspec
+        color of the label lines (default foreground color)
+
     layer : int
         layer (default 0)
 
@@ -2462,6 +2565,16 @@ class AnimateMonitor(object):
         width=200,
         height=75,
         xy_anchor="sw",
+        vertical_map = float,
+        labels=(),
+        label_color="fg",
+        label_font="",
+        label_fontsize=15,
+        label_anchor="e",
+        label_offsetx=0,
+        label_offsety=0,
+        label_linewidth=1,
+        label_linecolor='fg',
         layer=0,
     ):
 
@@ -2551,11 +2664,36 @@ class AnimateMonitor(object):
                 height=height,
                 value_offsety=vertical_offset,
                 value_scale=vertical_scale,
+                value_map = vertical_map,
                 linewidth=linewidth,
                 t_scale=horizontal_scale,
                 layer=layer,
             )
         )
+        for label in labels:
+            try:
+                label_y = vertical_map(label) * vertical_scale + vertical_offset
+                
+                self.aos.append(AnimateText(
+                    text=str(label),
+                    textcolor=label_color,
+                    x=x,
+                    y=y,
+                    offsetx=offsetx + label_offsetx,
+                    offsety=offsety + label_offsety + label_y,
+                    angle=angle,
+                    text_anchor=label_anchor,
+                    screen_coordinates=True,
+                    fontsize=label_fontsize,
+                    font=label_font,
+                    
+                    layer=layer,
+                ))
+                self.aos.append(AnimateLine(spec=(0, 0, width, 0), x=x, y=y, offsetx=offsetx, offsety=label_y, angle=angle, linewidth=label_linewidth, linecolor=label_linecolor))
+            except (ValueError, TypeError):
+                pass
+
+
         self.env.sys_objects.append(self)
 
     def update(self, t):
@@ -4102,7 +4240,7 @@ class Environment(object):
         self._now = 0
         self._offset = 0
         self._main = Component(name="main", env=self, process=None)
-        self._main._status = current
+        self._main.status._value = current
         self._main.frame = _get_caller_frame()
         self._current_component = self._main
         if self._trace:
@@ -4255,8 +4393,8 @@ class Environment(object):
             if not self._current_component._skip_standby:
                 if len(self.env._pendingstandbylist) > 0:
                     c = self.env._pendingstandbylist.pop(0)
-                    if c._status == standby:  # skip cancelled components
-                        c._status = current
+                    if c.status.value == standby:  # skip cancelled components
+                        c.status._value = current
                         c._scheduled_time = inf
                         self.env._current_component = c
                         if self._trace:
@@ -4296,7 +4434,7 @@ class Environment(object):
 
             self._current_component = c
 
-            c._status = current
+            c.status._value = current
             c._scheduled_time = inf
             if self._trace:
                 if c.overridden_lineno:
@@ -4342,7 +4480,7 @@ class Environment(object):
             if c.overridden_lineno:
                 s0 = c.overridden_lineno
             self.print_trace("", "", c.name() + " ended", s0=s0)
-        c._status = data
+        c.status._value = data
         c._scheduled_time = inf
         c._process = None
 
@@ -5667,6 +5805,7 @@ class Environment(object):
                 raise ValueError("both duration and till specified")
 
         self._main.frame = _get_caller_frame()
+        self._main.status._value = scheduled
         self._main._reschedule(scheduled_time, priority, urgent, "run", extra=extra)
 
         self.running = True
@@ -10777,12 +10916,13 @@ class _AosObject(object):  # for Monitor.animate
 
 
 class _Animate_t_x_Line(Animate):
-    def __init__(self, monitor, width, height, value_offsety, value_scale, t_scale, linewidth, *args, **kwargs):
+    def __init__(self, monitor, width, height, value_offsety, value_scale, value_map, t_scale, linewidth, *args, **kwargs):
         self.monitor = monitor
         self.width = width
         self.height = height
         self.value_offsety = value_offsety
         self.value_scale = value_scale
+        self.value_map = value_map
         self.t_scale = t_scale
         self._linewidth = linewidth
         self.as_level = self.monitor._level
@@ -10804,7 +10944,7 @@ class _Animate_t_x_Line(Animate):
             value = 0
         else:
             try:
-                value = float(value)
+                value = self.value_map(value)
             except (ValueError, TypeError):
                 value = 0
         return max(
@@ -10926,7 +11066,7 @@ class Component(object):
     mode : str preferred
         mode |n|
         will be used in trace and can be used in animations |n|
-        if omitted, the mode will be None. |n|
+        if omitted, the mode will be "". |n|
         also mode_time will be set to now.
 
     env : Environment
@@ -10947,7 +11087,7 @@ class Component(object):
         suppress_trace=False,
         suppress_pause_at_step=False,
         skip_standby=False,
-        mode=None,
+        mode="",
         env=None,
         **kwargs
     ):
@@ -10958,7 +11098,7 @@ class Component(object):
         _set_name(name, self.env._nameserializeComponent, self)
         self._qmembers = {}
         self._process = None
-        self._status = data
+        self.status = _StatusMonitor(name=self.name() + ".status", level=True, initial_tally=data)
         self._requests = collections.OrderedDict()
         self._claims = collections.OrderedDict()
         self._waits = []
@@ -10969,14 +11109,10 @@ class Component(object):
         self._creation_time = self.env._now
         self._suppress_trace = suppress_trace
         self._suppress_pause_at_step = suppress_pause_at_step
-        self._mode = mode
+        self.mode = _ModeMonitor(name=self.name() + ".mode", level=True, initial_tally=mode, component=self) 
         self._mode_time = self.env._now
         self._aos = {}
         self._animation_children = set()
-
-        if mode is not None:
-            self._mode = mode
-            self._mode_time = self.env._now
 
         if process is None:
             if hasattr(self, "process"):
@@ -11004,11 +11140,11 @@ class Component(object):
                 raise TypeError("priority is not allowed for a data component")
             if self.env._trace:
                 if self._name == "main":
-                    self.env.print_trace("", "", self.name() + " create", _modetxt(self._mode))
+                    self.env.print_trace("", "", self.name() + " create", self._modetxt())
                 else:
-                    self.env.print_trace("", "", self.name() + " create data component", _modetxt(self._mode))
+                    self.env.print_trace("", "", self.name() + " create data component", self._modetxt())
         else:
-            self.env.print_trace("", "", self.name() + " create", _modetxt(self._mode))
+            self.env.print_trace("", "", self.name() + " create", self._modetxt())
 
             kwargs_p = {}
             if kwargs:
@@ -11046,7 +11182,7 @@ class Component(object):
                 if callable(at):
                     at = at()
                 scheduled_time = at + self.env._offset + delay
-
+            self.status._value = scheduled
             self._reschedule(scheduled_time, priority, urgent, "activate", extra=extra)
         self.setup(**kwargs)
 
@@ -11182,8 +11318,8 @@ class Component(object):
         result.append("  class=" + str(type(self)).split(".")[-1].split("'")[0])
         result.append("  suppress_trace=" + str(self._suppress_trace))
         result.append("  suppress_pause_at_step=" + str(self._suppress_pause_at_step))
-        result.append("  status=" + self._status())
-        result.append("  mode=" + _modetxt(self._mode).strip())
+        result.append("  status=" + self.status())
+        result.append("  mode=" + self.mode())
         result.append("  mode_time=" + self.env.time_to_str(self._mode_time))
         result.append("  creation_time=" + self.env.time_to_str(self._creation_time))
         result.append("  scheduled_time=" + self.env.time_to_str(self._scheduled_time))
@@ -11268,7 +11404,6 @@ class Component(object):
         self._scheduled_time = scheduled_time
         if scheduled_time != inf:
             self._push(scheduled_time, priority, urgent)
-        self._status = scheduled
         if self.env._trace:
             if extra == "*":
                 scheduled_time_str = "ends on no events left  "
@@ -11289,7 +11424,7 @@ class Component(object):
                 self.name() + " " + caller + delta,
                 merge_blanks(
                     scheduled_time_str + _prioritytxt(priority) + _urgenttxt(urgent) + lineno,
-                    _modetxt(self._mode),
+                    self._modetxt(),
                     extra,
                 ),
                 s0=s0,
@@ -11370,7 +11505,7 @@ class Component(object):
         """
         p = None
         if process is None:
-            if self._status == data:
+            if self.status.value == data:
                 if hasattr(self, "process"):
                     p = self.process
                     process_name = "process"
@@ -11406,7 +11541,7 @@ class Component(object):
 
             extra = "process=" + process_name
 
-        if self._status != current:
+        if self.status.value != current:
             self._remove()
             if p is None:
                 if not (keep_request or keep_wait):
@@ -11414,9 +11549,7 @@ class Component(object):
             else:
                 self._check_fail()
 
-        if mode is not None:
-            self._mode = mode
-            self._mode_time = self.env._now
+        self.set_mode(mode)
 
         if callable(delay):
             delay = delay()
@@ -11428,6 +11561,7 @@ class Component(object):
                 at = at()
             scheduled_time = at + self.env._offset + delay
 
+        self.status._value = scheduled
         self._reschedule(scheduled_time, priority, urgent, "activate", extra=extra)
 
     def hold(self, duration=None, till=None, priority=0, urgent=False, mode=None):
@@ -11476,14 +11610,13 @@ class Component(object):
         if both duration and till are specified, the component will become current at the sum of
         these two.
         """
-        if self._status != passive:
+        if self.status.value != passive:
             if self.status != current:
                 self._checkisnotdata()
                 self._remove()
                 self._check_fail()
-        if mode is not None:
-            self._mode = mode
-            self._mode_time = self.env._now
+
+        self.set_mode(mode)
 
         if till is None:
             if duration is None:
@@ -11499,6 +11632,7 @@ class Component(object):
                 scheduled_time = till + self.env._offset
             else:
                 raise ValueError("both duration and till specified")
+        self.status._value = scheduled
         self._reschedule(scheduled_time, priority, urgent, "hold")
 
     def passivate(self, mode=None):
@@ -11517,7 +11651,7 @@ class Component(object):
         ----
         if to be used for the current component (nearly always the case), use ``yield self.passivate()``.
         """
-        if self._status == current:
+        if self.status.value == current:
             self._remaining_duration = 0
         else:
             self._checkisnotdata()
@@ -11525,12 +11659,11 @@ class Component(object):
             self._check_fail()
             self._remaining_duration = self._scheduled_time - self.env._now
         self._scheduled_time = inf
-        if mode is not None:
-            self._mode = mode
-            self._mode_time = self.env._now
+
+        self.set_mode(mode)
         if self.env._trace:
-            self.env.print_trace("", "", self.name() + " passivate", merge_blanks(_modetxt(self._mode)))
-        self._status = passive
+            self.env.print_trace("", "", self.name() + " passivate", merge_blanks(self._modetxt()))
+        self.status._value = passive
 
     def interrupt(self, mode=None):
         """
@@ -11549,24 +11682,22 @@ class Component(object):
         Cannot be applied on the current component. |n|
         Use resume() to resume
         """
-        if self._status == current:
+        if self.status.value == current:
             raise ValueError(self.name() + " current component cannot be interrupted")
         else:
-            if mode is not None:
-                self._mode = mode
-                self._mode_time = self.env._now
-            if self._status == interrupted:
+            self.set_mode(mode)
+            if self.status.value == interrupted:
                 self._interrupt_level += 1
                 extra = "." + str(self._interrupt_level)
             else:
                 self._checkisnotdata()
                 self._remove()
                 self._remaining_duration = self._scheduled_time - self.env._now
-                self._interrupted_status = self._status
+                self._interrupted_status = self.status.value
                 self._interrupt_level = 1
-                self._status = interrupted
+                self.status._value = interrupted
                 extra = ""
-            self.env.print_trace("", "", self.name() + " interrupt" + extra, merge_blanks(_modetxt(self._mode)))
+            self.env.print_trace("", "", self.name() + " interrupt" + extra, merge_blanks(self._modetxt()))
 
     def resume(self, all=False, mode=None, priority=0, urgent=False):
         """
@@ -11605,43 +11736,42 @@ class Component(object):
         ----
         Can be only applied to interrupted components. |n|
         """
-        if self._status == interrupted:
-            if mode is not None:
-                self._mode = mode
-                self._mode_time = self.env._now
+        if self.status.value == interrupted:
+            self.set_mode(mode)
             self._interrupt_level -= 1
             if self._interrupt_level and (not all):
                 self.env.print_trace(
                     "",
                     "",
                     self.name() + " resume (interrupted." + str(self._interrupt_level) + ")",
-                    merge_blanks(_modetxt(self._mode)),
+                    merge_blanks(self._modetxt()),
                 )
             else:
-                self._status = self._interrupted_status
+                self.status._value = self._interrupted_status
                 self.env.print_trace(
-                    "", "", self.name() + " resume (" + self.status()() + ")", merge_blanks(_modetxt(self._mode))
+                    "", "", self.name() + " resume (" + self.status() + ")", merge_blanks(self._modetxt())
                 )
-                if self._status == passive:
-                    self.env.print_trace("", "", self.name() + " passivate", merge_blanks(_modetxt(self._mode)))
-                elif self._status == standby:
+                if self.status.value == passive:
+                    self.env.print_trace("", "", self.name() + " passivate", merge_blanks(self._modetxt()))
+                elif self.status.value == standby:
                     self._scheduled_time = self.env._now
                     self.env._standbylist.append(self)
-                    self.env.print_trace("", "", self.name() + " standby", merge_blanks(_modetxt(self._mode)))
-                elif self._status == scheduled:
-                    if self._waits:
-                        if self._trywait():
-                            return
-                        reason = "wait"
-                    elif self._requests:
+                    self.env.print_trace("", "", self.name() + " standby", merge_blanks(self._modetxt()))
+                elif self.status.value in (scheduled, waiting, requesting):
+                    if self.status.value == waiting:
+                        if self._waits:
+                            if self._trywait():
+                                return
+                            reason = "wait"
+                    elif self.status.value == requesting:
                         if self._tryrequest():
                             return
                         reason = "request"
-                    else:
+                    elif self.status.value == scheduled:
                         reason = "hold"
                     self._reschedule(self.env._now + self._remaining_duration, priority, urgent, reason)
                 else:
-                    raise Exception(self.name() + " unexpected interrupted_status", self._status())
+                    raise Exception(self.name() + " unexpected interrupted_status", self.status.value())
         else:
             raise ValueError(self.name() + " not interrupted")
 
@@ -11661,18 +11791,16 @@ class Component(object):
         ----
         if to be used for the current component, use ``yield self.cancel()``.
         """
-        if self._status != current:
+        if self.status.value != current:
             self._checkisnotdata()
             self._remove()
             self._check_fail()
         self._process = None
         self._scheduled_time = inf
-        if mode is not None:
-            self._mode = mode
-            self._mode_time = self.env._now
+        self.set_mode(mode)
         if self.env._trace:
-            self.env.print_trace("", "", "cancel " + self.name() + " " + _modetxt(self._mode))
-        self._status = data
+            self.env.print_trace("", "", "cancel " + self.name() + " " + self._modetxt())
+        self.status._value = data
 
     def standby(self, mode=None):
         """
@@ -11694,22 +11822,20 @@ class Component(object):
         (which will be nearly always the case),
         use ``yield self.standby()``.
         """
-        if self._status != current:
+        if self.status.value != current:
             self._checkisnotdata()
             self._checkisnotmain()
             self._remove()
             self._check_fail()
         self._scheduled_time = self.env._now
         self.env._standbylist.append(self)
-        if mode is not None:
-            self._mode = mode
-            self._mode_time = self.env._now
+        self.set_mode(mode)
         if self.env._trace:
             if self.env._buffered_trace:
                 self.env._buffered_trace = False
             else:
-                self.env.print_trace("", "", "standby", _modetxt(self._mode))
-        self._status = standby
+                self.env.print_trace("", "", "standby", self._modetxt())
+        self.status._value = standby
 
     def request(self, *args, **kwargs):
         """
@@ -11786,7 +11912,7 @@ class Component(object):
         if kwargs:
             raise TypeError(called_from + "() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
-        if self._status != current:
+        if self.status.value != current:
             self._checkisnotdata()
             self._checkisnotmain()
             self._remove()
@@ -11809,9 +11935,7 @@ class Component(object):
             else:
                 raise ValueError("both fail_at and fail_delay specified")
 
-        if mode is not None:
-            self._mode = mode
-            self._mode_time = self.env._now
+        self.set_mode(mode)
 
         self._failed = False
         for arg in args:
@@ -11881,6 +12005,7 @@ class Component(object):
         self._tryrequest()
 
         if self._requests:
+            self.status._value = requesting
             self._reschedule(scheduled_time, 0, False, "request")
 
     def isbumped(self, resource=None):
@@ -11957,7 +12082,7 @@ class Component(object):
         return []
 
     def _tryrequest(self):  # this is Component._tryrequest
-        if self._status == interrupted:
+        if self.status.value == interrupted:
             return False
 
         if self.oneof_request:
@@ -11998,6 +12123,7 @@ class Component(object):
             self._requests = collections.OrderedDict()
             self._remove()
             honoredstr = r_honor[0].name() + (len(r_honor) > 1) * " ++"
+            self.status._value = scheduled
             self._reschedule(self.env._now, 0, False, "request honor " + honoredstr, s0=self.env.last_s0)
             for r in anonymous_resources:
                 r._tryrequest()
@@ -12177,7 +12303,7 @@ class Component(object):
         if kwargs:
             raise TypeError("wait() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
-        if self._status != current:
+        if self.status.value != current:
             self._checkisnotdata()
             self._checkisnotmain()
             self._remove()
@@ -12204,9 +12330,7 @@ class Component(object):
             else:
                 raise ValueError("both fail_at and fail_delay specified")
 
-        if mode is not None:
-            self._mode = mode
-            self._mode_time = self.env._now
+        self.set_mode(mode)
 
         for arg in args:
             value = True
@@ -12242,10 +12366,11 @@ class Component(object):
         self._trywait()
 
         if self._waits:
+            self.status._value = waiting
             self._reschedule(scheduled_time, 0, False, "wait")
 
     def _trywait(self):
-        if self._status == interrupted:
+        if self.status.value == interrupted:
             return False
         if self._wait_all:
             honored = True
@@ -12285,6 +12410,7 @@ class Component(object):
                     self.leave(s._waiters)
             self._waits = []
             self._remove()
+            self.status._value = scheduled
             self._reschedule(self.env._now, 0, False, "wait honor", s0=self.env.last_s0)
 
         return honored
@@ -12446,26 +12572,24 @@ class Component(object):
             self._skip_standby = value
         return self._skip_standby
 
-    def mode(self, value=None):
+    def set_mode(self, value=None):
         """
         Parameters
         ----------
         value: any, str recommended
             new mode |n|
-            if omitted, no change |n|
-            mode_time will be set if a new mode is specified
-
-        Returns
-        -------
-        mode of the component : any, usually str
-            the mode is useful for tracing and animations. |n|
-            Usually the mode will be set in a call to passivate, hold, activate, request or standby.
+            mode_time will be set to now
+            if omitted, no change
         """
         if value is not None:
-            self._mode_time = self.env._now
-            self._mode = value
+            self.mode.value = value
 
-        return self._mode
+    
+    def _modetxt(self):
+        if self.mode() == "":
+            return ""
+        else:
+            return "mode=" + str(self.mode())        
 
     def ispassive(self):
         """
@@ -12477,7 +12601,7 @@ class Component(object):
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
         """
-        return self._status == passive
+        return self.status.value == passive
 
     def iscurrent(self):
         """
@@ -12489,7 +12613,7 @@ class Component(object):
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
         """
-        return self._status == current
+        return self.status.value == current
 
     def isrequesting(self):
         """
@@ -12501,7 +12625,7 @@ class Component(object):
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
         """
-        return bool(self._requests)
+        return self.status.value == requesting
 
     def iswaiting(self):
         """
@@ -12513,7 +12637,7 @@ class Component(object):
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
         """
-        return bool(self._waits)
+        return self.status.value == waiting
 
     def isscheduled(self):
         """
@@ -12525,7 +12649,7 @@ class Component(object):
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
         """
-        return (self._status == scheduled) and (not self._requests) and (not self._waits)
+        return self.status.value == scheduled
 
     def isstandby(self):
         """
@@ -12537,7 +12661,7 @@ class Component(object):
         ----
         Be sure to always include the parentheses, otherwise the result will be always True
         """
-        return self._status == standby
+        return self.status.value == standby
 
     def isinterrupted(self):
         """
@@ -12549,7 +12673,7 @@ class Component(object):
         ----
         Be sure to always include the parentheses, otherwise the result will be always True
         """
-        return self._status == interrupted
+        return self.status.value == interrupted
 
     def isdata(self):
         """
@@ -12561,7 +12685,7 @@ class Component(object):
         ----
         Be sure to always include the parentheses, otherwise the result will be always True!
         """
-        return self._status == data
+        return self.status.value == data
 
     def queues(self):
         """
@@ -12929,19 +13053,19 @@ class Component(object):
         after some (breakdown) time
         """
         if value is not None:
-            if self._status in (passive, interrupted):
+            if self.status.value in (passive, interrupted):
                 self._remaining_duration = value
-            elif self._status == current:
+            elif self.status.value == current:
                 raise ValueError("setting remaining_duration not allowed for current component (" + self.name() + ")")
-            elif self._status == standby:
+            elif self.status.value == standby:
                 raise ValueError("setting remaining_duration not allowed for standby component (" + self.name() + ")")
             else:
                 self._remove()
                 self._reschedule(value + self.env._now, priority, urgent, "set remaining_duration", extra="")
 
-        if self._status in (passive, interrupted):
+        if self.status.value in (passive, interrupted):
             return self._remaining_duration
-        elif self._status == scheduled:
+        elif self.status.value in (scheduled, waiting, requesting):
             return self._scheduled_time - self.env._now
         else:
             return 0
@@ -12971,11 +13095,7 @@ class Component(object):
             - standby
             - interrupted
         """
-        if len(self._requests) > 0:
-            return requesting
-        if len(self._waits) > 0:
-            return waiting
-        return self._status
+        return self.status.value
 
     def interrupted_status(self):
         """
@@ -12988,12 +13108,9 @@ class Component(object):
             - waiting
             - standby
         """
-        if self._status != interrupted:
+        if self.status.value != interrupted:
             raise ValueError(self.name() + "not interrupted")
-        if len(self._requests) > 0:
-            return requesting
-        if len(self._waits) > 0:
-            return waiting
+
         return self._interrupted_status
 
     def interrupt_level(self):
@@ -13001,7 +13118,7 @@ class Component(object):
         returns interrupt level of an interrupted component |n|
         non interrupted components return 0
         """
-        if self._status == interrupted:
+        if self.status.value == interrupted:
             return self._interrupt_level
         else:
             return 0
@@ -13024,7 +13141,7 @@ class Component(object):
             return mx
 
     def _checkisnotdata(self):
-        if self._status == data:
+        if self.status.value == data:
             raise ValueError(self.name() + " data component not allowed")
 
     def _checkisnotmain(self):
@@ -13294,8 +13411,8 @@ class ComponentGenerator(Component):
         result.append("  iat=" + repr(self.iat))
         result.append("  suppress_trace=" + str(self._suppress_trace))
         result.append("  suppress_pause_at_step=" + str(self._suppress_pause_at_step))
-        result.append("  status=" + self._status())
-        result.append("  mode=" + _modetxt(self._mode).strip())
+        result.append("  status=" + self.status.value)
+        result.append("  mode=" + self._modetxt().strip())
         result.append("  mode_time=" + self.env.time_to_str(self._mode_time))
         result.append("  creation_time=" + self.env.time_to_str(self._creation_time))
         result.append("  scheduled_time=" + self.env.time_to_str(self._scheduled_time))
@@ -17087,16 +17204,21 @@ def type_to_typecode_off(type):
     return lookup[type]
 
 
-def list_to_array(arg):
-    float_result = array.array("d")
+def do_force_numeric(arg):
+    result = []
     for v in arg:
-        try:
-            vfloat = float(v)
-        except (ValueError, TypeError):
-            vfloat = 0
-        float_result.append(vfloat)
+        if isinstance(v, numbers.Number):
+            result.append(v)
+        else:
+            try:
+                if int(v) == float(v):
+                    result.append(int(v))
+                else:
+                    result.append(float(v))
+            except (ValueError, TypeError):
+                result.append(0)
 
-    return float_result
+    return result
 
 
 def deep_flatten(arg):
@@ -17137,13 +17259,6 @@ def _urgenttxt(urgent):
 
 def _prioritytxt(priority):
     return ""
-
-
-def _modetxt(mode):
-    if mode is None:
-        return ""
-    else:
-        return "mode=" + str(mode)
 
 
 def object_to_str(object, quoted=False):
@@ -17200,38 +17315,25 @@ def de_none(lst):
             result.append(item)
     return result
 
+def statuses():
+    """
+    tuple of all statuses a component can be in, in alphabetical order.
+    """
 
-def data():
-    return "data"
+    return tuple("current data interrupted passive requesting scheduled standby waiting".split(" "))
 
-
-def current():
-    return "current"
-
-
-def standby():
-    return "standby"
-
-
-def passive():
-    return "passive"
-
-
-def interrupted():
-    return "interrupted"
-
-
-def scheduled():
-    return "scheduled"
-
-
-def requesting():
-    return "requesting"
-
-
-def waiting():
-    return "waiting"
-
+for status in statuses():
+    globals()[status] = status
+"""
+data = "data"
+current = "current"
+standby = "standby"
+passive = "passive"
+interrupted = "interrupted"
+scheduled = "scheduled"
+requesting = "requesting"
+waiting = "waiting"
+"""
 
 def random_seed(seed=None, randomstream=None, set_numpy_random_seed=True):
     """

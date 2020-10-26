@@ -1,6 +1,153 @@
 salabim changelog
 
-version 20.0.3  2020-08-06
+version 20.0.4  2020-10-26
+==========================
+New functionality (0)
+---------------------
+A component now supports a level monitor 'status' that keeps track of all the statuses a component has been in.
+For instance, component.status.print_histogram(values=True) will print something like
+    Histogram of x.1.status
+    duration            40
+
+    value                     duration     %
+    data                         4.300  10.8 ********
+    interrupted                  4      10   ********
+    passive                     11.500  28.7 ***********************
+    requesting                  10.100  25.2 ********************   
+    scheduled                   10.100  25.3 ********************   
+
+And of course, it is possible to get the duration a component was in a certain status, like
+    passive_time = component.status.value_duration(sim.passive).
+You can even get the status of the component at a moment in the past, with e.g.
+    status_4_units_ago = c1.status(env.now() - 4)
+
+In line with this change, the various statutes (passive, scheduled, ...) are no longer functions,
+but just strings. So now, therefore it is also possible to say 
+     passive_time = component.status.value_duration("passive")
+This will be quite transparent from the user. Only if the text representation of a status was required,
+status() had to be called, like
+    print(f"car status={car.status()()}")
+From this version on, this should read
+    print(f"car status={car.status()}")
+, which is also more intuitive.
+Alternatively, you can now also write
+    print(f"car status={car.status.value}")
+
+This makes the methods Component.ispassive(), Component.isscheduled, etc. less required as
+    component.status() == "passive" and
+    component.status() == "scheduled"
+are arguably easier to understand.
+
+The package salabim now has a function statuses() that returns a tuple with all statuses a component can be in.
+So
+    print(sim.statuses())
+will print    
+    ('current', 'data', 'interrupted', 'passive', 'requesting', 'scheduled', 'standby', 'waiting')
+
+New functionality (1)
+---------------------
+Component.mode is now a monitor. That makes it possible to get an overview of all modes a component
+has been in, either as a histogram or an animated monitor.
+And it is possible to get the duration a component was in a certain mode, with e.g.
+    red_time = c1.mode.value_duration("red")
+It is even possible to get the mode a component was in at a given moment, like
+    mode_4_units_ago = c1.mode(env.now() - 4)
+Because of this you can't use mode(x) anymore to set the mode directly. In order to do that, you
+have to use the new method set_mode:
+    c1.set_mode("green")
+or
+    c1.mode.value = "green"
+Both options do store the modetime correctly.
+Please observe that the initial value for mode is now the null string and not None.
+
+New_functionality (3)
+---------------------
+New method: Monitor.values() to assess all values in a monitor.
+The values returned will be alphabetically sorted (not case sensitive), just as in Monitor.print_histogram().
+The method supports both ex0 and force_numeric parameter flags.
+Example (with same monitor as above):
+    print(x1.status.values())
+will print
+    ['data', 'interrupted', 'passive', 'requesting', 'scheduled']
+
+New functionality (4)
+---------------------
+The values parameter of print_histogram() can now also be an iterable (i.e. tuple, list or set).
+In that case, the statistics of only these values will be shown. 
+Example (with same monitor as above):
+    x1.status.print_histogram(values = sim.statuses())
+will print
+    Histogram of x.1.status
+    duration            40
+
+    value                     duration     %
+    current                      0       0
+    data                         4.300  10.8 ********
+    interrupted                  4      10   ********
+    passive                     11.500  28.7 ***********************
+    requesting                  10.100  25.2 ********************
+    scheduled                   10.100  25.3 ********************
+    standby                      0       0
+    waiting                      0       0
+
+Any not shown values will be shown at the bottom as '<rest>'.
+So, again with the same monitor as above:
+    x1.status.print_histogram(values = ("passive", "requesting", "error"))
+will print
+    Histogram of x.1.status
+    duration            40
+
+    value                     duration     %
+    passive                     11.500  28.7 ***********************
+    requesting                  10.100  25.2 ********************
+    error                        0       0
+    <rest>                    18.400  46.0 ************************************
+
+New functionality (5)
+---------------------
+AnimateMonitor and Monitor.animate has got a new parameter: vertical_map.
+This parameter should be a function that accepts one argument (the value to be plotted). By default
+vertical_map is float.
+The function vertical_map should result in a float or raise a TypeError or ValueError.
+E.g. to map "red" to the value 1, "blue" to 2, etc., you could provide a mapping function like:
+    vertical_map = "unknown red blue green yellow".split().index
+Note that in this example any value other than red, blue, green or yellow would map to 0
+(via a ValueError exception). 
+This vertical_map function can also be used to map to a logarithmic scale:
+    vertical_map = lambda value_y: math.log(value_y) * 10   
+
+New functionality (6)
+---------------------
+AnimateMonitor and Monitor.animate can now show labels and corresponding lines.
+There is full control of the colours, linewidth, fonts, placement, etc. See the docstring or 
+documentation for details.
+There is a sample model (demo animation of labeled monitors.py) in the sample model folder
+to illustrate the usage of this new functionality with the new Component.status and
+Component.mode monitors.
+
+Changed functionality (0)
+-------------------------
+The tests for which value(s) to include in
+    Montitor.value_number_of_entries()
+    Monitor.value_duration()
+    Monitor.value_weight()
+are now direct and do not involve string conversion anymore. Normally, this won't cause any compatibility issues.
+
+Distribution change (0)
+-----------------------
+The setup information (used in PyPI) now includes a set of classifiers as well as requires_python information.
+
+Compatibility change (0)
+------------------------
+Salabim requires Python 3.6 from now on.
+
+Internal change (0)
+-------------------
+The statuses requesting and waiting were internally stored as scheduled and 'translated' in the status()
+method. Now, these statuses are natively stored as such (in the status monitor).
+
+
+Version 20.0.3  2020-08-06
 ==========================
 New functionality (0)
 -----------------------
@@ -1089,7 +1236,7 @@ It is also possible to use the sum function to merge a number of monitors. So,
 is equivalent to the constructs above.
 And if ms = (m0, m1, m2), it is also possible to use:
     print(sum(ms).mean())
-A practical example of this is the case where the list waitinglines contains a number of queues.
+A practical example of this, is the case where the list waitinglines contains a number of queues.
 Then to get the aggregated statistics of the length of all these queues, use:
     sum(waitingline.length for waitingline in waitinglines).print_statistics()
     
