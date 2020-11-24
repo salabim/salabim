@@ -1,5 +1,101 @@
 salabim changelog
 
+version 20.0.5  2020-11-24
+==========================
+Added functionality (0)
+-----------------------
+The methods Component.request() and Component.wait() now also support the urgent and priority parameters, which
+make it possible to fine-tune race conditions.
+
+Added functionality (1)
+-----------------------
+ComponentGenerator can now 'propagate' keyword parameters to the components generated.
+In line with this, the name parameter is changed to generator_name, in order to make it possible to
+define the name of the generated components.
+Example:
+
+    import salabim as sim
+
+    class Worker(sim.Component):
+        def process(self, collar):
+            print(f"I am {self.name()} and I have a {collar} collar")
+         
+    env = sim.Environment(trace=True)
+    sim.ComponentGenerator(Worker, "technician generator", iat=sim.Uniform(2,4), name="technician.", collar="blue")
+    sim.ComponentGenerator(Worker, "manager generator", iat=sim.Uniform(3,6), name="manager.", collar="white")
+    env.run(10)
+
+Added functionality (2)
+-----------------------
+sim.Environment() has now an extra parameter, blind_animation that can be used to create videos
+without showing the animation during production.
+This is particularly useful when running a simulation on a platform where tkinter is not supported,
+such a server. 
+This functionality can also be used to slightly increase the performance of video production.
+    
+Example usage:
+    try:
+        import tkinter  
+        blind_animation = False
+    except ImportError:
+        blind_animation = True
+    env = sim.Environment(blind_animation = blind_animation)
+        
+Improved functionality (0)
+--------------------------
+Monitor.print_histogram() can now show a user specified collection of values. This can be done by giving
+an iterable to the values parameter. If not all values present in the monitor are given, a <rest> value
+will be shown at the bottom. Like:
+    x0.status.print_histogram(values=["scheduled", "current", "passive"])
+may result in
+    Histogram of x.0.status
+    duration            50
+
+    value                     duration     %
+    scheduled                   10.100  20.2 ****************
+    current                      0       0
+    passive                     31.600  63.2 **************************************************
+    <rest>                       8.300  16.6 *************
+    
+By default, the values are shown in the given order, but can also be sorted on value by specifying
+sort_on_value=True.
+
+Improved functionality (1)
+--------------------------
+Monitor.print_histogram() with values now supports sorting on weight (=number of entries if
+all weights are 1) (for non level monitors) and sorting on duration (for level monitors).
+Therefore, two parameters have been added to print_histogram(): sort_on_weight and sort_on_duration.
+
+So,
+    x0.status.print_histogram(values=["scheduled", "current", "passive"], sort_on_duration=True)
+may result in
+    Histogram of x.0.status
+    duration            50
+
+    value                     duration     %
+    passive                     31.600  63.2 **************************************************
+    scheduled                   10.100  20.2 ****************
+    current                      0       0
+    <rest>                       8.300  16.6 *************
+    
+Improved functionality (2)
+--------------------------
+Monitor.values() now supports sorting on weight (=number of entries if all weights are 1) (for non level monitors) and sorting on duration (for level monitors).
+Therefore, two parameters have been added to values(): sort_on_weight and sort_on_duration.
+So, in the above example, 
+    print(x0.status.values())
+may result in
+    ['data', 'interrupted', 'passive', 'scheduled']
+, whereas 
+    print(x0.status.values(sort_on_duration))
+may result in
+    ['passive', 'scheduled', data', 'interrupted']
+    
+Internal change (0)
+-------------------
+The Component.__del__ now explicitly checks for the existence of an _animation_children attribute to prevent
+an error when deleting a component which is not completely initialized yet.
+
 version 20.0.4  2020-10-26
 ==========================
 New functionality (0)
@@ -145,7 +241,6 @@ Internal change (0)
 -------------------
 The statuses requesting and waiting were internally stored as scheduled and 'translated' in the status()
 method. Now, these statuses are natively stored as such (in the status monitor).
-
 
 Version 20.0.3  2020-08-06
 ==========================

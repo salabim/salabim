@@ -1,16 +1,13 @@
-#               _         _      _               ____    ___       ___      _  _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \    | || |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |   | || |_
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _ |__   _|
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)   |_|
+#               _         _      _               ____    ___       ___      ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \    | ___|
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |   |___ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _  ___) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|____/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-from __future__ import print_function  # compatibility with Python 2.x
-from __future__ import division  # compatibility with Python 2.x
-
-__version__ = "20.0.4"
+__version__ = "20.0.5"
 
 import heapq
 import random
@@ -1841,7 +1838,7 @@ class Monitor(object):
         return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str, file=file)
 
     def print_histogram(
-        self, number_of_bins=None, lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None
+        self, number_of_bins=None, lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None, sort_on_weight=False, sort_on_duration=False, sort_on_value=False
     ):
         """
         print monitor statistics and histogram
@@ -1878,6 +1875,31 @@ class Monitor(object):
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
+        sort_on_weight : bool
+            if True, sort the values on weight first (largest first), then on the values itself|n|
+            if False, sort the values on the values itself |n|
+            False is the default for non level monitors. Not permitted for level monitors.
+
+        sort_on_duration : bool
+            if True, sort the values on duration first (largest first), then on the values itself|n|
+            if False, sort the values on the values itself |n|
+            False is the default for level monitors. Not permitted for non level monitors.
+            
+        sort        sort_on_weight : bool
+            if True, sort the values on weight first (largest first), then on the values itself|n|
+            if False (default), sort the values on the values itself |n|
+            Not permitted for level monitors.
+
+        sort_on_duration : bool
+            if True, sort the values on duration first (largest first), then on the values itself|n|
+            if False (default), sort the values on the values itself |n|
+            Not permitted for non level monitors.
+            
+        sort_on_value : bool
+            if True, sort on the values. |n|
+            if False (default), no sorting will take place, unless values is an iterable, in which case
+            sorting will be done on the values anyway.
+                      
         Returns
         -------
         histogram (if as_str is True) : str
@@ -1887,6 +1909,16 @@ class Monitor(object):
         If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
         with a maximum of 30 classes.
         """
+        if self._level and sort_on_weight:
+            raise ValueError("level monitors can't be sorted on weight. Use sort_on_duration instead")
+        if not self._level and sort_on_duration:
+            raise ValueError("non level monitors can't be sorted on duration. Use sort_on_weight instead")
+        if sort_on_value and sort_on_weight:
+            raise ValueError("sort_on_value can't be combined with sorted_on_value")
+        if sort_on_value and sort_on_weight:
+            raise ValueError("sort_on_weight can't be combined with sorted_on_value")                      
+ 
+                
         result = []
         result.append("Histogram of " + self.name() + ("[ex0]" if ex0 else ""))
 
@@ -1897,7 +1929,14 @@ class Monitor(object):
             result.append("")
             result.append("no data")
         else:
-            if values:
+            values_is_iterable = False
+            if not isinstance(values, str):
+                try:
+                    values = list(values)  # iterable?
+                    values_is_iterable=True
+                except TypeError:
+                    pass
+            if values or values_is_iterable:
                 nentries = len(x)
                 if self._weight:
                     result.append(pad(self.weight_legend, 13) + "{}".format(fn(weight_total, 13, 3)))
@@ -1912,26 +1951,38 @@ class Monitor(object):
                     else:
                         result.append("value               entries     %")
 
-                if isinstance(values, str):
-                    values = [values]                    
-                try:
-                    iter(values)  # iterable?
-                    values_label = list(values)
-                except TypeError:
-                    values_label = self.values(ex0=ex0)
-                values_condition = [{value} for value in values_label]  # guarantees same order as values_label
-                rest_values = set(self.values(ex0=ex0)) - set(values_label)
+                if values_is_iterable:     
+                    unique_values = []
+                    for v in values:
+                        if v in unique_values:
+                            raise ValueError('value ' + str(v) + ' used more than once')
+                        unique_values.append(v)     
+                                       
+                    if sort_on_weight or sort_on_duration or sort_on_value:
+                        values_label = [v for v in self.values(ex0=ex0, sort_on_weight=sort_on_weight, sort_on_duration=sort_on_duration) if v in values]
+                        values_not_in_monitor = [v for v in values if v not in values_label]
+                        values_label.extend(sorted(values_not_in_monitor))
+                    else:
+                        values_label = values
+                else:                    
+                    values_label = self.values(ex0=ex0, sort_on_weight=sort_on_weight, sort_on_duration=sort_on_duration)
                 
-                if rest_values:
+                values_condition = [[v] for v in values_label]
+                rest_values = self.values(ex0=ex0)
+                for v in values_label:
+                    if v in rest_values:
+                        rest_values.remove(v)
+
+                if rest_values:  # not possible via set subtraction as values may be not hashable
                     values_condition.append(rest_values)
                     values_label.append("<rest>")
-                    
+
                 for value_condition, value_label in zip(values_condition, values_label):
                     if self._level:
                         count = self.value_duration(value_condition)
                     else:
                         if self._weight:
-                            count = self.value_weight(value_condition) 
+                            count = self.value_weight(value_condition)
                             count_entries = self.value_number_of_entries(value_condition)
                         else:
                             count = self.value_number_of_entries(value_condition)
@@ -1939,7 +1990,7 @@ class Monitor(object):
                     perc = count / weight_total
                     scale = 80
                     n = int(perc * scale)
-                    s = ("*" * n) 
+                    s = "*" * n
 
                     if self._level:
                         result.append(pad(str(value_label), 20) + fn(count, 14, 3) + fn(perc * 100, 6, 1) + " " + s)
@@ -1951,10 +2002,11 @@ class Monitor(object):
                                 + fn(perc * 100, 6, 1)
                                 + rpad(str(count_entries), 8)
                                 + fn(count_entries * 100 / nentries, 6, 1)
-                                
                             )
                         else:
-                            result.append(pad(str(value_label), 20) + rpad(str(count), 7) + fn(perc * 100, 6, 1) + " " + s)
+                            result.append(
+                                pad(str(value_label), 20) + rpad(str(count), 7) + fn(perc * 100, 6, 1) + " " + s
+                            )
             else:
                 auto_scale = True
                 if bin_width is None:
@@ -2013,8 +2065,8 @@ class Monitor(object):
                         )
         result.append("")
         return return_or_print(result, as_str=as_str, file=file)
-        
-    def values(self, ex0=False, force_numeric=False):
+
+    def values(self, ex0=False, force_numeric=False, sort_on_weight=False, sort_on_duration=False):
         """
         values
 
@@ -2026,24 +2078,51 @@ class Monitor(object):
         force_numeric : bool
             if True, convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
             if False (default), do not interpret x-values, return as list if type is list
+            
+        sort_on_weight : bool
+            if True, sort the values on weight first (largest first), then on the values itself|n|
+            if False, sort the values on the values itself |n|
+            False is the default for non level monitors. Not permitted for level monitors.
 
+        sort_on_duration : bool
+            if True, sort the values on duration first (largest first), then on the values itself|n|
+            if False, sort the values on the values itself |n|
+            False is the default for level monitors. Not permitted for non level monitors.
+            
         Returns
         -------
         all tallied values : array/list
         """
-        x, _ = self._xweight(ex0, force_numeric)        
         
+        x, _ = self._xweight(ex0, force_numeric)            
+
+        if self._level:
+            if sort_on_weight:
+                raise ValueError("level monitors can't be sorted on weight. Use sort_on_duration instead")
+        else:
+            if sort_on_duration:
+                raise ValueError("non level monitors can't be sorted on duration. Use sort_on_weight instead")                   
+
         def key(x):
-            try:
-                x1 = float(x)
-                x2 = ""
-            except ValueError:
-                x1 = math.inf
-                x2 = str(x).lower()
-            return (x1, x2)     
+            if sort_on_weight:
+                weight = -self.value_weight(x)
+            elif sort_on_duration:
+                weight = -self.value_duration(x)
+            else:
+                weight=1
             
-        return list(sorted(set(x), key=key))
-        
+            try:
+                return (weight, float(x), "")
+            except (ValueError, TypeError):
+                return (weight, math.inf, str(x).lower())
+
+        x_unique = []  # not possible to use set() as items do not have to be hashable
+        for item in x:
+            if item not in x_unique:
+                x_unique.append(item)
+
+        return list(sorted(x_unique, key=key))
+
     def animate(self, *args, **kwargs):
         """
         animates the monitor in a panel
@@ -2256,7 +2335,7 @@ class Monitor(object):
             off = self.off
         else:
             x = do_force_numeric(self._x)
-            typecode = x.typecode
+            typecode = ''
             off = -inf  # float
 
         if typecode:
@@ -2322,9 +2401,10 @@ class Monitor(object):
 
         if self.xtypecode or (not force_numeric):
             x = self._x
+            typecode = self.xtypecode
         else:
             x = do_force_numeric(self._x)
-        typecode = self.xtypecode
+            typecode = ''
 
         if self._level:
             weightall = array.array("d")
@@ -2344,7 +2424,7 @@ class Monitor(object):
 
             for vx, vweight in zip(x, weightall):
                 if vx != self.off:
-                    if vx !=0  or not ex0:
+                    if vx != 0 or not ex0:
                         xx.append(vx)
                         weight.append(vweight)
             xweight = (xx, weight)
@@ -2378,11 +2458,12 @@ class _CapacityMonitor(Monitor):
     def value(self, value):
         self.resource.set_capacity(value)
 
+
 class _ModeMonitor(Monitor):
     def __init__(self, component, *args, **kwargs):
         self.component = component
         super().__init__(*args, **kwargs)
-        
+
     @property
     def value(self):
         return self._tally
@@ -2391,19 +2472,21 @@ class _ModeMonitor(Monitor):
     def value(self, value):
         self.component._mode_time = self.env._now
         self.tally(value)
-        
+
+
 class _StatusMonitor(Monitor):
     @property
     def value(self):
         return self._tally
-        
+
     @property
     def _value(self):  # this is just defined to be able to make the setter
         return self._tally
 
     @_value.setter
     def _value(self, value):  # as we don't want user to set (tally) the status
-        self.tally(value)    
+        self.tally(value)
+
 
 class _SystemMonitor(Monitor):
     @property
@@ -2565,7 +2648,7 @@ class AnimateMonitor(object):
         width=200,
         height=75,
         xy_anchor="sw",
-        vertical_map = float,
+        vertical_map=float,
         labels=(),
         label_color="fg",
         label_font="",
@@ -2574,7 +2657,7 @@ class AnimateMonitor(object):
         label_offsetx=0,
         label_offsety=0,
         label_linewidth=1,
-        label_linecolor='fg',
+        label_linecolor="fg",
         layer=0,
     ):
 
@@ -2664,7 +2747,7 @@ class AnimateMonitor(object):
                 height=height,
                 value_offsety=vertical_offset,
                 value_scale=vertical_scale,
-                value_map = vertical_map,
+                value_map=vertical_map,
                 linewidth=linewidth,
                 t_scale=horizontal_scale,
                 layer=layer,
@@ -2673,26 +2756,37 @@ class AnimateMonitor(object):
         for label in labels:
             try:
                 label_y = vertical_map(label) * vertical_scale + vertical_offset
-                
-                self.aos.append(AnimateText(
-                    text=str(label),
-                    textcolor=label_color,
-                    x=x,
-                    y=y,
-                    offsetx=offsetx + label_offsetx,
-                    offsety=offsety + label_offsety + label_y,
-                    angle=angle,
-                    text_anchor=label_anchor,
-                    screen_coordinates=True,
-                    fontsize=label_fontsize,
-                    font=label_font,
-                    
-                    layer=layer,
-                ))
-                self.aos.append(AnimateLine(spec=(0, 0, width, 0), x=x, y=y, offsetx=offsetx, offsety=label_y, angle=angle, linewidth=label_linewidth, linecolor=label_linecolor))
+
+                self.aos.append(
+                    AnimateText(
+                        text=str(label),
+                        textcolor=label_color,
+                        x=x,
+                        y=y,
+                        offsetx=offsetx + label_offsetx,
+                        offsety=offsety + label_offsety + label_y,
+                        angle=angle,
+                        text_anchor=label_anchor,
+                        screen_coordinates=True,
+                        fontsize=label_fontsize,
+                        font=label_font,
+                        layer=layer,
+                    )
+                )
+                self.aos.append(
+                    AnimateLine(
+                        spec=(0, 0, width, 0),
+                        x=x,
+                        y=y,
+                        offsetx=offsetx,
+                        offsety=label_y,
+                        angle=angle,
+                        linewidth=label_linewidth,
+                        linecolor=label_linecolor,
+                    )
+                )
             except (ValueError, TypeError):
                 pass
-
 
         self.env.sys_objects.append(self)
 
@@ -4180,7 +4274,13 @@ class Environment(object):
     reset : bool
         if True, reset the simulation environment |n|
         if False, do not reset the simulation environment |n|
-        if None (default), reset the simulation environment when run under Pythonista, otherwise no reset*
+        if None (default), reset the simulation environment when run under Pythonista, otherwise no reset
+
+    blind_animation : bool
+        if False (default), animation will be performed as expected |n|
+        if True, animations will run silently. This is useful to make videos when tkinter is not installed (installable).
+        This is particularly useful when running a simulation on a server.
+        Note that this will show a slight performance increase, when creating videos.
 
     Note
     ----
@@ -4205,6 +4305,7 @@ class Environment(object):
         isdefault_env=True,
         retina=False,
         do_reset=None,
+        blind_animation = False,
         *args,
         **kwargs
     ):
@@ -4273,6 +4374,12 @@ class Environment(object):
         self.stopped = False
         self.paused = False
         self.last_s0 = ""
+        self._blind_animation = blind_animation
+        if self._blind_animation:
+            save_trace = self.trace()
+            self.trace(False)
+            self._blind_video_maker = _BlindVideoMaker(process="", suppress_trace=True)
+            self.trace(save_trace)
         if PyDroid:
             if g.tkinter_loaded == "?":
                 g.tkinter_loaded = "tkinter" in sys.modules
@@ -4774,7 +4881,7 @@ class Environment(object):
         self._scale = self._width / (self._x1 - self._x0)
         self._y1 = self._y0 + self._height / self._scale
 
-        if g.animation_env is not self:
+        if g.animation_env is not self: 
             if g.animation_env is not None:
                 g.animation_env.video_close()
             if self._animate:
@@ -4796,7 +4903,8 @@ class Environment(object):
                 self._video = video
 
                 if video:
-                    can_animate(try_only=False)
+                    if not self._blind_animation:
+                        can_animate(try_only=False)
                     video_opened = True
                     video_path = Path(video)
                     extension = video_path.suffix.lower()
@@ -4866,33 +4974,43 @@ class Environment(object):
                     g.animation_env.root.destroy()
                 g.animation_env = None
 
-            if self._animate:
-                can_animate(try_only=False)  # install modules
-
-                g.animation_env = self
-                self.t = self._now  # for the call to set_start_animation
-                self.paused = False
-                self.set_start_animation()
-
-                if Pythonista:
-                    if g.animation_scene is None:
-                        g.animation_scene = AnimationScene(env=self)
-                        scene.run(g.animation_scene, frame_interval=1, show_fps=False)
-
+            if self._blind_animation:
+                if self._animate:
+                    if self._video != "":
+                        save_trace = self.trace()
+                        self.trace(False)
+                        self._blind_video_maker.activate(process="process")
+                        self.trace(save_trace)
                 else:
-                    if self.use_toplevel:
-                        self.root = tkinter.Toplevel()
+                    self._blind_video_maker.cancel()
+            else:    
+                if self._animate:
+                    can_animate(try_only=False)  # install modules
+
+                    g.animation_env = self
+                    self.t = self._now  # for the call to set_start_animation
+                    self.paused = False
+                    self.set_start_animation()
+
+                    if Pythonista:
+                        if g.animation_scene is None:
+                            g.animation_scene = AnimationScene(env=self)
+                            scene.run(g.animation_scene, frame_interval=1, show_fps=False)
+
                     else:
-                        self.root = tkinter.Tk()
-                    g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
-                    g.canvas.configure(background=self.colorspec_to_hex("bg", False))
-                    g.canvas.pack()
-                    g.canvas_objects = []
-                    g.canvas_object_overflow_image = None
+                        if self.use_toplevel:
+                            self.root = tkinter.Toplevel()
+                        else:
+                            self.root = tkinter.Tk()
+                        g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
+                        g.canvas.configure(background=self.colorspec_to_hex("bg", False))
+                        g.canvas.pack()
+                        g.canvas_objects = []
+                        g.canvas_object_overflow_image = None
 
-                self.uninstall_uios()  # this causes all ui objects to be (re)installed
+                    self.uninstall_uios()  # this causes all ui objects to be (re)installed
 
-                self.an_menu_buttons()
+                    self.an_menu_buttons()
 
     def video_close(self):
         """
@@ -5001,7 +5119,7 @@ class Environment(object):
                             "-i",
                             "aevalsrc=0:0::duration=" + str(audio_segment.t0 - last_t),
                             "-ab",
-                            "320k",
+                            "128k",
                             tempdir + "\\temp" + str(seq) + ".mp3",
                         )
                         self.ffmpeg_execute(command)
@@ -5027,6 +5145,10 @@ class Environment(object):
 
                 with open(tempdir + "\\temp.txt", "w") as f:
                     f.write("\n".join("file '" + tempdir + "\\temp" + str(i) + ".mp3'" for i in range(seq)))
+                if hasattr(self, "debug_ffmpeg"):
+                    print("contents of temp.txt file")
+                    with open(tempdir + "\\temp.txt", "r") as f:
+                        print(f.read())
 
                 command = (
                     "-i",
@@ -5810,7 +5932,7 @@ class Environment(object):
 
         self.running = True
         while self.running:
-            if self._animate:
+            if self._animate and not self._blind_animation:
                 self.do_simulate_and_animate()
             else:
                 self.do_simulate()
@@ -5818,10 +5940,14 @@ class Environment(object):
             self.quit()
 
     def do_simulate(self):
-        while g.in_draw:
-            pass
-        while self.running and not self._animate:
-            self.step()
+        if self._blind_animation:
+            while self.running:
+                self.step()
+        else:
+            while g.in_draw:
+                pass
+            while self.running and not self._animate:
+                self.step()
 
     def do_simulate_and_animate(self):
         if Pythonista:
@@ -7085,7 +7211,6 @@ class Environment(object):
                 sound.play_effect("game:Beep", pitch=0.3)
             except Exception:
                 pass
-
 
 class Animate(object):
     """
@@ -10916,7 +11041,9 @@ class _AosObject(object):  # for Monitor.animate
 
 
 class _Animate_t_x_Line(Animate):
-    def __init__(self, monitor, width, height, value_offsety, value_scale, value_map, t_scale, linewidth, *args, **kwargs):
+    def __init__(
+        self, monitor, width, height, value_offsety, value_scale, value_map, t_scale, linewidth, *args, **kwargs
+    ):
         self.monitor = monitor
         self.width = width
         self.height = height
@@ -11034,7 +11161,7 @@ class Component(object):
         urgency indicator |n|
         if False (default), the component will be scheduled
         behind all other components scheduled
-        for the same time |n|
+        for the same time and priority |n|
         if True, the component will be scheduled
         in front of all components scheduled
         for the same time and priority
@@ -11109,7 +11236,7 @@ class Component(object):
         self._creation_time = self.env._now
         self._suppress_trace = suppress_trace
         self._suppress_pause_at_step = suppress_pause_at_step
-        self.mode = _ModeMonitor(name=self.name() + ".mode", level=True, initial_tally=mode, component=self) 
+        self.mode = _ModeMonitor(name=self.name() + ".mode", level=True, initial_tally=mode, component=self)
         self._mode_time = self.env._now
         self._aos = {}
         self._animation_children = set()
@@ -11187,8 +11314,9 @@ class Component(object):
         self.setup(**kwargs)
 
     def __del__(self):
-        for ao in set(self._animation_children):  # copy required, because elements are removed
-            ao.remove()
+        if hasattr(self, "_animation_children"):  # prevent problems with not fully initialized components
+            for ao in set(self._animation_children):  # copy required, because elements are removed
+                ao.remove()
 
     def animation_objects(self, id):
         """
@@ -11423,9 +11551,7 @@ class Component(object):
                 "",
                 self.name() + " " + caller + delta,
                 merge_blanks(
-                    scheduled_time_str + _prioritytxt(priority) + _urgenttxt(urgent) + lineno,
-                    self._modetxt(),
-                    extra,
+                    scheduled_time_str + _prioritytxt(priority) + _urgenttxt(urgent) + lineno, self._modetxt(), extra
                 ),
                 s0=s0,
             )
@@ -11468,7 +11594,7 @@ class Component(object):
             urgency indicator |n|
             if False (default), the component will be scheduled
             behind all other components scheduled
-            for the same time |n|
+            for the same time and priority |n|
             if True, the component will be scheduled
             in front of all components scheduled
             for the same time and priority
@@ -11592,7 +11718,7 @@ class Component(object):
             urgency indicator |n|
             if False (default), the component will be scheduled
             behind all other components scheduled
-            for the same time |n|
+            for the same time and priority |n|
             if True, the component will be scheduled
             in front of all components scheduled
             for the same time and priority
@@ -11727,7 +11853,7 @@ class Component(object):
             urgency indicator |n|
             if False (default), the component will be scheduled
             behind all other components scheduled
-            for the same time |n|
+            for the same time and priority |n|
             if True, the component will be scheduled
             in front of all components scheduled
             for the same time and priority
@@ -11849,6 +11975,21 @@ class Component(object):
                 if the priority is not specified, the request
                 for the resource be added to the tail of
                 the requesters queue |n|
+        
+        priority : float
+            priority |n|
+            default: 0 |n|
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+
+        urgent : bool
+            urgency indicator |n|
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority |n|
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority        
 
         fail_at : float or distribution
             time out |n|
@@ -11907,6 +12048,9 @@ class Component(object):
         fail_at = kwargs.pop("fail_at", None)
         fail_delay = kwargs.pop("fail_delay", None)
         mode = kwargs.pop("mode", None)
+        urgent = kwargs.pop("urgent", False)
+        schedule_priority = kwargs.pop("priority", 0)
+
         self.oneof_request = kwargs.pop("oneof", False)
         called_from = kwargs.pop("called_from", "request")
         if kwargs:
@@ -12006,7 +12150,7 @@ class Component(object):
 
         if self._requests:
             self.status._value = requesting
-            self._reschedule(scheduled_time, 0, False, "request")
+            self._reschedule(scheduled_time, schedule_priority, urgent, "request")
 
     def isbumped(self, resource=None):
         """
@@ -12226,6 +12370,21 @@ class Component(object):
                 be added to the tail of
                 the waiters queue |n|
 
+        priority : float
+            priority |n|
+            default: 0 |n|
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+
+        urgent : bool
+            urgency indicator |n|
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority |n|
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority        
+
         fail_at : float or distribution
             time out |n|
             if the wait is not honored before fail_at,
@@ -12300,6 +12459,9 @@ class Component(object):
         fail_delay = kwargs.pop("fail_delay", None)
         all = kwargs.pop("all", False)
         mode = kwargs.pop("mode", None)
+        urgent = kwargs.pop("urgent", False)
+        schedule_priority = kwargs.pop("priority", 0)
+
         if kwargs:
             raise TypeError("wait() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
@@ -12367,7 +12529,7 @@ class Component(object):
 
         if self._waits:
             self.status._value = waiting
-            self._reschedule(scheduled_time, 0, False, "wait")
+            self._reschedule(scheduled_time, schedule_priority, urgent, "wait")
 
     def _trywait(self):
         if self.status.value == interrupted:
@@ -12584,12 +12746,11 @@ class Component(object):
         if value is not None:
             self.mode.value = value
 
-    
     def _modetxt(self):
         if self.mode() == "":
             return ""
         else:
-            return "mode=" + str(self.mode())        
+            return "mode=" + str(self.mode())
 
     def ispassive(self):
         """
@@ -13034,7 +13195,7 @@ class Component(object):
             urgency indicator |n|
             if False (default), the component will be scheduled
             behind all other components scheduled
-            for the same time |n|
+            for the same time and priority |n|
             if True, the component will be scheduled
             in front of all components scheduled
             for the same time and priority
@@ -13180,7 +13341,7 @@ class ComponentGenerator(Component):
         the type of components to be generated |n|
         in case of a distribution, the Pdf or Cdf should return a subclass of Component
 
-    name : str
+    generator_name : str
         name of the component generator. |n|
         if the name ends with a period (.),
         auto serializing will be applied |n|
@@ -13254,7 +13415,7 @@ class ComponentGenerator(Component):
     def __init__(
         self,
         component_class,
-        name=None,
+        generator_name=None,
         at=None,
         delay=None,
         till=None,
@@ -13266,9 +13427,10 @@ class ComponentGenerator(Component):
         suppress_trace=False,
         suppress_pause_at_step=False,
         env=None,
+        **kwargs
     ):
-        if name is None:
-            name = str(component_class).split(".")[-1][:-2] + ".generator."
+        if generator_name is None:
+            generator_name = str(component_class).split(".")[-1][:-2] + ".generator."
         if env is None:
             env = g.default_env
         self.overridden_lineno = env._frame_to_lineno(_get_caller_frame())
@@ -13328,7 +13490,7 @@ class ComponentGenerator(Component):
                         max_sample = samples[-1]
                         samples = [interpolate(sample, min_sample, max_sample, v_at, v_till) for sample in samples]
                 self.intervals = [t1 - t0 for t0, t1 in zip([0] + samples, samples)]
-                at = self.intervals.pop(0)
+                at = 0 # self.intervals.pop(0)
                 process = "do_spread"
             else:
                 if force_till:
@@ -13343,9 +13505,10 @@ class ComponentGenerator(Component):
                     process = "do_finalize"
                 else:
                     process = "do_iat"
+        self.kwargs = kwargs
 
         super().__init__(
-            name=name,
+            name=generator_name,
             env=env,
             process=process,
             at=at,
@@ -13357,18 +13520,18 @@ class ComponentGenerator(Component):
         for interval in self.intervals:
             yield self.hold(interval)
             if isinstance(self.component_class, _Distribution):
-                self.component_class()()
+                self.component_class()(**self.kwargs)
             else:
-                self.component_class()
+                self.component_class(**self.kwargs)
         self.env.print_trace("", "", "all components generated")
 
     def do_iat(self):
         n = 0
         while True:
             if isinstance(self.component_class, _Distribution):
-                self.component_class()()
+                self.component_class()(**self.kwargs)
             else:
-                self.component_class()
+                self.component_class(**self.kwargs)
             n += 1
             if n >= self.number:
                 self.env.print_trace("", "", str(n) + " components generated")
@@ -13418,6 +13581,13 @@ class ComponentGenerator(Component):
         result.append("  scheduled_time=" + self.env.time_to_str(self._scheduled_time))
         return return_or_print(result, as_str, file)
 
+class _BlindVideoMaker(Component):
+    def process(self):
+        while True:
+            self.env.t = self.env._now
+            self.env.save_frame()
+            self.env.frame_number += 1
+            yield self.hold(self.env._speed / self.env._fps)
 
 class Random(random.Random):
     """
@@ -17217,6 +17387,7 @@ def do_force_numeric(arg):
                     result.append(float(v))
             except (ValueError, TypeError):
                 result.append(0)
+    
 
     return result
 
@@ -17315,12 +17486,14 @@ def de_none(lst):
             result.append(item)
     return result
 
+
 def statuses():
     """
     tuple of all statuses a component can be in, in alphabetical order.
     """
 
     return tuple("current data interrupted passive requesting scheduled standby waiting".split(" "))
+
 
 for status in statuses():
     globals()[status] = status
@@ -17334,6 +17507,7 @@ scheduled = "scheduled"
 requesting = "requesting"
 waiting = "waiting"
 """
+
 
 def random_seed(seed=None, randomstream=None, set_numpy_random_seed=True):
     """
@@ -17616,7 +17790,6 @@ def can_animate(try_only=True):
 
     if not Pythonista:
         if PyDroid:
-
             if not g.tkinter_loaded:
                 if try_only:
                     return False
