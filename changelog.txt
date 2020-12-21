@@ -1,5 +1,63 @@
 salabim changelog
 
+version 20.0.6  2020-12-18
+==========================
+New functionality (0)
+---------------------
+Monitors can now optionally collect statistics only.
+This minimizes memory usage as individual tallies will not be stored in that case.
+But beware that some important functionality is not available in stats_only monitors (see below).
+
+You can define the stats_only status at creation time of the monitor, like:
+    m = sim.Monitor('m', stats_only=True)
+
+But, it is also possible to reset a monitor with a different stats_only value. 
+This can be useful if you want a system monitor, like Component.mode or Component.status to not keep individual
+tallied values:
+    class Car(sim.Component):
+        def setup(self):
+            self.mode.reset(stats_only=True)
+When stats_only is active, values are always forced to numeric, with a fallback value of 0.
+
+Monitor with stats_only=True support
+    __call__/get (without arguments), base_name, deregister, duration, duration_zero, maximum, mean,
+    minimum, monitor, name, number_of_entries, number_of_entries_zero, print_histogram,
+    print_histograms, print_statistics, register, rename, reset, reset_monitors, sequence_number,
+    setup, stats_only, std, t, tally, weight, weight_zero
+
+Monitors with stats_only=True do NOT support (these will raise a NotImplementedError):
+    __call__/get (with an argument), arithmeric operations (+, *, /), animate, bin_duration,
+    bin_number_of_entries, bin_weight, freeze, histogram_autoscale, median, merge, multiply,
+    percentile, slice, slicing, to_days, to_hours, to_microseconds, to_milliseconds, to_minutes,
+    to_seconds, to_time_unit, to_weeks, to_years, tx, value_duration, value_number_of_entries,
+    value_weight, values, x, xduration, xt, xweight
+
+In line with the above, Queue.reset_monitors, Resource.reset_monitors, State.reset_monitors now
+have a stats_only parameter, with which all monitors can set/reset the stats_only status.
+So, if you want all eight monitors belonging to a resource, but the requesters' to be stats_only, you can write
+    r.reset_monitors(stats_only=True)
+    r.requesters.monitors(stats_only=False)
+    
+The current stats_only mode can be queried with Monitor.stats_only() .
+    
+New functionality (1)
+---------------------
+Queue.all_monitors() returns all (2) monitors associated with the queue
+Resource.all_monitors() returns all (8) monitors associated with the resource
+State.all_monitors() returns all (3) monitors associated with the state
+
+Change of functionality (0)
+---------------------------
+Monitor.t is no longer a property, but a method. That means that to get the last tally time and value
+of monitor m, you can write
+    last_tally_t = m.t()
+    last_tally = m()  # or last_tally = m.get()
+
+Bug fix (0)
+-----------
+Non-level monitors did not always calculate the ex0=True mean and ex0=True std correctly when weights
+other than one were in the monitor. Fixed.
+
 version 20.0.5  2020-11-24
 ==========================
 Added functionality (0)

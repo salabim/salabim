@@ -1,13 +1,13 @@
-#               _         _      _               ____    ___       ___      ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \    | ___|
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |   |___ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _  ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|____/
+#               _         _      _               ____    ___       ___       __
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \     / /_
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |   | '_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _ | (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_) \___/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "20.0.5"
+__version__ = "20.0.6"
 
 import heapq
 import random
@@ -265,9 +265,13 @@ class Monitor(object):
         used in print_statistics and print_histogram to indicate the dimension of weight or duration (for
         level monitors, e.g. minutes. Default: weight for non level monitors, duration for level monitors.
 
+    stats_only : bool
+        if True, only statistics will be collected (using less memory, but also less functionality) |n|
+        if False (default), full functionality |n|
+
     fill : list or tuple
         can be used to fill the tallied values (all at time now). |n|
-        fill is only available for non level monitors.
+fill is only available for non level and not stats_only monitors. |n|        
 
     env : Environment
         environment where the monitor is defined |n|
@@ -285,6 +289,7 @@ class Monitor(object):
         type=None,
         weight_legend=None,
         fill=None,
+        stats_only=False,
         env=None,
         *args,
         **kwargs
@@ -324,29 +329,37 @@ class Monitor(object):
         except KeyError:
             raise ValueError("type '" + type + "' not recognized")
         self.xtype = type
+        self._stats_only = stats_only
         self.isgenerated = False
         self.reset(monitor)
         if fill is not None:
             if self._level:
                 raise ValueError("fill is not supported for level monitors")
+            if self._stats_only:
+                raise ValueError("fill is not supported for stats_only monitors")
             self._x.extend(fill)
             self._t.extend(len(fill) * [self.env._now])
 
         self.setup(*args, **kwargs)
 
     def __add__(self, other):
+        self._block_stats_only()
         if not isinstance(other, Monitor):
             return NotImplemented
+        other._block_stats_only()
         return self.merge(other)
 
     def __radd__(self, other):
+        self._block_stats_only()
         if other == 0:  # to be able to use sum
             return self
         if not isinstance(other, Monitor):
             return NotImplemented
+        other._block_stats_only()
         return self.merge(other)
 
     def __mul__(self, other):
+        self._block_stats_only()
         try:
             other = float(other)
         except Exception:
@@ -354,14 +367,24 @@ class Monitor(object):
         return self.multiply(other)
 
     def __rmul__(self, other):
+        self._block_stats_only()
         return self * other
 
     def __truediv__(self, other):
+        self._block_stats_only()
         try:
             other = float(other)
         except Exception:
             return NotImplemented
         return self * (1 / other)
+
+    def _block_stats_only(self):
+        if self._stats_only:
+            function = inspect.getframeinfo(inspect.stack()[1][0]).function
+            raise NotImplementedError(function + " not available for " + self.name() + " because it is stats_only")
+
+    def stats_only(self):
+        return self._stats_only
 
     def merge(self, *monitors, **kwargs):
         """
@@ -388,11 +411,13 @@ class Monitor(object):
         If no monitors are specified, a copy is created. |n|
         For level monitors, merging means summing the available x-values|n|
         """
+        self._block_stats_only()
         name = kwargs.pop("name", None)
         if kwargs:
             raise TypeError("merge() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
         for m in monitors:
+            m._block_stats_only()
             if not isinstance(m, Monitor):
                 raise TypeError("not possible to merge monitor with " + object_to_str(m, True) + " type")
             if self._level != m._level:
@@ -494,6 +519,7 @@ class Monitor(object):
         The env attribute will become a partial copy of the original environment, with the name
         of the original environment, padded with '.copy.<serial number>'
         """
+        self._block_stats_only()
         self_env = self.env
         self.env = Environment(to_freeze=True, name=self.env.name() + ".copy", time_unit=self.env.get_time_unit())
         m = copy.deepcopy(self)
@@ -532,6 +558,7 @@ class Monitor(object):
         -------
         sliced monitor : Monitor
         """
+        self._block_stats_only()
         if name is None:
             name = self.name() + ".sliced"
         new = _SystemMonitor(level=self._level, type=self.xtype, name=name, env=self.env)
@@ -695,7 +722,17 @@ class Monitor(object):
         return self
 
     def __repr__(self):
-        return object_to_str(self) + ("[level]" if self._level else "") + " (" + self.name() + ")"
+        return (
+            object_to_str(self)
+            + ("[level]" if self._level else "")
+            + " ("
+            + self.name()
+            + ")"
+            + ("[stats_only]" if self._stats_only else "")
+            + " ("
+            + self.name()
+            + ")"
+        )
 
     def __call__(self, t=None):  # direct moneypatching __call__ doesn't work
 
@@ -704,10 +741,12 @@ class Monitor(object):
         if t is None:
             return self._tally
         t += self.env._offset
-        if t < self._t[0] or t > self.env._now:
-            return self.off
         if t == self.env._now:
             return self._tally  # even if monitor is off, the current value is valid
+        if self._stats_only:
+            raise NotImplementedError("__call__(t) not supported for stats_only monitors")
+        if t < self._t[0] or t > self.env._now:
+            return self.off
         i = bisect.bisect_left(list(zip(self._t, itertools.count())), (t, float("inf")))
         return self._x[i - 1]
 
@@ -766,7 +805,6 @@ class Monitor(object):
         else:
             raise TypeError("non level monitors are not supported")
 
-    @property
     def t(self):
         """
         get the time of last tally of a level monitor
@@ -783,7 +821,7 @@ class Monitor(object):
             return self._ttally
         raise TypeError("non level monitors are not supported")
 
-    def reset_monitors(self, monitor=None):
+    def reset_monitors(self, monitor=None, stats_only=None):
         """
         resets monitor
 
@@ -794,13 +832,18 @@ class Monitor(object):
             if False, monitoring is disabled |n|
             if omitted, the monitor state remains unchanged
 
+        stats_only : bool
+            if True, only statistics will be collected (using less memory, but also less functionality) |n|
+            if False, full functionality |n|
+            if omittted, no change of stats_only
+
         Note
         ----
         Exactly same functionality as Monitor.reset()
         """
-        self.reset(monitor)
+        self.reset(monitor=monitor, stats_only=stats_only)
 
-    def reset(self, monitor=None):
+    def reset(self, monitor=None, stats_only=None):
         """
         resets monitor
 
@@ -810,32 +853,52 @@ class Monitor(object):
             if True, monitoring will be on. |n|
             if False, monitoring is disabled
             if omitted, no change of monitoring state
+
+        stats_only : bool
+            if True, only statistics will be collected (using less memory, but also less functionality) |n|
+            if False, full functionality |n|
+            if omittted, no change of stats_only
         """
         if self.isgenerated:
-            raise TypeError("sliced, merged or frozen monitors cannot not be reset")
+            raise TypeError("sliced, merged or frozen monitors cannot be reset")
         if monitor is not None:
             self._monitor = monitor
+        if stats_only is not None:
+            self._stats_only = stats_only
 
-        if self.xtypecode:
-            self._x = array.array(self.xtypecode)
+        if self._stats_only:  # all values for ex0=False and ex0=True
+            self.mun = [0] * 2
+            self.n = [0] * 2
+            self.sn = [0] * 2
+            self.sumw = [0] * 2
+            self._minimum = [inf] * 2
+            self._maximum = [-inf] * 2
+            if self._level:
+                self._ttally_monitored = self.env._now
+            self._weight = False
+
         else:
-            self._x = []
-        self._weight = False
-        self._t = array.array("d")
-        if self._level:
-            self._weight = True  # signal for statistics that weights are present (although not stored in _weight)
-            if self._monitor:
-                self._x.append(self._tally)
+            if self.xtypecode:
+                self._x = array.array(self.xtypecode)
             else:
-                self._x.append(self.off)
-            self._t.append(self.env._now)
-        else:
-            self._weight = False  # weights are only stored if there is a non 1 weight
-        self.start = self.env._now - self.env._offset  # not self.env.now() to support frozen monitors
+                self._x = []
+            self._t = array.array("d")
+            self._weight = False
+            if self._level:
+                self._weight = True  # signal for statistics that weights are present (although not stored in _weight)
+                if self._monitor:
+                    self._x.append(self._tally)
+                else:
+                    self._x.append(self.off)
+                self._t.append(self.env._now)
+            else:
+                self._weight = False  # weights are only stored if there is a non 1 weight
+            self.start = self.env._now - self.env._offset  # not self.env.now() to support frozen monitors
+            Monitor.cached_xweight = {
+                (ex0, force_numeric): (0, 0) for ex0 in (False, True) for force_numeric in (False, True)
+            }  # invalidate the cache
+
         self.monitor(monitor)
-        Monitor.cached_xweight = {
-            (ex0, force_numeric): (0, 0) for ex0 in (False, True) for force_numeric in (False, True)
-        }  # invalidate the cache
 
     def monitor(self, value=None):
         """
@@ -852,15 +915,26 @@ class Monitor(object):
         -------
         True, if monitoring enabled. False, if not : bool
         """
-        if value is not None:
-            if value and self.isgenerated:
-                raise TypeError("sliced, merged or frozen monitors cannot not be turned on")
-            self._monitor = value
-            if self._level:
+        if self._stats_only:
+            if value is not None:
                 if self._monitor:
-                    self.tally(self._tally)
-                else:
-                    self._tally_off()  # can't use tally() here because self._tally should be untouched
+                    if self._level:
+                        self._tally_add_now()
+
+                self._ttally_monitored = self.env._now
+
+                self._monitor = value
+        else:
+
+            if value is not None:
+                if value and self.isgenerated:
+                    raise TypeError("sliced, merged or frozen monitors cannot be turned on")
+                self._monitor = value
+                if self._level:
+                    if self._monitor:
+                        self.tally(self._tally)
+                    else:
+                        self._tally_off()  # can't use tally() here because self._tally should be untouched
         return self.monitor
 
     def tally(self, value, weight=1):
@@ -875,38 +949,81 @@ class Monitor(object):
             default : 1 |n|
         """
         if self.isgenerated:
-            raise TypeError("sliced, merged or frozen monitors cannot not be reset")
-        if self._level:
-            if weight != 1:
-                if self._level:
-                    raise ValueError("level monitor supports only weight=1, not: " + str(weight))
-            if value == self.off:
-                raise ValueError("not allowed to tally " + str(self.off) + " (off)")
-            self._tally = value
-            self._ttally = self.env._now
+            raise TypeError("sliced, merged or frozen monitors cannot be reset")
 
-            if self._monitor:
-                t = self.env._now
-                if self._t[-1] == t:
-                    self._x[-1] = value
-                else:
-                    self._x.append(value)
-                    self._t.append(t)
+        if self._stats_only:
+            if self._level:
+                if weight != 1:
+                    raise ValueError("level monitor supports only weight=1, not: " + str(weight))
+                if self._monitor:
+                    weight = self.env._now - self._ttally_monitored
+                    value_num = self._tally
+                    self._ttally_monitored = self.env._now
+                self._tally = value
+                self._ttally = self.env._now
+
+            else:
+                value_num = value
+
+            if self._monitor and weight != 0:
+                if not isinstance(value_num, numbers.Number):
+                    try:
+                        if int(value_num) == float(value_num):
+                            value_num = int(value_num)
+                        else:
+                            value_num = float(value_num)
+                    except (ValueError, TypeError):
+                        value_num = 0
+
+                for ex0 in [False, True] if value_num else [False]:
+                    self.n[ex0] += 1
+                    # algorithm based on https://fanf2.user.srcf.net/hermes/doc/antiforgery/stats.pdf
+                    self.sumw[ex0] += weight
+                    mun1 = self.mun[ex0]
+                    self.mun[ex0] = mun1 + (weight / self.sumw[ex0]) * (value_num - mun1)
+                    self.sn[ex0] = self.sn[ex0] + weight * (value_num - mun1) * (value_num - self.mun[ex0])
+                    self._minimum[ex0] = min(self._minimum[ex0], value_num)
+                    self._maximum[ex0] = max(self._maximum[ex0], value_num)
+                if weight != 1:
+                    self._weight = True
+
         else:
-            if self._monitor:
-                if weight == 1:
-                    if self._weight:
+            if self._level:
+                if weight != 1:
+                    if self._level:
+                        raise ValueError("level monitor supports only weight=1, not: " + str(weight))
+                if value == self.off:
+                    raise ValueError("not allowed to tally " + str(self.off) + " (off)")
+                self._tally = value
+                self._ttally = self.env._now
+
+                if self._monitor:
+                    t = self.env._now
+                    if self._t[-1] == t:
+                        self._x[-1] = value
+                    else:
+                        self._x.append(value)
+                        self._t.append(t)
+            else:
+                if self._monitor:
+                    if weight == 1:
+                        if self._weight:
+                            self._weight.append(weight)
+                    else:
+                        if not self._weight:
+                            self._weight = array.array("d", (1,) * len(self._x))
                         self._weight.append(weight)
-                else:
-                    if not self._weight:
-                        self._weight = array.array("d", (1,) * len(self._x))
-                    self._weight.append(weight)
-                self._x.append(value)
-                self._t.append(self.env._now)
+                    self._x.append(value)
+                    self._t.append(self.env._now)
+
+    def _tally_add_now(self):  # used by stats_only level monitors
+        save_ttally = self._ttally
+        self.tally(self._tally)
+        self._ttally = save_ttally
 
     def _tally_off(self):
         if self.isgenerated:
-            raise TypeError("sliced, merged or frozen monitors cannot not be reset")
+            raise TypeError("sliced, merged or frozen monitors cannot be reset")
         t = self.env._now
         if self._t[-1] == t:
             self._x[-1] = self.off
@@ -933,6 +1050,7 @@ class Monitor(object):
         Only non level monitors with type float can be converted. |n|
         It is required that a time_unit is defined for the environment.
         """
+        self._block_stats_only()
         self.env._check_time_unit_na()
         return self.to_time_unit("years", name=name)
 
@@ -955,6 +1073,7 @@ class Monitor(object):
         Only non level monitors with type float can be converted. |n|
         It is required that a time_unit is defined for the environment.
         """
+        self._block_stats_only()
         self.env._check_time_unit_na()
         return self.to_time_unit("weeks", name=name)
 
@@ -977,6 +1096,7 @@ class Monitor(object):
         Only non level monitors with type float can be converted. |n|
         It is required that a time_unit is defined for the environment.
         """
+        self._block_stats_only()
         self.env._check_time_unit_na()
         return self.to_time_unit("days", name=name)
 
@@ -999,6 +1119,7 @@ class Monitor(object):
         Only non level monitors with type float can be converted. |n|
         It is required that a time_unit is defined for the environment.
         """
+        self._block_stats_only()
         self.env._check_time_unit_na()
         return self.to_time_unit("hours", name=name)
 
@@ -1021,6 +1142,7 @@ class Monitor(object):
         Only non level monitors with type float can be converted. |n|
         It is required that a time_unit is defined for the environment.
         """
+        self._block_stats_only()
         self.env._check_time_unit_na()
         return self.to_time_unit("minutes", name=name)
 
@@ -1043,6 +1165,7 @@ class Monitor(object):
         Only non level monitors with type float can be converted. |n|
         It is required that a time_unit is defined for the environment.
         """
+        self._block_stats_only()
         self.env._check_time_unit_na()
         return self.to_time_unit("seconds", name=name)
 
@@ -1065,6 +1188,7 @@ class Monitor(object):
         Only non level monitors with type float can be converted. |n|
         It is required that a time_unit is defined for the environment.
         """
+        self._block_stats_only()
         self.env._check_time_unit_na()
         return self.to_time_unit("milliseconds", name=name)
 
@@ -1087,6 +1211,7 @@ class Monitor(object):
         Only non level monitors with type float can be converted. |n|
         It is required that a time_unit is defined for the environment.
         """
+        self._block_stats_only()
         self.env._check_time_unit_na()
         return self.to_time_unit("microseconds", name=name)
 
@@ -1113,6 +1238,7 @@ class Monitor(object):
         Only non level monitors with type float can be converted. |n|
         It is required that a time_unit is defined for the environment.
         """
+        self._block_stats_only()
         self.env._check_time_unit_na()
         return self.multiply(_time_unit_lookup(time_unit) / self.env._time_unit, name=name)
 
@@ -1137,6 +1263,7 @@ class Monitor(object):
         ----
         Only non level monitors with type float can be multiplied |n|
         """
+        self._block_stats_only()
         if self._level:
             raise ValueError("level monitors can't be multiplied")
 
@@ -1230,12 +1357,21 @@ class Monitor(object):
         ----
         If weights are applied , the weighted mean is returned
         """
-        x, weight = self._xweight(ex0=ex0)
-        sumweight = sum(weight)
-        if sumweight:
-            return sum(vx * vweight for vx, vweight in zip(x, weight)) / sumweight
+        if self._stats_only:
+            ex0 = bool(ex0)
+            if self._level:
+                self._tally_add_now()
+            if self.sumw[ex0]:
+                return self.mun[ex0]
+            else:
+                return nan
         else:
-            return nan
+            x, weight = self._xweight(ex0=ex0)
+            sumweight = sum(weight)
+            if sumweight:
+                return sum(vx * vweight for vx, vweight in zip(x, weight)) / sumweight
+            else:
+                return nan
 
     def std(self, ex0=False):
         """
@@ -1254,14 +1390,23 @@ class Monitor(object):
         ----
         If weights are applied, the weighted standard deviation is returned
         """
-        x, weight = self._xweight(ex0=ex0)
-        sumweight = sum(weight)
-        if sumweight:
-            wmean = self.mean(ex0=ex0)
-            wvar = sum((vweight * (vx - wmean) ** 2) for vx, vweight in zip(x, weight)) / sumweight
-            return math.sqrt(wvar)
+        if self._stats_only:
+            ex0 = bool(ex0)
+            if self._level:
+                self._tally_add_now()
+            if self.sumw[ex0]:
+                return math.sqrt(self.sn[ex0] / self.sumw[ex0])
+            else:
+                return nan
         else:
-            return nan
+            x, weight = self._xweight(ex0=ex0)
+            sumweight = sum(weight)
+            if sumweight:
+                wmean = self.mean(ex0=ex0)
+                wvar = sum((vweight * (vx - wmean) ** 2) for vx, vweight in zip(x, weight)) / sumweight
+                return math.sqrt(wvar)
+            else:
+                return nan
 
     def minimum(self, ex0=False):
         """
@@ -1276,11 +1421,18 @@ class Monitor(object):
         -------
         minimum : float
         """
-        x = self._xweight(ex0=ex0)[0]
-        if x:
-            return min(x)
+        if self._stats_only:
+            ex0 = bool(ex0)
+            if self.n[ex0]:
+                return self._minimum[ex0]
+            else:
+                return nan
         else:
-            return nan
+            x = self._xweight(ex0=ex0)[0]
+            if x:
+                return min(x)
+            else:
+                return nan
 
     def maximum(self, ex0=False):
         """
@@ -1296,11 +1448,17 @@ class Monitor(object):
         maximum : float
         """
 
-        x = self._xweight(ex0=ex0)[0]
-        if x:
-            return max(x)
+        if self._stats_only:
+            if self.n[ex0]:
+                return self._maximum[ex0]
+            else:
+                return nan
         else:
-            return nan
+            x = self._xweight(ex0=ex0)[0]
+            if x:
+                return max(x)
+            else:
+                return nan
 
     def median(self, ex0=False):
         """
@@ -1319,6 +1477,7 @@ class Monitor(object):
         ----
         If weights are applied, the weighted median is returned
         """
+        self._block_stats_only()
         return self.percentile(50, ex0=ex0)
 
     def percentile(self, q, ex0=False):
@@ -1347,6 +1506,7 @@ class Monitor(object):
         """
         # algorithm based on
         # https://stats.stackexchange.com/questions/13169/defining-quantiles-over-a-weighted-sample
+        self._block_stats_only()
         q = max(0, min(q, 100)) / 100
         x, weight = self._xweight(ex0=ex0)
 
@@ -1396,6 +1556,7 @@ class Monitor(object):
         ----
         Not available for level monitors
         """
+        self._block_stats_only()
         if self._level:
             raise TypeError("bin_number_of_entries not available for level monitors")
         x = self._xweight(ex0=ex0)[0]
@@ -1424,6 +1585,7 @@ class Monitor(object):
         ----
         Not available for level monitors
         """
+        self._block_stats_only()
         if self._level:
             raise TypeError("bin_weight not available for level monitors")
         return self.sys_bin_weight(lowerbound, upperbound)
@@ -1451,6 +1613,7 @@ class Monitor(object):
         ----
         Not available for level monitors
         """
+        self._block_stats_only()
         if not self._level:
             raise TypeError("bin_duration not available for non level monitors")
         return self.sys_bin_weight(lowerbound, upperbound)
@@ -1477,6 +1640,7 @@ class Monitor(object):
         ----
         Not available for level monitors
         """
+        self._block_stats_only()
         if self._level:
             raise TypeError("value_number_of_entries not available for level monitors")
         if isinstance(value, str):
@@ -1508,6 +1672,7 @@ class Monitor(object):
         ----
         Not available for level monitors
         """
+        self._block_stats_only()
         if self._level:
             raise TypeError("value_weight not supported for level monitors")
         return self.sys_value_weight(value)
@@ -1530,6 +1695,7 @@ class Monitor(object):
         ----
         Not available for non level monitors
         """
+        self._block_stats_only()
         if not self._level:
             raise TypeError("value_weight not available for non level monitors")
         return self.sys_value_weight(value)
@@ -1566,8 +1732,12 @@ class Monitor(object):
         """
         if self._level:
             raise TypeError("number_of_entries not available for level monitors")
-        x = self._xweight(ex0=ex0)[0]
-        return len(x)
+        if self._stats_only:
+            ex0 = bool(ex0)
+            return self.n[ex0]
+        else:
+            x = self._xweight(ex0=ex0)[0]
+            return len(x)
 
     def number_of_entries_zero(self):
         """
@@ -1628,8 +1798,12 @@ class Monitor(object):
         return self.sys_weight(ex0)
 
     def sys_weight(self, ex0=False):
-        x, weight = self._xweight(ex0=ex0)
-        return sum(weight)
+        if self._stats_only:
+            ex0 = bool(ex0)
+            return self.sumw[ex0]
+        else:
+            self.x, weight = self._xweight(ex0=ex0)
+            return sum(weight)
 
     def weight_zero(self):
         """
@@ -1740,18 +1914,19 @@ class Monitor(object):
         result.append(
             indent + "minimum       {}{}".format(fn(self.minimum(), 13, 3), fn(self.minimum(ex0=True), 13, 3))
         )
-        result.append(
-            indent
-            + "median        {}{}".format(fn(self.percentile(50), 13, 3), fn(self.percentile(50, ex0=True), 13, 3))
-        )
-        result.append(
-            indent
-            + "90% percentile{}{}".format(fn(self.percentile(90), 13, 3), fn(self.percentile(90, ex0=True), 13, 3))
-        )
-        result.append(
-            indent
-            + "95% percentile{}{}".format(fn(self.percentile(95), 13, 3), fn(self.percentile(95, ex0=True), 13, 3))
-        )
+        if not self._stats_only:
+            result.append(
+                indent
+                + "median        {}{}".format(fn(self.percentile(50), 13, 3), fn(self.percentile(50, ex0=True), 13, 3))
+            )
+            result.append(
+                indent
+                + "90% percentile{}{}".format(fn(self.percentile(90), 13, 3), fn(self.percentile(90, ex0=True), 13, 3))
+            )
+            result.append(
+                indent
+                + "95% percentile{}{}".format(fn(self.percentile(95), 13, 3), fn(self.percentile(95, ex0=True), 13, 3))
+            )
         result.append(
             indent + "maximum       {}{}".format(fn(self.maximum(), 13, 3), fn(self.maximum(ex0=True), 13, 3))
         )
@@ -1771,6 +1946,7 @@ class Monitor(object):
         -------
         bin_width, lowerbound, number_of_bins : tuple
         """
+        self._block_stats_only()
 
         xmax = self.maximum(ex0=ex0)
         xmin = self.minimum(ex0=ex0)
@@ -1838,7 +2014,17 @@ class Monitor(object):
         return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str, file=file)
 
     def print_histogram(
-        self, number_of_bins=None, lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None, sort_on_weight=False, sort_on_duration=False, sort_on_value=False
+        self,
+        number_of_bins=None,
+        lowerbound=None,
+        bin_width=None,
+        values=False,
+        ex0=False,
+        as_str=False,
+        file=None,
+        sort_on_weight=False,
+        sort_on_duration=False,
+        sort_on_value=False,
     ):
         """
         print monitor statistics and histogram
@@ -1909,6 +2095,7 @@ class Monitor(object):
         If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
         with a maximum of 30 classes.
         """
+
         if self._level and sort_on_weight:
             raise ValueError("level monitors can't be sorted on weight. Use sort_on_duration instead")
         if not self._level and sort_on_duration:
@@ -1916,14 +2103,16 @@ class Monitor(object):
         if sort_on_value and sort_on_weight:
             raise ValueError("sort_on_value can't be combined with sorted_on_value")
         if sort_on_value and sort_on_weight:
-            raise ValueError("sort_on_weight can't be combined with sorted_on_value")                      
- 
-                
+            raise ValueError("sort_on_weight can't be combined with sorted_on_value")
+
         result = []
         result.append("Histogram of " + self.name() + ("[ex0]" if ex0 else ""))
 
-        x, weight = self._xweight(ex0=ex0, force_numeric=not values)
-        weight_total = sum(weight)
+        if self._stats_only:
+            weight_total = self.sumw[bool(ex0)]
+        else:
+            x, weight = self._xweight(ex0=ex0, force_numeric=not values)
+            weight_total = sum(weight)
 
         if weight_total == 0:
             result.append("")
@@ -1933,7 +2122,7 @@ class Monitor(object):
             if not isinstance(values, str):
                 try:
                     values = list(values)  # iterable?
-                    values_is_iterable=True
+                    values_is_iterable = True
                 except TypeError:
                     pass
             if values or values_is_iterable:
@@ -1951,22 +2140,30 @@ class Monitor(object):
                     else:
                         result.append("value               entries     %")
 
-                if values_is_iterable:     
+                if values_is_iterable:
                     unique_values = []
                     for v in values:
                         if v in unique_values:
-                            raise ValueError('value ' + str(v) + ' used more than once')
-                        unique_values.append(v)     
-                                       
+                            raise ValueError("value " + str(v) + " used more than once")
+                        unique_values.append(v)
+
                     if sort_on_weight or sort_on_duration or sort_on_value:
-                        values_label = [v for v in self.values(ex0=ex0, sort_on_weight=sort_on_weight, sort_on_duration=sort_on_duration) if v in values]
+                        values_label = [
+                            v
+                            for v in self.values(
+                                ex0=ex0, sort_on_weight=sort_on_weight, sort_on_duration=sort_on_duration
+                            )
+                            if v in values
+                        ]
                         values_not_in_monitor = [v for v in values if v not in values_label]
                         values_label.extend(sorted(values_not_in_monitor))
                     else:
                         values_label = values
-                else:                    
-                    values_label = self.values(ex0=ex0, sort_on_weight=sort_on_weight, sort_on_duration=sort_on_duration)
-                
+                else:
+                    values_label = self.values(
+                        ex0=ex0, sort_on_weight=sort_on_weight, sort_on_duration=sort_on_duration
+                    )
+
                 values_condition = [[v] for v in values_label]
                 rest_values = self.values(ex0=ex0)
                 for v in values_label:
@@ -2025,7 +2222,7 @@ class Monitor(object):
                 if auto_scale:
                     bin_width, lowerbound, number_of_bins = self.histogram_autoscale()
                 result.append(self.print_statistics(show_header=False, show_legend=True, do_indent=False, as_str=True))
-                if number_of_bins >= 0:
+                if not self._stats_only and number_of_bins >= 0:
                     result.append("")
                     if self._weight:
                         result.append("           <= " + rpad(self.weight_legend, 13) + "     %  cum%")
@@ -2093,15 +2290,15 @@ class Monitor(object):
         -------
         all tallied values : array/list
         """
-        
-        x, _ = self._xweight(ex0, force_numeric)            
+        self._block_stats_only()
+        x, _ = self._xweight(ex0, force_numeric)
 
         if self._level:
             if sort_on_weight:
                 raise ValueError("level monitors can't be sorted on weight. Use sort_on_duration instead")
         else:
             if sort_on_duration:
-                raise ValueError("non level monitors can't be sorted on duration. Use sort_on_weight instead")                   
+                raise ValueError("non level monitors can't be sorted on duration. Use sort_on_weight instead")
 
         def key(x):
             if sort_on_weight:
@@ -2109,8 +2306,8 @@ class Monitor(object):
             elif sort_on_duration:
                 weight = -self.value_duration(x)
             else:
-                weight=1
-            
+                weight = 1
+
             try:
                 return (weight, float(x), "")
             except (ValueError, TypeError):
@@ -2215,7 +2412,7 @@ class Monitor(object):
 
         All measures are in screen coordinates |n|
         """
-
+        self._block_stats_only()
         return AnimateMonitor(monitor=self, *args, **kwargs)
 
     def x(self, ex0=False, force_numeric=True):
@@ -2239,6 +2436,8 @@ class Monitor(object):
         ----
         Not available for level monitors. Use xduration(), xt() or tx() instead.
         """
+        self._block_stats_only()
+
         if self._level:
             raise TypeError("x not available for level monitors")
         return self._xweight(ex0=ex0, force_numeric=force_numeric)[0]
@@ -2264,6 +2463,8 @@ class Monitor(object):
         ----
         not available for level monitors
         """
+        self._block_stats_only()
+
         if self._level:
             raise TypeError("xweight not available for level monitors")
         return self._xweight(ex0, force_numeric)
@@ -2289,6 +2490,8 @@ class Monitor(object):
         ----
         not available for non level monitors
         """
+        self._block_stats_only()
+
         if not self._level:
             raise TypeError("xduration not available for non level monitors")
         return self._xweight(ex0, force_numeric)
@@ -2325,6 +2528,8 @@ class Monitor(object):
         The value self.off is stored when monitoring is turned off |n|
         The timestamps are not corrected for any reset_now() adjustment.
         """
+        self._block_stats_only()
+
         if not self._level:
             exoff = False
             add_now = False
@@ -2335,7 +2540,7 @@ class Monitor(object):
             off = self.off
         else:
             x = do_force_numeric(self._x)
-            typecode = ''
+            typecode = ""
             off = -inf  # float
 
         if typecode:
@@ -2389,6 +2594,8 @@ class Monitor(object):
         The value self.off is stored when monitoring is turned off |n|
         The timestamps are not corrected for any reset_now() adjustment.
         """
+        self._block_stats_only()
+
         return tuple(reversed(self.xt(ex0=ex0, exoff=exoff, force_numeric=force_numeric, add_now=add_now)))
 
     def _xweight(self, ex0=False, force_numeric=True):
@@ -2404,7 +2611,7 @@ class Monitor(object):
             typecode = self.xtypecode
         else:
             x = do_force_numeric(self._x)
-            typecode = ''
+            typecode = ""
 
         if self._level:
             weightall = array.array("d")
@@ -2431,19 +2638,20 @@ class Monitor(object):
         else:
 
             if ex0:
-                x = [vx for vx in x if vx != 0]
+                x0 = [vx for vx in x if vx != 0]
                 if typecode:
-                    x = array.array(typecode, x)
-
-            weight = self._weight
+                    x0 = array.array(typecode, x)
 
             if self._weight:
                 if ex0:
-                    xweight = (x, array.array("d", [vweight for vx, vweight in zip(x, self._weight) if vx != 0]))
+                    xweight = (x0, array.array("d", [vweight for vx, vweight in zip(x, self._weight) if vx != 0]))
                 else:
                     xweight = (x, self._weight)
             else:
-                xweight = (x, array.array("d", (1,) * len(x)))
+                if ex0:
+                    xweight = (x0, array.array("d", (1,) * len(x0)))
+                else:
+                    xweight = (x, array.array("d", (1,) * len(x)))
 
         Monitor.cached_xweight[(ex0, force_numeric)] = (thishash, xweight)
         return xweight
@@ -3119,8 +3327,18 @@ class Queue(object):
 
         """
         return AnimateQueue(self, *args, **kwargs)
+        
+    def all_monitors(self):
+        '''
+        returns all mononitors belonging to the queue
+        
+        Returns
+        -------
+        all monitors : tuple of monitors
+        '''
+        return (self.length, self.length_of_stay)         
 
-    def reset_monitors(self, monitor=None):
+    def reset_monitors(self, monitor=None, stats_only=None):
         """
         resets queue monitor length_of_stay and length
 
@@ -3131,12 +3349,17 @@ class Queue(object):
             if False, monitoring is disabled |n|
             if omitted, no change of monitoring state
 
+        stats_only : bool
+            if True, only statistics will be collected (using less memory, but also less functionality) |n|
+            if False, full functionality |n|
+            if omittted, no change of stats_only
+
         Note
         ----
         it is possible to reset individual monitoring with length_of_stay.reset() and length.reset()
         """
-        self.length.reset(monitor=monitor)
-        self.length_of_stay.reset(monitor=monitor)
+        self.length.reset(monitor=monitor, stats_only=stats_only)
+        self.length_of_stay.reset(monitor=monitor, stats_only=stats_only)
 
     def arrival_rate(self, reset=False):
         """
@@ -4287,7 +4510,7 @@ class Environment(object):
     The trace may be switched on/off later with trace |n|
     The seed may be later set with random_seed() |n|
     Initially, the random stream will be seeded with the value 1234567.
-    If required to be purely, not not reproducable, values, use
+    If required to be purely, not reproducable, values, use
     random_seed="*".
     """
 
@@ -4305,7 +4528,7 @@ class Environment(object):
         isdefault_env=True,
         retina=False,
         do_reset=None,
-        blind_animation = False,
+        blind_animation=False,
         *args,
         **kwargs
     ):
@@ -4881,7 +5104,7 @@ class Environment(object):
         self._scale = self._width / (self._x1 - self._x0)
         self._y1 = self._y0 + self._height / self._scale
 
-        if g.animation_env is not self: 
+        if g.animation_env is not self:
             if g.animation_env is not None:
                 g.animation_env.video_close()
             if self._animate:
@@ -4983,7 +5206,7 @@ class Environment(object):
                         self.trace(save_trace)
                 else:
                     self._blind_video_maker.cancel()
-            else:    
+            else:
                 if self._animate:
                     can_animate(try_only=False)  # install modules
 
@@ -7211,6 +7434,7 @@ class Environment(object):
                 sound.play_effect("game:Beep", pitch=0.3)
             except Exception:
                 pass
+
 
 class Animate(object):
     """
@@ -13490,7 +13714,7 @@ class ComponentGenerator(Component):
                         max_sample = samples[-1]
                         samples = [interpolate(sample, min_sample, max_sample, v_at, v_till) for sample in samples]
                 self.intervals = [t1 - t0 for t0, t1 in zip([0] + samples, samples)]
-                at = 0 # self.intervals.pop(0)
+                at = 0  # self.intervals.pop(0)
                 process = "do_spread"
             else:
                 if force_till:
@@ -13581,6 +13805,7 @@ class ComponentGenerator(Component):
         result.append("  scheduled_time=" + self.env.time_to_str(self._scheduled_time))
         return return_or_print(result, as_str, file)
 
+
 class _BlindVideoMaker(Component):
     def process(self):
         while True:
@@ -13588,6 +13813,7 @@ class _BlindVideoMaker(Component):
             self.env.save_frame()
             self.env.frame_number += 1
             yield self.hold(self.env._speed / self.env._fps)
+
 
 class Random(random.Random):
     """
@@ -16157,7 +16383,17 @@ class State(object):
         self.waiters().monitor(value)
         self.value.monitor(value)
 
-    def reset_monitors(self, monitor=None):
+    def all_monitors(self):
+        '''
+        returns all mononitors belonging to the state
+        
+        Returns
+        -------
+        all monitors : tuple of monitors
+        '''
+        return (self.waiters().length, self.waiters().length_of_stay, self.value) 
+        
+    def reset_monitors(self, monitor=None, stats_only=None):
         """
         resets the monitor for the state's value and the monitors of the waiters queue
 
@@ -16168,9 +16404,13 @@ class State(object):
             if False, monitoring is disabled |n|
             if omitted, no change of monitoring state
 
+        stats_only : bool
+            if True, only statistics will be collected (using less memory, but also less functionality) |n|
+            if False, full functionality |n|
+            if omittted, no change of stats_only
         """
-        self._waiters.reset_monitors(monitor)
-        self.value.reset()
+        self._waiters.reset_monitors(monitor=monitor, stats_only=stats_only)
+        self.value.reset(monitor=monitor, stats_only=stats_only)
 
     def _get_value(self):
         return self._value
@@ -16374,8 +16614,18 @@ class Resource(object):
         only keyword arguments are passed
         """
         pass
+        
+    def all_monitors(self):
+        '''
+        returns all mononitors belonging to the resource
+        
+        Returns
+        -------
+        all monitors : tuple of monitors
+        '''
+        return (self.requesters().length, self.requesters().length_of_stay, self.claimers().length, self.claimers().length_of_stay, self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy) 
 
-    def reset_monitors(self, monitor=None):
+    def reset_monitors(self, monitor=None, stats_only=None):
         """
         resets the resource monitors
 
@@ -16385,6 +16635,11 @@ class Resource(object):
             if True, monitoring will be on. |n|
             if False, monitoring is disabled |n|
             if omitted, no change of monitoring state
+
+        stats_only : bool
+            if True, only statistics will be collected (using less memory, but also less functionality) |n|
+            if False, full functionality |n|
+            if omittted, no change of stats_only
 
         Note
         ----
@@ -16397,10 +16652,10 @@ class Resource(object):
             occupancy.reset()
         """
 
-        self.requesters().reset_monitors(monitor)
-        self.claimers().reset_monitors(monitor)
+        self.requesters().reset_monitors(monitor=monitor, stats_only=stats_only)
+        self.claimers().reset_monitors(monitor=monitor, stats_only=stats_only)
         for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
-            m.reset(monitor)
+            m.reset(monitor=monitor, stats_only=stats_only)
 
     def print_statistics(self, as_str=False, file=None):
         """
@@ -17387,7 +17642,6 @@ def do_force_numeric(arg):
                     result.append(float(v))
             except (ValueError, TypeError):
                 result.append(0)
-    
 
     return result
 
