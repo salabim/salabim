@@ -11725,10 +11725,10 @@ class Component(object):
                     return
             raise Exception("remove error", self.name())
         if self.status == standby:
-            if self in self.env._standby_list:
-                self.env._standby_list(self)
-            if self in self.env._pending_standby_list:
-                self.env._pending_standby_list(self)
+            if self in self.env._standbylist:
+                self.env._standbylist.remove(self)
+            if self in self.env._pendingstandbylist:
+                self.env._pendingstandbylist.remove(self)
 
     def _check_fail(self):
         if self._requests:
