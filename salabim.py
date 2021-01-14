@@ -1,13 +1,13 @@
-#               _         _      _               ____   _      ___       ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |    / _ \     / _ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | | | |   | | | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | |_| | _ | |_| |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_) \___/ (_) \___/
+#               _         _      _               ____   _      ___      _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |    / _ \    / |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | | | |   | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | |_| | _ | |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_) \___/ (_)|_|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "21.0.0"
+__version__ = "21.0.1"
 
 import heapq
 import random
@@ -11801,9 +11801,9 @@ class Component(object):
             raise Exception("remove error", self.name())
         if self.status == standby:
             if self in self.env._standby_list:
-                self.env._standby_list(self)
+                self.env._standby_list(self).remove(self)
             if self in self.env._pending_standby_list:
-                self.env._pending_standby_list(self)
+                self.env._pending_standby_list(self).remove(self)
 
     def _check_fail(self):
         if self._requests:
