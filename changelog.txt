@@ -2,7 +2,7 @@ salabim changelog
 
 version 21.0.1  2021-01-14
 ==========================
-Bug fix (0)
+Bug fix (0) 
 -----------
 Bug in Component._remove() fixed.
 

@@ -3327,16 +3327,16 @@ class Queue(object):
 
         """
         return AnimateQueue(self, *args, **kwargs)
-        
+
     def all_monitors(self):
-        '''
+        """
         returns all mononitors belonging to the queue
         
         Returns
         -------
         all monitors : tuple of monitors
-        '''
-        return (self.length, self.length_of_stay)         
+        """
+        return (self.length, self.length_of_stay)
 
     def reset_monitors(self, monitor=None, stats_only=None):
         """
@@ -5663,7 +5663,6 @@ class Environment(object):
             self.animation_parameters(title=value, animate=None)
         return self._title
 
-
     def background_color(self, value=None):
         """
         background_color of the animation
@@ -5957,8 +5956,6 @@ class Environment(object):
         if value is not None:
             self.animation_parameters(show_menu_buttons=value, animate=None)
         return self._show_menu_buttons
-
-
 
     def maximum_number_of_bitmaps(self, value=None):
         """
@@ -16459,15 +16456,15 @@ class State(object):
         self.value.monitor(value)
 
     def all_monitors(self):
-        '''
+        """
         returns all mononitors belonging to the state
         
         Returns
         -------
         all monitors : tuple of monitors
-        '''
-        return (self.waiters().length, self.waiters().length_of_stay, self.value) 
-        
+        """
+        return (self.waiters().length, self.waiters().length_of_stay, self.value)
+
     def reset_monitors(self, monitor=None, stats_only=None):
         """
         resets the monitor for the state's value and the monitors of the waiters queue
@@ -16689,16 +16686,25 @@ class Resource(object):
         only keyword arguments are passed
         """
         pass
-        
+
     def all_monitors(self):
-        '''
+        """
         returns all mononitors belonging to the resource
         
         Returns
         -------
         all monitors : tuple of monitors
-        '''
-        return (self.requesters().length, self.requesters().length_of_stay, self.claimers().length, self.claimers().length_of_stay, self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy) 
+        """
+        return (
+            self.requesters().length,
+            self.requesters().length_of_stay,
+            self.claimers().length,
+            self.claimers().length_of_stay,
+            self.capacity,
+            self.available_quantity,
+            self.claimed_quantity,
+            self.occupancy,
+        )
 
     def reset_monitors(self, monitor=None, stats_only=None):
         """
