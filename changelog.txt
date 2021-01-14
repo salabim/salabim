@@ -1,5 +1,20 @@
 salabim changelog
 
+version 21.0.0  2021-01-14
+==========================
+New functionality (0)
+---------------------
+Added Environment.title()
+With this, the title of the canvas window can be set. The title is set to "", the title will be completely suppressed.
+
+Added Environment.show_menu_buttons()
+With this, the menu buttons can be hidden
+
+Added parameter title and show_menu_buttons to Environment.animation_parameters
+
+The title of the canvas window now defaults to salabim, instead of tk. This can be overruled with Environment.title()
+
+
 version 20.0.6  2020-12-18
 ==========================
 New functionality (0)

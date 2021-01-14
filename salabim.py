@@ -1,13 +1,13 @@
-#               _         _      _               ____    ___       ___       __
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \     / /_
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |   | '_ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _ | (_) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_) \___/
+#               _         _      _               ____   _      ___       ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |    / _ \     / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | | | |   | | | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | |_| | _ | |_| |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_) \___/ (_) \___/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "20.0.6"
+__version__ = "21.0.0"
 
 import heapq
 import random
@@ -4620,6 +4620,8 @@ class Environment(object):
         else:
             self._width = 1024
             self._height = 768
+        self._title = "salabim"
+        self._show_menu_buttons = True
         self._x0 = 0
         self._y0 = 0
         self._x1 = self._width
@@ -4826,6 +4828,8 @@ class Environment(object):
         speed=None,
         width=None,
         height=None,
+        title=None,
+        show_menu_buttons=None,
         x0=None,
         y0=None,
         x1=None,
@@ -4874,6 +4878,12 @@ class Environment(object):
             if omitted, no change. At init of the environment, the height will be
             set to 768 for non Pythonista and the current screen height for Pythonista.
 
+        title : str
+            title of the canvas window |n|
+            if omitted, no change. At init of the environment, the title will be
+            set to salabim. |n|
+            if "", the title will be suppressed.
+
         x0 : float
             user x-coordinate of the lower left corner |n|
             if omitted, no change. At init of the environment, x0 will be set to 0.
@@ -4918,9 +4928,13 @@ class Environment(object):
             if True, show the number of frames per second |n|
             if False, do not show the number of frames per second (default)
 
-        show_time: bool
+        show_time : bool
             if True, show the time (default)  |n|
             if False, do not show the time
+
+        show_menu_buttons : bool
+            if True, show the menu buttons (default)  |n|
+            if False, do show the menu buttons
 
         maximum_number_of_bitmaps : int
             maximum number of tkinter bitmaps (default 4000)
@@ -4995,6 +5009,16 @@ class Environment(object):
                 self._height = height
                 frame_changed = True
                 height_changed = True
+
+        if title is not None:
+            if self._title != title:
+                self._title = title
+                frame_changed = True
+
+        if show_menu_buttons is not None:
+            if self._show_menu_buttons != show_menu_buttons:
+                self._show_menu_buttons = show_menu_buttons
+                frame_changed = True
 
         if fps is not None:
             if self._fps != fps:
@@ -5225,6 +5249,10 @@ class Environment(object):
                             self.root = tkinter.Toplevel()
                         else:
                             self.root = tkinter.Tk()
+                        if self._title:
+                            self.root.title(self._title)
+                        else:
+                            self.root.overrideredirect(1)
                         g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
                         g.canvas.configure(background=self.colorspec_to_hex("bg", False))
                         g.canvas.pack()
@@ -5233,7 +5261,8 @@ class Environment(object):
 
                     self.uninstall_uios()  # this causes all ui objects to be (re)installed
 
-                    self.an_menu_buttons()
+                    if self._show_menu_buttons:
+                        self.an_menu_buttons()
 
     def video_close(self):
         """
@@ -5611,6 +5640,30 @@ class Environment(object):
             self.animation_parameters(height=value, animate=None)
         return self._height
 
+    def title(self, value=None):
+        """
+        title of the canvas window
+
+        Parameters
+        ----------
+        value : str
+            new title |n|
+            if "", the title will be suppressed |n|
+            if not specified, no change
+
+        Returns
+        -------
+        title of canvas window : str
+
+        Note
+        ----
+        No effect for Pythonista
+        """
+        if value is not None:
+            self.animation_parameters(title=value, animate=None)
+        return self._title
+
+
     def background_color(self, value=None):
         """
         background_color of the animation
@@ -5885,6 +5938,27 @@ class Environment(object):
         if value is not None:
             self.animation_parameters(show_fps=value, animate=None)
         return self._show_fps
+
+    def show_menu_buttons(self, value=None):
+        """
+        controls menu buttons
+
+        Parameters
+        ----------
+        value : bool
+            if True, menu buttons are shown |n|
+            if False, menu buttons are hidden |n|
+            if not specified, no change
+
+        Returns
+        -------
+        show menu button status : bool
+        """
+        if value is not None:
+            self.animation_parameters(show_menu_buttons=value, animate=None)
+        return self._show_menu_buttons
+
+
 
     def maximum_number_of_bitmaps(self, value=None):
         """
@@ -6386,6 +6460,7 @@ class Environment(object):
         else:
             fillcolor = "blue"
             color = "white"
+
         uio = AnimateButton(
             x=38,
             y=-21,
@@ -10088,10 +10163,10 @@ class AnimateRectangle(_Vis):
     textcolor : colorspec
         color of the text (default foreground_color)
 
-    textoffsetx : float
+    text_offsetx : float
         extra x offset to the text_anchor point
 
-    textoffsety : float
+    text_offsety : float
         extra y offset to the text_anchor point
 
     fontsize : float
