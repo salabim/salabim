@@ -1,13 +1,13 @@
-#               _         _      _               ____   _      ___      _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |    / _ \    / |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | | | |   | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | |_| | _ | |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_) \___/ (_)|_|
+#               _         _      _               ____   _      ___      ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |    / _ \    |___ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | | | |     __) |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | |_| | _  / __/
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_) \___/ (_)|_____|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "21.0.1"
+__version__ = "21.0.2"
 
 import heapq
 import random
@@ -388,7 +388,7 @@ fill is only available for non level and not stats_only monitors. |n|
 
     def merge(self, *monitors, **kwargs):
         """
-        merges this monitor with other monitors
+        merges this monitor with other monitor(s)
 
         Parameters
         ----------
@@ -468,7 +468,7 @@ fill is only available for non level and not stats_only monitors. |n|
                 else:
                     new._t.append(t)
                     new._x.append(sum)
-
+            new.start = new._t[0]
         else:
             for t, _, x, weight in heapq.merge(
                 *[
@@ -573,7 +573,7 @@ fill is only available for non level and not stats_only monitors. |n|
                 stop = inf
             else:
                 stop += self.env._offset
-            stop = min(stop, self.env._now - self.env._offset)  # not self.now() in order to support froze monitors
+            stop = min(stop, self.env._now - self.env._offset)  # not self.now() in order to support frozen monitors
             actions.append((start, "a", 0, 0))
             actions.append((stop, "z", 0, 0))  # non inclusive
         else:
@@ -15497,18 +15497,18 @@ class Pdf(_Distribution):
 
     Parameters
     ----------
-    spec : list or tuple
+    spec : list, tuple or dict
         either
-
         -   if no probabilities specified: |n|
-            list with x-values and corresponding probability
+            list/tuple with x-values and corresponding probability
+            dict where the keys are re x-values and the values are probabilities
             (x0, p0, x1, p1, ...xn,pn) |n|
         -   if probabilities is specified: |n|
             list with x-values
 
-    probabilities : list, tuple or float
+    probabilities : iterable or float
         if omitted, spec contains the probabilities |n|
-        the list (p0, p1, ...pn) contains the probabilities of the corresponding
+        the iterable (p0, p1, ...pn) contains the probabilities of the corresponding
         x-values from spec. |n|
         alternatively, if a float is given (e.g. 1), all x-values
         have equal probability. The value is not important.
@@ -15551,16 +15551,19 @@ class Pdf(_Distribution):
         sumxp = 0
         hasmean = True
         if probabilities is None:
-
             if not spec:
                 raise TypeError("no arguments specified")
-            xs = spec[::2]
-            probabilities = spec[1::2]
-            if len(xs) != len(probabilities):
-                raise ValueError("uneven number of parameters specified")
+            if isinstance(spec, dict):
+                xs = list(spec.keys())
+                probabilities=list(spec.values())
+            else:
+                xs = spec[::2]
+                probabilities = spec[1::2]
+                if len(xs) != len(probabilities):
+                    raise ValueError("uneven number of parameters specified")
         else:
             xs = list(spec)
-            if isinstance(probabilities, (list, tuple)):
+            if hasattr(probabilities, "__iter__") and not isinstance(probabilities, str):
                 probabilities = list(probabilities)
                 if len(xs) != len(probabilities):
                     raise ValueError("length of x-values does not match length of probabilities")

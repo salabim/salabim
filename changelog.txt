@@ -1,5 +1,31 @@
 salabim changelog
 
+version 21.0.2  2021-01-25
+==========================
+Improved functionality (0)
+--------------------------
+The probabilities parameter of sim.Pdf can now be any iterable, so not just list or tuple.
+This can be useful when using the keys or values of a dict as probabilities.
+
+Improved functionality (1)
+--------------------------
+The spec parameter of sim.Pdf can now be a dict, where the keys are the x-values and the values
+are the probabilities. In that case, the probabilities parameter can't be used.
+E.g.
+    d = sim.Pdf({1:10, 2:70, 3:20})
+    d = sim.Pdf(dict(red=45, yellow=10, green=45))
+
+Change in distribution (0)
+--------------------------
+The test scripts are now also available on GitHub (in the /test folder).
+
+Bug fix (0)
+-----------
+Slicing of a merged level monitor didn't work properly, because the attribute start of the merged
+monitor was not set correctly. Fixed.
+
+
+
 version 21.0.1  2021-01-14
 ==========================
 Bug fix (0) 
