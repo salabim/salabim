@@ -1,13 +1,13 @@
-#               _         _      _               ____    ___       ___       __
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / _ \     / _ \     / /_
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || | | |   | | | |   | '_ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | |_| | _ | |_| | _ | (_) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_) \___/
+#               _         _      _               ____   _      ___      ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |    / _ \    |___ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | | | |     __) |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | |_| | _  / __/
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_) \___/ (_)|_____|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "20.0.6"
+__version__ = "21.0.2"
 
 import heapq
 import random
@@ -388,7 +388,7 @@ fill is only available for non level and not stats_only monitors. |n|
 
     def merge(self, *monitors, **kwargs):
         """
-        merges this monitor with other monitors
+        merges this monitor with other monitor(s)
 
         Parameters
         ----------
@@ -468,7 +468,7 @@ fill is only available for non level and not stats_only monitors. |n|
                 else:
                     new._t.append(t)
                     new._x.append(sum)
-
+            new.start = new._t[0]
         else:
             for t, _, x, weight in heapq.merge(
                 *[
@@ -573,7 +573,7 @@ fill is only available for non level and not stats_only monitors. |n|
                 stop = inf
             else:
                 stop += self.env._offset
-            stop = min(stop, self.env._now - self.env._offset)  # not self.now() in order to support froze monitors
+            stop = min(stop, self.env._now - self.env._offset)  # not self.now() in order to support frozen monitors
             actions.append((start, "a", 0, 0))
             actions.append((stop, "z", 0, 0))  # non inclusive
         else:
@@ -3327,16 +3327,16 @@ class Queue(object):
 
         """
         return AnimateQueue(self, *args, **kwargs)
-        
+
     def all_monitors(self):
-        '''
+        """
         returns all mononitors belonging to the queue
         
         Returns
         -------
         all monitors : tuple of monitors
-        '''
-        return (self.length, self.length_of_stay)         
+        """
+        return (self.length, self.length_of_stay)
 
     def reset_monitors(self, monitor=None, stats_only=None):
         """
@@ -4620,6 +4620,8 @@ class Environment(object):
         else:
             self._width = 1024
             self._height = 768
+        self._title = "salabim"
+        self._show_menu_buttons = True
         self._x0 = 0
         self._y0 = 0
         self._x1 = self._width
@@ -4826,6 +4828,8 @@ class Environment(object):
         speed=None,
         width=None,
         height=None,
+        title=None,
+        show_menu_buttons=None,
         x0=None,
         y0=None,
         x1=None,
@@ -4874,6 +4878,12 @@ class Environment(object):
             if omitted, no change. At init of the environment, the height will be
             set to 768 for non Pythonista and the current screen height for Pythonista.
 
+        title : str
+            title of the canvas window |n|
+            if omitted, no change. At init of the environment, the title will be
+            set to salabim. |n|
+            if "", the title will be suppressed.
+
         x0 : float
             user x-coordinate of the lower left corner |n|
             if omitted, no change. At init of the environment, x0 will be set to 0.
@@ -4918,9 +4928,13 @@ class Environment(object):
             if True, show the number of frames per second |n|
             if False, do not show the number of frames per second (default)
 
-        show_time: bool
+        show_time : bool
             if True, show the time (default)  |n|
             if False, do not show the time
+
+        show_menu_buttons : bool
+            if True, show the menu buttons (default)  |n|
+            if False, do show the menu buttons
 
         maximum_number_of_bitmaps : int
             maximum number of tkinter bitmaps (default 4000)
@@ -4995,6 +5009,16 @@ class Environment(object):
                 self._height = height
                 frame_changed = True
                 height_changed = True
+
+        if title is not None:
+            if self._title != title:
+                self._title = title
+                frame_changed = True
+
+        if show_menu_buttons is not None:
+            if self._show_menu_buttons != show_menu_buttons:
+                self._show_menu_buttons = show_menu_buttons
+                frame_changed = True
 
         if fps is not None:
             if self._fps != fps:
@@ -5225,6 +5249,10 @@ class Environment(object):
                             self.root = tkinter.Toplevel()
                         else:
                             self.root = tkinter.Tk()
+                        if self._title:
+                            self.root.title(self._title)
+                        else:
+                            self.root.overrideredirect(1)
                         g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
                         g.canvas.configure(background=self.colorspec_to_hex("bg", False))
                         g.canvas.pack()
@@ -5233,7 +5261,8 @@ class Environment(object):
 
                     self.uninstall_uios()  # this causes all ui objects to be (re)installed
 
-                    self.an_menu_buttons()
+                    if self._show_menu_buttons:
+                        self.an_menu_buttons()
 
     def video_close(self):
         """
@@ -5611,6 +5640,29 @@ class Environment(object):
             self.animation_parameters(height=value, animate=None)
         return self._height
 
+    def title(self, value=None):
+        """
+        title of the canvas window
+
+        Parameters
+        ----------
+        value : str
+            new title |n|
+            if "", the title will be suppressed |n|
+            if not specified, no change
+
+        Returns
+        -------
+        title of canvas window : str
+
+        Note
+        ----
+        No effect for Pythonista
+        """
+        if value is not None:
+            self.animation_parameters(title=value, animate=None)
+        return self._title
+
     def background_color(self, value=None):
         """
         background_color of the animation
@@ -5885,6 +5937,25 @@ class Environment(object):
         if value is not None:
             self.animation_parameters(show_fps=value, animate=None)
         return self._show_fps
+
+    def show_menu_buttons(self, value=None):
+        """
+        controls menu buttons
+
+        Parameters
+        ----------
+        value : bool
+            if True, menu buttons are shown |n|
+            if False, menu buttons are hidden |n|
+            if not specified, no change
+
+        Returns
+        -------
+        show menu button status : bool
+        """
+        if value is not None:
+            self.animation_parameters(show_menu_buttons=value, animate=None)
+        return self._show_menu_buttons
 
     def maximum_number_of_bitmaps(self, value=None):
         """
@@ -6386,6 +6457,7 @@ class Environment(object):
         else:
             fillcolor = "blue"
             color = "white"
+
         uio = AnimateButton(
             x=38,
             y=-21,
@@ -10088,10 +10160,10 @@ class AnimateRectangle(_Vis):
     textcolor : colorspec
         color of the text (default foreground_color)
 
-    textoffsetx : float
+    text_offsetx : float
         extra x offset to the text_anchor point
 
-    textoffsety : float
+    text_offsety : float
         extra y offset to the text_anchor point
 
     fontsize : float
@@ -11725,10 +11797,10 @@ class Component(object):
                     return
             raise Exception("remove error", self.name())
         if self.status == standby:
-            if self in self.env._standbylist:
-                self.env._standbylist.remove(self)
-            if self in self.env._pendingstandbylist:
-                self.env._pendingstandbylist.remove(self)
+            if self in self.env._standby_list:
+                self.env._standby_list(self).remove(self)
+            if self in self.env._pending_standby_list:
+                self.env._pending_standby_list(self).remove(self)
 
     def _check_fail(self):
         if self._requests:
@@ -15425,18 +15497,18 @@ class Pdf(_Distribution):
 
     Parameters
     ----------
-    spec : list or tuple
+    spec : list, tuple or dict
         either
-
         -   if no probabilities specified: |n|
-            list with x-values and corresponding probability
+            list/tuple with x-values and corresponding probability
+            dict where the keys are re x-values and the values are probabilities
             (x0, p0, x1, p1, ...xn,pn) |n|
         -   if probabilities is specified: |n|
             list with x-values
 
-    probabilities : list, tuple or float
+    probabilities : iterable or float
         if omitted, spec contains the probabilities |n|
-        the list (p0, p1, ...pn) contains the probabilities of the corresponding
+        the iterable (p0, p1, ...pn) contains the probabilities of the corresponding
         x-values from spec. |n|
         alternatively, if a float is given (e.g. 1), all x-values
         have equal probability. The value is not important.
@@ -15479,16 +15551,19 @@ class Pdf(_Distribution):
         sumxp = 0
         hasmean = True
         if probabilities is None:
-
             if not spec:
                 raise TypeError("no arguments specified")
-            xs = spec[::2]
-            probabilities = spec[1::2]
-            if len(xs) != len(probabilities):
-                raise ValueError("uneven number of parameters specified")
+            if isinstance(spec, dict):
+                xs = list(spec.keys())
+                probabilities=list(spec.values())
+            else:
+                xs = spec[::2]
+                probabilities = spec[1::2]
+                if len(xs) != len(probabilities):
+                    raise ValueError("uneven number of parameters specified")
         else:
             xs = list(spec)
-            if isinstance(probabilities, (list, tuple)):
+            if hasattr(probabilities, "__iter__") and not isinstance(probabilities, str):
                 probabilities = list(probabilities)
                 if len(xs) != len(probabilities):
                     raise ValueError("length of x-values does not match length of probabilities")
@@ -16384,15 +16459,15 @@ class State(object):
         self.value.monitor(value)
 
     def all_monitors(self):
-        '''
+        """
         returns all mononitors belonging to the state
         
         Returns
         -------
         all monitors : tuple of monitors
-        '''
-        return (self.waiters().length, self.waiters().length_of_stay, self.value) 
-        
+        """
+        return (self.waiters().length, self.waiters().length_of_stay, self.value)
+
     def reset_monitors(self, monitor=None, stats_only=None):
         """
         resets the monitor for the state's value and the monitors of the waiters queue
@@ -16614,16 +16689,25 @@ class Resource(object):
         only keyword arguments are passed
         """
         pass
-        
+
     def all_monitors(self):
-        '''
+        """
         returns all mononitors belonging to the resource
         
         Returns
         -------
         all monitors : tuple of monitors
-        '''
-        return (self.requesters().length, self.requesters().length_of_stay, self.claimers().length, self.claimers().length_of_stay, self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy) 
+        """
+        return (
+            self.requesters().length,
+            self.requesters().length_of_stay,
+            self.claimers().length,
+            self.claimers().length_of_stay,
+            self.capacity,
+            self.available_quantity,
+            self.claimed_quantity,
+            self.occupancy,
+        )
 
     def reset_monitors(self, monitor=None, stats_only=None):
         """
