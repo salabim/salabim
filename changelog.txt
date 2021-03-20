@@ -1,5 +1,22 @@
 salabim changelog
 
+version 21.0.3  2021-03-20
+==========================
+Added functionality (0)
+-----------------------
+Environment.snapshot() now also supports the .ico image file format.
+This may be useful when (mis)using salabim as an icon generator.
+
+Bug fix (0)
+----------
+Bug in initializing system monitors at init of a component (not setting env to self.env). Fixed. 
+
+Bug fix (1)
+-----------
+When producing videos with blind_animation=True (to allow running without tkinter installed),
+the Environment.animation_pre_tick_sys() method was not called prior to saving a frame, 
+causing problems with animating queues. Fixed. 
+
 version 21.0.2  2021-01-25
 ==========================
 Improved functionality (0)

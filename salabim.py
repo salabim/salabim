@@ -1,13 +1,13 @@
-#               _         _      _               ____   _      ___      ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |    / _ \    |___ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | | | |     __) |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | |_| | _  / __/
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_) \___/ (_)|_____|
+#               _         _      _               ____   _      ___      _____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |    / _ \    |___ /
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | | | |     |_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | |_| | _  ___) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_) \___/ (_)|____/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "21.0.2"
+__version__ = "21.0.3"
 
 import heapq
 import random
@@ -4601,7 +4601,7 @@ class Environment(object):
         if self._blind_animation:
             save_trace = self.trace()
             self.trace(False)
-            self._blind_video_maker = _BlindVideoMaker(process="", suppress_trace=True)
+            self._blind_video_maker = _BlindVideoMaker(process="", suppress_trace=True) 
             self.trace(save_trace)
         if PyDroid:
             if g.tkinter_loaded == "?":
@@ -4945,10 +4945,10 @@ class Environment(object):
             Normally, use .mp4 as extension. |n|
             If the extension is .gif or .png an animated gif / png file will be written, unless there
             is a * in the filename |n|
-            If the extension is .gif, .jpg, .png, .bmp or .tiff and one * appears in the filename,
+            If the extension is .gif, .jpg, .png, .bmp, .ico or .tiff and one * appears in the filename,
             individual frames will be written with
             a six digit sequence at the place of the asteriks in the file name.
-            If the video extension is not .gif, .jpg, .png, .bmp or .tiff, a codec may be added
+            If the video extension is not .gif, .jpg, .png, .bmp, .ico or .tiff, a codec may be added
             by appending a plus sign and the four letter code name,
             like "myvideo.avi+DIVX". |n|
             If no codec is given, MJPG will be used for .avi files, otherwise .mp4v |n|
@@ -5163,7 +5163,7 @@ class Environment(object):
                     elif extension == ".png" and not ("*" in video_path.stem):
                         self._video_out = "png"
                         self._images = []
-                    elif extension.lower() in (".jpg", ".png", ".bmp", ".tiff", ".gif"):
+                    elif extension.lower() in (".jpg", ".png", ".bmp", ".ico", ".tiff", ".gif"):
                         if "*" in video_path.stem:
                             if video.count("*") > 1:
                                 raise ValueError("more than one * found in " + video)
@@ -6384,7 +6384,7 @@ class Environment(object):
         ----------
         filename : str
             file to save the current animated frame to. |n|
-            The following formats are accepted: .png, .jpg, .bmp, .gif and .tiff are supported.
+            The following formats are accepted: .png, .jpg, .bmp, .ico, .gif and .tiff are supported.
             Other formats are not possible.
             Note that, apart from .JPG files. the background may be semi transparent by setting
             the alpha value to something else than 255.
@@ -6392,7 +6392,7 @@ class Environment(object):
         can_animate(try_only=False)
         filename_path = Path(filename)
         extension = filename_path.suffix.lower()
-        if extension in (".png", ".gif", ".bmp", ".tiff"):
+        if extension in (".png", ".gif", ".bmp", ".ico", ".tiff"):
             mode = "RGBA"
         elif extension == ".jpg":
             mode = "RGB"
@@ -11521,7 +11521,7 @@ class Component(object):
         _set_name(name, self.env._nameserializeComponent, self)
         self._qmembers = {}
         self._process = None
-        self.status = _StatusMonitor(name=self.name() + ".status", level=True, initial_tally=data)
+        self.status = _StatusMonitor(name=self.name() + ".status", level=True, initial_tally=data, env=self.env)
         self._requests = collections.OrderedDict()
         self._claims = collections.OrderedDict()
         self._waits = []
@@ -11532,7 +11532,7 @@ class Component(object):
         self._creation_time = self.env._now
         self._suppress_trace = suppress_trace
         self._suppress_pause_at_step = suppress_pause_at_step
-        self.mode = _ModeMonitor(name=self.name() + ".mode", level=True, initial_tally=mode, component=self)
+        self.mode = _ModeMonitor(name=self.name() + ".mode", level=True, initial_tally=mode, component=self,env=self.env)
         self._mode_time = self.env._now
         self._aos = {}
         self._animation_children = set()
@@ -13882,6 +13882,8 @@ class _BlindVideoMaker(Component):
     def process(self):
         while True:
             self.env.t = self.env._now
+            self.env.animation_pre_tick_sys(self.env.t) # required to update sys objects, like AnimateQueue
+            self.env.animation_pre_tick_sys(self.env.t)            
             self.env.save_frame()
             self.env.frame_number += 1
             yield self.hold(self.env._speed / self.env._fps)
@@ -15555,7 +15557,7 @@ class Pdf(_Distribution):
                 raise TypeError("no arguments specified")
             if isinstance(spec, dict):
                 xs = list(spec.keys())
-                probabilities=list(spec.values())
+                probabilities = list(spec.values())
             else:
                 xs = spec[::2]
                 probabilities = spec[1::2]
