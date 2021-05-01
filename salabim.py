@@ -1,13 +1,12 @@
-#               _         _      _               ____   _      ___      _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |    / _ \    |___ /
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | | | |     |_ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | |_| | _  ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_) \___/ (_)|____/
+#               _         _      _               ____   _      ___      _  _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |    / _ \    | || |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | | | |   | || |_
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | |_| | _ |__   _|
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_) \___/ (_)   |_|
 #  Discrete event simulation in Python
 #
-#  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "21.0.3"
+__version__ = "21.0.4"
 
 import heapq
 import random
@@ -42,6 +41,7 @@ from pathlib import Path
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
 PyDroid = sys.platform == "linux" and any("pydroid" in v for v in os.environ.values())
+Chromebook = "penguin" in platform.uname()
 
 
 class g:
@@ -271,7 +271,7 @@ class Monitor(object):
 
     fill : list or tuple
         can be used to fill the tallied values (all at time now). |n|
-fill is only available for non level and not stats_only monitors. |n|        
+fill is only available for non level and not stats_only monitors. |n|
 
     env : Environment
         environment where the monitor is defined |n|
@@ -571,11 +571,14 @@ fill is only available for non level and not stats_only monitors. |n|
             start = max(start, self.start)
             if stop is None:
                 stop = inf
+                stop_action = "z" # inclusive
             else:
                 stop += self.env._offset
+                stop_action = "b" # non inclusive
+
             stop = min(stop, self.env._now - self.env._offset)  # not self.now() in order to support frozen monitors
             actions.append((start, "a", 0, 0))
-            actions.append((stop, "z", 0, 0))  # non inclusive
+            actions.append((stop, stop_action, 0, 0))
         else:
             if start is None:
                 raise TypeError("modulo specified, but no start specified. ")
@@ -625,7 +628,7 @@ fill is only available for non level and not stats_only monitors. |n|
                         else:
                             new._t.append(t)
                             new._x.append(curx)
-                elif type == "z":
+                elif type in ("b", "z"):
                     enabled = False
                     if new._t[-1] == t:
                         new._x[-1] = self.off
@@ -650,7 +653,7 @@ fill is only available for non level and not stats_only monitors. |n|
             else:
                 if type == "a":
                     enabled = True
-                elif type == "z":
+                elif type in ("b", "z"):
                     enabled = False
                 else:
                     if enabled:
@@ -4601,7 +4604,7 @@ class Environment(object):
         if self._blind_animation:
             save_trace = self.trace()
             self.trace(False)
-            self._blind_video_maker = _BlindVideoMaker(process="", suppress_trace=True) 
+            self._blind_video_maker = _BlindVideoMaker(process="", suppress_trace=True)
             self.trace(save_trace)
         if PyDroid:
             if g.tkinter_loaded == "?":
@@ -9405,10 +9408,18 @@ class AnimateButton(object):
     def install(self):
         x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
         y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
+        if Chromebook:  # the Chromebook settings are not accurate for anything else than the menu buttons
+            my_font = tkinter.font.Font(size=int(self.fontsize * 0.45))
+            my_width=int(0.6 * self.width / self.fontsize)
+            y = y + 8
+        else:
+            my_font = tkinter.font.Font(size=int(self.fontsize * 0.7))
+            my_width=int(1.85 * self.width / self.fontsize)
 
         self.button = tkinter.Button(self.env.root, text=self.lasttext, command=self.action, anchor=tkinter.CENTER)
         self.button.configure(
-            width=int(2.2 * self.width / self.fontsize),
+            font=my_font,
+            width=my_width,
             foreground=self.env.colorspec_to_hex(self.color, False),
             background=self.env.colorspec_to_hex(self.fillcolor, False),
             relief=tkinter.FLAT,
@@ -12285,7 +12296,7 @@ class Component(object):
             for the same time and priority |n|
             if True, the component will be scheduled
             in front of all components scheduled
-            for the same time and priority        
+            for the same time and priority
 
         fail_at : float or distribution
             time out |n|
@@ -12679,7 +12690,7 @@ class Component(object):
             for the same time and priority |n|
             if True, the component will be scheduled
             in front of all components scheduled
-            for the same time and priority        
+            for the same time and priority
 
         fail_at : float or distribution
             time out |n|
@@ -13883,7 +13894,7 @@ class _BlindVideoMaker(Component):
         while True:
             self.env.t = self.env._now
             self.env.animation_pre_tick_sys(self.env.t) # required to update sys objects, like AnimateQueue
-            self.env.animation_pre_tick_sys(self.env.t)            
+            self.env.animation_pre_tick_sys(self.env.t)
             self.env.save_frame()
             self.env.frame_number += 1
             yield self.hold(self.env._speed / self.env._fps)
@@ -17109,17 +17120,19 @@ class PeriodMonitor(object):
     """
 
     @staticmethod
-    def new_tally(self, x):
+    def new_tally(self, x, weight=1):
         for m in self.period_monitors:
-            m.perperiod[m.iperiod].tally(x)
-        self.org_tally(x)
+            m.perperiod[m.iperiod].tally(x, weight)
+        self.org_tally(x, weight)
 
     @staticmethod
-    def new_reset(self, monitor=None):
+    def new_reset(self, monitor=None, stats_only=None):
         for m in self.period_monitors:
             for iperiod in range(len(m.periods)):
-                m.perperiod[iperiod].reset()
-        self.org_reset(monitor=monitor)
+                m.perperiod[iperiod].reset(stats_only=stats_only)
+                # the individual monitors do not follow the monitor flag
+
+        self.org_reset(monitor=monitor, stats_only=stats_only)
 
     def __getitem__(self, i):
         return self.perperiod[i]
@@ -17925,28 +17938,29 @@ def fonts():
             dirs.append(Path("/system/fonts"))  # for android
 
         for dir in dirs:
-            for file_path in dir.glob("**/*.ttf"):
-                file = str(file_path)
-                fn = os.path.basename(file).split(".")[0]
-                if fn in _std_fonts():
-                    fullname = _std_fonts()[fn]
-                else:
-                    try:
-                        f = ImageFont.truetype(file, 12)
-                    except OSError:  # to avoid PyDroid problems
-                        continue
-                    if f is None:
-                        fullname = ""
+            for file_path in dir.glob("**/*.*"):  # ***
+                if file_path.suffix.lower() == ".ttf":
+                    file = str(file_path)
+                    fn = os.path.basename(file).split(".")[0]
+                    if fn in _std_fonts():
+                        fullname = _std_fonts()[fn]
                     else:
-                        if str(f.font.style).lower() == "regular":
-                            fullname = str(f.font.family)
+                        try:
+                            f = ImageFont.truetype(file, 12)
+                        except OSError:  # to avoid PyDroid problems
+                            continue
+                        if f is None:
+                            fullname = ""
                         else:
-                            fullname = str(f.font.family) + " " + str(f.font.style)
-                if fullname != "":
-                    if fn.lower() == fullname.lower():
-                        fonts.font_list.append(((fullname,), file))
-                    else:
-                        fonts.font_list.append(((fn, fullname), file))
+                            if str(f.font.style).lower() == "regular":
+                                fullname = str(f.font.family)
+                            else:
+                                fullname = str(f.font.family) + " " + str(f.font.style)
+                    if fullname != "":
+                        if fn.lower() == fullname.lower():
+                            fonts.font_list.append(((fullname,), file))
+                        else:
+                            fonts.font_list.append(((fn, fullname), file))
     return fonts.font_list
 
 
@@ -18136,9 +18150,12 @@ def can_animate(try_only=True):
                 raise ImportError("PyDroid animation requires that the main program imports tkinter")
         try:
             import tkinter
+            import tkinter.font
+
         except ImportError:
             try:
                 import Tkinter as tkinter
+
             except ImportError:
                 if try_only:
                     return False
