@@ -1,12 +1,13 @@
-#               _         _      _               ____   _      ___      _  _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |    / _ \    | || |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | | | |   | || |_
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | |_| | _ |__   _|
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_) \___/ (_)   |_|
+#               _         _      _               ____   _     _      ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |    / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |   | | | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _ | |_| |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_)|_|(_) \___/
 #  Discrete event simulation in Python
 #
+#  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "21.0.4"
+__version__ = "21.1.0"
 
 import heapq
 import random
@@ -16,7 +17,6 @@ import array
 import collections
 import os
 import inspect
-import platform
 import sys
 import itertools
 import io
@@ -35,8 +35,18 @@ import binascii
 import operator
 import copy
 import numbers
+import platform
+import functools
 
 from pathlib import Path
+
+try:
+    import OpenGL.GL as gl
+    import OpenGL.GLU as glu
+    import OpenGL.GLUT as glut
+except ImportError:
+    gl = glu = glut = None
+
 
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
@@ -281,18 +291,7 @@ fill is only available for non level and not stats_only monitors. |n|
     cached_xweight = {(ex0, force_numeric): (0, 0) for ex0 in (False, True) for force_numeric in (False, True)}
 
     def __init__(
-        self,
-        name=None,
-        monitor=True,
-        level=False,
-        initial_tally=None,
-        type=None,
-        weight_legend=None,
-        fill=None,
-        stats_only=False,
-        env=None,
-        *args,
-        **kwargs
+        self, name=None, monitor=True, level=False, initial_tally=None, type=None, weight_legend=None, fill=None, stats_only=False, env=None, *args, **kwargs
     ):
         if env is None:
             self.env = g.default_env
@@ -445,9 +444,7 @@ fill is only available for non level and not stats_only monitors. |n|
 
             curx = [new.off] * len(merge)
             new._t = array.array("d")
-            for t, index, x in heapq.merge(
-                *[zip(merge[index]._t, itertools.repeat(index), merge[index]._x) for index in range(len(merge))]
-            ):
+            for t, index, x in heapq.merge(*[zip(merge[index]._t, itertools.repeat(index), merge[index]._x) for index in range(len(merge))]):
                 if new.xtypecode:
                     curx[index] = x
                 else:
@@ -473,10 +470,7 @@ fill is only available for non level and not stats_only monitors. |n|
             for t, _, x, weight in heapq.merge(
                 *[
                     zip(
-                        merge[index]._t,
-                        itertools.repeat(index),
-                        merge[index]._x,
-                        merge[index]._weight if merge[index]._weight else (1,) * len(merge[index]._x),
+                        merge[index]._t, itertools.repeat(index), merge[index]._x, merge[index]._weight if merge[index]._weight else (1,) * len(merge[index]._x)
                     )
                     for index in range(len(merge))
                 ]
@@ -557,6 +551,10 @@ fill is only available for non level and not stats_only monitors. |n|
         Returns
         -------
         sliced monitor : Monitor
+
+        Note
+        ----
+        It is also possible to use square bracktets to slice, like m[0:1000].
         """
         self._block_stats_only()
         if name is None:
@@ -571,10 +569,10 @@ fill is only available for non level and not stats_only monitors. |n|
             start = max(start, self.start)
             if stop is None:
                 stop = inf
-                stop_action = "z" # inclusive
+                stop_action = "z"  # inclusive
             else:
                 stop += self.env._offset
-                stop_action = "b" # non inclusive
+                stop_action = "b"  # non inclusive
 
             stop = min(stop, self.env._now - self.env._offset)  # not self.now() in order to support frozen monitors
             actions.append((start, "a", 0, 0))
@@ -609,13 +607,7 @@ fill is only available for non level and not stats_only monitors. |n|
 
         enabled = False
         for (t, type, x, weight) in heapq.merge(
-            actions,
-            zip(
-                self._t,
-                itertools.repeat("c"),
-                self._x,
-                self._weight if (self._weight and not self._level) else (1,) * len(self._x),
-            ),
+            actions, zip(self._t, itertools.repeat("c"), self._x, self._weight if (self._weight and not self._level) else (1,) * len(self._x))
         ):
             if new._level:
                 if type == "a":
@@ -897,9 +889,7 @@ fill is only available for non level and not stats_only monitors. |n|
             else:
                 self._weight = False  # weights are only stored if there is a non 1 weight
             self.start = self.env._now - self.env._offset  # not self.env.now() to support frozen monitors
-            Monitor.cached_xweight = {
-                (ex0, force_numeric): (0, 0) for ex0 in (False, True) for force_numeric in (False, True)
-            }  # invalidate the cache
+            Monitor.cached_xweight = {(ex0, force_numeric): (0, 0) for ex0 in (False, True) for force_numeric in (False, True)}  # invalidate the cache
 
         self.monitor(monitor)
 
@@ -1878,9 +1868,7 @@ fill is only available for non level and not stats_only monitors. |n|
         indent = pad("", ll)
 
         if show_header:
-            result.append(
-                indent + "Statistics of {} at {}".format(self.name(), fn(self.env._now - self.env._offset, 13, 3))
-            )
+            result.append(indent + "Statistics of {} at {}".format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
 
         if show_legend:
             result.append(indent + "                        all    excl.zero         zero")
@@ -1893,46 +1881,25 @@ fill is only available for non level and not stats_only monitors. |n|
             result.append(
                 pad(self.name(), ll)
                 + pad(self.weight_legend, 14)
-                + "{}{}{}".format(
-                    fn(self.sys_weight(), 13, 3),
-                    fn(self.sys_weight(ex0=True), 13, 3),
-                    fn(self.sys_weight_zero(), 13, 3),
-                )
+                + "{}{}{}".format(fn(self.sys_weight(), 13, 3), fn(self.sys_weight(ex0=True), 13, 3), fn(self.sys_weight_zero(), 13, 3))
             )
         else:
             result.append(
                 pad(self.name(), ll)
                 + pad("entries", 14)
-                + "{}{}{}".format(
-                    fn(self.number_of_entries(), 13, 3),
-                    fn(self.number_of_entries(ex0=True), 13, 3),
-                    fn(self.number_of_entries_zero(), 13, 3),
-                )
+                + "{}{}{}".format(fn(self.number_of_entries(), 13, 3), fn(self.number_of_entries(ex0=True), 13, 3), fn(self.number_of_entries_zero(), 13, 3))
             )
 
         result.append(indent + "mean          {}{}".format(fn(self.mean(), 13, 3), fn(self.mean(ex0=True), 13, 3)))
 
         result.append(indent + "std.deviation {}{}".format(fn(self.std(), 13, 3), fn(self.std(ex0=True), 13, 3)))
         result.append("")
-        result.append(
-            indent + "minimum       {}{}".format(fn(self.minimum(), 13, 3), fn(self.minimum(ex0=True), 13, 3))
-        )
+        result.append(indent + "minimum       {}{}".format(fn(self.minimum(), 13, 3), fn(self.minimum(ex0=True), 13, 3)))
         if not self._stats_only:
-            result.append(
-                indent
-                + "median        {}{}".format(fn(self.percentile(50), 13, 3), fn(self.percentile(50, ex0=True), 13, 3))
-            )
-            result.append(
-                indent
-                + "90% percentile{}{}".format(fn(self.percentile(90), 13, 3), fn(self.percentile(90, ex0=True), 13, 3))
-            )
-            result.append(
-                indent
-                + "95% percentile{}{}".format(fn(self.percentile(95), 13, 3), fn(self.percentile(95, ex0=True), 13, 3))
-            )
-        result.append(
-            indent + "maximum       {}{}".format(fn(self.maximum(), 13, 3), fn(self.maximum(ex0=True), 13, 3))
-        )
+            result.append(indent + "median        {}{}".format(fn(self.percentile(50), 13, 3), fn(self.percentile(50, ex0=True), 13, 3)))
+            result.append(indent + "90% percentile{}{}".format(fn(self.percentile(90), 13, 3), fn(self.percentile(90, ex0=True), 13, 3)))
+            result.append(indent + "95% percentile{}{}".format(fn(self.percentile(95), 13, 3), fn(self.percentile(95, ex0=True), 13, 3)))
+        result.append(indent + "maximum       {}{}".format(fn(self.maximum(), 13, 3), fn(self.maximum(ex0=True), 13, 3)))
         return return_or_print(result, as_str, file)
 
     def histogram_autoscale(self, ex0=False):
@@ -1967,9 +1934,7 @@ fill is only available for non level and not stats_only monitors. |n|
                 break
         return bin_width, lowerbound, number_of_bins
 
-    def print_histograms(
-        self, number_of_bins=None, lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None
-    ):
+    def print_histograms(self, number_of_bins=None, lowerbound=None, bin_width=None, values=False, ex0=False, as_str=False, file=None):
         """
         print monitor statistics and histogram
 
@@ -2073,7 +2038,7 @@ fill is only available for non level and not stats_only monitors. |n|
             if True, sort the values on duration first (largest first), then on the values itself|n|
             if False, sort the values on the values itself |n|
             False is the default for level monitors. Not permitted for non level monitors.
-            
+
         sort        sort_on_weight : bool
             if True, sort the values on weight first (largest first), then on the values itself|n|
             if False (default), sort the values on the values itself |n|
@@ -2083,12 +2048,12 @@ fill is only available for non level and not stats_only monitors. |n|
             if True, sort the values on duration first (largest first), then on the values itself|n|
             if False (default), sort the values on the values itself |n|
             Not permitted for non level monitors.
-            
+
         sort_on_value : bool
             if True, sort on the values. |n|
             if False (default), no sorting will take place, unless values is an iterable, in which case
             sorting will be done on the values anyway.
-                      
+
         Returns
         -------
         histogram (if as_str is True) : str
@@ -2151,21 +2116,13 @@ fill is only available for non level and not stats_only monitors. |n|
                         unique_values.append(v)
 
                     if sort_on_weight or sort_on_duration or sort_on_value:
-                        values_label = [
-                            v
-                            for v in self.values(
-                                ex0=ex0, sort_on_weight=sort_on_weight, sort_on_duration=sort_on_duration
-                            )
-                            if v in values
-                        ]
+                        values_label = [v for v in self.values(ex0=ex0, sort_on_weight=sort_on_weight, sort_on_duration=sort_on_duration) if v in values]
                         values_not_in_monitor = [v for v in values if v not in values_label]
                         values_label.extend(sorted(values_not_in_monitor))
                     else:
                         values_label = values
                 else:
-                    values_label = self.values(
-                        ex0=ex0, sort_on_weight=sort_on_weight, sort_on_duration=sort_on_duration
-                    )
+                    values_label = self.values(ex0=ex0, sort_on_weight=sort_on_weight, sort_on_duration=sort_on_duration)
 
                 values_condition = [[v] for v in values_label]
                 rest_values = self.values(ex0=ex0)
@@ -2204,9 +2161,7 @@ fill is only available for non level and not stats_only monitors. |n|
                                 + fn(count_entries * 100 / nentries, 6, 1)
                             )
                         else:
-                            result.append(
-                                pad(str(value_label), 20) + rpad(str(count), 7) + fn(perc * 100, 6, 1) + " " + s
-                            )
+                            result.append(pad(str(value_label), 20) + rpad(str(count), 7) + fn(perc * 100, 6, 1) + " " + s)
             else:
                 auto_scale = True
                 if bin_width is None:
@@ -2258,11 +2213,7 @@ fill is only available for non level and not stats_only monitors. |n|
                             s = ("*" * n) + (" " * (scale - n))
                             s = s[: ncum - 1] + "|" + s[ncum + 1 :]
 
-                        result.append(
-                            "{} {}{}{} {}".format(
-                                fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s
-                            )
-                        )
+                        result.append("{} {}{}{} {}".format(fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s))
         result.append("")
         return return_or_print(result, as_str=as_str, file=file)
 
@@ -2278,7 +2229,7 @@ fill is only available for non level and not stats_only monitors. |n|
         force_numeric : bool
             if True, convert non numeric tallied values numeric if possible, otherwise assume 0 |n|
             if False (default), do not interpret x-values, return as list if type is list
-            
+
         sort_on_weight : bool
             if True, sort the values on weight first (largest first), then on the values itself|n|
             if False, sort the values on the values itself |n|
@@ -2288,7 +2239,7 @@ fill is only available for non level and not stats_only monitors. |n|
             if True, sort the values on duration first (largest first), then on the values itself|n|
             if False, sort the values on the values itself |n|
             False is the default for level monitors. Not permitted for non level monitors.
-            
+
         Returns
         -------
         all tallied values : array/list
@@ -2800,8 +2751,8 @@ class AnimateMonitor(object):
         font of the labels (default null string)
 
     label_fontsize : int
-        size of the font of the labels (default 15)
-    
+        size of the font of the labels (default 15)    
+
     label_anchor : str
         specifies where the label coordinates (as returned by map_value) are relative to |n|
         possible values are (default: sw): |n|
@@ -2986,14 +2937,7 @@ class AnimateMonitor(object):
                 )
                 self.aos.append(
                     AnimateLine(
-                        spec=(0, 0, width, 0),
-                        x=x,
-                        y=y,
-                        offsetx=offsetx,
-                        offsety=label_y,
-                        angle=angle,
-                        linewidth=label_linewidth,
-                        linecolor=label_linecolor,
+                        spec=(0, 0, width, 0), x=x, y=y, offsetx=offsetx, offsety=label_y, angle=angle, linewidth=label_linewidth, linecolor=label_linecolor
                     )
                 )
             except (ValueError, TypeError):
@@ -3056,9 +3000,7 @@ if Pythonista:
                         if env.paused:
                             env.t = env.start_animation_time
                         else:
-                            env.t = env.start_animation_time + (
-                                (time.time() - env.start_animation_clocktime) * env._speed
-                            )
+                            env.t = env.start_animation_time + ((time.time() - env.start_animation_clocktime) * env._speed)
                     while (env.peek() < env.t) and env.running and env._animate:
                         env.step()
                 else:
@@ -3245,9 +3187,7 @@ class Queue(object):
         self._isinternal = False
         self.arrival_rate(reset=True)
         self.departure_rate(reset=True)
-        self.length = _SystemMonitor(
-            "Length of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="uint32", env=self.env
-        )
+        self.length = _SystemMonitor("Length of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="uint32", env=self.env)
         self.length_of_stay = Monitor("Length of stay in " + self.name(), monitor=monitor, type="float", env=self.env)
         if fill is not None:
             savetrace = self.env._trace
@@ -3334,7 +3274,7 @@ class Queue(object):
     def all_monitors(self):
         """
         returns all mononitors belonging to the queue
-        
+
         Returns
         -------
         all monitors : tuple of monitors
@@ -3542,9 +3482,7 @@ class Queue(object):
         result.append(self.length.print_statistics(show_header=False, show_legend=True, do_indent=True, as_str=True))
 
         result.append("")
-        result.append(
-            self.length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True, as_str=True)
-        )
+        result.append(self.length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True, as_str=True))
         return return_or_print(result, as_str, file)
 
     def print_histograms(self, exclude=(), as_str=False, file=None):
@@ -4449,6 +4387,138 @@ class Queue(object):
             self.env.print_trace("", "", self.name() + " clear")
 
 
+class Animate3dBase:
+    """
+    Base class for a 3D animation object |n|
+    When a class inherits from this base class, it will be added to the animation objects list to be shown
+
+    Parameters
+    ----------
+    visible : bool
+        visible |n|
+        if False, animation object is not shown, shown otherwise
+        (default True)
+
+    layer : int
+         layer value |n|
+         lower layer values are displayed later in the frame (default 0)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically when the parent component is no longer accessible
+
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
+    """
+
+    def __init__(self, visible=True, arg=None, layer=0, parent=None, env=None, **kwargs):
+
+        self._dynamics = set()
+        self.env = g.default_env if env is None else env
+        self.visible = visible
+        self.arg = self if arg is None else arg
+        self.layer = layer
+        if parent is not None:
+            if not isinstance(parent, Component):
+                raise ValueError(repr(parent) + " is not a component")
+        self.sequence = self.env.serialize()
+        self.env.an_objects3d.append(self)
+        self.register_dynamic_attributes("visible layer")
+        self.setup(**kwargs)
+
+    def setup(self):
+        """
+        called immediately after initialization of a the Animate3dBase object.
+
+        by default this is a dummy method, but it can be overridden.
+
+        only keyword arguments will be passed
+
+        Example
+        -------
+            class AnimateVehicle(sim.Animate3dBase):
+                def setup(self, length):
+                    self.length = length
+                    self.register_dynamic_attributes("length")
+
+                ...
+        """
+        pass
+
+    def remove(self):
+        if self in self.env.an_objects3d:
+            self.env.an_objects3d.remove(self)
+
+    def register_dynamic_attributes(self, attributes):
+        """
+        Registers one or more attributes as being dynamic
+
+        Parameters
+        ----------
+        attributes : str
+            a specification of attributes to be registered as dynamic |n|
+            e.g. "x y"
+        """
+        if isinstance(attributes, str):
+            attributes = attributes.split()
+        for attribute in attributes:
+            if hasattr(self, attribute):
+                self._dynamics.add((attribute))
+            else:
+                raise ValueError(f"attribute {attribute} does not exist")
+
+    def deregister_dynamic_attributes(self, attributes):
+        """
+        Deregisters one or more attributes as being dynamic
+
+        Parameters
+        ----------
+        attributes : str
+            a specification of attributes to be registered as dynamic |n|
+            e.g. "x y"
+        """
+
+        if isinstance(attributes, str):
+            attributes = attributes.split()
+        for attribute in attributes:
+            if hasattr(self, attribute):
+                self._dynamics.remove((attribute))
+            else:
+                raise ValueError(f"attribute {attribute} does not exist")
+
+    def __getattribute__(self, attr):
+        if attr == "_dynamics":
+            return super().__getattribute__(attr)
+        c = super().__getattribute__(attr)
+        if attr not in self._dynamics:
+            return c
+        if callable(c):
+            if inspect.isfunction(c):
+                nargs = c.__code__.co_argcount
+                if nargs == 0:
+                    return lambda t: c()
+                if nargs == 1:
+                    return c
+                return functools.partial(c, self.arg)
+            if inspect.ismethod(c):
+                return c
+        return lambda t: c
+
+    def __call__(self, **kwargs):
+        for k, v in kwargs.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
+            else:
+                raise AttributeError(f"attribute {k} does not exist")
+
+
 class Environment(object):
     """
     environment object
@@ -4582,11 +4652,17 @@ class Environment(object):
         self._pendingstandbylist = []
 
         self.an_objects = []
+        self.an_objects3d = []
         self.ui_objects = []
         self.sys_objects = []
         self.serial = 0
         self._speed = 1
         self._animate = False
+        self._animate3d = False
+        self.view = _AnimateIntro()
+        _AnimateExtro()
+        self._gl_initialized = False
+        self.obj_filenames = {}
         self.running = False
         self._maximum_number_of_bitmaps = 4000
         self.t = 0
@@ -4623,6 +4699,13 @@ class Environment(object):
         else:
             self._width = 1024
             self._height = 768
+        self.root = None
+        self._position = (0, 0)
+        self._position3d = (0, 0)
+        self._width3d = 1024
+        self._height3d = 768
+        self._width_video = "auto"
+        self._height_video = "auto"
         self._title = "salabim"
         self._show_menu_buttons = True
         self._x0 = 0
@@ -4691,6 +4774,93 @@ class Environment(object):
     def animation_pre_tick_sys(self, t):
         for ao in self.sys_objects:
             ao.update(t)
+
+    def animation3d_init(self):
+        can_animate3d()
+        glut.glutInit(sys.argv)
+        glut.glutInitDisplayMode(glut.GLUT_RGBA | glut.GLUT_DOUBLE | glut.GLUT_DEPTH)
+        glut.glutInitWindowSize(self._width3d, self._height3d)
+        glut.glutInitWindowPosition(*self._position3d)
+
+        self.window3d = glut.glutCreateWindow("salabim3d")
+
+        gl.glClearColor(0.0, 0.0, 0.0, 0.0)
+        gl.glClearDepth(1.0)
+        gl.glDepthFunc(gl.GL_LESS)
+        gl.glEnable(gl.GL_DEPTH_TEST)
+        gl.glShadeModel(gl.GL_SMOOTH)
+
+        #        glut.glutReshapeFunc(lambda width, height: glut.glutReshapeWindow(640, 480))
+        glut.glutDisplayFunc(lambda: None)
+        self._gl_initialized = True
+
+    def camera_rotate(self, event, degrees):
+        radians = degrees * math.pi / 180
+        adjusted_x = self.view.x_eye(self.t) - self.view.x_center(self.t)
+        adjusted_y = self.view.y_eye(self.t) - self.view.y_center(self.t)
+        cos_rad = math.cos(radians)
+        sin_rad = math.sin(radians)
+        self.view.x_eye = self.view.x_center(self.t) + cos_rad * adjusted_x + sin_rad * adjusted_y
+        self.view.y_eye = self.view.y_center(self.t) - sin_rad * adjusted_x + cos_rad * adjusted_y
+
+    def camera_zoom(self, event, factor_xy, factor_z):
+        self.view.x_eye = self.view.x_center(self.t) - (self.view.x_center(self.t) - self.view.x_eye(self.t)) * factor_xy
+        self.view.y_eye = self.view.y_center(self.t) - (self.view.y_center(self.t) - self.view.y_eye(self.t)) * factor_xy
+        self.view.z_eye = self.view.z_center(self.t) - (self.view.z_center(self.t) - self.view.z_eye(self.t)) * factor_z
+
+    def camera_xy_center(self, event, x_dis, y_dis):
+        self.view.x_center = self.view.x_center(self.t) + x_dis
+        self.view.y_center = self.view.y_center(self.t) + y_dis
+
+    def camera_field_of_view(self, event, factor):
+        self.view.field_of_view_y = self.view.field_of_view_y(self.t) * factor
+
+    def camera_print(self, event):
+        print(
+            f"view(x_eye={self.view.x_eye(self.t)}, y_eye={self.view.y_eye(self.t)}, z_eye={self.view.z_eye(self.t)}, x_center={self.view.x_center(self.t)}, y_center={self.view.y_center(self.t)}, z_center={self.view.z_center(self.t)}, field_of_view_y={self.view.field_of_view_y(self.t)})"
+        )
+
+    def camera_control(self):
+        self.root.bind("<Left>", functools.partial(self.camera_rotate, degrees=-5))
+        self.root.bind("<Right>", functools.partial(self.camera_rotate, degrees=+5))
+
+        self.root.bind("<Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=0.9))
+        self.root.bind("<Down>", functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1 / 0.9))
+
+        self.root.bind("z", functools.partial(self.camera_zoom, factor_xy=1, factor_z=0.9))
+        self.root.bind("Z", functools.partial(self.camera_zoom, factor_xy=1, factor_z=1 / 0.9))
+
+        self.root.bind("<Shift-Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=1))
+        self.root.bind("<Shift-Down>", functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1))
+
+        self.root.bind("x", functools.partial(self.camera_xy_center, x_dis=-10, y_dis=0))
+        self.root.bind("X", functools.partial(self.camera_xy_center, x_dis=10, y_dis=0))
+        self.root.bind("y", functools.partial(self.camera_xy_center, x_dis=0, y_dis=-10))
+        self.root.bind("Y", functools.partial(self.camera_xy_center, x_dis=0, y_dis=10))
+
+        self.root.bind("o", functools.partial(self.camera_field_of_view, factor=0.9))
+        self.root.bind("O", functools.partial(self.camera_field_of_view, factor=1 / 0.9))
+
+        self.root.bind("p", functools.partial(self.camera_print))
+
+    def show_camera_position(self):
+
+        for i, prop in enumerate("x_eye y_eye z_eye x_center y_center z_center field_of_view_y".split()):
+            ao = AnimateRectangle(spec=(0, 0, 75, 35), fillcolor="30%gray", x=5 + i * 80, y=self.height() - 90, screen_coordinates=True)
+            ao = AnimateText(
+                text=lambda arg, t: f"{arg.label}", x=5 + i * 80 + 70, y=self.height() - 90 + 15, text_anchor="se", textcolor="white", screen_coordinates=True
+            )
+            ao.label = "fovy" if prop == "field_of_view_y" else prop
+
+            ao = AnimateText(
+                text=lambda arg, t: f"{getattr(self.view,arg.prop)(t):11.3f}",
+                x=5 + i * 80 + 70,
+                y=self.height() - 90,
+                text_anchor="se",
+                textcolor="white",
+                screen_coordinates=True,
+            )
+            ao.prop = prop
 
     def print_info(self, as_str=False, file=None):
         """
@@ -4773,9 +4943,7 @@ class Environment(object):
             c._scheduled_time = inf
             if self._trace:
                 if c.overridden_lineno:
-                    self.print_trace(
-                        self.time_to_str(self._now - self._offset), c.name(), "current", s0=c.overridden_lineno
-                    )
+                    self.print_trace(self.time_to_str(self._now - self._offset), c.name(), "current", s0=c.overridden_lineno)
                 else:
                     self.print_trace(self.time_to_str(self._now - self._offset), c.name(), "current", s0=c.lineno_txt())
             if c == self._main:
@@ -4850,6 +5018,13 @@ class Environment(object):
         audio=None,
         audio_speed=None,
         animate_debug=None,
+        animate3d=None,
+        width3d=None,
+        height3d=None,
+        width_video=None,
+        height_video=None,
+        position=None,
+        position3d=None,
     ):
 
         """
@@ -4860,6 +5035,11 @@ class Environment(object):
         animate : bool
             animate indicator |n|
             new animate indicator |n|
+            if not specified, no change
+
+        animate3d : bool
+            animate3d indicator |n|
+            new animate3d indicator |n|
             if not specified, no change
 
         synced : bool
@@ -4881,6 +5061,27 @@ class Environment(object):
             if omitted, no change. At init of the environment, the height will be
             set to 768 for non Pythonista and the current screen height for Pythonista.
 
+        position : tuple(x,y)
+            position of the animation window |n|
+            if omitted, no change. At init of the environment, the position will be
+            set to (0, 0) |n|
+            no effect for Pythonista
+
+        width3d : int
+            width of the 3d animation in screen coordinates |n|
+            if omitted, no change. At init of the environment, the 3d width will be
+            set to 1024.
+
+        height3d : int
+            height of the 3d animation in screen coordinates |n|
+            if omitted, no change. At init of the environment, the 3d height will be
+            set to 768.
+
+        position3d : tuple(x,y)
+            position of the 3d animation window |n|
+            At init of the environment, the position will be set to (0, 0) |n|
+            This has to be set before the 3d animation starts as the window can only be postioned at initialization
+            
         title : str
             title of the canvas window |n|
             if omitted, no change. At init of the environment, the title will be
@@ -4984,6 +5185,7 @@ class Environment(object):
         width_changed = False
         height_changed = False
         fps_changed = False
+
         if speed is not None:
             self._speed = speed
             self.set_start_animation()
@@ -5012,6 +5214,33 @@ class Environment(object):
                 self._height = height
                 frame_changed = True
                 height_changed = True
+
+        if width3d is not None:
+            if self._width != width:
+                self._width3d = width3d
+                if self._gl_initialized:
+                    glut.glutReshapeWindow(self._width3d, self._height3d)
+
+        if height3d is not None:
+            if self._height != height:
+                self._height3d = height3d
+                if self._gl_initialized:
+                    glut.glutReshapeWindow(self._width3d, self._height3d)
+
+        if position is not None:
+            if self._position != position:
+                self._position = position
+                if self.root is not None:
+                    self.root.geometry(f"+{self._position[0]}+{self._position[1]}")
+
+        if position3d is not None:
+            self._position3d = position3d
+
+        if width_video is not None:
+            self._width_vdeo = width_video
+
+        if height_video is not None:
+            self._height_vdeo = height_video
 
         if title is not None:
             if self._title != title:
@@ -5116,12 +5345,12 @@ class Environment(object):
 
                     self._audio.filename = audio_filename
 
-                    if (
-                        self._video_out is not None
-                    ):  # if video ist started here as well, the audio_segment is created later
+                    if self._video_out is not None:  # if video ist started here as well, the audio_segment is created later
                         self._audio.t0 = self.frame_number / self._fps
                         self.audio_segments.append(self._audio)
                     self.set_start_animation()
+        if animate3d is not None:
+            self._animate3d = animate3d
 
         if animate is not None:
             if animate != self._animate:
@@ -5153,8 +5382,24 @@ class Environment(object):
                 self._video = video
 
                 if video:
+                    if self._width_video == "auto":
+                        if self._animate3d:
+                            self._width_video_real = self._width3d
+                        else:
+                            self._width_video_real = self._width
+                    else:
+                        self._width_video_real = self._width_video
+
+                    if self._height_video == "auto":
+                        if self._animate3d:
+                            self._height_video_real = self._height3d
+                        else:
+                            self._height_video_real = self._height
+                    else:
+                        self._height_video_real = self._height_video
                     if not self._blind_animation:
                         can_animate(try_only=False)
+
                     video_opened = True
                     video_path = Path(video)
                     extension = video_path.suffix.lower()
@@ -5183,6 +5428,7 @@ class Environment(object):
                     else:
                         if "+" in extension:
                             extension, codec = extension.split("+")
+                            self._video_name = self._video_name[:-5]  # get rid of codec
                         else:
                             codec = "MJPG" if extension.lower() == ".avi" else "mp4v"
                         if PyDroid and extension.lower() != ".avi":
@@ -5192,9 +5438,7 @@ class Environment(object):
                         if video_path.is_file():
                             video_path.unlink()
                         self._video_name_temp = tempfile.NamedTemporaryFile(suffix=extension, delete=False).name
-                        self._video_out = cv2.VideoWriter(
-                            self._video_name_temp, fourcc, self._fps, (self._width, self._height)
-                        )
+                        self._video_out = cv2.VideoWriter(self._video_name_temp, fourcc, self._fps, (self._width_video_real, self._height_video_real))
                         self.frame_number = 0
                         self.audio_segments = []
                         if self._audio is not None:
@@ -5222,6 +5466,7 @@ class Environment(object):
                 g.animation_env._animate = self._animate
                 if not Pythonista:
                     g.animation_env.root.destroy()
+                    g.animation_env.root = None
                 g.animation_env = None
 
             if self._blind_animation:
@@ -5252,10 +5497,13 @@ class Environment(object):
                             self.root = tkinter.Toplevel()
                         else:
                             self.root = tkinter.Tk()
+
                         if self._title:
                             self.root.title(self._title)
                         else:
                             self.root.overrideredirect(1)
+                        self.root.geometry(f"+{self._position[0]}+{self._position[1]}")
+
                         g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
                         g.canvas.configure(background=self.colorspec_to_hex("bg", False))
                         g.canvas.pack()
@@ -5279,17 +5527,10 @@ class Environment(object):
                     if Pythonista:
                         import images2gif
 
-                        images2gif.writeGif(
-                            self._video_name, self._images, duration=1 / self._fps, repeat=self._video_repeat
-                        )
+                        images2gif.writeGif(self._video_name, self._images, duration=1 / self._fps, repeat=self._video_repeat)
                     else:
                         self._images[0].save(
-                            self._video_name,
-                            save_all=True,
-                            append_images=self._images[1:],
-                            loop=self._video_repeat,
-                            duration=1000 / self._fps,
-                            optimize=False,
+                            self._video_name, save_all=True, append_images=self._images[1:], loop=self._video_repeat, duration=1000 / self._fps, optimize=False
                         )
 
                     del self._images
@@ -5318,32 +5559,43 @@ class Environment(object):
             self._video_out = None
             self._video = ""
 
-    def capture_image(self, mode="RGBA"):
+    def capture_image(self, mode="RGBA", as_gl=False):
+        if as_gl:
+            width = self._width3d
+            height = self._height3d
+            # https://stackoverflow.com/questions/41126090/how-to-write-pyopengl-in-to-jpg-image
+            gl.glPixelStorei(gl.GL_PACK_ALIGNMENT, 1)
+            data = gl.glReadPixels(0, 0, width, height, gl.GL_RGB, gl.GL_UNSIGNED_BYTE)
+            image = Image.frombytes("RGB", (width, height), data)
+            image = image.transpose(Image.FLIP_TOP_BOTTOM)
+            return image
+
         an_objects = sorted(self.an_objects, key=lambda obj: (-obj.layer(self.t), obj.sequence))  # has to be a copy!
         this_image = Image.new(mode, (self._width, self._height), self.colorspec_to_tuple("bg"))
         for ao in an_objects:
             ao.make_pil_image(self.t)
             if ao._image_visible:
-                this_image.paste(
-                    ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image
-                )
+                this_image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image)
         return this_image
 
     def save_frame(self):
+        as_gl = self._animate3d
         if self._video_out == "gif":
-            self._images.append(self.capture_image("RGB"))
+            self._images.append(self.capture_image("RGB", as_gl))
 
         elif self._video_out == "png":
-            self._images.append(self.capture_image("RGBA"))
+            self._images.append(self.capture_image("RGBA", as_gl))
         elif self._video_out == "snapshots":
             serialized_video_name = self.video_name_format.format(self.frame_number)
             if self._video_name.lower().endswith(".jpg"):
-                self.capture_image("RGB").save(serialized_video_name)
+                self.capture_image("RGB", as_gl).save(serialized_video_name)
             else:
-                self.capture_image("RGBA").save(serialized_video_name)
+                self.capture_image("RGBA", as_gl).save(serialized_video_name)
 
         else:
-            open_cv_image = cv2.cvtColor(numpy.array(self.capture_image("RGB")), cv2.COLOR_RGB2BGR)
+            image = self.capture_image("RGB", as_gl)
+            image = resize_with_pad(image, self._width_video_real, self._height_video_real)
+            open_cv_image = cv2.cvtColor(numpy.array(image), cv2.COLOR_RGB2BGR)
             self._video_out.write(open_cv_image)
 
     def add_audio(self):
@@ -5405,21 +5657,7 @@ class Environment(object):
                     with open(tempdir + "\\temp.txt", "r") as f:
                         print(f.read())
 
-                command = (
-                    "-i",
-                    temp_filename,
-                    "-f",
-                    "concat",
-                    "-i",
-                    tempdir + "\\temp.txt",
-                    "-map",
-                    "0:v",
-                    "-map",
-                    "1:a",
-                    "-c",
-                    "copy",
-                    self._video_name_temp,
-                )
+                command = ("-i", temp_filename, "-f", "concat", "-i", tempdir + "\\temp.txt", "-map", "0:v", "-map", "1:a", "-c", "copy", self._video_name_temp)
                 self.ffmpeg_execute(command)
 
     def ffmpeg_execute(self, command):
@@ -5643,6 +5881,102 @@ class Environment(object):
             self.animation_parameters(height=value, animate=None)
         return self._height
 
+    def width3d(self, value=None):
+        """
+        width of the 3d animation in screen coordinates
+
+        Parameters
+        ----------
+        value : int
+            new 3d width |n|
+            if not specified, no change
+
+
+        Returns
+        -------
+        width of 3d animation : int
+        """
+        if value is not None:
+            self.animation_parameters(width3d=value, animate=None)
+        return self._width
+
+    def height3d(self, value=None):
+        """
+        height of the 3d animation in screen coordinates
+
+        Parameters
+        ----------
+        value : int
+            new 3d height |n|
+            if not specified, no change
+
+        Returns
+        -------
+        height of 3d animation : int
+        """
+        if value is not None:
+            self.animation_parameters(height3d=value, animate=None)
+        return self._height
+
+    def width(self, value=None):
+        """
+        width of the animation in screen coordinates
+
+        Parameters
+        ----------
+        value : int
+            new width |n|
+            if not specified, no change
+
+
+        Returns
+        -------
+        width of animation : int
+        """
+        if value is not None:
+            self.animation_parameters(width=value, animate=None)
+        return self._width
+
+    def position(self, value=None):
+        """
+        position of the animation window
+
+        Parameters
+        ----------
+        value : tuple (x, y)
+            new position |n|
+            if not specified, no change
+
+        Returns
+        -------
+        position of animation window: tuple (x,y)
+        """
+        if value is not None:
+            self.animation_parameters(position=value, animate=None)
+        return self._position
+
+    def position3d(self, value=None):
+        """
+        position of the 3d animation window
+
+        Parameters
+        ----------
+        value : tuple (x, y)
+            new position |n|
+            if not specified, no change
+
+        Returns
+        -------
+        position of th 3d animation window: tuple (x,y)
+
+        Note
+        ----
+        This must be given before the 3d animation is started.
+        """
+        if value is not None:
+            self.animation_parameters(position3d=value, animate=None)
+        return self._position3d
+
     def title(self, value=None):
         """
         title of the canvas window
@@ -5718,11 +6052,34 @@ class Environment(object):
 
         Note
         ----
-        When the run is not issued, no acction will be taken.
+        When the run is not issued, no action will be taken.
         """
         if value is not None:
             self.animation_parameters(animate=value)
         return self._animate
+
+    def animate3d(self, value=None):
+        """
+        animate3d indicator
+
+        Parameters
+        ----------
+        value : bool
+            new animate3d indicator |n|
+            if not specified, no change
+
+        Returns
+        -------
+        animate3d status : bool
+
+        Note
+        ----
+        When the animate is not issued, no action will be taken.
+        """
+
+        if value is not None:
+            self.animation_parameters(animate3d=value, animate=None)
+        return self._animate3d
 
     def modelname(self, value=None):
         """
@@ -5966,13 +6323,13 @@ class Environment(object):
 
         Parameters
         ----------
-        value : bool
+        value : int
             new maximum_number_of_bitmaps |n|
             if not specified, no change
 
         Returns
         -------
-        show_fps : bool
+        maximum number of bitmaps : int
         """
         if value is not None:
             self.animation_parameters(maximum_number_of_bitmaps=value, animate=None)
@@ -6072,12 +6429,7 @@ class Environment(object):
         self._offset = self._now - new_now
 
         if self._trace:
-            self.print_trace(
-                "",
-                "",
-                "now reset to {:0.3f}".format(new_now),
-                "(all times are reduced by {:0.3f})".format(self._offset - offset_before),
-            )
+            self.print_trace("", "", "now reset to {:0.3f}".format(new_now), "(all times are reduced by {:0.3f})".format(self._offset - offset_before))
 
     def trace(self, value=None):
         """
@@ -6235,6 +6587,7 @@ class Environment(object):
                 self.do_simulate()
         if self.stopped:
             self.quit()
+            sys.exit()
 
     def do_simulate(self):
         if self._blind_animation:
@@ -6255,7 +6608,13 @@ class Environment(object):
             self.root.mainloop()
 
     def simulate_and_animate_loop(self):
-        while True:  # to be changed
+        while True:
+            if self._animate3d and not self._gl_initialized:
+                self.animation3d_init()
+                self.camera_control()
+                self.start_animation_clocktime = time.time()
+                self.start_animation_time = self.t
+
             tick_start = time.time()
 
             if self._synced or self._video:  # video forces synced
@@ -6265,14 +6624,13 @@ class Environment(object):
                     if self.paused:
                         self.t = self.start_animation_time
                     else:
-                        self.t = self.start_animation_time + (
-                            (time.time() - self.start_animation_clocktime) * self._speed
-                        )
+                        self.t = self.start_animation_time + ((time.time() - self.start_animation_clocktime) * self._speed)
 
                 while self.peek() < self.t:
                     self.step()
                     if not (self.running and self._animate):
-                        self.root.quit()
+                        if self.root is not None:
+                            self.root.quit()
                         return
             else:
                 if self._step_pressed or (not self.paused):
@@ -6283,7 +6641,8 @@ class Environment(object):
                     self.t = self._now
 
             if not (self.running and self._animate):
-                self.root.quit()
+                if self.root is not None:
+                    self.root.quit()
                 return
 
             if not self.paused:
@@ -6303,17 +6662,11 @@ class Environment(object):
                         if len(g.canvas_objects) >= self._maximum_number_of_bitmaps:
                             if overflow_image is None:
                                 overflow_image = Image.new("RGBA", (self._width, self._height), (0, 0, 0, 0))
-                            overflow_image.paste(
-                                ao._image,
-                                (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])),
-                                ao._image,
-                            )
+                            overflow_image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image)
                             ao.canvas_object = None
                         else:
                             ao.im = ImageTk.PhotoImage(ao._image)
-                            co1 = g.canvas.create_image(
-                                ao._image_x, self._height - ao._image_y, image=ao.im, anchor=tkinter.SW
-                            )
+                            co1 = g.canvas.create_image(ao._image_x, self._height - ao._image_y, image=ao.im, anchor=tkinter.SW)
                             g.canvas_objects.append(co1)
                             ao.canvas_object = co1
 
@@ -6346,6 +6699,13 @@ class Environment(object):
                     g.canvas_object_overflow_image = g.canvas.create_image(0, self._height, image=im, anchor=tkinter.SW)
                 else:
                     g.canvas.itemconfig(g.canvas_object_overflow_image, image=im)
+
+            if self._animate3d:
+                t = self.t
+                self.an_objects3d.sort(key=lambda obj: (obj.layer(t), obj.sequence))
+                for an in self.an_objects3d:
+                    if an.visible(t):
+                        an.draw(t)
 
             self.animation_post_tick(self.t)
 
@@ -6406,10 +6766,7 @@ class Environment(object):
 
     def modelname_width(self):
         if Environment.cached_modelname_width[0] != self._modelname:
-            Environment.cached_modelname_width = [
-                self._modelname,
-                self.env.getwidth(self._modelname + " : a ", font="", fontsize=18),
-            ]
+            Environment.cached_modelname_width = [self._modelname, self.env.getwidth(self._modelname + " : a ", font="", fontsize=18)]
         return Environment.cached_modelname_width[1]
 
     def modelname_text(self, t):
@@ -6438,9 +6795,7 @@ class Environment(object):
         an = Animate(text="", x0=8, y0=y, anchor="w", fontsize0=18, screen_coordinates=True, xy_anchor="nw", env=self)
         an.visible = self.modelname_visible
         an.text = self.modelname_text
-        an = Animate(
-            image="", y0=y + 1, offsety0=5, anchor="w", width0=61, screen_coordinates=True, xy_anchor="nw", env=self
-        )
+        an = Animate(image="", y0=y + 1, offsety0=5, anchor="w", width0=61, screen_coordinates=True, xy_anchor="nw", env=self)
         an.visible = self.modelname_visible
         an.x = self.modelname_x_logo
         an.image = self.modelname_image
@@ -6461,17 +6816,7 @@ class Environment(object):
             fillcolor = "blue"
             color = "white"
 
-        uio = AnimateButton(
-            x=38,
-            y=-21,
-            text="Menu",
-            width=50,
-            action=self.env.an_menu,
-            env=self,
-            fillcolor=fillcolor,
-            color=color,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38, y=-21, text="Menu", width=50, action=self.env.an_menu, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
 
         uio.in_topleft = True
 
@@ -6487,32 +6832,16 @@ class Environment(object):
         else:
             fillcolor = "green"
             color = "white"
-        uio = AnimateButton(
-            x=38,
-            y=-21,
-            text="Go",
-            width=50,
-            action=self.env.an_go,
-            env=self,
-            fillcolor=fillcolor,
-            color=color,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38, y=-21, text="Go", width=50, action=self.env.an_go, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 1 * 60, y=-21, text="Step", width=50, action=self.env.an_step, env=self, xy_anchor="nw"
-        )
+        uio = AnimateButton(x=38 + 1 * 60, y=-21, text="Step", width=50, action=self.env.an_step, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 3 * 60, y=-21, text="Synced", width=50, action=self.env.an_synced_on, env=self, xy_anchor="nw"
-        )
+        uio = AnimateButton(x=38 + 3 * 60, y=-21, text="Synced", width=50, action=self.env.an_synced_on, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 4 * 60, y=-21, text="Trace", width=50, action=self.env.an_trace, env=self, xy_anchor="nw"
-        )
+        uio = AnimateButton(x=38 + 4 * 60, y=-21, text="Trace", width=50, action=self.env.an_trace, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
         if self.colorspec_to_tuple("bg")[:-1] == self.colorspec_to_tuple("red")[:-1]:
@@ -6521,28 +6850,14 @@ class Environment(object):
         else:
             fillcolor = "red"
             color = "white"
-        uio = AnimateButton(
-            x=38 + 5 * 60,
-            y=-21,
-            text="Stop",
-            width=50,
-            action=self.env.quit,
-            env=self,
-            fillcolor=fillcolor,
-            color=color,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38 + 5 * 60, y=-21, text="Stop", width=50, action=self.env.quit, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = Animate(
-            x0=38 + 3 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw"
-        )
+        uio = Animate(x0=38 + 3 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw")
         uio.text = self.syncedtext
         uio.in_topleft = True
 
-        uio = Animate(
-            x0=38 + 4 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw"
-        )
+        uio = Animate(x0=38 + 4 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw")
         uio.text = self.tracetext
         uio.in_topleft = True
 
@@ -6559,37 +6874,19 @@ class Environment(object):
             fillcolor = "green"
             color = "white"
 
-        uio = AnimateButton(
-            x=38,
-            y=-21,
-            text="Go",
-            width=50,
-            action=self.env.an_go,
-            env=self,
-            fillcolor=fillcolor,
-            color=color,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38, y=-21, text="Go", width=50, action=self.env.an_go, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 1 * 60, y=-21, text="/2", width=50, action=self.env.an_half, env=self, xy_anchor="nw"
-        )
+        uio = AnimateButton(x=38 + 1 * 60, y=-21, text="/2", width=50, action=self.env.an_half, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 2 * 60, y=-21, text="*2", width=50, action=self.env.an_double, env=self, xy_anchor="nw"
-        )
+        uio = AnimateButton(x=38 + 2 * 60, y=-21, text="*2", width=50, action=self.env.an_double, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 3 * 60, y=-21, text="Synced", width=50, action=self.env.an_synced_off, env=self, xy_anchor="nw"
-        )
+        uio = AnimateButton(x=38 + 3 * 60, y=-21, text="Synced", width=50, action=self.env.an_synced_off, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 4 * 60, y=-21, text="Trace", width=50, action=self.env.an_trace, env=self, xy_anchor="nw"
-        )
+        uio = AnimateButton(x=38 + 4 * 60, y=-21, text="Trace", width=50, action=self.env.an_trace, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
         if self.colorspec_to_tuple("bg") == self.colorspec_to_tuple("red"):
@@ -6598,41 +6895,18 @@ class Environment(object):
         else:
             fillcolor = "red"
             color = "white"
-        uio = AnimateButton(
-            x=38 + 5 * 60,
-            y=-21,
-            text="Stop",
-            width=50,
-            action=self.env.an_quit,
-            env=self,
-            fillcolor=fillcolor,
-            color=color,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38 + 5 * 60, y=-21, text="Stop", width=50, action=self.env.an_quit, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = Animate(
-            x0=38 + 1.5 * 60,
-            y0=-35,
-            text="",
-            textcolor0="fg",
-            anchor="N",
-            fontsize0=15,
-            screen_coordinates=True,
-            xy_anchor="nw",
-        )
+        uio = Animate(x0=38 + 1.5 * 60, y0=-35, text="", textcolor0="fg", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw")
         uio.text = self.speedtext
         uio.in_topleft = True
 
-        uio = Animate(
-            x0=38 + 3 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw"
-        )
+        uio = Animate(x0=38 + 3 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw")
         uio.text = self.syncedtext
         uio.in_topleft = True
 
-        uio = Animate(
-            x0=38 + 4 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw"
-        )
+        uio = Animate(x0=38 + 4 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw")
         uio.text = self.tracetext
         uio.in_topleft = True
 
@@ -6685,6 +6959,7 @@ class Environment(object):
         self.stopped = True
         if not Pythonista:
             self.root.destroy()
+            self.root = None
         self.quit()
 
     def quit(self):
@@ -6860,12 +7135,7 @@ class Environment(object):
                 if len(colorspec) == 7:
                     return (int(colorspec[1:3], 16), int(colorspec[3:5], 16), int(colorspec[5:7], 16), 255)
                 elif len(colorspec) == 9:
-                    return (
-                        int(colorspec[1:3], 16),
-                        int(colorspec[3:5], 16),
-                        int(colorspec[5:7], 16),
-                        int(colorspec[7:9], 16),
-                    )
+                    return (int(colorspec[1:3], 16), int(colorspec[3:5], 16), int(colorspec[5:7], 16), int(colorspec[7:9], 16))
             else:
                 s = colorspec.split("#")
                 if len(s) == 2:
@@ -6929,6 +7199,14 @@ class Environment(object):
             return "#{:02x}{:02x}{:02x}{:02x}".format(int(v[0]), int(v[1]), int(v[2]), int(v[3]))
         else:
             return "#{:02x}{:02x}{:02x}".format(int(v[0]), int(v[1]), int(v[2]))
+
+    def colorspec_to_gl_color(self, colorspec):
+        color_tuple = self.colorspec_to_tuple(colorspec)
+        return (color_tuple[0] / 255, color_tuple[1] / 255, color_tuple[2] / 255)
+
+    def colorspec_to_gl_color_alpha(self, colorspec):
+        color_tuple = self.colorspec_to_tuple(colorspec)
+        return (color_tuple[0] / 255, color_tuple[1] / 255, color_tuple[2] / 255), color_tuple[3]
 
     def pythonistacolor(self, colorspec):
         c = self.colorspec_to_tuple(colorspec)
@@ -7495,9 +7773,7 @@ class Environment(object):
             try:
                 import winsound
 
-                winsound.Playaudio(
-                    os.environ["WINDIR"] + r"\media\Windows Ding.wav", winsound.SND_FILENAME | winsound.SND_ASYNC
-                )
+                winsound.Playaudio(os.environ["WINDIR"] + r"\media\Windows Ding.wav", winsound.SND_FILENAME | winsound.SND_ASYNC)
             except Exception:
                 pass
 
@@ -7511,7 +7787,7 @@ class Environment(object):
                 pass
 
 
-class Animate(object):
+class Animate:
     """
     defines an animation object
 
@@ -8359,9 +8635,7 @@ class Animate(object):
         linecolor : colorspec
             default behaviour: linear interpolation between self.linecolor0 and self.linecolor1
         """
-        return self.env.colorinterpolate(
-            (self.env._now if t is None else t), self.t0, self.t1, self.linecolor0, self.linecolor1
-        )
+        return self.env.colorinterpolate((self.env._now if t is None else t), self.t0, self.t1, self.linecolor0, self.linecolor1)
 
     def fillcolor(self, t=None):
         """
@@ -8377,9 +8651,7 @@ class Animate(object):
         fillcolor : colorspec
             default behaviour: linear interpolation between self.fillcolor0 and self.fillcolor1
         """
-        return self.env.colorinterpolate(
-            (self.env._now if t is None else t), self.t0, self.t1, self.fillcolor0, self.fillcolor1
-        )
+        return self.env.colorinterpolate((self.env._now if t is None else t), self.t0, self.t1, self.fillcolor0, self.fillcolor1)
 
     def circle(self, t=None):
         """
@@ -8416,9 +8688,7 @@ class Animate(object):
         textcolor : colorspec
             default behaviour: linear interpolation between self.textcolor0 and self.textcolor1
         """
-        return self.env.colorinterpolate(
-            (self.env._now if t is None else t), self.t0, self.t1, self.textcolor0, self.textcolor1
-        )
+        return self.env.colorinterpolate((self.env._now if t is None else t), self.t0, self.t1, self.textcolor0, self.textcolor1)
 
     def line(self, t=None):
         """
@@ -8753,37 +9023,14 @@ class Animate(object):
 
                     if self.type == "rectangle":
                         rectangle = tuple(de_none(self.rectangle(t)))
-                        self._image_ident = (
-                            tuple(rectangle),
-                            linewidth,
-                            linecolor,
-                            fillcolor,
-                            as_points,
-                            angle,
-                            self.screen_coordinates,
-                        )
+                        self._image_ident = (tuple(rectangle), linewidth, linecolor, fillcolor, as_points, angle, self.screen_coordinates)
                     elif self.type == "line":
                         line = tuple(de_none(self.line(t)))
                         fillcolor = (0, 0, 0, 0)
-                        self._image_ident = (
-                            tuple(line),
-                            linewidth,
-                            linecolor,
-                            as_points,
-                            angle,
-                            self.screen_coordinates,
-                        )
+                        self._image_ident = (tuple(line), linewidth, linecolor, as_points, angle, self.screen_coordinates)
                     elif self.type == "polygon":
                         polygon = tuple(de_none(self.polygon(t)))
-                        self._image_ident = (
-                            tuple(polygon),
-                            linewidth,
-                            linecolor,
-                            fillcolor,
-                            as_points,
-                            angle,
-                            self.screen_coordinates,
-                        )
+                        self._image_ident = (tuple(polygon), linewidth, linecolor, fillcolor, as_points, angle, self.screen_coordinates)
                     elif self.type == "circle":
                         circle = self.circle(t)
                         if isinstance(circle, list):
@@ -8903,26 +9150,16 @@ class Animate(object):
                         rscaled = tuple(rscaled)  # to make it hashable
 
                         if as_points:
-                            self._image = Image.new(
-                                "RGBA",
-                                (int(maxrx - minrx + 2 * linewidth), int(maxry - minry + 2 * linewidth)),
-                                (0, 0, 0, 0),
-                            )
+                            self._image = Image.new("RGBA", (int(maxrx - minrx + 2 * linewidth), int(maxry - minry + 2 * linewidth)), (0, 0, 0, 0))
                             point_image = Image.new("RGBA", (int(linewidth), int(linewidth)), linecolor)
 
                             for i in range(0, len(r), 2):
                                 rx = rscaled[i]
                                 ry = rscaled[i + 1]
-                                self._image.paste(
-                                    point_image, (int(rx - 0.5 * linewidth), int(ry - 0.5 * linewidth)), point_image
-                                )
+                                self._image.paste(point_image, (int(rx - 0.5 * linewidth), int(ry - 0.5 * linewidth)), point_image)
 
                         else:
-                            self._image = Image.new(
-                                "RGBA",
-                                (int(maxrx - minrx + 2 * linewidth), int(maxry - minry + 2 * linewidth)),
-                                (0, 0, 0, 0),
-                            )
+                            self._image = Image.new("RGBA", (int(maxrx - minrx + 2 * linewidth), int(maxry - minry + 2 * linewidth)), (0, 0, 0, 0))
                             draw = ImageDraw.Draw(self._image)
                             if fillcolor[3] != 0:
                                 draw.polygon(rscaled, fill=fillcolor)
@@ -9223,19 +9460,7 @@ class AnimateEntry(object):
     This class is not available under Pythonista.
     """
 
-    def __init__(
-        self,
-        x=0,
-        y=0,
-        number_of_chars=20,
-        value="",
-        fillcolor="fg",
-        color="bg",
-        text="",
-        action=None,
-        env=None,
-        xy_anchor="sw",
-    ):
+    def __init__(self, x=0, y=0, number_of_chars=20, value="", fillcolor="fg", color="bg", text="", action=None, env=None, xy_anchor="sw"):
         self.env = g.default_env if env is None else env
         self.env.ui_objects.append(self)
         self.type = "entry"
@@ -9410,11 +9635,11 @@ class AnimateButton(object):
         y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
         if Chromebook:  # the Chromebook settings are not accurate for anything else than the menu buttons
             my_font = tkinter.font.Font(size=int(self.fontsize * 0.45))
-            my_width=int(0.6 * self.width / self.fontsize)
+            my_width = int(0.6 * self.width / self.fontsize)
             y = y + 8
         else:
             my_font = tkinter.font.Font(size=int(self.fontsize * 0.7))
-            my_width=int(1.85 * self.width / self.fontsize)
+            my_width = int(1.85 * self.width / self.fontsize)
 
         self.button = tkinter.Button(self.env.root, text=self.lasttext, command=self.action, anchor=tkinter.CENTER)
         self.button.configure(
@@ -9424,9 +9649,7 @@ class AnimateButton(object):
             background=self.env.colorspec_to_hex(self.fillcolor, False),
             relief=tkinter.FLAT,
         )
-        self.button_window = g.canvas.create_window(
-            x + self.width, self.env._height - y - self.height, anchor=tkinter.NE, window=self.button
-        )
+        self.button_window = g.canvas.create_window(x + self.width, self.env._height - y - self.height, anchor=tkinter.NE, window=self.button)
         self.installed = True
 
     def remove(self):
@@ -9609,13 +9832,7 @@ class AnimateSlider(object):
         x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
         y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
         self.slider = tkinter.Scale(
-            self.env.root,
-            from_=self.vmin,
-            to=self.vmax,
-            orient=tkinter.HORIZONTAL,
-            label=self.label,
-            resolution=self.resolution,
-            command=self.action,
+            self.env.root, from_=self.vmin, to=self.vmax, orient=tkinter.HORIZONTAL, label=self.label, resolution=self.resolution, command=self.action
         )
         self.slider.window = g.canvas.create_window(x, self.env._height - y, anchor=tkinter.NW, window=self.slider)
         self.slider.config(
@@ -9864,11 +10081,151 @@ class AnimateQueue(object):
             for ao in animation_objects[2:]:
                 ao.remove()
 
+
+class Animate3dQueue:
+    """
+    Animates the component in a queue.
+
+    Parameters
+    ----------
+    queue : Queue
+
+    x : float
+        x-position of the first component in the queue |n|
+        default: 0
+
+    y : float
+        y-position of the first component in the queue |n|
+        default: 0
+
+    z : float
+        z-position of the first component in the queue |n|
+        default: 0
+
+    direction : str
+        if "x+", waiting line runs in positive x direction (default) |n|
+        if "x-", waiting line runs in negative x direction |n|
+        if "y+", waiting line runs in positive y direction |n|
+        if "y-", waiting line runs in negative y direction |n|
+        if "z+", waiting line runs in positive z direction |n|
+        if "z-", waiting line runs in negative z direction |n|
+
+    reverse : bool
+        if False (default), display in normal order. If True, reversed.
+
+    max_length : int
+        maximum number of components to be displayed
+
+    layer : int
+        layer (default 0)
+
+    id : any
+        the animation works by calling the animation_objects method of each component, optionally
+        with id. By default, this is self, but can be overriden, particularly with the queue
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically when the parent component is no longer accessible
+
+    Note
+    ----
+    All parameters, apart from queue, id, arg and parent can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: title |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+    """
+
+    def __init__(
+        self, queue, x=0, y=0, z=0, direction="x+", y_displacement=0, z_displacement=0, max_length=None, reverse=False, layer=0, id=None, arg=None, parent=None
+    ):
+        _checkisqueue(queue)
+        self._queue = queue
+        self.x = x
+        self.y = y
+        self.z = z
+        self.id = self if id is None else id
+        self.arg = self if arg is None else arg
+        self.max_length = max_length
+        self.direction = direction
+        self.reverse = reverse
+        self.current_aos = {}
+        if parent is not None:
+            if not isinstance(parent, Component):
+                raise ValueError(repr(parent) + " is not a component")
+            parent._animation_children.add(self)
+        self.env = queue.env
+        self.layer = layer
+        self.env.sys_objects.append(self)
+
+    def update(self, t):
+        prev_aos = self.current_aos
+        self.current_aos = {}
+        max_length = _call(self.max_length, t, self.arg)
+        x = _call(self.x, t, self.arg)
+        y = _call(self.y, t, self.arg)
+        z = _call(self.z, t, self.arg)
+
+        direction = _call(self.direction, t, self.arg).lower()
+        if direction not in ("x+ x- y+ y- z+ z-").split():
+            raise ValueError(f"direction {direction} nor recognized")
+
+        reverse = _call(self.reverse, t, self.arg)
+
+        n = 0
+        for c in reversed(self._queue) if reverse else self._queue:
+            if (max_length is not None) and n >= max_length:
+                break
+            if c not in prev_aos:
+                nargs = c.animation3d_objects.__code__.co_argcount
+                if nargs == 1:
+                    animation_objects = self.current_aos[c] = c.animation3d_objects()
+                else:
+                    animation_objects = self.current_aos[c] = c.animation3d_objects(self.id)
+            else:
+                animation_objects = self.current_aos[c] = prev_aos[c]
+                del prev_aos[c]
+            dimx = _call(animation_objects[0], t, c)
+            dimy = _call(animation_objects[1], t, c)
+            dimz = _call(animation_objects[2], t, c)
+
+            for ao in animation_objects[3:]:
+                ao.x_offset = x
+                ao.y_offset = y
+                ao.z_offset = z
+
+            if direction == "x+":
+                x += dimx
+            if direction == "x-":
+                x -= dimx
+
+            if direction == "y+":
+                y += dimy
+            if direction == "y-":
+                y -= dimy
+
+            if direction == "z+":
+                z += dimz
+            if direction == "z-":
+                z -= dimz
+            n += 1
+
+        for animation_objects in prev_aos.values():
+            for ao in animation_objects[3:]:
+                ao.remove()
+
     def queue(self):
         """
         Returns
         -------
-        the queue this object refers to. Can be useful in Component.animation_objects: queue
+        the queue this object refers to. Can be useful in Component.animation3d_objects: queue
         """
         return self._queue
 
@@ -10026,7 +10383,7 @@ class AnimateText(_Vis):
     ----
     All measures are in screen coordinates |n|
 
-    All parameters, apart from queue and arg can be specified as: |n|
+    All parameters, apart from parent, arg and env can be specified as: |n|
     - a scalar, like 10 |n|
     - a function with zero arguments, like lambda: title |n|
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
@@ -10194,7 +10551,7 @@ class AnimateRectangle(_Vis):
     ----
     All measures are in screen coordinates |n|
 
-    All parameters, apart from queue and arg can be specified as: |n|
+    All parameters, apart from parent, arg and env can be specified as: |n|
     - a scalar, like 10 |n|
     - a function with zero arguments, like lambda: title |n|
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
@@ -10385,7 +10742,7 @@ class AnimatePolygon(_Vis):
     ----
     All measures are in screen coordinates |n|
 
-    All parameters, apart from queue and arg can be specified as: |n|
+    All parameters, apart from parent, arg and env can be specified as: |n|
     - a scalar, like 10 |n|
     - a function with zero arguments, like lambda: title |n|
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
@@ -10571,7 +10928,7 @@ class AnimateLine(_Vis):
     ----
     All measures are in screen coordinates |n|
 
-    All parameters, apart from queue and arg can be specified as: |n|
+    All parameters, apart from parent, arg and env can be specified as: |n|
     - a scalar, like 10 |n|
     - a function with zero arguments, like lambda: title |n|
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
@@ -10755,7 +11112,7 @@ class AnimatePoints(_Vis):
     ----
     All measures are in screen coordinates |n|
 
-    All parameters, apart from queue and arg can be specified as: |n|
+    All parameters, apart from parent, arg and env can be specified as: |n|
     - a scalar, like 10 |n|
     - a function with zero arguments, like lambda: title |n|
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
@@ -10832,9 +11189,7 @@ class AnimatePoints(_Vis):
             self.layer = layer
         self.fillcolor = ""
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(
-            line0=(), as_points=True, vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent
-        )
+        ao0 = _AnimateVis(line0=(), as_points=True, vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
@@ -10953,7 +11308,7 @@ class AnimateCircle(_Vis):
     ----
     All measures are in screen coordinates |n|
 
-    All parameters, apart from queue and arg can be specified as: |n|
+    All parameters, apart from parent, arg and env can be specified as: |n|
     - a scalar, like 10 |n|
     - a function with zero arguments, like lambda: title |n|
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
@@ -11154,7 +11509,7 @@ class AnimateImage(_Vis):
     ----
     All measures are in screen coordinates |n|
 
-    All parameters, apart from queue and arg can be specified as: |n|
+    All parameters, apart from parent, arg and env can be specified as: |n|
     - a scalar, like 10 |n|
     - a function with zero arguments, like lambda: title |n|
     - a function with one argument, being the time t, like lambda t: t + 10 |n|
@@ -11348,9 +11703,7 @@ class _AosObject(object):  # for Monitor.animate
 
 
 class _Animate_t_x_Line(Animate):
-    def __init__(
-        self, monitor, width, height, value_offsety, value_scale, value_map, t_scale, linewidth, *args, **kwargs
-    ):
+    def __init__(self, monitor, width, height, value_offsety, value_scale, value_map, t_scale, linewidth, *args, **kwargs):
         self.monitor = monitor
         self.width = width
         self.height = height
@@ -11381,9 +11734,7 @@ class _Animate_t_x_Line(Animate):
                 value = self.value_map(value)
             except (ValueError, TypeError):
                 value = 0
-        return max(
-            self._linewidth / 2, min(self.height - self._linewidth / 2, value * self.value_scale + self.value_offsety)
-        )
+        return max(self._linewidth / 2, min(self.height - self._linewidth / 2, value * self.value_scale + self.value_offsety))
 
     def line(self, t):
         self.tnow = t
@@ -11428,6 +11779,95 @@ class _Animate_t_Line(Animate):
             t = self.t_width
         x = t * self.t_scale
         return x, 0, x, self.height
+
+
+class AnimateBlock(Animate3dBase):
+    def __init__(self, length=1, width=1, height=1, x=0, y=0, z=0, xa=0, ya=0, za=0, color="", **kwargs):
+        super().__init__(**kwargs)
+        self.length = length
+        self.width = width
+        self.height = height
+        self.x = x
+        self.y = y
+        self.z = z
+        self.xa = xa
+        self.ya = ya
+        self.za = za
+        self.color = color
+
+    def show(self, t):
+        length = _call(self.length, t, self.arg)
+        width = _call(self.width, t, self.arg)
+        height = _call(self.height, t, self.arg)
+        x = _call(self.x, t, self.arg)
+        y = _call(self.y, t, self.arg)
+        z = _call(self.x, t, self.arg)
+        xa = _call(self.xa, t, self.arg)
+        ya = _call(self.ya, t, self.arg)
+        za = _call(self.xa, t, self.arg)
+
+        color = _call(self.color, t, self.arg)
+
+        color_tuple = self.env.colorspec_to_tuple(color)
+        gl_color = (color_tuple[0] / 255, color_tuple[1] / 255, color_tuple[2] / 255)
+
+        l2 = 0.5 * length
+        w2 = 0.5 * width
+        h2 = 0.5 * height
+        gl.glPushMatrix()
+        gl.glTranslate(x, y, z)
+        gl.glRotate(xa, 1.0, 0.0, 0.0)
+        gl.glRotate(ya, 0.0, 1.0, 0.0)
+        gl.glRotate(za, 0.0, 0.0, 1.0)
+        gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color)
+        gl.glBegin(gl.GL_QUADS)
+
+        """ bottom z- """
+
+        gl.glNormal3f(0, 0, -1)
+        gl.glVertex3f(-l2, -w2, -h2)
+        gl.glVertex3f(l2, -w2, -h2)
+        gl.glVertex3f(l2, w2, -h2)
+        gl.glVertex3f(-l2, w2, -h2)
+        """ top z+ """
+
+        gl.glNormal3f(0, 0, 1)
+        gl.glVertex3f(-l2, -w2, h2)
+        gl.glVertex3f(l2, -w2, h2)
+        gl.glVertex3f(l2, w2, h2)
+        gl.glVertex3f(-l2, w2, h2)
+
+        """ left y- """
+        gl.glNormal3f(0, -1, 0)
+        gl.glVertex3f(-l2, -w2, -h2)
+        gl.glVertex3f(l2, -w2, -h2)
+        gl.glVertex3f(l2, -w2, h2)
+        gl.glVertex3f(-l2, -w2, h2)
+
+        """ right y+ """
+        gl.glNormal3f(0, 1, 0)
+        gl.glVertex3f(-l2, w2, -h2)
+        gl.glVertex3f(l2, w2, -h2)
+        gl.glVertex3f(l2, w2, h2)
+        gl.glVertex3f(-l2, w2, h2)
+
+        """ rear x- """
+        gl.glNormal3f(-1, 0, 0)
+        gl.glVertex3f(-l2, -w2, -h2)
+        gl.glVertex3f(-l2, -w2, h2)
+        gl.glVertex3f(-l2, w2, h2)
+        gl.glVertex3f(-l2, w2, -h2)
+
+        """ front x+ """
+
+        gl.glNormal3f(1, 0, 0)
+        gl.glVertex3f(l2, -w2, -h2)
+        gl.glVertex3f(l2, -w2, h2)
+        gl.glVertex3f(l2, w2, h2)
+        gl.glVertex3f(l2, w2, -h2)
+        gl.glEnd()
+
+        gl.glPopMatrix()
 
 
 class Component(object):
@@ -11543,7 +11983,7 @@ class Component(object):
         self._creation_time = self.env._now
         self._suppress_trace = suppress_trace
         self._suppress_pause_at_step = suppress_pause_at_step
-        self.mode = _ModeMonitor(name=self.name() + ".mode", level=True, initial_tally=mode, component=self,env=self.env)
+        self.mode = _ModeMonitor(name=self.name() + ".mode", level=True, initial_tally=mode, component=self, env=self.env)
         self._mode_time = self.env._now
         self._aos = {}
         self._animation_children = set()
@@ -11649,10 +12089,42 @@ class Component(object):
         """
         size_x = 50
         size_y = 50
-        ao0 = AnimateRectangle(
-            text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg"
-        )
+        ao0 = AnimateRectangle(text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg")
         return (size_x, size_y, ao0)
+
+    def animation3d_objects(self, id):
+        """
+        defines how to display a component in Animate3dQueue
+
+        Parameters
+        ----------
+        id : any
+            id as given by Animate3dQueue. Note that by default this the reference to the Animate3dQueue object.
+
+        Returns
+        -------
+        List or tuple containg |n|
+            size_x : how much to displace the next component in x-direction, if applicable |n|
+            size_y : how much to displace the next component in y-direction, if applicable |n|
+            size_z : how much to displace the next component in z-direction, if applicable |n|
+            animation objects : instances of Animate3dBase class |n|
+            default behaviour: |n|
+            white 3dbox of size 8, placed on the z=0 plane (displacements 10).
+
+        Note
+        ----
+        If you override this method, be sure to use the same header, either with or without the id parameter. |n|
+
+        Note
+        ----
+        The animation object should support the x_offset, y_offset and z_offset attributes, in order to be able
+        to position the object correctly. All native salabim Animate3d classes are offset aware.
+        """
+        size_x = 10
+        size_y = 10
+        size_z = 10
+        ao0 = Animate3dBox(x_len=8, y_len=8, z_len=8, x_ref=0, y_ref=0, z_ref=1, color="white", shaded=True)
+        return (size_x, size_y, size_z, ao0)
 
     def _remove_from_aos(self, q):
         if q in self._aos:
@@ -11857,24 +12329,11 @@ class Component(object):
                 "",
                 "",
                 self.name() + " " + caller + delta,
-                merge_blanks(
-                    scheduled_time_str + _prioritytxt(priority) + _urgenttxt(urgent) + lineno, self._modetxt(), extra
-                ),
+                merge_blanks(scheduled_time_str + _prioritytxt(priority) + _urgenttxt(urgent) + lineno, self._modetxt(), extra),
                 s0=s0,
             )
 
-    def activate(
-        self,
-        at=None,
-        delay=0,
-        priority=0,
-        urgent=False,
-        process=None,
-        keep_request=False,
-        keep_wait=False,
-        mode=None,
-        **kwargs
-    ):
+    def activate(self, at=None, delay=0, priority=0, urgent=False, process=None, keep_request=False, keep_wait=False, mode=None, **kwargs):
         """
         activate component
 
@@ -12173,17 +12632,10 @@ class Component(object):
             self.set_mode(mode)
             self._interrupt_level -= 1
             if self._interrupt_level and (not all):
-                self.env.print_trace(
-                    "",
-                    "",
-                    self.name() + " resume (interrupted." + str(self._interrupt_level) + ")",
-                    merge_blanks(self._modetxt()),
-                )
+                self.env.print_trace("", "", self.name() + " resume (interrupted." + str(self._interrupt_level) + ")", merge_blanks(self._modetxt()))
             else:
                 self.status._value = self._interrupted_status
-                self.env.print_trace(
-                    "", "", self.name() + " resume (" + self.status() + ")", merge_blanks(self._modetxt())
-                )
+                self.env.print_trace("", "", self.name() + " resume (" + self.status() + ")", merge_blanks(self._modetxt()))
                 if self.status.value == passive:
                     self.env.print_trace("", "", self.name() + " passivate", merge_blanks(self._modetxt()))
                 elif self.status.value == standby:
@@ -12282,7 +12734,7 @@ class Component(object):
                 if the priority is not specified, the request
                 for the resource be added to the tail of
                 the requesters queue |n|
-        
+
         priority : float
             priority |n|
             default: 0 |n|
@@ -12564,9 +13016,7 @@ class Component(object):
                     r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
                     r.available_quantity.tally(r._capacity - r._claimed_quantity)
                     if self.env._trace:
-                        self.env.print_trace(
-                            "", "", self.name(), "claim " + str(r._claimed_quantity) + " from " + r.name() + prio_trace
-                        )
+                        self.env.print_trace("", "", self.name(), "claim " + str(r._claimed_quantity) + " from " + r.name() + prio_trace)
                 self.leave(r._requesters)
                 if r._requesters._length == 0:
                     r._minq = inf
@@ -12602,13 +13052,7 @@ class Component(object):
         extra = " bumped by " + bumped_by.name() if bumped_by else ""
         if self.env._trace:
             if bumped_by:
-                self.env.print_trace(
-                    "",
-                    "",
-                    self.name(),
-                    "bumped from " + r.name() + " by " + bumped_by.name() + " (release " + str(q) + ")",
-                    s0=s0,
-                )
+                self.env.print_trace("", "", self.name(), "bumped from " + r.name() + " by " + bumped_by.name() + " (release " + str(q) + ")", s0=s0)
             else:
                 self.env.print_trace("", "", self.name(), "release " + str(q) + " from " + r.name() + extra, s0=s0)
         if not bumped_by:
@@ -13814,14 +14258,7 @@ class ComponentGenerator(Component):
                     process = "do_iat"
         self.kwargs = kwargs
 
-        super().__init__(
-            name=generator_name,
-            env=env,
-            process=process,
-            at=at,
-            suppress_trace=suppress_trace,
-            suppress_pause_at_step=suppress_pause_at_step,
-        )
+        super().__init__(name=generator_name, env=env, process=process, at=at, suppress_trace=suppress_trace, suppress_pause_at_step=suppress_pause_at_step)
 
     def do_spread(self):
         for interval in self.intervals:
@@ -13893,7 +14330,7 @@ class _BlindVideoMaker(Component):
     def process(self):
         while True:
             self.env.t = self.env._now
-            self.env.animation_pre_tick_sys(self.env.t) # required to update sys objects, like AnimateQueue
+            self.env.animation_pre_tick_sys(self.env.t)  # required to update sys objects, like AnimateQueue
             self.env.animation_pre_tick_sys(self.env.t)
             self.env.save_frame()
             self.env.frame_number += 1
@@ -13915,15 +14352,7 @@ class Random(random.Random):
 
 
 class _Distribution:
-    def bounded_sample(
-        self,
-        lowerbound=None,
-        upperbound=None,
-        fail_value=None,
-        number_of_retries=None,
-        include_lowerbound=True,
-        include_upperbound=True,
-    ):
+    def bounded_sample(self, lowerbound=None, upperbound=None, fail_value=None, number_of_retries=None, include_lowerbound=True, include_upperbound=True):
         """
         Parameters
         ----------
@@ -13962,9 +14391,7 @@ class _Distribution:
         Samples that cannot be converted (only possible with Pdf and CumPdf) to float
         are assumed to be within the bounds.
         """
-        return Bounded(
-            self, lowerbound, upperbound, fail_value, number_of_retries, include_lowerbound, include_upperbound
-        ).sample()
+        return Bounded(self, lowerbound, upperbound, fail_value, number_of_retries, include_lowerbound, include_upperbound).sample()
 
     def __call__(self, *args, **kwargs):
         return self.sample(*args, **kwargs)
@@ -14361,9 +14788,7 @@ class Exponential(_Distribution):
         result = []
         result.append("Exponential distribution " + hex(id(self)))
         result.append("  mean=" + str(self._mean) + " " + self.time_unit)
-        result.append(
-            "  rate (lambda)=" + str(1 / self._mean) + (" " if self.time_unit == "" else " /" + self.time_unit)
-        )
+        result.append("  rate (lambda)=" + str(1 / self._mean) + (" " if self.time_unit == "" else " /" + self.time_unit))
         result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
@@ -14427,16 +14852,7 @@ class Normal(_Distribution):
         if omitted, default_env will be used
     """
 
-    def __init__(
-        self,
-        mean,
-        standard_deviation=None,
-        time_unit=None,
-        coefficient_of_variation=None,
-        use_gauss=False,
-        randomstream=None,
-        env=None,
-    ):
+    def __init__(self, mean, standard_deviation=None, time_unit=None, coefficient_of_variation=None, use_gauss=False, randomstream=None, env=None):
         self.register_time_unit(time_unit, env)
         self._use_gauss = use_gauss
         self._mean = mean
@@ -16189,9 +16605,7 @@ class State(object):
         if omitted, default_env is used
     """
 
-    def __init__(
-        self, name=None, value=False, type="any", monitor=True, animation_objects=None, env=None, *args, **kwargs
-    ):
+    def __init__(self, name=None, value=False, type="any", monitor=True, animation_objects=None, env=None, *args, **kwargs):
         if env is None:
             self.env = g.default_env
         else:
@@ -16204,9 +16618,7 @@ class State(object):
         self._waiters = Queue(name="waiters of " + self.name(), monitor=monitor, env=self.env)
         self._waiters._isinternal = True
         self.env._trace = savetrace
-        self.value = _SystemMonitor(
-            name="Value of " + self.name(), level=True, initial_tally=value, monitor=monitor, type=type, env=self.env
-        )
+        self.value = _SystemMonitor(name="Value of " + self.name(), level=True, initial_tally=value, monitor=monitor, type=type, env=self.env)
         if animation_objects is not None:
             self.animation_objects = animation_objects.__get__(self, State)
         if self.env._trace:
@@ -16429,12 +16841,7 @@ class State(object):
         if value_after is None:
             value_after = self._value
         if self.env._trace:
-            self.env.print_trace(
-                "",
-                "",
-                self.name() + " trigger",
-                " value = " + str(value) + " --> " + str(value_after) + " allow " + str(max) + " components",
-            )
+            self.env.print_trace("", "", self.name() + " trigger", " value = " + str(value) + " --> " + str(value_after) + " allow " + str(max) + " components")
         self._value = value
         self.value.tally(value)  # strictly speaking, not required
         self._trywait(max)
@@ -16474,7 +16881,7 @@ class State(object):
     def all_monitors(self):
         """
         returns all mononitors belonging to the state
-        
+
         Returns
         -------
         all monitors : tuple of monitors
@@ -16567,15 +16974,9 @@ class State(object):
         """
         result = []
         result.append("Statistics of {} at {}".format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
-        result.append(
-            self.waiters().length.print_statistics(show_header=False, show_legend=True, do_indent=True, as_str=True)
-        )
+        result.append(self.waiters().length.print_statistics(show_header=False, show_legend=True, do_indent=True, as_str=True))
         result.append("")
-        result.append(
-            self.waiters().length_of_stay.print_statistics(
-                show_header=False, show_legend=False, do_indent=True, as_str=True
-            )
-        )
+        result.append(self.waiters().length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True, as_str=True))
         result.append("")
         result.append(self.value.print_statistics(show_header=False, show_legend=False, do_indent=True, as_str=True))
         return return_or_print(result, as_str, file)
@@ -16624,9 +17025,7 @@ class Resource(object):
         if omitted, default_env is used
     """
 
-    def __init__(
-        self, name=None, capacity=1, anonymous=False, preemptive=False, monitor=True, env=None, *args, **kwargs
-    ):
+    def __init__(self, name=None, capacity=1, anonymous=False, preemptive=False, monitor=True, env=None, *args, **kwargs):
         if env is None:
             self.env = g.default_env
         else:
@@ -16647,41 +17046,15 @@ class Resource(object):
         self._minq = inf
         self._trying = False
 
-        self.capacity = _CapacityMonitor(
-            "Capacity of " + self.name(),
-            level=True,
-            initial_tally=capacity,
-            monitor=monitor,
-            type="float",
-            env=self.env,
-        )
+        self.capacity = _CapacityMonitor("Capacity of " + self.name(), level=True, initial_tally=capacity, monitor=monitor, type="float", env=self.env)
         self.capacity.resource = self
-        self.claimed_quantity = _SystemMonitor(
-            "Claimed quantity of " + self.name(),
-            level=True,
-            initial_tally=0,
-            monitor=monitor,
-            type="float",
-            env=self.env,
-        )
+        self.claimed_quantity = _SystemMonitor("Claimed quantity of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="float", env=self.env)
         self.available_quantity = _SystemMonitor(
-            "Available quantity of " + self.name(),
-            level=True,
-            initial_tally=capacity,
-            monitor=monitor,
-            type="float",
-            env=self.env,
+            "Available quantity of " + self.name(), level=True, initial_tally=capacity, monitor=monitor, type="float", env=self.env
         )
-        self.occupancy = _SystemMonitor(
-            "Occupancy of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="float", env=self.env
-        )
+        self.occupancy = _SystemMonitor("Occupancy of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="float", env=self.env)
         if self.env._trace:
-            self.env.print_trace(
-                "",
-                "",
-                self.name() + " create",
-                "capacity=" + str(self._capacity) + (" anonymous" if self._anonymous else ""),
-            )
+            self.env.print_trace("", "", self.name() + " create", "capacity=" + str(self._capacity) + (" anonymous" if self._anonymous else ""))
         self.setup(*args, **kwargs)
 
     def ispreemptive(self):
@@ -16706,7 +17079,7 @@ class Resource(object):
     def all_monitors(self):
         """
         returns all mononitors belonging to the resource
-        
+
         Returns
         -------
         all monitors : tuple of monitors
@@ -16776,16 +17149,10 @@ class Resource(object):
         result.append("Statistics of {} at {:13.3f}".format(self.name(), self.env._now - self.env._offset))
         show_legend = True
         for q in [self.requesters(), self.claimers()]:
-            result.append(
-                q.length.print_statistics(show_header=False, show_legend=show_legend, do_indent=True, as_str=True)
-            )
+            result.append(q.length.print_statistics(show_header=False, show_legend=show_legend, do_indent=True, as_str=True))
             show_legend = False
             result.append("")
-            result.append(
-                q.length_of_stay.print_statistics(
-                    show_header=False, show_legend=show_legend, do_indent=True, as_str=True
-                )
-            )
+            result.append(q.length_of_stay.print_statistics(show_header=False, show_legend=show_legend, do_indent=True, as_str=True))
             result.append("")
 
         for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
@@ -17158,9 +17525,7 @@ class PeriodMonitor(object):
         if period_monitor_names is None:
             period_monitor_names = []
             for duration in periods:
-                period_monitor_names.append(
-                    parent_monitor.name() + ".period [" + str(cum) + " - " + str(cum + duration) + "]"
-                )
+                period_monitor_names.append(parent_monitor.name() + ".period [" + str(cum) + " - " + str(cum + duration) + "]")
                 cum += duration
 
         self.m = parent_monitor
@@ -17174,15 +17539,9 @@ class PeriodMonitor(object):
 
         self.iperiod = 0
         if self.m._level:
-            self.perperiod = [
-                Monitor(name=period_monitor_name, level=True, monitor=False, env=self.env)
-                for period_monitor_name in period_monitor_names
-            ]
+            self.perperiod = [Monitor(name=period_monitor_name, level=True, monitor=False, env=self.env) for period_monitor_name in period_monitor_names]
         else:
-            self.perperiod = [
-                Monitor(name=period_monitor_name, monitor=False, env=self.env)
-                for period_monitor_name in period_monitor_names
-            ]
+            self.perperiod = [Monitor(name=period_monitor_name, monitor=False, env=self.env) for period_monitor_name in period_monitor_names]
 
 
 class AudioClip(object):
@@ -17349,9 +17708,7 @@ class _APNG:
             return im
 
     class FrameControl:
-        def __init__(
-            self, width=None, height=None, x_offset=0, y_offset=0, delay=100, delay_den=1000, depose_op=1, blend_op=0
-        ):
+        def __init__(self, width=None, height=None, x_offset=0, y_offset=0, delay=100, delay_den=1000, depose_op=1, blend_op=0):
             self.width = width
             self.height = height
             self.x_offset = x_offset
@@ -17362,17 +17719,7 @@ class _APNG:
             self.blend_op = blend_op
 
         def to_bytes(self):
-            return struct.pack(
-                "!IIIIHHbb",
-                self.width,
-                self.height,
-                self.x_offset,
-                self.y_offset,
-                self.delay,
-                self.delay_den,
-                self.depose_op,
-                self.blend_op,
-            )
+            return struct.pack("!IIIIHHbb", self.width, self.height, self.x_offset, self.y_offset, self.delay, self.delay_den, self.depose_op, self.blend_op)
 
     def __init__(self, num_plays=0):
         self.frames = []
@@ -17396,20 +17743,7 @@ class _APNG:
         self.frames.append((png, control))
 
     def to_bytes(self):
-        CHUNK_BEFORE_IDAT = {
-            "cHRM",
-            "gAMA",
-            "iCCP",
-            "sBIT",
-            "sRGB",
-            "bKGD",
-            "hIST",
-            "tRNS",
-            "pHYs",
-            "sPLT",
-            "tIME",
-            "PLTE",
-        }
+        CHUNK_BEFORE_IDAT = {"cHRM", "gAMA", "iCCP", "sBIT", "sRGB", "bKGD", "hIST", "tRNS", "pHYs", "sPLT", "tIME", "PLTE"}
         PNG_SIGN = b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
         out = [PNG_SIGN]
         other_chunks = []
@@ -17469,7 +17803,7 @@ def colornames():
     """
     if not hasattr(colornames, "cached"):
         colornames.cached = pickle.loads(
-            b"(dp0\nVfuchsia\np1\nV#FF00FF\np2\nsV\np3\nV#00000000\np4\nsVtransparent\np5\ng4\nsVpalevioletred\np6\nV#DB7093\np7\nsVskyblue\np8\nV#87CEEB\np9\nsVpaleturquoise\np10\nV#AFEEEE\np11\nsVcadetblue\np12\nV#5F9EA0\np13\nsVorangered\np14\nV#FF4500\np15\nsVsteelblue\np16\nV#4682B4\np17\nsVdimgray\np18\nV#696969\np19\nsVdarkseagreen\np20\nV#8FBC8F\np21\nsV60%gray\np22\nV#999999\np23\nsVroyalblue\np24\nV#4169E1\np25\nsVmediumblue\np26\nV#0000CD\np27\nsVgoldenrod\np28\nV#DAA520\np29\nsVmediumvioletred\np30\nV#C71585\np31\nsVblueviolet\np32\nV#8A2BE2\np33\nsVgainsboro\np34\nV#DCDCDC\np35\nsVdarkred\np36\nV#8B0000\np37\nsVrosybrown\np38\nV#BC8F8F\np39\nsVgold\np40\nV#FFD700\np41\nsVcoral\np42\nV#FF7F50\np43\nsVwhite\np44\nV#FFFFFF\np45\nsVdarkcyan\np46\nV#008B8B\np47\nsVblack\np48\nV#000000\np49\nsVorchid\np50\nV#DA70D6\np51\nsVmediumturquoise\np52\nV#48D1CC\np53\nsVlightgreen\np54\nV#90EE90\np55\nsVlime\np56\nV#00FF00\np57\nsVpapayawhip\np58\nV#FFEFD5\np59\nsVchocolate\np60\nV#D2691E\np61\nsV40%gray\np62\nV#666666\np63\nsVoldlace\np64\nV#FDF5E6\np65\nsVdarkblue\np66\nV#00008B\np67\nsVsilver\np68\nV#C0C0C0\np69\nsVaquamarine\np70\nV#7FFFD4\np71\nsVlightcoral\np72\nV#F08080\np73\nsVcyan\np74\nV#00FFFF\np75\nsVdodgerblue\np76\nV#1E90FF\np77\nsV10%gray\np78\nV#191919\np79\nsVmidnightblue\np80\nV#191970\np81\nsVgreen\np82\nV#008000\np83\nsVlightsalmon\np84\nV#FFA07A\np85\nsVazure\np86\nV#F0FFFF\np87\nsVred\np88\nV#FF0000\np89\nsVlightpink\np90\nV#FFB6C1\np91\nsVwhitesmoke\np92\nV#F5F5F5\np93\nsVyellow\np94\nV#FFFF00\np95\nsVlawngreen\np96\nV#7CFC00\np97\nsVmagenta\np98\ng2\nsVlightsteelblue\np99\nV#B0C4DE\np100\nsVolivedrab\np101\nV#6B8E23\np102\nsVlightslategray\np103\nV#778899\np104\nsVslategray\np105\nV#708090\np106\nsVlightblue\np107\nV#ADD8E6\np108\nsVmoccasin\np109\nV#FFE4B5\np110\nsVmediumspringgreen\np111\nV#00FA9A\np112\nsVlightgray\np113\nV#D3D3D3\np114\nsVseashell\np115\nV#FFF5EE\np116\nsVdarkkhaki\np117\nV#BDB76B\np118\nsVslateblue\np119\nV#6A5ACD\np120\nsVaqua\np121\ng75\nsVpalegoldenrod\np122\nV#EEE8AA\np123\nsVdeeppink\np124\nV#FF1493\np125\nsVdarkgreen\np126\nV#006400\np127\nsVblanchedalmond\np128\nV#FFEBCD\np129\nsVturquoise\np130\nV#40E0D0\np131\nsVnavy\np132\nV#000080\np133\nsVtomato\np134\nV#FF6347\np135\nsVyellowgreen\np136\nV#9ACD32\np137\nsVpeachpuff\np138\nV#FFDAB9\np139\nsV30%gray\np140\nV#464646\np141\nsVpink\np142\nV#FFC0CB\np143\nsVpalegreen\np144\nV#98FB98\np145\nsVlightskyblue\np146\nV#87CEFA\np147\nsVchartreuse\np148\nV#7FFF00\np149\nsVmediumorchid\np150\nV#BA55D3\np151\nsVolive\np152\nV#808000\np153\nsVdarkorange\np154\nV#FF8C00\np155\nsVbeige\np156\nV#F5F5DC\np157\nsVforestgreen\np158\nV#228B22\np159\nsVmediumpurple\np160\nV#9370DB\np161\nsVmintcream\np162\nV#F5FFFA\np163\nsVhotpink\np164\nV#FF69B4\np165\nsVdarkgoldenrod\np166\nV#B8860B\np167\nsVpowderblue\np168\nV#B0E0E6\np169\nsVhoneydew\np170\nV#F0FFF0\np171\nsVsalmon\np172\nV#FA8072\np173\nsVsnow\np174\nV#FFFAFA\np175\nsVmistyrose\np176\nV#FFE4E1\np177\nsVkhaki\np178\nV#F0E68C\np179\nsVmediumaquamarine\np180\nV#66CDAA\np181\nsVdarksalmon\np182\nV#E9967A\np183\nsValiceblue\np184\nV#F0F8FF\np185\nsVdarkturquoise\np186\nV#00CED1\np187\nsVlightyellow\np188\nV#FFFFE0\np189\nsVwheat\np190\nV#F5DEB3\np191\nsVlightseagreen\np192\nV#20B2AA\np193\nsVlightcyan\np194\nV#E0FFFF\np195\nsVantiquewhite\np196\nV#FAEBD7\np197\nsVsaddlebrown\np198\nV#8B4513\np199\nsVmediumseagreen\np200\nV#3CB371\np201\nsV70%gray\np202\nV#B2B2B2\np203\nsVsienna\np204\nV#A0522D\np205\nsVcornflowerblue\np206\nV#6495ED\np207\nsVseagreen\np208\nV#2E8B57\np209\nsVfloralwhite\np210\nV#FFFAF0\np211\nsVivory\np212\nV#FFFFF0\np213\nsVcornsilk\np214\nV#FFF8DC\np215\nsVindianred\np216\nV#CD5C5C\np217\nsVplum\np218\nV#DDA0DD\np219\nsV90%gray\np220\nV#E6E6E6\np221\nsVgreenyellow\np222\nV#ADFF2F\np223\nsVteal\np224\nV#008080\np225\nsVbrown\np226\nV#A52A2A\np227\nsVdarkslategray\np228\nV#2F4F4F\np229\nsVpurple\np230\nV#800080\np231\nsVviolet\np232\nV#EE82EE\np233\nsVdeepskyblue\np234\nV#00BFFF\np235\nsVghostwhite\np236\nV#F8F8FF\np237\nsVburlywood\np238\nV#DEB887\np239\nsVblue\np240\nV#0000FF\np241\nsVcrimson\np242\nV#DC143C\np243\nsVindigo\np244\nV#4B0082\np245\nsV20%gray\np246\nV#333333\np247\nsVdarkmagenta\np248\nV#8B008B\np249\nsV80%gray\np250\nV#CCCCCC\np251\nsVlightgoldenrodyellow\np252\nV#FAFAD2\np253\nsVtan\np254\nV#D2B48C\np255\nsVlimegreen\np256\nV#32CD32\np257\nsVlemonchiffon\np258\nV#FFFACD\np259\nsVbisque\np260\nV#FFE4C4\np261\nsVfirebrick\np262\nV#B22222\np263\nsVnavajowhite\np264\nV#FFDEAD\np265\nsVnone\np266\ng4\nsVmaroon\np267\nV#800000\np268\nsV50%gray\np269\nV#7F7F7F\np270\nsVdarkgray\np271\nV#A9A9A9\np272\nsVorange\np273\nV#FFA500\np274\nsVlavenderblush\np275\nV#FFF0F5\np276\nsVdarkorchid\np277\nV#9932CC\np278\nsVlavender\np279\nV#E6E6FA\np280\nsVspringgreen\np281\nV#00FF7F\np282\nsVthistle\np283\nV#D8BFD8\np284\nsVlinen\np285\nV#FAF0E6\np286\nsVdarkolivegreen\np287\nV#556B2F\np288\nsVdarkslateblue\np289\nV#483D8B\np290\nsVgray\np291\nV#808080\np292\nsVdarkviolet\np293\nV#9400D3\np294\nsVperu\np295\nV#CD853F\np296\nsVsandybrown\np297\nV#FAA460\np298\nsVmediumslateblue\np299\nV#7B68EE\np300\ns."  # NOQA
+            b"(dp0\nVfuchsia\np1\nV#FF00FF\np2\nsV\np3\nV#00000000\np4\nsVtransparent\np5\ng4\nsVpalevioletred\np6\nV#DB7093\np7\nsVskyblue\np8\nV#87CEEB\np9\nsVpaleturquoise\np10\nV#AFEEEE\np11\nsVcadetblue\np12\nV#5F9EA0\np13\nsVorangered\np14\nV#FF4500\np15\nsVsteelblue\np16\nV#4682B4\np17\nsVdimgray\np18\nV#696969\np19\nsVdarkseagreen\np20\nV#8FBC8F\np21\nsV60%gray\np22\nV#999999\np23\nsVroyalblue\np24\nV#4169E1\np25\nsVmediumblue\np26\nV#0000CD\np27\nsVgoldenrod\np28\nV#DAA520\np29\nsVmediumvioletred\np30\nV#C71585\np31\nsVblueviolet\np32\nV#8A2BE2\np33\nsVgainsboro\np34\nV#DCDCDC\np35\nsVdarkred\np36\nV#8B0000\np37\nsVrosybrown\np38\nV#BC8F8F\np39\nsVgold\np40\nV#FFD700\np41\nsVcoral\np42\nV#FF7F50\np43\nsVwhite\np44\nV#FFFFFF\np45\nsVdarkcyan\np46\nV#008B8B\np47\nsVblack\np48\nV#000000\np49\nsVorchid\np50\nV#DA70D6\np51\nsVmediumturquoise\np52\nV#48D1CC\np53\nsVlightgreen\np54\nV#90EE90\np55\nsVlime\np56\nV#00FF00\np57\nsVpapayawhip\np58\nV#FFEFD5\np59\nsVchocolate\np60\nV#D2691E\np61\nsV40%gray\np62\nV#666666\np63\nsVoldlace\np64\nV#FDF5E6\np65\nsVdarkblue\np66\nV#00008B\np67\nsVsilver\np68\nV#C0C0C0\np69\nsVaquamarine\np70\nV#7FFFD4\np71\nsVlightcoral\np72\nV#F08080\np73\nsVcyan\np74\nV#00FFFF\np75\nsVdodgerblue\np76\nV#1E90FF\np77\nsV10%gray\np78\nV#191919\np79\nsVmidnightblue\np80\nV#191970\np81\nsVgreen\np82\nV#008000\np83\nsVlightsalmon\np84\nV#FFA07A\np85\nsVazure\np86\nV#F0FFFF\np87\nsVred\np88\nV#FF0000\np89\nsVlightpink\np90\nV#FFB6C1\np91\nsVwhitesmoke\np92\nV#F5F5F5\np93\nsVyellow\np94\nV#FFFF00\np95\nsVlawngreen\np96\nV#7CFC00\np97\nsVmagenta\np98\ng2\nsVlightsteelblue\np99\nV#B0C4DE\np100\nsVolivedrab\np101\nV#6B8E23\np102\nsVlightslategray\np103\nV#778899\np104\nsVslategray\np105\nV#708090\np106\nsVlightblue\np107\nV#ADD8E6\np108\nsVmoccasin\np109\nV#FFE4B5\np110\nsVmediumspringgreen\np111\nV#00FA9A\np112\nsVlightgray\np113\nV#D3D3D3\np114\nsVseashell\np115\nV#FFF5EE\np116\nsVdarkkhaki\np117\nV#BDB76B\np118\nsVslateblue\np119\nV#6A5ACD\np120\nsVaqua\np121\ng75\nsVpalegoldenrod\np122\nV#EEE8AA\np123\nsVdeeppink\np124\nV#FF1493\np125\nsVdarkgreen\np126\nV#006400\np127\nsVblanchedalmond\np128\nV#FFEBCD\np129\nsVturquoise\np130\nV#40E0D0\np131\nsVnavy\np132\nV#000080\np133\nsVtomato\np134\nV#FF6347\np135\nsVyellowgreen\np136\nV#9ACD32\np137\nsVpeachpuff\np138\nV#FFDAB9\np139\nsV30%gray\np140\nV#464646\np141\nsVpink\np142\nV#FFC0CB\np143\nsVpalegreen\np144\nV#98FB98\np145\nsVlightskyblue\np146\nV#87CEFA\np147\nsVchartreuse\np148\nV#7FFF00\np149\nsVmediumorchid\np150\nV#BA55D3\np151\nsVolive\np152\nV#808000\np153\nsVdarkorange\np154\nV#FF8C00\np155\nsVbeige\np156\nV#F5F5DC\np157\nsVforestgreen\np158\nV#228B22\np159\nsVmediumpurple\np160\nV#9370DB\np161\nsVmintcream\np162\nV#F5FFFA\np163\nsVhotpink\np164\nV#FF69B4\np165\nsVdarkgoldenrod\np166\nV#B8860B\np167\nsVpowderblue\np168\nV#B0E0E6\np169\nsVhoneydew\np170\nV#F0FFF0\np171\nsVsalmon\np172\nV#FA8072\np173\nsVsnow\np174\nV#FFFAFA\np175\nsVmistyrose\np176\nV#FFE4E1\np177\nsVkhaki\np178\nV#F0E68C\np179\nsVmediumaquamarine\np180\nV#66CDAA\np181\nsVdarksalmon\np182\nV#E9967A\np183\nsValiceblue\np184\nV#F0F8FF\np185\nsVdarkturquoise\np186\nV#00CED1\np187\nsVlightyellow\np188\nV#FFFFE0\np189\nsVwheat\np190\nV#F5DEB3\np191\nsVlightseagreen\np192\nV#20B2AA\np193\nsVlightcyan\np194\nV#E0FFFF\np195\nsVantiquewhite\np196\nV#FAEBD7\np197\nsVsaddlebrown\np198\nV#8B4513\np199\nsVmediumseagreen\np200\nV#3CB371\np201\nsV70%gray\np202\nV#B2B2B2\np203\nsVsienna\np204\nV#A0522D\np205\nsVcornflowerblue\np206\nV#6495ED\np207\nsVseagreen\np208\nV#2E8B57\np209\nsVfloralwhite\np210\nV#FFFAF0\np211\nsVivory\np212\nV#FFFFF0\np213\nsVcornsilk\np214\nV#FFF8DC\np215\nsVindianred\np216\nV#CD5C5C\np217\nsVplum\np218\nV#DDA0DD\np219\nsV90%gray\np220\nV#E6E6E6\np221\nsVgreenyellow\np222\nV#ADFF2F\np223\nsVteal\np224\nV#008080\np225\nsVbrown\np226\nV#A52A2A\np227\nsVdarkslategray\np228\nV#2F4F4F\np229\nsVpurple\np230\nV#800080\np231\nsVviolet\np232\nV#EE82EE\np233\nsVdeepskyblue\np234\nV#00BFFF\np235\nsVghostwhite\np236\nV#F8F8FF\np237\nsVburlywood\np238\nV#DEB887\np239\nsVblue\np240\nV#0000FF\np241\nsVcrimson\np242\nV#DC143C\np243\nsVindigo\np244\nV#4B0082\np245\nsV20%gray\np246\nV#333333\np247\nsVdarkmagenta\np248\nV#8B008B\np249\nsV80%gray\np250\nV#CCCCCC\np251\nsVlightgoldenrodyellow\np252\nV#FAFAD2\np253\nsVtan\np254\nV#D2B48C\np255\nsVlimegreen\np256\nV#32CD32\np257\nsVlemonchiffon\np258\nV#FFFACD\np259\nsVbisque\np260\nV#FFE4C4\np261\nsVfirebrick\np262\nV#B22222\np263\nsVnavajowhite\np264\nV#FFDEAD\np265\nsVnone\np266\ng4\nsVmaroon\np267\nV#800000\np268\nsV50%gray\np269\nV#7F7F7F\np270\nsVdarkgray\np271\nV#A9A9A9\np272\nsVorange\np273\nV#FFA500\np274\nsVlavenderblush\np275\nV#FFF0F5\np276\nsVdarkorchid\np277\nV#9932CC\np278\nsVlavender\np279\nV#E6E6FA\np280\nsVspringgreen\np281\nV#00FF7F\np282\nsVthistle\np283\nV#D8BFD8\np284\nsVlinen\np285\nV#FAF0E6\np286\nsVdarkolivegreen\np287\nV#556B2F\np288\nsVdarkslateblue\np289\nV#483D8B\np290\nsVgray\np291\nV#808080\np292\nsVdarkviolet\np293\nV#9400D3\np294\nsVperu\np295\nV#CD853F\np296\nsVsandybrown\np297\nV#F4A460\np298\nsVmediumslateblue\np299\nV#7B68EE\np300\nsVlightgrey\np301\ng114\ns."
         )
     return colornames.cached
 
@@ -17900,6 +18234,1380 @@ def random_seed(seed=None, randomstream=None, set_numpy_random_seed=True):
 _random_seed = random_seed  # used by Environment.__init__
 
 
+def resize_with_pad(im, target_width, target_height):
+    """
+    Resize PIL image keeping ratio and using white background.
+    """
+    if im.height == target_width and im.width == target_height:
+        return im
+    target_ratio = target_height / target_width
+    im_ratio = im.height / im.width
+    if target_ratio > im_ratio:
+        # It must be fixed by width
+        resize_width = target_width
+        resize_height = round(resize_width * im_ratio)
+    else:
+        # Fixed by height
+        resize_height = target_height
+        resize_width = round(resize_height / im_ratio)
+
+    image_resize = im.resize((resize_width, resize_height), Image.ANTIALIAS)
+    background = Image.new("RGBA", (target_width, target_height), (255, 255, 255, 255))
+    offset = (round((target_width - resize_width) / 2), round((target_height - resize_height) / 2))
+    background.paste(image_resize, offset)
+    return background.convert("RGB")
+
+
+class _AnimateIntro(Animate3dBase):
+    def setup(self):
+        self.layer = -math.inf
+        self.field_of_view_y = 45
+        self.z_near = 0.1
+        self.z_far = 100000
+        self.x_eye = 4
+        self.y_eye = 4
+        self.z_eye = 4
+        self.x_center = 0
+        self.y_center = 0
+        self.z_center = 0
+        self.x_up = 0
+        self.y_up = 0
+        self.z_up = 1
+        self.model_lights_pname = gl.GL_LIGHT_MODEL_AMBIENT
+        self.model_lights_param = (0.42, 0.42, 0.42, 1)
+        self.lights_light = gl.GL_LIGHT0
+        self.lights_pname = gl.GL_POSITION
+        self.lights_param = (-1, -1, 1, 0)
+
+        self.register_dynamic_attributes("field_of_view_y z_near z_far x_eye y_eye z_eye x_center y_center z_center x_up y_up z_up")
+        self.register_dynamic_attributes("model_lights_pname model_lights_param lights_light lights_pname lights_param")
+
+    def draw(self, t):
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+
+        gl.glMatrixMode(gl.GL_PROJECTION)
+
+        gl.glLoadIdentity()
+        glu.gluPerspective(self.field_of_view_y(t), glut.glutGet(glut.GLUT_WINDOW_WIDTH) / glut.glutGet(glut.GLUT_WINDOW_HEIGHT), self.z_near(t), self.z_far(t))
+        glu.gluLookAt(
+            self.x_eye(t), self.y_eye(t), self.z_eye(t), self.x_center(t), self.y_center(t), self.z_center(t), self.x_up(t), self.y_up(t), self.z_up(t)
+        )
+        gl.glEnable(gl.GL_LIGHTING)
+        gl.glLightModelfv(self.model_lights_pname(t), self.model_lights_param(t))
+        gl.glLightfv(self.lights_light(t), self.lights_pname(t), self.lights_param(t))
+        gl.glEnable(gl.GL_LIGHT0)
+
+        gl.glMatrixMode(gl.GL_MODELVIEW)
+
+        gl.glLoadIdentity()
+
+
+class _AnimateExtro(Animate3dBase):
+    def setup(self):
+        self.layer = math.inf
+
+    def draw(self, t):
+        glut.glutSwapBuffers()
+        glut.glutMainLoopEvent()
+
+
+class Animate3dObj(Animate3dBase):
+    """
+    Creates a 3D animation object from an .obj file
+
+    Parameters
+    ----------
+    filename : str or Path
+        obj file to be read (default extension .obj) |n|
+        if there are .mtl or .jpg required by this file, they should be available
+        
+    x : float
+        x position (default 0)
+
+    y : float
+        y position (default 0)
+
+    z : float
+        z position (default 0)
+
+    x_angle : float
+        angle along x axis (default: 0)
+
+    y_angle : float
+        angle along y axis (default: 0)
+
+    z_angle : float
+        angle along z axis (default: 0)
+
+    x_translate : float
+        translation in x direction (default: 0)
+
+    y_translate : float
+        translation in y direction (default: 0)
+
+    z_translate : float
+        translation in z direction (default: 0)
+
+    x_scale : float
+        scaling in x direction (default: 1)
+
+    y_translate : float
+        translation in y direction (default: 1)
+
+    z_translate : float
+        translation in z direction (default: 1)
+
+    shos_warnings : bool
+        as pywavefront does not support all obj commands, reading the file sometimes leads
+        to (many) warning log messages |n|
+        with this flag, they can be turned off (the deafult)
+
+    visible : bool
+        visible |n|
+        if False, animation object is not shown, shown otherwise
+        (default True)
+
+    layer : int
+         layer value |n|
+         lower layer values are displayed later in the frame (default 0)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically when the parent component is no longer accessible
+
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
+
+    Note
+    ----
+    All parameters, apart from parent, arg and env can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: my_x |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+
+    Note
+    ----
+    This method requires the pywavefront and pyglet module to be installed
+    """
+
+    def __init__(
+        self,
+        filename,
+        x=0,
+        y=0,
+        z=0,
+        x_angle=0,
+        y_angle=0,
+        z_angle=0,
+        x_translate=0,
+        y_translate=0,
+        z_translate=0,
+        x_scale=1,
+        y_scale=1,
+        z_scale=1,
+        show_warnings=False,
+        visible=True,
+        arg=None,
+        layer=0,
+        parent=None,
+        env=None,
+        **kwargs
+    ):
+        global pywavefront
+        import pywavefront
+
+        global visualization
+        from pywavefront import visualization
+
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
+
+        self.x = x
+        self.y = y
+        self.z = z
+        self.x_angle = x_angle
+        self.y_angle = y_angle
+        self.z_angle = z_angle
+        self.x_translate = x_translate
+        self.y_translate = y_translate
+        self.z_translate = z_translate
+
+        self.x_scale = x_scale
+        self.y_scale = y_scale
+        self.z_scale = z_scale
+
+        self.register_dynamic_attributes("x y z x_angle y_angle z_angle x_translate y_translate z_translate x_scale y_scale z_scale")
+        self.x_offset = 0
+        self.y_offset = 0
+        self.z_offset = 0
+        obj_filename = Path(filename)
+        if not obj_filename.suffix:
+            obj_filename = obj_filename.with_suffix(".obj")
+        obj_filename = obj_filename.resolve()
+
+        if obj_filename not in self.env.obj_filenames:
+            save_logging_level = logging.root.level
+            if not show_warnings:
+                logging.basicConfig(level=logging.ERROR)
+
+            with open(obj_filename, "r") as obj_file:
+
+                create_materials = False
+                obj_file_path = Path(obj_filename).resolve().parent
+                save_cwd = os.getcwd()
+                os.chdir(obj_file_path)
+                for l in obj_file:
+                    if l.startswith("mtllib "):
+                        mtllib_filename = Path(l[7:].strip())
+                        if mtllib_filename.is_file():
+                            create_materials = True
+                        break
+            os.chdir(save_cwd)
+            logging.basicConfig(level=save_logging_level)
+
+            self.env.obj_filenames[obj_filename] = pywavefront.Wavefront(obj_filename, create_materials=create_materials)
+        self.obj = self.env.obj_filenames[obj_filename]
+
+    def draw(self, t):
+
+        gl.glMatrixMode(gl.GL_MODELVIEW)
+        gl.glPushMatrix()
+        gl.glTranslate(self.x(t) + self.x_offset, self.y(t) + self.y_offset, self.z(t) + self.z_offset)
+        gl.glRotate(self.z_angle(t), 0.0, 0.0, 1.0)
+        gl.glRotate(self.y_angle(t), 0.0, 1.0, 0.0)
+        gl.glRotate(self.x_angle(t), 1.0, 0.0, 0.0)
+        gl.glTranslate(self.x_translate(t), self.y_translate(t), self.z_translate(t))
+        gl.glScale(self.x_scale(t), self.y_scale(t), self.z_scale(t))
+        visualization.draw(self.obj)
+        gl.glPopMatrix()
+
+
+class Animate3dRectangle(Animate3dBase):
+    """
+    Creates a 3D rectangle
+
+    Parameters
+    ----------
+    x0 : float
+        lower left x position (default 0)
+
+    y0 : float
+        lower left y position (default 0)
+
+    x1 : float
+        upper right x position (default 1)
+
+    y1 : float
+        upper right y position (default 1)
+
+    z : float
+        z position of rectangle (default 0)
+
+    color : colorspec
+        color of the rectangle (default "white")
+        
+    visible : bool
+        visible |n|
+        if False, animation object is not shown, shown otherwise
+        (default True)
+
+    layer : int
+         layer value |n|
+         lower layer values are displayed later in the frame (default 0)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically when the parent component is no longer accessible
+
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
+
+    Note
+    ----
+    All parameters, apart from parent, arg and env can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: my_x |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+    """
+
+    def __init__(self, x0=0, y0=0, x1=1, y1=1, z=0, color="white", visible=True, arg=None, layer=0, parent=None, env=None, **kwargs):
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
+
+        self.x0 = x0
+        self.y0 = y0
+        self.x1 = x1
+        self.y1 = y1
+        self.z = z
+        self.color = color
+        self.register_dynamic_attributes("x0 y0 x1 y1 z color")
+
+    def draw(self, t):
+        gl_color = self.env.colorspec_to_gl_color(self.color(t))
+        x0 = self.x0(t)
+        y0 = self.y0(t)
+        x1 = self.x1(t)
+        y1 = self.y1(t)
+        z = self.z(t)
+        draw_rectangle3d(x0=x0, y0=y0, z=z, x1=x1, y1=y1, gl_color=gl_color)
+
+
+class Animate3dLine(Animate3dBase):
+    """
+    Creates a 3D line
+
+    Parameters
+    ----------
+    x0 : float
+        x coordinate of start point (default 0)
+
+    y0 : float
+        y coordinate of start point (default 0)
+
+    z0 : float
+        z coordinate of start point (default 0)
+
+    x1 : float
+        x coordinate of end point (default 0)
+
+    y1 : float
+        y coordinate of end point (default 0)
+
+    z1 : float
+        z coordinate of end point (default 0)
+
+    color : colorspec
+        color of the line (default "white")
+        
+    visible : bool
+        visible |n|
+        if False, animation object is not shown, shown otherwise
+        (default True)
+
+    layer : int
+         layer value |n|
+         lower layer values are displayed later in the frame (default 0)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically when the parent component is no longer accessible
+
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
+
+    Note
+    ----
+    All parameters, apart from parent, arg and env can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: my_x |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+    """
+
+    def __init__(self, x0=0, y0=0, z0=0, x1=1, y1=1, z1=0, color="red", visible=True, arg=None, layer=0, parent=None, env=None, **kwargs):
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
+
+        self.x0 = x0
+        self.y0 = y0
+        self.z0 = z0
+        self.x1 = x1
+        self.y1 = y1
+        self.z1 = z1
+        self.color = color
+        self.register_dynamic_attributes("x0 y0 z0 x1 y1 z1 color")
+
+    def draw(self, t):
+        gl_color = self.env.colorspec_to_gl_color(self.color(t))
+        x0 = self.x0(t)
+        y0 = self.y0(t)
+        z0 = self.z0(t)
+        x1 = self.x1(t)
+        y1 = self.y1(t)
+        z1 = self.z1(t)
+        draw_line3d(x0=x0, y0=y0, z0=z0, x1=x1, y1=y1, z1=z1, gl_color=gl_color)
+
+
+class Animate3dGrid(Animate3dBase):
+    """
+    Creates a 3D grid
+
+    Parameters
+    ----------
+    x_range : iterable
+        x coordinates of grid lines (default [0])
+
+    y_range : iterable
+        y coordinates of grid lines (default [0])
+
+    z_range : iterable
+        z coordinates of grid lines (default [0])
+
+    color : colorspec
+        color of the line (default "white")
+        
+    visible : bool
+        visible |n|
+        if False, animation object is not shown, shown otherwise
+        (default True)
+
+    layer : int
+         layer value |n|
+         lower layer values are displayed later in the frame (default 0)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically when the parent component is no longer accessible
+
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
+
+    Note
+    ----
+    All parameters, apart from parent, arg and env can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: my_x |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+    """
+
+    def __init__(self, x_range=[0], y_range=[0], z_range=[0], color="white", visible=True, arg=None, layer=0, parent=None, env=None, **kwargs):
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
+
+        self.x_range = x_range
+        self.y_range = y_range
+        self.z_range = z_range
+        self.color = color
+        self.register_dynamic_attributes("x_range y_range z_range color")
+
+    def draw(self, t):
+        gl_color = self.env.colorspec_to_gl_color(self.color(t))
+        x_range = list(self.x_range(t))
+        y_range = list(self.y_range(t))
+        z_range = list(self.z_range(t))
+
+        for x in x_range:
+            for y in y_range:
+                draw_line3d(x0=x, y0=y, z0=min(z_range), x1=x, y1=y, z1=max(z_range), gl_color=gl_color)
+
+            for z in z_range:
+                draw_line3d(x0=x, y0=min(y_range), z0=z, x1=x, y1=max(y_range), z1=z, gl_color=gl_color)
+
+        for y in x_range:
+            for x in x_range:
+                draw_line3d(x0=x, y0=y, z0=min(z_range), x1=x, y1=y, z1=max(z_range), gl_color=gl_color)
+
+            for z in z_range:
+                draw_line3d(x0=min(x_range), y0=y, z0=z, x1=max(x_range), y1=y, z1=z, gl_color=gl_color)
+
+        for z in z_range:
+            for x in x_range:
+                draw_line3d(x0=x, y0=min(y_range), z0=z, x1=x, y1=max(y_range), z1=z, gl_color=gl_color)
+
+            for y in y_range:
+                draw_line3d(x0=min(x_range), y0=y, z0=z, x1=max(x_range), y1=y, z1=z, gl_color=gl_color)
+
+
+class Animate3dBox(Animate3dBase):
+    """
+    Creates a 3D box
+
+    Parameters
+    ----------
+    x_len : float
+        length of the box in x direction (deffult 1)
+        
+    y_len : float 
+        length of the box in y direction (default 1)
+        
+    z_len : float
+        length of the box in z direction (default 1)
+        
+    x : float
+        x position of the box (default 0)
+
+    y : float
+        y position of the box (default 0)
+
+    z : float
+        z position of the box (default 0)
+
+    z_angle : float
+        angle around the z-axis (default 0)
+
+    x_ref : int
+        if -1, the x parameter refers to the 'end' of the box |n|
+        if  0, the x parameter refers to the center of the box (default) |n|
+        if  1, the x parameter refers to the 'start' of the box
+
+    y_ref : int
+        if -1, the y parameter refers to the 'end' of the box |n|
+        if  0, the y parameter refers to the center of the box (default) |n|
+        if  1, the y parameter refers to the 'start' of the box
+
+    z_ref : int
+        if -1, the z parameter refers to the 'end' of the box |n|
+        if  0, the z parameter refers to the center of the box (default) |n|
+        if  1, the z parameter refers to the 'start' of the box
+
+    color : colorspec
+        color of the box (default "white") |n|
+        if the color is "" (or the alpha is 0), the sides will not be colored at all
+
+    edge_color : colorspec
+        color of the edges of the (default "") |n|
+        if the color is "" (or the alpha is 0), the edges will not be drawn at all
+
+    shaded : bool
+        if False (default), all sides will be colored with color
+        if True, the various sides will have a sligtly different darkness, thus resulting in a pseudo shaded object
+
+    visible : bool
+        visible |n|
+        if False, animation object is not shown, shown otherwise
+        (default True)
+
+    layer : int
+         layer value |n|
+         lower layer values are displayed later in the frame (default 0)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically when the parent component is no longer accessible
+
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
+
+    Note
+    ----
+    All parameters, apart from parent, arg and env can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: my_x |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+    """
+
+    def __init__(
+        self,
+        x_len=1,
+        y_len=1,
+        z_len=1,
+        x=0,
+        y=0,
+        z=0,
+        z_angle=0,
+        x_ref=0,
+        y_ref=0,
+        z_ref=0,
+        color="white",
+        edge_color="",
+        shaded=False,
+        visible=True,
+        arg=None,
+        layer=0,
+        parent=None,
+        env=None,
+        **kwargs
+    ):
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
+
+        self.x_len = x_len
+        self.y_len = y_len
+        self.z_len = z_len
+        self.x = x
+        self.y = y
+        self.z = z
+        self.z_angle = z_angle
+        self.x_ref = x_ref
+        self.y_ref = y_ref
+        self.z_ref = z_ref
+        self.color = color
+        self.edge_color = edge_color
+        self.shaded = shaded
+        self.register_dynamic_attributes("x_len y_len z_len x y z z_angle x_ref y_ref z_ref color edge_color shaded")
+        self.x_offset = 0
+        self.y_offset = 0
+        self.z_offset = 0
+
+    def draw(self, t):
+        gl_color, show = self.env.colorspec_to_gl_color_alpha(self.color(t))
+        gl_edge_color, show_edge = self.env.colorspec_to_gl_color_alpha(self.edge_color(t))
+
+        draw_box3d(
+            x_len=self.x_len(t),
+            y_len=self.y_len(t),
+            z_len=self.z_len(t),
+            x=self.x(t) + self.x_offset,
+            y=self.y(t) + self.y_offset,
+            z=self.z(t) + self.z_offset,
+            x_angle=0,
+            y_angle=0,
+            z_angle=self.z_angle(t),
+            x_ref=self.x_ref(t),
+            y_ref=self.y_ref(t),
+            z_ref=self.z_ref(t),
+            gl_color=gl_color,
+            show=show,
+            edge_gl_color=gl_edge_color,
+            show_edge=show_edge,
+            shaded=self.shaded(t),
+        )
+
+
+class Animate3dBar(Animate3dBase):
+    """
+    Creates a 3D bar between two given points
+
+    Parameters
+    ----------
+    x0 : float
+        x coordinate of start point (default 0)
+
+    y0 : float
+        y coordinate of start point (default 0)
+
+    z0 : float
+        z coordinate of start point (default 0)
+
+    x1 : float
+        x coordinate of end point (default 0)
+
+    y1 : float
+        y coordinate of end point (default 0)
+
+    z1 : float
+        z coordinate of end point (default 0)
+
+    color : colorspec
+        color of the bar (default "white") |n|
+        if the color is "" (or the alpha is 0), the sides will not be colored at all
+
+    edge_color : colorspec
+        color of the edges of the (default "") |n|
+        if the color is "" (or the alpha is 0), the edges will not be drawn at all
+
+    shaded : bool
+        if False (default), all sides will be colored with color
+        if True, the various sides will have a sligtly different darkness, thus resulting in a pseudo shaded object
+
+    bar_width : float
+        width of the bar (default 1)
+
+    bar_width_2 : float
+        if not specified both sides will have equal width (bar_width) |n|
+        if specified, the bar will have width bar_width and bar_width_2
+
+    rotation_angle : float
+        rotation of the bar in degrees (default 0)
+
+    visible : bool
+        visible |n|
+        if False, animation object is not shown, shown otherwise
+        (default True)
+
+    layer : int
+         layer value |n|
+         lower layer values are displayed later in the frame (default 0)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically when the parent component is no longer accessible
+
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
+
+    Note
+    ----
+    All parameters, apart from parent, arg and env can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: my_x |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+    """
+
+    def __init__(
+        self,
+        x0=0,
+        y0=0,
+        z0=0,
+        x1=1,
+        y1=1,
+        z1=1,
+        color="white",
+        edge_color="",
+        bar_width=1,
+        bar_width_2=None,
+        shaded=False,
+        rotation_angle=0,
+        show_lids=True,
+        visible=True,
+        arg=None,
+        layer=0,
+        parent=None,
+        env=None,
+        **kwargs
+    ):
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
+
+        self.x0 = x0
+        self.y0 = y0
+        self.z0 = z0
+        self.x1 = x1
+        self.y1 = y1
+        self.z1 = z1
+        self.color = color
+        self.edge_color = edge_color
+        self.bar_width = bar_width
+        self.bar_width_2 = bar_width_2
+        self.shaded = shaded
+        self.rotation_angle = rotation_angle
+        self.show_lids = show_lids
+        self.register_dynamic_attributes("x0 y0 z0 x1 y1 z1 color bar_width bar_width_2 edge_color shaded rotation_angle show_lids")
+        self.x_offset = 0
+        self.y_offset = 0
+        self.z_offset = 0
+
+    def draw(self, t):
+        x0, x1 = self.x0(t) + self.x_offset, self.x1(t) + self.x_offset
+        y0, y1 = self.y0(t) + self.y_offset, self.y1(t) + self.y_offset
+        z0, z1 = self.z0(t) + self.z_offset, self.z1(t) + self.z_offset
+
+        bar_width = self.bar_width(t)
+        bar_width_2 = self.bar_width_2(t)
+        gl_color, show = self.env.colorspec_to_gl_color_alpha(self.color(t))
+        edge_gl_color, show_edge = self.env.colorspec_to_gl_color_alpha(self.edge_color(t))
+        shaded = self.shaded(t)
+        rotation_angle = self.rotation_angle(t)
+        show_lids = self.show_lids(t)
+        draw_bar3d(
+            x0=x0,
+            y0=y0,
+            z0=z0,
+            x1=x1,
+            y1=y1,
+            z1=z1,
+            bar_width=bar_width,
+            bar_width_2=bar_width_2,
+            gl_color=gl_color,
+            show=show,
+            edge_gl_color=edge_gl_color,
+            show_edge=show_edge,
+            shaded=shaded,
+            rotation_angle=rotation_angle,
+            show_lids=show_lids,
+        )
+
+
+class Animate3dCylinder(Animate3dBase):
+    """
+    Creates a 3D cylinder between two given points
+
+    Parameters
+    ----------
+    x0 : float
+        x coordinate of start point (default 0)
+
+    y0 : float
+        y coordinate of start point (default 0)
+
+    z0 : float
+        z coordinate of start point (default 0)
+
+    x1 : float
+        x coordinate of end point (default 0)
+
+    y1 : float
+        y coordinate of end point (default 0)
+
+    z1 : float
+        z coordinate of end point (default 0)
+
+    color : colorspec
+        color of the cylinder (default "white")
+
+    number_of_sides : int
+        number of sides of the cylinder (default 8) |n|
+        must be >= 3
+
+    rotation_angle : float
+        rotation of the bar in degrees (default 0)
+        
+    show_lids : bool
+        if True (default), the lids will be drawn
+        if False, tyhe cylinder will be open at both sides
+
+    visible : bool
+        visible |n|
+        if False, animation object is not shown, shown otherwise
+        (default True)
+
+    layer : int
+         layer value |n|
+         lower layer values are displayed later in the frame (default 0)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically when the parent component is no longer accessible
+
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
+
+    Note
+    ----
+    All parameters, apart from parent, arg and env can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: my_x |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+    """
+
+    def __init__(
+        self,
+        x0=0,
+        y0=0,
+        z0=0,
+        x1=1,
+        y1=1,
+        z1=1,
+        color="white",
+        radius=1,
+        number_of_sides=8,
+        rotation_angle=0,
+        show_lids=True,
+        visible=True,
+        arg=None,
+        layer=0,
+        parent=None,
+        env=None,
+        **kwargs
+    ):
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
+        self.x0 = x0
+        self.y0 = y0
+        self.z0 = z0
+        self.x1 = x1
+        self.y1 = y1
+        self.z1 = z1
+        self.color = color
+        self.radius = radius
+        self.number_of_sides = number_of_sides
+        self.rotation_angle = rotation_angle
+        self.show_lids = show_lids
+        self.register_dynamic_attributes("x0 y0 z0 x1 y1 z1 color radius number_of_sides rotation_angle show_lids")
+        self.x_offset = 0
+        self.y_offset = 0
+        self.z_offset = 0
+
+    def draw(self, t):
+        x0, x1 = self.x0(t) + self.x_offset, self.x1(t) + self.x_offset
+        y0, y1 = self.y0(t) + self.y_offset, self.y1(t) + self.y_offset
+        z0, z1 = self.z0(t) + self.z_offset, self.z1(t) + self.z_offset
+
+        gl_color = self.env.colorspec_to_gl_color(self.color(t))
+        rotation_angle = self.rotation_angle(t)
+        radius = self.radius(t)
+        number_of_sides = self.number_of_sides(t)
+        show_lids = self.show_lids(t)
+        draw_cylinder3d(
+            x0=x0,
+            y0=y0,
+            z0=z0,
+            x1=x1,
+            y1=y1,
+            z1=z1,
+            radius=radius,
+            number_of_sides=number_of_sides,
+            gl_color=gl_color,
+            rotation_angle=rotation_angle,
+            show_lids=show_lids,
+        )
+
+
+def draw_bar3d(
+    x0=0,
+    y0=0,
+    z0=0,
+    x1=1,
+    y1=1,
+    z1=1,
+    gl_color=(1, 1, 1),
+    show=True,
+    edge_gl_color=(1, 1, 1),
+    show_edge=False,
+    bar_width=1,
+    bar_width_2=None,
+    rotation_angle=0,
+    shaded=False,
+    show_lids=True,
+):
+    """
+    draws a 3d bar (should be added to the event loop by encapsulating with Animate3dBase)
+
+    Parameters
+    ----------
+    x0 : int, optional
+        [description], by default 0
+    y0 : int, optional
+        [description], by default 0
+    z0 : int, optional
+        [description], by default 0
+    x1 : int, optional
+        [description], by default 1
+    y1 : int, optional
+        [description], by default 1
+    z1 : int, optional
+        [description], by default 1
+    gl_color : tuple, optional
+        [description], by default (1, 1, 1)
+    show : bool, optional
+        [description], by default True
+    edge_gl_color : tuple, optional
+        [description], by default (1, 1, 1)
+    show_edge : bool, optional
+        [description], by default False
+    bar_width : int, optional
+        [description], by default 1
+    bar_width_2 : [type], optional
+        [description], by default None
+    rotation_angle : int, optional
+        [description], by default 0
+    shaded : bool, optional
+        [description], by default False
+    show_lids : bool, optional
+        [description], by default True
+    """
+    dx = x1 - x0
+    dy = y1 - y0
+    dz = z1 - z0
+
+    length = math.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
+    y_angle = -math.atan2(dz, math.sqrt(dx ** 2 + dy ** 2)) * 180 / math.pi
+    z_angle = math.atan2(dy, dx) * 180 / math.pi
+    bar_width_2 = bar_width if bar_width_2 is None else bar_width_2
+
+    draw_box3d(
+        x=x0,
+        y=y0,
+        z=z0,
+        x_len=length,
+        y_len=bar_width,
+        z_len=bar_width_2,
+        x_angle=rotation_angle,
+        y_angle=y_angle,
+        z_angle=z_angle,
+        x_ref=1,
+        y_ref=0,
+        z_ref=0,
+        gl_color=gl_color,
+        show=show,
+        edge_gl_color=edge_gl_color,
+        show_edge=show_edge,
+        shaded=shaded,
+        _show_lids=show_lids,
+    )
+
+
+def draw_cylinder3d(
+    x0=0,
+    y0=0,
+    z0=0,
+    x1=1,
+    y1=1,
+    z1=1,
+    gl_color=(1, 1, 1),
+    radius=1,
+    number_of_sides=8,
+    rotation_angle=0,
+    show_lids=True,
+):
+    """
+    draws a 3d cylinder (should be added to the event loop by encapsulating with Animate3dBase)
+
+    Parameters
+    ----------
+    x0 : int, optional
+        [description], by default 0
+    y0 : int, optional
+        [description], by default 0
+    z0 : int, optional
+        [description], by default 0
+    x1 : int, optional
+        [description], by default 1
+    y1 : int, optional
+        [description], by default 1
+    z1 : int, optional
+        [description], by default 1
+    gl_color : tuple, optional
+        [description], by default (1, 1, 1)
+    radius : int, optional
+        [description], by default 1
+    number_of_sides : int, optional
+        [description], by default 8
+    rotation_angle : int, optional
+        [description], by default 0
+    show_lids : bool, optional
+        [description], by default True
+    """
+    dx = x1 - x0
+    dy = y1 - y0
+    dz = z1 - z0
+
+    length = math.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
+    y_angle = -math.atan2(dz, math.sqrt(dx ** 2 + dy ** 2)) * 180 / math.pi
+    z_angle = math.atan2(dy, dx) * 180 / math.pi
+    x_angle = rotation_angle
+    gl.glPushMatrix()
+    gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color)
+
+    gl.glTranslate(x0, y0, z0)
+    if z_angle:
+        gl.glRotate(z_angle, 0.0, 0.0, 1.0)
+    if y_angle:
+        gl.glRotate(y_angle, 0.0, 1.0, 0.0)
+    if x_angle:
+        gl.glRotate(x_angle, 1.0, 0.0, 0.0)
+
+    step_angle = 360 / number_of_sides
+    start_angle = -90 + step_angle / 2
+
+    two_d_vertices = []
+    for i in range(number_of_sides):
+        angle = (i * step_angle + start_angle) * math.pi / 180.0
+        two_d_vertices.append((radius * math.cos(angle), radius * math.sin(angle)))
+    two_d_vertices.append(two_d_vertices[0])
+
+    if show_lids:
+        """ draw front lid """
+        gl.glBegin(gl.GL_TRIANGLE_FAN)
+        gl.glNormal3f(-1, 0, 0)
+        for two_d_vertex in two_d_vertices:
+            gl.glVertex3f(0, two_d_vertex[0], two_d_vertex[1])
+        gl.glEnd()
+
+        """ draw back lid """
+        gl.glBegin(gl.GL_TRIANGLE_FAN)
+        gl.glNormal3f(1, 0, 0)
+        for two_d_vertex in two_d_vertices:
+            gl.glVertex3f(length, two_d_vertex[0], two_d_vertex[1])
+        gl.glEnd()
+
+    """ draw sides """
+    gl.glBegin(gl.GL_QUADS)
+    for i, (two_d_vertex0, two_d_vertex1) in enumerate(zip(two_d_vertices, two_d_vertices[1:])):
+        a1 = (start_angle + (i + 0.5) * step_angle) * (math.pi / 180.0)
+        gl.glNormal3f(0, math.cos(a1), math.sin(a1))
+        gl.glVertex3f(0, *two_d_vertex0)
+        gl.glVertex3f(length, *two_d_vertex0)
+        gl.glVertex3f(length, *two_d_vertex1)
+        gl.glVertex3f(0, *two_d_vertex1)
+    gl.glEnd()
+
+    gl.glPopMatrix()
+
+
+def draw_line3d(x0=0, y0=0, z0=0, x1=1, y1=1, z1=1, gl_color=(1, 1, 1)):
+    """
+    draws a 3d line (should be added to the event loop by encapsulating with Animate3dBase)
+
+    Parameters
+    ----------
+    x0 : int, optional
+        [description], by default 0
+    y0 : int, optional
+        [description], by default 0
+    z0 : int, optional
+        [description], by default 0
+    x1 : int, optional
+        [description], by default 1
+    y1 : int, optional
+        [description], by default 1
+    z1 : int, optional
+        [description], by default 1
+    gl_color : tuple, optional
+        [description], by default (1, 1, 1)
+    """
+    gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color)
+
+    gl.glBegin(gl.GL_LINES)
+    gl.glVertex3f(x0, y0, z0)
+    gl.glVertex3f(x1, y1, z1)
+    gl.glEnd()
+
+
+def draw_rectangle3d(x0=0, y0=0, z=0, x1=1, y1=1, gl_color=(1, 1, 1)):
+    """
+    draws a 3d rectangle (should be added to the event loop by encapsulating with Animate3dBase)
+
+    Parameters
+    ----------
+    x0 : int, optional
+        [description], by default 0
+    y0 : int, optional
+        [description], by default 0
+    z : int, optional
+        [description], by default 0
+    x1 : int, optional
+        [description], by default 1
+    y1 : int, optional
+        [description], by default 1
+    gl_color : tuple, optional
+        [description], by default (1, 1, 1)
+    """
+    gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color)
+
+    gl.glBegin(gl.GL_QUADS)
+    gl.glVertex3f(x0, y0, z)
+    gl.glVertex3f(x1, y0, z)
+    gl.glVertex3f(x1, y1, z)
+    gl.glVertex3f(x0, y1, z)
+    gl.glEnd()
+
+
+def draw_box3d(
+    x_len=1,
+    y_len=1,
+    z_len=1,
+    x=0,
+    y=0,
+    z=0,
+    x_angle=0,
+    y_angle=0,
+    z_angle=0,
+    x_ref=0,
+    y_ref=0,
+    z_ref=0,
+    gl_color=(1, 1, 1),
+    show=True,
+    edge_gl_color=(1, 1, 1),
+    show_edge=False,
+    shaded=False,
+    _show_lids=True,
+):
+    """
+    draws a 3d box (should be added to the event loop by encapsulating with Animate3dBase)
+
+    Parameters
+    ----------
+    x_len : int, optional
+        [description], by default 1
+    y_len : int, optional
+        [description], by default 1
+    z_len : int, optional
+        [description], by default 1
+    x : int, optional
+        [description], by default 0
+    y : int, optional
+        [description], by default 0
+    z : int, optional
+        [description], by default 0
+    x_angle : int, optional
+        [description], by default 0
+    y_angle : int, optional
+        [description], by default 0
+    z_angle : int, optional
+        [description], by default 0
+    x_ref : int, optional
+        [description], by default 0
+    y_ref : int, optional
+        [description], by default 0
+    z_ref : int, optional
+        [description], by default 0
+    gl_color : tuple, optional
+        [description], by default (1, 1, 1)
+    show : bool, optional
+        [description], by default True
+    edge_gl_color : tuple, optional
+        [description], by default (1, 1, 1)
+    show_edge : bool, optional
+        [description], by default False
+    shaded : bool, optional
+        [description], by default False
+    _show_lids : bool, optional
+        [description], by default True
+    """
+    gl_color0 = gl_color
+    if shaded:
+        gl_color1 = (gl_color0[0] * 0.9, gl_color0[1] * 0.9, gl_color0[2] * 0.9)
+        gl_color2 = (gl_color0[0] * 0.8, gl_color0[1] * 0.8, gl_color0[2] * 0.8)
+    else:
+        gl_color1 = gl_color2 = gl_color0
+
+    x1 = ((x_ref - 1) / 2) * x_len
+    x2 = ((x_ref + 1) / 2) * x_len
+
+    y1 = ((y_ref - 1) / 2) * y_len
+    y2 = ((y_ref + 1) / 2) * y_len
+
+    z1 = ((z_ref - 1) / 2) * z_len
+    z2 = ((z_ref + 1) / 2) * z_len
+
+    bv = [[x1, y1, z1], [x2, y1, z1], [x2, y2, z1], [x1, y2, z1], [x1, y1, z2], [x2, y1, z2], [x2, y2, z2], [x1, y2, z2]]
+
+    gl.glPushMatrix()
+
+    gl.glTranslate(x, y, z)
+    if z_angle:
+        gl.glRotate(z_angle, 0.0, 0.0, 1.0)
+    if y_angle:
+        gl.glRotate(y_angle, 0.0, 1.0, 0.0)
+    if x_angle:
+        gl.glRotate(x_angle, 1.0, 0.0, 0.0)
+
+    if show:
+        gl.glBegin(gl.GL_QUADS)
+
+        # bottom z-
+        gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color0)
+        gl.glNormal(0, 0, -1)
+        gl.glVertex3f(*bv[0])
+        gl.glVertex3f(*bv[1])
+        gl.glVertex3f(*bv[2])
+        gl.glVertex3f(*bv[3])
+
+        # top z+
+        gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color0)
+        gl.glNormal3f(0, 0, 1)
+        gl.glVertex3f(*bv[4])
+        gl.glVertex3f(*bv[5])
+        gl.glVertex3f(*bv[6])
+        gl.glVertex3f(*bv[7])
+
+        # left y-
+        gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color1)
+        gl.glNormal3f(0, -1, 0)
+        gl.glVertex3f(*bv[0])
+        gl.glVertex3f(*bv[1])
+        gl.glVertex3f(*bv[5])
+        gl.glVertex3f(*bv[4])
+
+        # right y+
+        gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color1)
+        gl.glNormal3f(0, 1, 0)
+        gl.glVertex3f(*bv[2])
+        gl.glVertex3f(*bv[3])
+        gl.glVertex3f(*bv[7])
+        gl.glVertex3f(*bv[6])
+
+        if _show_lids:
+            # front x+
+            gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color2)
+            gl.glNormal3f(1, 0, 0)
+            gl.glVertex3f(*bv[1])
+            gl.glVertex3f(*bv[2])
+            gl.glVertex3f(*bv[6])
+            gl.glVertex3f(*bv[5])
+
+            # front x-
+            gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color2)
+            gl.glNormal3f(-1, 0, 0)
+            gl.glVertex3f(*bv[3])
+            gl.glVertex3f(*bv[0])
+            gl.glVertex3f(*bv[4])
+            gl.glVertex3f(*bv[7])
+
+        gl.glEnd()
+
+    if show_edge:
+        gl.glBegin(gl.GL_LINES)
+        gl_color = (1, 0, 1)
+        gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, edge_gl_color)
+
+        gl.glVertex3f(*bv[0])
+        gl.glVertex3f(*bv[4])
+
+        gl.glVertex3f(*bv[4])
+        gl.glVertex3f(*bv[7])
+
+        gl.glVertex3f(*bv[7])
+        gl.glVertex3f(*bv[3])
+
+        gl.glVertex3f(*bv[3])
+        gl.glVertex3f(*bv[0])
+
+        gl.glVertex3f(*bv[5])
+        gl.glVertex3f(*bv[6])
+
+        gl.glVertex3f(*bv[6])
+        gl.glVertex3f(*bv[2])
+
+        gl.glVertex3f(*bv[2])
+        gl.glVertex3f(*bv[1])
+
+        gl.glVertex3f(*bv[1])
+        gl.glVertex3f(*bv[5])
+
+        gl.glVertex3f(*bv[0])
+        gl.glVertex3f(*bv[1])
+
+        gl.glVertex3f(*bv[4])
+        gl.glVertex3f(*bv[5])
+
+        gl.glVertex3f(*bv[7])
+        gl.glVertex3f(*bv[6])
+
+        gl.glVertex3f(*bv[3])
+        gl.glVertex3f(*bv[2])
+
+        gl.glEnd()
+
+    gl.glPopMatrix()
+
+
 def _std_fonts():
     # the names of the standard fonts are generated by ttf fontdict.py on the standard development machine
     if not hasattr(_std_fonts, "cached"):
@@ -17938,7 +19646,7 @@ def fonts():
             dirs.append(Path("/system/fonts"))  # for android
 
         for dir in dirs:
-            for file_path in dir.glob("**/*.*"):  # ***
+            for file_path in dir.glob("**/*.*"):
                 if file_path.suffix.lower() == ".ttf":
                     file = str(file_path)
                     fn = os.path.basename(file).split(".")[0]
@@ -18162,6 +19870,33 @@ def can_animate(try_only=True):
                 raise ImportError("tkinter is required for animation")
 
     return True
+
+
+def can_animate3d(try_only=True):
+    """
+    Tests whether 3d animation is supported.
+
+    Parameters
+    ----------
+    try_only : bool
+        if True (default), the function does not raise an error when the required modules cannot be imported |n|
+        if False, the function will only return if the required modules could be imported.
+
+    Returns
+    -------
+    True, if required modules were imported, False otherwise : bool
+    """
+    if can_animate(try_only=True):
+        if gl is None:
+            raise ImportError("OpenGL is required for animation3d. Install with pip install OpenGL or see salabim manual")
+
+        return True
+
+    else:
+        if try_only:
+            return False
+        else:
+            raise ImportError("cannot even animate, let alone animate3d")
 
 
 def can_video(try_only=True):

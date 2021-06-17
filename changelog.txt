@@ -1,22 +1,53 @@
 salabim changelog
 
+version 21.1.0  2021-06-17
+==========================
+Added functionality (0)
+-----------------------
+This version introduces 3D animation. That's a very powerful feature that
+required users at least to know how to do 2D animation.
+
+Note that the API is still work in progress and might change.
+
+Note that the documetation is not properly updated. Only the reference section
+contains is now up-to-date.
+In intend to update the documentation soon. Volunteers to help with that are welcome!
+
+The sample 3d models folder on GitHub contains a couple of demo models, that
+could be used as a start.
+
+Changed functionality (0)
+-------------------------
+When Stop is pressed from the menu, the program now correctly exits, instead of returning to main.
+
+Changed functionality (1)
+-------------------------
+Color name 'lightgrey' added, as this is present in the X11 color name standard, but was absent in salabim.
+Color name 'sandybrown' updated, to be in line with the X11 color name standard
+
+Bugfix (0)
+----------
+If video specified an extension with a coded, like .mp4+h264, the output file extension incorrectly
+contained the codec information.
+From this version on, the codec information is skipped in the resulting filename.
+
 version 21.0.4  2021-05-01
 ==========================
-Bug fix (0)
+Bugfix (0)
 -----------
 When a non-level monitor was sliced, the stop value was included in the slice,
 so causing an overlap with a slice that started at that value.
 Fixed.
 
-Bug fix (1)
+Bugfix (1)
 -----------
 When run on a Chromebook (at least on a Lenovo Duet), the menu buttons were far too big. Fixed.
 
-Bug fix (2)
+Bugfix (2)
 -----------
 On Linux platforms fonts not having the .ttf extension (particularly .TTF) were not found. Fixed.
 
-Bug fix (3)
+Bugfix (3)
 -----------
 PeriodMonitors now get the stats_only flag from the parent monitor.
 PeriodMonitors now correctly tally the weight.
