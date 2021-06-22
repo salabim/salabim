@@ -49,46 +49,20 @@ def do_animation():
     xdoor = {left: -0.5 * locklength, right: 0.5 * locklength}
     xbound = {left: -1.2 * locklength, right: 1.2 * locklength}
 
-    env.animation_parameters(
-        x0=xbound[left], y0=-waterdepth, x1=xbound[right], modelname="Lock", speed=8, background_color="20%gray"
-    )
+    env.animation_parameters(animate=True, x0=xbound[left], y0=-waterdepth, x1=xbound[right], modelname="Lock", speed=8, background_color="20%gray")
 
     for side in [left, right]:
         sim.AnimateQueue(queue=wait[side], x=xdoor[side], y=10 + ylevel[side], direction="n", title="")
 
     sim.AnimateRectangle(spec=(xbound[left], ylevel[left] - waterdepth, xdoor[left], ylevel[left]), fillcolor="aqua")
-    sim.AnimateRectangle(
-        spec=(xdoor[right], ylevel[right] - waterdepth, xbound[right], ylevel[right]), fillcolor="aqua"
-    )
+    sim.AnimateRectangle(spec=(xdoor[right], ylevel[right] - waterdepth, xbound[right], ylevel[right]), fillcolor="aqua")
     sim.AnimateRectangle(spec=lock_water_rectangle, fillcolor="aqua")
     sim.AnimateRectangle(spec=lock_door_left_rectangle)
     sim.AnimateRectangle(spec=lock_door_right_rectangle)
 
+    sim.AnimateSlider(x=520, y=0, width=100, height=20, vmin=16, vmax=60, resolution=4, v=iat, label="iat", action=set_iat, xy_anchor="nw")
     sim.AnimateSlider(
-        x=520,
-        y=0,
-        width=100,
-        height=20,
-        vmin=16,
-        vmax=60,
-        resolution=4,
-        v=iat,
-        label="iat",
-        action=set_iat,
-        xy_anchor="nw",
-    )
-    sim.AnimateSlider(
-        x=660,
-        y=0,
-        width=100,
-        height=20,
-        vmin=10,
-        vmax=60,
-        resolution=5,
-        v=meanlength,
-        label="mean length",
-        action=set_meanlength,
-        xy_anchor="nw",
+        x=660, y=0, width=100, height=20, vmin=10, vmax=60, resolution=5, v=meanlength, label="mean length", action=set_meanlength, xy_anchor="nw"
     )
     sim.AnimateMonitor(
         wait[left].length,
@@ -143,13 +117,7 @@ def do_animation():
         title=lambda: "Waiting time of ships left. Mean={:10.2f}".format(wait[right].length_of_stay.mean()),
     )
 
-    sim.AnimateQueue(
-        queue=lockqueue,
-        x=lambda: xdoor[-lock.sideq],
-        y=lock_y,
-        direction=lambda: "w" if lock.sideq == left else "e",
-        title="",
-    )
+    sim.AnimateQueue(queue=lockqueue, x=lambda: xdoor[-lock.sideq], y=lock_y, direction=lambda: "w" if lock.sideq == left else "e", title="")
 
 
 def set_iat(val):
