@@ -1,13 +1,13 @@
-#               _         _      _               ____   _     _      ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |    / _ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |   | | | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _ | |_| |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_)|_|(_) \___/
+#               _         _      _               ____   _     _     _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |   / |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |   | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _ | |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_)|_|(_)|_|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "21.1.0"
+__version__ = "21.1.1"
 
 import heapq
 import random
@@ -40,13 +40,7 @@ import functools
 
 from pathlib import Path
 
-try:
-    import OpenGL.GL as gl
-    import OpenGL.GLU as glu
-    import OpenGL.GLUT as glut
-except ImportError:
-    gl = glu = glut = None
-
+from ycecream import yc
 
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
@@ -2622,18 +2616,13 @@ class _CapacityMonitor(Monitor):
 
 
 class _ModeMonitor(Monitor):
-    def __init__(self, component, *args, **kwargs):
-        self.component = component
-        super().__init__(*args, **kwargs)
-
     @property
     def value(self):
         return self._tally
 
     @value.setter
     def value(self, value):
-        self.component._mode_time = self.env._now
-        self.tally(value)
+        raise ValueError("not allowed to use set value! Use setmode() instead")
 
 
 class _StatusMonitor(Monitor):
@@ -3270,6 +3259,72 @@ class Queue(object):
 
         """
         return AnimateQueue(self, *args, **kwargs)
+
+    def animate3d(self, *args, **kwargs):
+        """
+        Animates the components in the queue in 3D.
+
+        Parameters
+        x : float
+            x-position of the first component in the queue |n|
+            default: 0
+
+        y : float
+            y-position of the first component in the queue |n|
+            default: 0
+
+        z : float
+            z-position of the first component in the queue |n|
+            default: 0
+
+        direction : str
+            if "x+", waiting line runs in positive x direction (default) |n|
+            if "x-", waiting line runs in negative x direction |n|
+            if "y+", waiting line runs in positive y direction |n|
+            if "y-", waiting line runs in negative y direction |n|
+            if "z+", waiting line runs in positive z direction |n|
+            if "z-", waiting line runs in negative z direction |n|
+
+        reverse : bool
+            if False (default), display in normal order. If True, reversed.
+
+        max_length : int
+            maximum number of components to be displayed
+
+        layer : int
+            layer (default 0)
+
+        id : any
+            the animation works by calling the animation_objects method of each component, optionally
+            with id. By default, this is self, but can be overriden, particularly with the queue
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        Returns
+        -------
+        reference to Animation3dQueue object : Animation3dQueue
+
+        Note
+        ----
+        It is recommended to use sim.AnimatedQueue instead |n|
+
+        All parameters, apart from queue and arg can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: title |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+
+        """
+        return Animate3dQueue(self, *args, **kwargs)
 
     def all_monitors(self):
         """
@@ -4776,8 +4831,8 @@ class Environment(object):
             ao.update(t)
 
     def animation3d_init(self):
-        can_animate3d()
-        glut.glutInit(sys.argv)
+        can_animate3d(try_only=False)
+        glut.glutInit()
         glut.glutInitDisplayMode(glut.GLUT_RGBA | glut.GLUT_DOUBLE | glut.GLUT_DEPTH)
         glut.glutInitWindowSize(self._width3d, self._height3d)
         glut.glutInitWindowPosition(*self._position3d)
@@ -4794,12 +4849,11 @@ class Environment(object):
         glut.glutDisplayFunc(lambda: None)
         self._gl_initialized = True
 
-    def camera_rotate(self, event, degrees):
-        radians = degrees * math.pi / 180
+    def camera_rotate(self, event, delta_angle):
         adjusted_x = self.view.x_eye(self.t) - self.view.x_center(self.t)
         adjusted_y = self.view.y_eye(self.t) - self.view.y_center(self.t)
-        cos_rad = math.cos(radians)
-        sin_rad = math.sin(radians)
+        cos_rad = math.cos(math.radians(delta_angle))
+        sin_rad = math.sin(math.radians(delta_angle))
         self.view.x_eye = self.view.x_center(self.t) + cos_rad * adjusted_x + sin_rad * adjusted_y
         self.view.y_eye = self.view.y_center(self.t) - sin_rad * adjusted_x + cos_rad * adjusted_y
 
@@ -4812,8 +4866,41 @@ class Environment(object):
         self.view.x_center = self.view.x_center(self.t) + x_dis
         self.view.y_center = self.view.y_center(self.t) + y_dis
 
+    def camera_xy_eye(self, event, x_dis, y_dis):
+        self.view.x_eye = self.view.x_eye(self.t) + x_dis
+        self.view.y_eye = self.view.y_eye(self.t) + y_dis
+
     def camera_field_of_view(self, event, factor):
         self.view.field_of_view_y = self.view.field_of_view_y(self.t) * factor
+
+    def camera_tilt(self, event, delta_angle):
+        x_eye = self.view.x_eye(self.t)
+        y_eye = self.view.y_eye(self.t)
+        z_eye = self.view.z_eye(self.t)
+        x_center = self.view.x_center(self.t)
+        y_center = self.view.y_center(self.t)
+        z_center = self.view.z_center(self.t)
+
+        dx = x_eye - x_center
+        dy = y_eye - y_center
+        dz = z_eye - z_center
+        dxy = math.hypot(dx, dy)
+        if dy > 0:
+            dxy = -dxy
+        alpha = math.degrees(math.atan2(dxy, dz))
+        alpha_new = alpha + delta_angle
+        dxy_new = math.tan(math.radians(alpha_new)) * dz
+
+        self.view.x_center = x_eye + (dxy_new / dxy) * (x_center - x_eye)
+        self.view.y_center = y_eye + (dxy_new / dxy) * (y_center - y_eye)
+
+    def camera_rotate_axis(self, event, delta_angle):
+        adjusted_x = self.view.x_center(self.t) - self.view.x_eye(self.t)
+        adjusted_y = self.view.y_center(self.t) - self.view.y_eye(self.t)
+        cos_rad = math.cos(math.radians(delta_angle))
+        sin_rad = math.sin(math.radians(delta_angle))
+        self.view.x_center = self.view.x_eye(self.t) + cos_rad * adjusted_x + sin_rad * adjusted_y
+        self.view.y_center = self.view.y_eye(self.t) - sin_rad * adjusted_x + cos_rad * adjusted_y
 
     def camera_print(self, event):
         print(
@@ -4821,8 +4908,8 @@ class Environment(object):
         )
 
     def camera_control(self):
-        self.root.bind("<Left>", functools.partial(self.camera_rotate, degrees=-5))
-        self.root.bind("<Right>", functools.partial(self.camera_rotate, degrees=+5))
+        self.root.bind("<Left>", functools.partial(self.camera_rotate, delta_angle=-1))
+        self.root.bind("<Right>", functools.partial(self.camera_rotate, delta_angle=+1))
 
         self.root.bind("<Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=0.9))
         self.root.bind("<Down>", functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1 / 0.9))
@@ -4833,17 +4920,33 @@ class Environment(object):
         self.root.bind("<Shift-Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=1))
         self.root.bind("<Shift-Down>", functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1))
 
-        self.root.bind("x", functools.partial(self.camera_xy_center, x_dis=-10, y_dis=0))
-        self.root.bind("X", functools.partial(self.camera_xy_center, x_dis=10, y_dis=0))
-        self.root.bind("y", functools.partial(self.camera_xy_center, x_dis=0, y_dis=-10))
-        self.root.bind("Y", functools.partial(self.camera_xy_center, x_dis=0, y_dis=10))
+        self.root.bind("<Alt-Left>", functools.partial(self.camera_xy_eye, x_dis=-10, y_dis=0))
+        self.root.bind("<Alt-Right>", functools.partial(self.camera_xy_eye, x_dis=10, y_dis=0))
+        self.root.bind("<Alt-Down>", functools.partial(self.camera_xy_eye, x_dis=0, y_dis=-10))
+        self.root.bind("<Alt-Up>", functools.partial(self.camera_xy_eye, x_dis=0, y_dis=10))
+
+        self.root.bind("<Control-Left>", functools.partial(self.camera_xy_center, x_dis=-10, y_dis=0))
+        self.root.bind("<Control-Right>", functools.partial(self.camera_xy_center, x_dis=10, y_dis=0))
+        self.root.bind("<Control-Down>", functools.partial(self.camera_xy_center, x_dis=0, y_dis=-10))
+        self.root.bind("<Control-Up>", functools.partial(self.camera_xy_center, x_dis=0, y_dis=10))
 
         self.root.bind("o", functools.partial(self.camera_field_of_view, factor=0.9))
         self.root.bind("O", functools.partial(self.camera_field_of_view, factor=1 / 0.9))
 
+        self.root.bind("t", functools.partial(self.camera_tilt, delta_angle=-1))
+        self.root.bind("T", functools.partial(self.camera_tilt, delta_angle=1))
+
+        self.root.bind("r", functools.partial(self.camera_rotate_axis, delta_angle=1))
+        self.root.bind("R", functools.partial(self.camera_rotate_axis, delta_angle=-1))
+
         self.root.bind("p", functools.partial(self.camera_print))
 
     def show_camera_position(self):
+        """
+        show camera position on the tkinter window
+
+        The 7 camera settings will be shown in the top left corner. 
+        """
 
         for i, prop in enumerate("x_eye y_eye z_eye x_center y_center z_center field_of_view_y".split()):
             ao = AnimateRectangle(spec=(0, 0, 75, 35), fillcolor="30%gray", x=5 + i * 80, y=self.height() - 90, screen_coordinates=True)
@@ -4965,14 +5068,14 @@ class Environment(object):
 
     def _terminate(self, c):
         if c._process_isgenerator:
-            if self._trace and not self.suppress_trace_linenumbers:
+            if self._trace and not self._suppress_trace_linenumbers:
                 gi_code = c._process.gi_code
                 gs = inspect.getsourcelines(gi_code)
                 s0 = self.filename_lineno_to_str(gi_code.co_filename, len(gs[0]) + gs[1] - 1) + "+"
             else:
                 s0 = None
         else:
-            if self._trace and not self.suppress_trace_linenumbers:
+            if self._trace and not self._suppress_trace_linenumbers:
                 gs = inspect.getsourcelines(c._process)
                 s0 = self.filename_lineno_to_str(c._process.__code__.co_filename, len(gs[0]) + gs[1] - 1) + "+"
             else:
@@ -5561,6 +5664,11 @@ class Environment(object):
 
     def capture_image(self, mode="RGBA", as_gl=False):
         if as_gl:
+            self.an_objects3d.sort(key=lambda obj: (obj.layer(self.t), obj.sequence))
+            for an in self.an_objects3d:
+                if an.visible(self.t):
+                    an.draw(self.t)
+
             width = self._width3d
             height = self._height3d
             # https://stackoverflow.com/questions/41126090/how-to-write-pyopengl-in-to-jpg-image
@@ -9012,8 +9120,9 @@ class Animate:
                     linecolor = self.env.colorspec_to_tuple(self.linecolor(t))
                     fillcolor = self.env.colorspec_to_tuple(self.fillcolor(t))
 
-                    cosa = math.cos(angle * math.pi / 180)
-                    sina = math.sin(angle * math.pi / 180)
+                    cosa = math.cos(math.radians(angle))
+                    sina = math.sin(math.radians(angle))
+
                     if self.screen_coordinates:
                         qx = x
                         qy = y
@@ -9091,9 +9200,8 @@ class Animate:
                             arc_angle = arc_angle0
                             ended = False
                             while True:
-                                arc_angle_radians = math.pi * arc_angle / 180
-                                sint = math.sin(arc_angle_radians)
-                                cost = math.cos(arc_angle_radians)
+                                sint = math.sin(math.radians(arc_angle))
+                                cost = math.cos(math.radians(arc_angle))
                                 x, y = (radius0 * cost, radius1 * sint)
                                 p.append(x)
                                 p.append(y)
@@ -9254,8 +9362,8 @@ class Animate:
                     dx, dy = anchor_to_dis[anchor.lower()]
                     dx = dx * self.imwidth + offsetx
                     dy = dy * self.imheight + offsety
-                    cosa = math.cos(angle * math.pi / 180)
-                    sina = math.sin(angle * math.pi / 180)
+                    cosa = math.cos(math.radians(angle))
+                    sina = math.sin(math.radians(angle))
                     ex = dx * cosa - dy * sina
                     ey = dx * sina + dy * cosa
                     imrwidth, imrheight = self._image.size
@@ -9382,8 +9490,8 @@ class Animate:
                     dx = dx * self.imwidth + offsetx - 0.1 * fontsize
 
                     dy = dy * self.imheight + offsety
-                    cosa = math.cos(angle * math.pi / 180)
-                    sina = math.sin(angle * math.pi / 180)
+                    cosa = math.cos(math.radians(angle))
+                    sina = math.sin(math.radians(angle))
                     ex = dx * cosa - dy * sina
                     ey = dx * sina + dy * cosa
                     imrwidth, imrheight = self._image.size
@@ -11781,95 +11889,6 @@ class _Animate_t_Line(Animate):
         return x, 0, x, self.height
 
 
-class AnimateBlock(Animate3dBase):
-    def __init__(self, length=1, width=1, height=1, x=0, y=0, z=0, xa=0, ya=0, za=0, color="", **kwargs):
-        super().__init__(**kwargs)
-        self.length = length
-        self.width = width
-        self.height = height
-        self.x = x
-        self.y = y
-        self.z = z
-        self.xa = xa
-        self.ya = ya
-        self.za = za
-        self.color = color
-
-    def show(self, t):
-        length = _call(self.length, t, self.arg)
-        width = _call(self.width, t, self.arg)
-        height = _call(self.height, t, self.arg)
-        x = _call(self.x, t, self.arg)
-        y = _call(self.y, t, self.arg)
-        z = _call(self.x, t, self.arg)
-        xa = _call(self.xa, t, self.arg)
-        ya = _call(self.ya, t, self.arg)
-        za = _call(self.xa, t, self.arg)
-
-        color = _call(self.color, t, self.arg)
-
-        color_tuple = self.env.colorspec_to_tuple(color)
-        gl_color = (color_tuple[0] / 255, color_tuple[1] / 255, color_tuple[2] / 255)
-
-        l2 = 0.5 * length
-        w2 = 0.5 * width
-        h2 = 0.5 * height
-        gl.glPushMatrix()
-        gl.glTranslate(x, y, z)
-        gl.glRotate(xa, 1.0, 0.0, 0.0)
-        gl.glRotate(ya, 0.0, 1.0, 0.0)
-        gl.glRotate(za, 0.0, 0.0, 1.0)
-        gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color)
-        gl.glBegin(gl.GL_QUADS)
-
-        """ bottom z- """
-
-        gl.glNormal3f(0, 0, -1)
-        gl.glVertex3f(-l2, -w2, -h2)
-        gl.glVertex3f(l2, -w2, -h2)
-        gl.glVertex3f(l2, w2, -h2)
-        gl.glVertex3f(-l2, w2, -h2)
-        """ top z+ """
-
-        gl.glNormal3f(0, 0, 1)
-        gl.glVertex3f(-l2, -w2, h2)
-        gl.glVertex3f(l2, -w2, h2)
-        gl.glVertex3f(l2, w2, h2)
-        gl.glVertex3f(-l2, w2, h2)
-
-        """ left y- """
-        gl.glNormal3f(0, -1, 0)
-        gl.glVertex3f(-l2, -w2, -h2)
-        gl.glVertex3f(l2, -w2, -h2)
-        gl.glVertex3f(l2, -w2, h2)
-        gl.glVertex3f(-l2, -w2, h2)
-
-        """ right y+ """
-        gl.glNormal3f(0, 1, 0)
-        gl.glVertex3f(-l2, w2, -h2)
-        gl.glVertex3f(l2, w2, -h2)
-        gl.glVertex3f(l2, w2, h2)
-        gl.glVertex3f(-l2, w2, h2)
-
-        """ rear x- """
-        gl.glNormal3f(-1, 0, 0)
-        gl.glVertex3f(-l2, -w2, -h2)
-        gl.glVertex3f(-l2, -w2, h2)
-        gl.glVertex3f(-l2, w2, h2)
-        gl.glVertex3f(-l2, w2, -h2)
-
-        """ front x+ """
-
-        gl.glNormal3f(1, 0, 0)
-        gl.glVertex3f(l2, -w2, -h2)
-        gl.glVertex3f(l2, -w2, h2)
-        gl.glVertex3f(l2, w2, h2)
-        gl.glVertex3f(l2, w2, -h2)
-        gl.glEnd()
-
-        gl.glPopMatrix()
-
-
 class Component(object):
     """Component object
 
@@ -11983,7 +12002,7 @@ class Component(object):
         self._creation_time = self.env._now
         self._suppress_trace = suppress_trace
         self._suppress_pause_at_step = suppress_pause_at_step
-        self.mode = _ModeMonitor(name=self.name() + ".mode", level=True, initial_tally=mode, component=self, env=self.env)
+        self.mode = _ModeMonitor(name=self.name() + ".mode", level=True, initial_tally=mode, env=self.env)
         self._mode_time = self.env._now
         self._aos = {}
         self._animation_children = set()
@@ -12061,9 +12080,16 @@ class Component(object):
         self.setup(**kwargs)
 
     def __del__(self):
+        self.remove_animation_children()
+
+    def remove_animation_children(self):
+        """
+        removes all animation objects which has this as a parent
+        """
         if hasattr(self, "_animation_children"):  # prevent problems with not fully initialized components
-            for ao in set(self._animation_children):  # copy required, because elements are removed
+            for ao in self._animation_children:
                 ao.remove()
+            del self._animation_children
 
     def animation_objects(self, id):
         """
@@ -13495,7 +13521,8 @@ class Component(object):
             if omitted, no change
         """
         if value is not None:
-            self.mode.value = value
+            self._mode_time = self.env._now
+            self.mode.tally(value)
 
     def _modetxt(self):
         if self.mode() == "":
@@ -14332,6 +14359,7 @@ class _BlindVideoMaker(Component):
             self.env.t = self.env._now
             self.env.animation_pre_tick_sys(self.env.t)  # required to update sys objects, like AnimateQueue
             self.env.animation_pre_tick_sys(self.env.t)
+
             self.env.save_frame()
             self.env.frame_number += 1
             yield self.hold(self.env._speed / self.env._fps)
@@ -18270,28 +18298,52 @@ class _AnimateIntro(Animate3dBase):
         self.x_center = 0
         self.y_center = 0
         self.z_center = 0
-        self.x_up = 0
-        self.y_up = 0
-        self.z_up = 1
-        self.model_lights_pname = gl.GL_LIGHT_MODEL_AMBIENT
+        self.model_lights_pname = None
         self.model_lights_param = (0.42, 0.42, 0.42, 1)
-        self.lights_light = gl.GL_LIGHT0
-        self.lights_pname = gl.GL_POSITION
+        self.lights_light = None
+        self.lights_pname = None
         self.lights_param = (-1, -1, 1, 0)
 
-        self.register_dynamic_attributes("field_of_view_y z_near z_far x_eye y_eye z_eye x_center y_center z_center x_up y_up z_up")
+        self.register_dynamic_attributes("field_of_view_y z_near z_far x_eye y_eye z_eye x_center y_center z_center")
         self.register_dynamic_attributes("model_lights_pname model_lights_param lights_light lights_pname lights_param")
 
     def draw(self, t):
+        x_eye = self.x_eye(t)
+        y_eye = self.y_eye(t)
+        z_eye = self.z_eye(t)
+        x_center = self.x_center(t)
+        y_center = self.y_center(t)
+        z_center = self.z_center(t)
+        x_up = 0
+        y_up = 0
+
+        dx = x_eye - x_center
+        dy = y_eye - y_center
+        dz = z_eye - z_center
+        dxy = math.hypot(dx, dy)
+        if dy > 0:
+            dxy = -dxy
+        alpha = math.degrees(math.atan2(dxy, dz))
+        if alpha < 0:
+            z_up = +1
+        else:
+            z_up = 1
+
+        if self.model_lights_pname(t) is None:
+            self.model_lights_pname = gl.GL_LIGHT_MODEL_AMBIENT  # in principal only at first call
+        if self.lights_light(t) is None:
+            self.lights_light = gl.GL_LIGHT0  # in principal only at first call
+        if self.lights_pname(t) is None:
+            self.lights_pname = gl.GL_POSITION  # in principal only at first call
+
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
 
         gl.glMatrixMode(gl.GL_PROJECTION)
 
         gl.glLoadIdentity()
         glu.gluPerspective(self.field_of_view_y(t), glut.glutGet(glut.GLUT_WINDOW_WIDTH) / glut.glutGet(glut.GLUT_WINDOW_HEIGHT), self.z_near(t), self.z_far(t))
-        glu.gluLookAt(
-            self.x_eye(t), self.y_eye(t), self.z_eye(t), self.x_center(t), self.y_center(t), self.z_center(t), self.x_up(t), self.y_up(t), self.z_up(t)
-        )
+
+        glu.gluLookAt(x_eye, y_eye, z_eye, x_center, y_center, z_center, x_up, y_up, z_up)
         gl.glEnable(gl.GL_LIGHTING)
         gl.glLightModelfv(self.model_lights_pname(t), self.model_lights_param(t))
         gl.glLightfv(self.lights_light(t), self.lights_pname(t), self.lights_param(t))
@@ -18628,7 +18680,7 @@ class Animate3dLine(Animate3dBase):
     - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
     """
 
-    def __init__(self, x0=0, y0=0, z0=0, x1=1, y1=1, z1=0, color="red", visible=True, arg=None, layer=0, parent=None, env=None, **kwargs):
+    def __init__(self, x0=0, y0=0, z0=0, x1=1, y1=1, z1=0, color="white", visible=True, arg=None, layer=0, parent=None, env=None, **kwargs):
         super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
 
         self.x0 = x0
@@ -19178,6 +19230,103 @@ class Animate3dCylinder(Animate3dBase):
         )
 
 
+class Animate3dSphere(Animate3dBase):
+    """
+    Creates a 3D box
+
+    Parameters
+    ----------
+    radius : float
+        radius of the sphere
+
+    x : float
+        x position of the box (default 0)
+
+    y : float
+        y position of the box (default 0)
+
+    z : float
+        z position of the box (default 0)
+
+    color : colorspec
+        color of the sphere (default "white")
+
+    visible : bool
+        visible |n|
+        if False, animation object is not shown, shown otherwise
+        (default True)
+
+    layer : int
+         layer value |n|
+         lower layer values are displayed later in the frame (default 0)
+
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
+
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically when the parent component is no longer accessible
+
+    env : Environment
+        environment where the component is defined |n|
+        if omitted, default_env will be used
+
+    Note
+    ----
+    All parameters, apart from parent, arg and env can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: my_x |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+    """
+
+    def __init__(
+        self,
+        radius=1,
+        x=0,
+        y=0,
+        z=0,
+        color="white",
+        number_of_slices=32,
+        number_of_stacks=None,
+        visible=True,
+        arg=None,
+        layer=0,
+        parent=None,
+        env=None,
+        **kwargs
+    ):
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
+
+        self.radius = radius
+        self.x = x
+        self.y = y
+        self.z = z
+        self.color = color
+        self.number_of_slices = number_of_slices
+        self.number_of_stacks = number_of_stacks
+        self.register_dynamic_attributes("radius x y z color number_of_slices number_of_stacks")
+        self.x_offset = 0
+        self.y_offset = 0
+        self.z_offset = 0
+
+    def draw(self, t):
+        gl_color = self.env.colorspec_to_gl_color(self.color(t))
+        draw_sphere3d(
+            radius=self.radius(t),
+            x=self.x(t) + self.x_offset,
+            y=self.y(t) + self.y_offset,
+            z=self.z(t) + self.z_offset,
+            gl_color=gl_color,
+            number_of_slices=self.number_of_slices(t),
+            number_of_stacks=self.number_of_stacks(t),
+        )
+
+
 def draw_bar3d(
     x0=0,
     y0=0,
@@ -19236,8 +19385,8 @@ def draw_bar3d(
     dz = z1 - z0
 
     length = math.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
-    y_angle = -math.atan2(dz, math.sqrt(dx ** 2 + dy ** 2)) * 180 / math.pi
-    z_angle = math.atan2(dy, dx) * 180 / math.pi
+    y_angle = -math.degrees(math.atan2(dz, math.sqrt(dx ** 2 + dy ** 2)))
+    z_angle = math.degrees(math.atan2(dy, dx))
     bar_width_2 = bar_width if bar_width_2 is None else bar_width_2
 
     draw_box3d(
@@ -19262,19 +19411,7 @@ def draw_bar3d(
     )
 
 
-def draw_cylinder3d(
-    x0=0,
-    y0=0,
-    z0=0,
-    x1=1,
-    y1=1,
-    z1=1,
-    gl_color=(1, 1, 1),
-    radius=1,
-    number_of_sides=8,
-    rotation_angle=0,
-    show_lids=True,
-):
+def draw_cylinder3d(x0=0, y0=0, z0=0, x1=1, y1=1, z1=1, gl_color=(1, 1, 1), radius=1, number_of_sides=8, rotation_angle=0, show_lids=True):
     """
     draws a 3d cylinder (should be added to the event loop by encapsulating with Animate3dBase)
 
@@ -19308,8 +19445,8 @@ def draw_cylinder3d(
     dz = z1 - z0
 
     length = math.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
-    y_angle = -math.atan2(dz, math.sqrt(dx ** 2 + dy ** 2)) * 180 / math.pi
-    z_angle = math.atan2(dy, dx) * 180 / math.pi
+    y_angle = -math.degrees(math.atan2(dz, math.sqrt(dx ** 2 + dy ** 2)))
+    z_angle = math.degrees(math.atan2(dy, dx))
     x_angle = rotation_angle
     gl.glPushMatrix()
     gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color)
@@ -19327,7 +19464,7 @@ def draw_cylinder3d(
 
     two_d_vertices = []
     for i in range(number_of_sides):
-        angle = (i * step_angle + start_angle) * math.pi / 180.0
+        angle = math.radians((i * step_angle + start_angle))
         two_d_vertices.append((radius * math.cos(angle), radius * math.sin(angle)))
     two_d_vertices.append(two_d_vertices[0])
 
@@ -19349,7 +19486,7 @@ def draw_cylinder3d(
     """ draw sides """
     gl.glBegin(gl.GL_QUADS)
     for i, (two_d_vertex0, two_d_vertex1) in enumerate(zip(two_d_vertices, two_d_vertices[1:])):
-        a1 = (start_angle + (i + 0.5) * step_angle) * (math.pi / 180.0)
+        a1 = math.radians((start_angle + (i + 0.5) * step_angle))
         gl.glNormal3f(0, math.cos(a1), math.sin(a1))
         gl.glVertex3f(0, *two_d_vertex0)
         gl.glVertex3f(length, *two_d_vertex0)
@@ -19608,6 +19745,28 @@ def draw_box3d(
     gl.glPopMatrix()
 
 
+def draw_sphere3d(x=0, y=0, z=0, radius=1, number_of_slices=32, number_of_stacks=None, gl_color=(1, 1, 1)):
+    """
+    draws a 3d spere (should be added to the event loop by encapsulating with Animate3dBase)
+
+    Parameters
+    ----------
+    radius : float, optional
+    """
+    quadratic = glu.gluNewQuadric()
+    glu.gluQuadricNormals(quadratic, glu.GLU_SMOOTH)
+    glu.gluQuadricTexture(quadratic, gl.GL_TRUE)
+
+    gl.glPushMatrix()
+
+    gl.glTranslate(x, y, z)
+    gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color)
+
+    glu.gluSphere(quadratic, radius, number_of_slices, number_of_slices if number_of_stacks is None else number_of_stacks)
+
+    gl.glPopMatrix()
+
+
 def _std_fonts():
     # the names of the standard fonts are generated by ttf fontdict.py on the standard development machine
     if not hasattr(_std_fonts, "cached"):
@@ -19805,8 +19964,8 @@ def regular_polygon(radius=1, number_of_sides=3, initial_angle=0):
     sint = math.sin(tangle)
     cost = math.cos(tangle)
     p = []
-    x = radius * math.cos(initial_angle * math.pi / 180)
-    y = radius * math.sin(initial_angle * math.pi / 180)
+    x = radius * math.cos(math.radians(initial_angle))
+    y = radius * math.sin(math.radians(initial_angle))
 
     for i in range(number_of_sides):
         x, y = (x * cost - y * sint, x * sint + y * cost)
@@ -19886,12 +20045,20 @@ def can_animate3d(try_only=True):
     -------
     True, if required modules were imported, False otherwise : bool
     """
+    global gl
+    global glu
+    global glut
     if can_animate(try_only=True):
-        if gl is None:
-            raise ImportError("OpenGL is required for animation3d. Install with pip install OpenGL or see salabim manual")
-
+        try:
+            import OpenGL.GL as gl
+            import OpenGL.GLU as glu
+            import OpenGL.GLUT as glut
+        except ImportError:
+            if try_only:
+                return False
+            else:
+                raise ImportError("OpenGL is required for animation3d. Install with pip install OpenGL or see salabim manual")
         return True
-
     else:
         if try_only:
             return False

@@ -1,17 +1,66 @@
 salabim changelog
 
+version 21.1.1  2021-07-02
+==========================
+New functionality (0)
+---------------------
+Introduced Animate3dSphere to animate a sphere.
+
+Enhanced functionality (0)
+--------------------------
+Blind animation now also supports 3D animations. Note that OpenGL needs to be installed, though.
+
+Functional change (0)
+---------------------
+The way the mode monitor was implemented made that the garbage collector could never remove a component,
+thus causing a memory leak.
+In order to change the behaviour, it won't be possible to set the mode of a component with 
+    Component.mode.value = ...
+anymore (as was mentioned in the 20.0.4 release notes).
+You have to set the mode via one of the process control functions or with set_mode().
+
+Bugfix (0)
+----------
+A bug in version 21.1.0 required to have OpenGL installed, even when no 3D animation was used. Fixed.
+This bugfix also makes startup of non 3D animation models faster.
+
+Bugfix (1)
+----------
+Under certain conditions, the file/linenumber in the trace was not shown correctly in the trace. Fixed.
+
+Sample models update (0)
+------------------------
+Updated several models in the sample models folder.
+
+Documentation update (0)
+------------------------
+A section on how to install OpenGL under Windows has been added to the documentation.
+Here's the same text (slightly differently formatted):
+    If, after  
+       pip install PyOpenGL
+    you get a runtime error that glutInit is not defined, try to install from the
+    Unofficial Windows Binaries for Python Extension Packages site at
+    https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyopengl
+    Find the right 3.1.5 or later version for you
+    (e.g. for Python 3.7, 64 bits you use PyOpenGL-3.1.5-cp37-cp37m-win_amd64.whl) and download that.
+    Then issue
+        pip install wheelfile
+    ,like (for the above package)
+        pip install PyOpenGL-3.1.5-cp37-cp37m-win_amd64.whl
+    and it should work.
+
 version 21.1.0  2021-06-17
 ==========================
 Added functionality (0)
 -----------------------
 This version introduces 3D animation. That's a very powerful feature that
-required users at least to know how to do 2D animation.
+requires users at least to know how to do 2D animation.
 
 Note that the API is still work in progress and might change.
 
 Note that the documetation is not properly updated. Only the reference section
 contains is now up-to-date.
-In intend to update the documentation soon. Volunteers to help with that are welcome!
+I intend to update the documentation soon. Volunteers to help with that are welcome!
 
 The sample 3d models folder on GitHub contains a couple of demo models, that
 could be used as a start.
@@ -30,6 +79,7 @@ Bugfix (0)
 If video specified an extension with a coded, like .mp4+h264, the output file extension incorrectly
 contained the codec information.
 From this version on, the codec information is skipped in the resulting filename.
+
 
 version 21.0.4  2021-05-01
 ==========================
