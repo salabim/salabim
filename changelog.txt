@@ -1,5 +1,16 @@
 salabim changelog
 
+version 21.1.2  2021-07-03
+==========================
+Bugfix (0)
+----------
+Version 21.1.1 tried erroneously to import ycecream. This dependency has been removed.
+
+BTW, my ycecream package is a very useful tool for debugging and benchmarking any Python program,
+including salabim models.
+See www.github.com/salabim/ycecream , if you are interested.
+
+
 version 21.1.1  2021-07-02
 ==========================
 New functionality (0)
