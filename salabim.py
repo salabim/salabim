@@ -40,8 +40,6 @@ import functools
 
 from pathlib import Path
 
-from ycecream import yc
-
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
 PyDroid = sys.platform == "linux" and any("pydroid" in v for v in os.environ.values())
