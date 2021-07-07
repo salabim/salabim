@@ -1,14 +1,13 @@
-#               _         _      _               ____   _     _     ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |   |___ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |     __) |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _  / __/
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_)|_|(_)|_____|
+#               _         _      _               ____   _     _     _____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |   |___ /
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |     |_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _  ___) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_)|_|(_)|____/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "21.1.2"
-
+__version__ = "21.1.3"
 import heapq
 import random
 import time
@@ -4757,8 +4756,9 @@ class Environment(object):
         self._position3d = (0, 0)
         self._width3d = 1024
         self._height3d = 768
-        self._width_video = "auto"
-        self._height_video = "auto"
+        self._video_width = "auto"
+        self._video_height = "auto"
+        self._video_mode = "2d"
         self._title = "salabim"
         self._show_menu_buttons = True
         self._x0 = 0
@@ -4844,10 +4844,39 @@ class Environment(object):
         gl.glShadeModel(gl.GL_SMOOTH)
 
         #        glut.glutReshapeFunc(lambda width, height: glut.glutReshapeWindow(640, 480))
+        self._opengl_key_press_bind = {}
+        self._opengl_key_press_special_bind = {}
+
+        glut.glutKeyboardFunc(self._opengl_key_pressed)
+        glut.glutSpecialFunc(self._opengl_key_pressed_special)
+
         glut.glutDisplayFunc(lambda: None)
         self._gl_initialized = True
 
-    def camera_rotate(self, event, delta_angle):
+    def _opengl_key_pressed(self, *args):
+        key = args[0]
+        if key in self._opengl_key_press_bind:
+            self._opengl_key_press_bind[key]()
+
+    def _opengl_key_pressed_special(self, *args):
+        special_keys = glut.glutGetModifiers()
+        alt_active = glut.GLUT_ACTIVE_ALT & special_keys
+        shift_active = glut.GLUT_ACTIVE_SHIFT & special_keys
+        ctrl_active = glut.GLUT_ACTIVE_CTRL & special_keys
+        spec_keys = []
+        if alt_active:
+            spec_keys.append("Alt")
+        if shift_active:
+            spec_keys.append("Shift")
+        if ctrl_active:
+            spec_keys.append("Control")
+        spec_key = "-".join(spec_keys)
+        key = (args[0], spec_key)
+
+        if key in self._opengl_key_press_special_bind:
+            self._opengl_key_press_special_bind[key]()
+
+    def camera_rotate(self, event=None, delta_angle=None):
         adjusted_x = self.view.x_eye(self.t) - self.view.x_center(self.t)
         adjusted_y = self.view.y_eye(self.t) - self.view.y_center(self.t)
         cos_rad = math.cos(math.radians(delta_angle))
@@ -4855,23 +4884,23 @@ class Environment(object):
         self.view.x_eye = self.view.x_center(self.t) + cos_rad * adjusted_x + sin_rad * adjusted_y
         self.view.y_eye = self.view.y_center(self.t) - sin_rad * adjusted_x + cos_rad * adjusted_y
 
-    def camera_zoom(self, event, factor_xy, factor_z):
+    def camera_zoom(self, event=None, factor_xy=None, factor_z=None):
         self.view.x_eye = self.view.x_center(self.t) - (self.view.x_center(self.t) - self.view.x_eye(self.t)) * factor_xy
         self.view.y_eye = self.view.y_center(self.t) - (self.view.y_center(self.t) - self.view.y_eye(self.t)) * factor_xy
         self.view.z_eye = self.view.z_center(self.t) - (self.view.z_center(self.t) - self.view.z_eye(self.t)) * factor_z
 
-    def camera_xy_center(self, event, x_dis, y_dis):
+    def camera_xy_center(self, event=None, x_dis=None, y_dis=None):
         self.view.x_center = self.view.x_center(self.t) + x_dis
         self.view.y_center = self.view.y_center(self.t) + y_dis
 
-    def camera_xy_eye(self, event, x_dis, y_dis):
+    def camera_xy_eye(self, event=None, x_dis=None, y_dis=None):
         self.view.x_eye = self.view.x_eye(self.t) + x_dis
         self.view.y_eye = self.view.y_eye(self.t) + y_dis
 
-    def camera_field_of_view(self, event, factor):
+    def camera_field_of_view(self, event=None, factor=None):
         self.view.field_of_view_y = self.view.field_of_view_y(self.t) * factor
 
-    def camera_tilt(self, event, delta_angle):
+    def camera_tilt(self, event=None, delta_angle=None):
         x_eye = self.view.x_eye(self.t)
         y_eye = self.view.y_eye(self.t)
         z_eye = self.view.z_eye(self.t)
@@ -4892,7 +4921,7 @@ class Environment(object):
         self.view.x_center = x_eye + (dxy_new / dxy) * (x_center - x_eye)
         self.view.y_center = y_eye + (dxy_new / dxy) * (y_center - y_eye)
 
-    def camera_rotate_axis(self, event, delta_angle):
+    def camera_rotate_axis(self, event=None, delta_angle=None):
         adjusted_x = self.view.x_center(self.t) - self.view.x_eye(self.t)
         adjusted_y = self.view.y_center(self.t) - self.view.y_eye(self.t)
         cos_rad = math.cos(math.radians(delta_angle))
@@ -4900,44 +4929,66 @@ class Environment(object):
         self.view.x_center = self.view.x_eye(self.t) + cos_rad * adjusted_x + sin_rad * adjusted_y
         self.view.y_center = self.view.y_eye(self.t) - sin_rad * adjusted_x + cos_rad * adjusted_y
 
-    def camera_print(self, event):
+    def camera_print(self, event=None):
         print(
             f"view(x_eye={self.view.x_eye(self.t)}, y_eye={self.view.y_eye(self.t)}, z_eye={self.view.z_eye(self.t)}, x_center={self.view.x_center(self.t)}, y_center={self.view.y_center(self.t)}, z_center={self.view.z_center(self.t)}, field_of_view_y={self.view.field_of_view_y(self.t)})"
         )
 
+    def _bind(self, tkinter_event, func):
+        self.root.bind(tkinter_event, func)
+        if len(tkinter_event) == 1:
+            opengl_key = bytes(tkinter_event, "utf-8")
+            self._opengl_key_press_bind[opengl_key] = func
+        else:
+            tkinter_event = tkinter_event[1:-1]  # get rid of <>
+            if "-" in tkinter_event:
+                spec_key, key = tkinter_event.split("-")
+            else:
+                key = tkinter_event
+                spec_key = ""
+            if key == "Up":
+                opengl_key = (glut.GLUT_KEY_UP, spec_key)
+            elif key == "Down":
+                opengl_key = (glut.GLUT_KEY_DOWN, spec_key)
+            elif key == "Left":
+                opengl_key = (glut.GLUT_KEY_LEFT, spec_key)
+            elif key == "Right":
+                opengl_key = (glut.GLUT_KEY_RIGHT, spec_key)
+            self._opengl_key_press_special_bind[opengl_key] = func
+
     def camera_control(self):
-        self.root.bind("<Left>", functools.partial(self.camera_rotate, delta_angle=-1))
-        self.root.bind("<Right>", functools.partial(self.camera_rotate, delta_angle=+1))
+        self._bind("<Left>", functools.partial(self.camera_rotate, delta_angle=-1))
+        self._bind("<Right>", functools.partial(self.camera_rotate, delta_angle=+1))
 
-        self.root.bind("<Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=0.9))
-        self.root.bind("<Down>", functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1 / 0.9))
+        self._bind("<Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=0.9))
+        self._bind("<Down>", functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1 / 0.9))
 
-        self.root.bind("z", functools.partial(self.camera_zoom, factor_xy=1, factor_z=0.9))
-        self.root.bind("Z", functools.partial(self.camera_zoom, factor_xy=1, factor_z=1 / 0.9))
+        self._bind("z", functools.partial(self.camera_zoom, factor_xy=1, factor_z=0.9))
+        self._bind("Z", functools.partial(self.camera_zoom, factor_xy=1, factor_z=1 / 0.9))
 
-        self.root.bind("<Shift-Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=1))
-        self.root.bind("<Shift-Down>", functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1))
+        self._bind("<Shift-Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=1))
+        self._bind("<Shift-Down>", functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1))
 
-        self.root.bind("<Alt-Left>", functools.partial(self.camera_xy_eye, x_dis=-10, y_dis=0))
-        self.root.bind("<Alt-Right>", functools.partial(self.camera_xy_eye, x_dis=10, y_dis=0))
-        self.root.bind("<Alt-Down>", functools.partial(self.camera_xy_eye, x_dis=0, y_dis=-10))
-        self.root.bind("<Alt-Up>", functools.partial(self.camera_xy_eye, x_dis=0, y_dis=10))
+        self._bind("<Alt-Left>", functools.partial(self.camera_xy_eye, x_dis=-10, y_dis=0))
+        self._bind("<Alt-Right>", functools.partial(self.camera_xy_eye, x_dis=10, y_dis=0))
+        self._bind("<Alt-Down>", functools.partial(self.camera_xy_eye, x_dis=0, y_dis=-10))
+        self._bind("<Alt-Up>", functools.partial(self.camera_xy_eye, x_dis=0, y_dis=10))
 
-        self.root.bind("<Control-Left>", functools.partial(self.camera_xy_center, x_dis=-10, y_dis=0))
-        self.root.bind("<Control-Right>", functools.partial(self.camera_xy_center, x_dis=10, y_dis=0))
-        self.root.bind("<Control-Down>", functools.partial(self.camera_xy_center, x_dis=0, y_dis=-10))
-        self.root.bind("<Control-Up>", functools.partial(self.camera_xy_center, x_dis=0, y_dis=10))
+        self._bind("<Control-Left>", functools.partial(self.camera_xy_center, x_dis=-10, y_dis=0))
+        self._bind("<Control-Right>", functools.partial(self.camera_xy_center, x_dis=10, y_dis=0))
+        self._bind("<Control-Down>", functools.partial(self.camera_xy_center, x_dis=0, y_dis=-10))
+        self._bind("<Control-Up>", functools.partial(self.camera_xy_center, x_dis=0, y_dis=10))
 
-        self.root.bind("o", functools.partial(self.camera_field_of_view, factor=0.9))
-        self.root.bind("O", functools.partial(self.camera_field_of_view, factor=1 / 0.9))
+        self._bind("o", functools.partial(self.camera_field_of_view, factor=0.9))
+        self._bind("O", functools.partial(self.camera_field_of_view, factor=1 / 0.9))
 
-        self.root.bind("t", functools.partial(self.camera_tilt, delta_angle=-1))
-        self.root.bind("T", functools.partial(self.camera_tilt, delta_angle=1))
+        self._bind("t", functools.partial(self.camera_tilt, delta_angle=-1))
+        self._bind("T", functools.partial(self.camera_tilt, delta_angle=1))
 
-        self.root.bind("r", functools.partial(self.camera_rotate_axis, delta_angle=1))
-        self.root.bind("R", functools.partial(self.camera_rotate_axis, delta_angle=-1))
+        self._bind("r", functools.partial(self.camera_rotate_axis, delta_angle=1))
+        self._bind("R", functools.partial(self.camera_rotate_axis, delta_angle=-1))
 
-        self.root.bind("p", functools.partial(self.camera_print))
+        self._bind("p", functools.partial(self.camera_print))
 
     def show_camera_position(self):
         """
@@ -5122,8 +5173,9 @@ class Environment(object):
         animate3d=None,
         width3d=None,
         height3d=None,
-        width_video=None,
-        height_video=None,
+        video_width=None,
+        video_height=None,
+        video_mode=None,
         position=None,
         position3d=None,
     ):
@@ -5337,11 +5389,16 @@ class Environment(object):
         if position3d is not None:
             self._position3d = position3d
 
-        if width_video is not None:
-            self._width_vdeo = width_video
+        if video_width is not None:
+            self._video_width = video_width
 
-        if height_video is not None:
-            self._height_vdeo = height_video
+        if video_height is not None:
+            self._video_height = video_height
+
+        if video_mode is not None:
+            if video_mode not in ("2d", "screen", "3d"):
+                raise TypeError("video_mode " + video_mode + " not recognized")
+            self._video_mode = video_mode
 
         if title is not None:
             if self._title != title:
@@ -5483,21 +5540,27 @@ class Environment(object):
                 self._video = video
 
                 if video:
-                    if self._width_video == "auto":
-                        if self._animate3d:
-                            self._width_video_real = self._width3d
+                    if self._video_width == "auto":
+                        if self._video_mode == "3d":
+                            self._video_width_real = self._width3d
+                        elif self._video_mode == "2d":
+                            self._video_width_real = self._width
                         else:
-                            self._width_video_real = self._width
+                            img = ImageGrab.grab()
+                            self._video_width_real = img.size[0]
                     else:
-                        self._width_video_real = self._width_video
+                        self._video_width_real = self._video_width
 
-                    if self._height_video == "auto":
-                        if self._animate3d:
-                            self._height_video_real = self._height3d
+                    if self._video_height == "auto":
+                        if self._video_mode == "3d":
+                            self._video_height_real = self._height3d
+                        elif self._video_mode == "2d":
+                            self._video_height_real = self._height
                         else:
-                            self._height_video_real = self._height
+                            img = ImageGrab.grab()
+                            self._video_height_real = img.size[1]
                     else:
-                        self._height_video_real = self._height_video
+                        self._video_height_real = self._video_height
                     if not self._blind_animation:
                         can_animate(try_only=False)
 
@@ -5539,7 +5602,7 @@ class Environment(object):
                         if video_path.is_file():
                             video_path.unlink()
                         self._video_name_temp = tempfile.NamedTemporaryFile(suffix=extension, delete=False).name
-                        self._video_out = cv2.VideoWriter(self._video_name_temp, fourcc, self._fps, (self._width_video_real, self._height_video_real))
+                        self._video_out = cv2.VideoWriter(self._video_name_temp, fourcc, self._fps, (self._video_width_real, self._video_height_real))
                         self.frame_number = 0
                         self.audio_segments = []
                         if self._audio is not None:
@@ -5660,13 +5723,16 @@ class Environment(object):
             self._video_out = None
             self._video = ""
 
-    def capture_image(self, mode="RGBA", as_gl=False):
-        if as_gl:
+    def capture_image(self, mode="RGBA", video_mode=""):
+        """
+        if video_mode can be "2d", "3d" or "screen" the corresponding image will be scales and padded if required
+        if video_mode is "", the 2d (tkinter) window will be returned without any scaling or padding
+        """
+        if video_mode == "3d":
             self.an_objects3d.sort(key=lambda obj: (obj.layer(self.t), obj.sequence))
             for an in self.an_objects3d:
                 if an.visible(self.t):
                     an.draw(self.t)
-
             width = self._width3d
             height = self._height3d
             # https://stackoverflow.com/questions/41126090/how-to-write-pyopengl-in-to-jpg-image
@@ -5674,33 +5740,37 @@ class Environment(object):
             data = gl.glReadPixels(0, 0, width, height, gl.GL_RGB, gl.GL_UNSIGNED_BYTE)
             image = Image.frombytes("RGB", (width, height), data)
             image = image.transpose(Image.FLIP_TOP_BOTTOM)
-            return image
-
-        an_objects = sorted(self.an_objects, key=lambda obj: (-obj.layer(self.t), obj.sequence))  # has to be a copy!
-        this_image = Image.new(mode, (self._width, self._height), self.colorspec_to_tuple("bg"))
-        for ao in an_objects:
-            ao.make_pil_image(self.t)
-            if ao._image_visible:
-                this_image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image)
-        return this_image
+        elif video_mode == "screen":
+            image = ImageGrab.grab()
+        else:
+            an_objects = sorted(self.an_objects, key=lambda obj: (-obj.layer(self.t), obj.sequence))  # has to be a copy!
+            image = Image.new(mode, (self._width, self._height), self.colorspec_to_tuple("bg"))
+            for ao in an_objects:
+                ao.make_pil_image(self.t)
+                if ao._image_visible:
+                    image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image)
+        if video_mode != "":
+            image = resize_with_pad(image, self._video_width_real, self._video_height_real)
+        return image
 
     def save_frame(self):
-        as_gl = self._animate3d
+        if self._video_mode == "3d":
+            if not self._animate3d:
+                raise TypeError("video_mode=='3d', but animate3d is not True")
         if self._video_out == "gif":
-            self._images.append(self.capture_image("RGB", as_gl))
+            self._images.append(self.capture_image("RGB", self._video_mode))
 
         elif self._video_out == "png":
-            self._images.append(self.capture_image("RGBA", as_gl))
+            self._images.append(self.capture_image("RGBA", self._video_mode))
         elif self._video_out == "snapshots":
             serialized_video_name = self.video_name_format.format(self.frame_number)
             if self._video_name.lower().endswith(".jpg"):
-                self.capture_image("RGB", as_gl).save(serialized_video_name)
+                self.capture_image("RGB", self._video_mode).save(serialized_video_name)
             else:
-                self.capture_image("RGBA", as_gl).save(serialized_video_name)
+                self.capture_image("RGBA", self._video_mode).save(serialized_video_name)
 
         else:
-            image = self.capture_image("RGB", as_gl)
-            image = resize_with_pad(image, self._width_video_real, self._height_video_real)
+            image = self.capture_image("RGB", self._video_mode)
             open_cv_image = cv2.cvtColor(numpy.array(image), cv2.COLOR_RGB2BGR)
             self._video_out.write(open_cv_image)
 
@@ -6042,6 +6112,65 @@ class Environment(object):
         if value is not None:
             self.animation_parameters(width=value, animate=None)
         return self._width
+
+    def video_width(self, value=None):
+        """
+        width of the video animation in screen coordinates
+
+        Parameters
+        ----------
+        value : int
+            new width |n|
+            if not specified, no change
+
+
+        Returns
+        -------
+        width of video animation : int
+        """
+        if value is not None:
+            self.animation_parameters(video_width=value, animate=None)
+        return self._video_width
+
+
+    def video_height(self, value=None):
+        """
+        height of the video animation in screen coordinates
+
+        Parameters
+        ----------
+        value : int
+            new width |n|
+            if not specified, no change
+
+
+        Returns
+        -------
+        height of video animation : int
+        """
+        if value is not None:
+            self.animation_parameters(video_height=value, animate=None)
+        return self._video_height
+
+
+    def video_mode(self, value=None):
+        """
+        video_mode
+
+        Parameters
+        ----------
+        value : int
+            new video mode ("2d", "3d" or "screen") |n|
+            if not specified, no change
+
+        Returns
+        -------
+        video_mode : int
+        """
+        if value is not None:
+            self.animation_parameters(video_mode=value, animate=None)
+        return self._video_mode
+
 
     def position(self, value=None):
         """
@@ -18262,7 +18391,7 @@ _random_seed = random_seed  # used by Environment.__init__
 
 def resize_with_pad(im, target_width, target_height):
     """
-    Resize PIL image keeping ratio and using white background.
+    Resize PIL image keeping ratio and using black background.
     """
     if im.height == target_width and im.width == target_height:
         return im
@@ -18278,7 +18407,7 @@ def resize_with_pad(im, target_width, target_height):
         resize_width = round(resize_height / im_ratio)
 
     image_resize = im.resize((resize_width, resize_height), Image.ANTIALIAS)
-    background = Image.new("RGBA", (target_width, target_height), (255, 255, 255, 255))
+    background = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 255))
     offset = (round((target_width - resize_width) / 2), round((target_height - resize_height) / 2))
     background.paste(image_resize, offset)
     return background.convert("RGB")
@@ -18774,7 +18903,7 @@ class Animate3dGrid(Animate3dBase):
             for z in z_range:
                 draw_line3d(x0=x, y0=min(y_range), z0=z, x1=x, y1=max(y_range), z1=z, gl_color=gl_color)
 
-        for y in x_range:
+        for y in y_range:
             for x in x_range:
                 draw_line3d(x0=x, y0=y, z0=min(z_range), x1=x, y1=y, z1=max(z_range), gl_color=gl_color)
 
@@ -19991,6 +20120,7 @@ def can_animate(try_only=True):
     global ImageDraw
     global ImageFont
     global GifImagePlugin
+    global ImageGrab
     global ImageTk
     global tkinter
     try:
@@ -19999,7 +20129,7 @@ def can_animate(try_only=True):
         from PIL import ImageDraw
         from PIL import ImageFont
         from PIL import GifImagePlugin
-
+        from PIL import ImageGrab
         if not Pythonista:
             from PIL import ImageTk
     except ImportError:
