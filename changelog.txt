@@ -1,5 +1,39 @@
 salabim changelog
 
+version 21.1.4  2021-07-18
+==========================
+New functionality (0)
+---------------------
+Introduced Environment.insert_frame() that can insert a PIL image or file (specified as str or pathlib.Path)
+into the video stream.
+This is particularly useful to add an introduction and explanatory frames.
+Note that each frame is 1/30 seconds and you can specify the number of frames.
+The image is automatically scaled to fit the current video resolution.
+
+New functionality (1)
+---------------------
+The method Environment.snapshot() now has an extra parameter 'video_mode' that can be "2d" (the default),
+"3d" or "screen".
+Note that "3d" is only available if animate3d is True.
+The resulting image is never scaled.
+
+Changed functionality (0)
+-------------------------
+The method Environment.Animate3dObj now postpones the actual loading of the file till the moment it is
+required. That makes it possible to call Animate3dObj even if no 3d animation is activated and
+even possible.
+Also, the filename and show_warnings may now be changed dynamically.
+
+Internal changes (0)
+--------------------
+Changed the internals of _save_frame (now via insert_frame) and _capture_image.
+
+Internal changes (1)
+--------------------
+If ImageGrab is not available on a platform, video_mode 'screen' is not supported
+for video and snapshot and properly detected.
+
+
 version 21.1.3  2021-07-07
 ==========================
 New functionality (0)
@@ -22,7 +56,7 @@ Alternatively, the video_width and video_height parameters of Environment.animat
 If the video_width/video_height is "auto" (the default), the resolution is taken from the video_mode at the time
 video recording was started.
 The captured images are always scaled to the given resolution, which might lead to horizontal or vertical
- (black) bars to pad the image.
+black bars to pad the image.
 
 Added functionality (0)
 -----------------------
@@ -88,7 +122,9 @@ Here's the same text (slightly differently formatted):
     ,like (for the above package)
         pip install PyOpenGL-3.1.5-cp37-cp37m-win_amd64.whl
     and it should work.
-
+    It is reecommended to install pyopengl_accelerate in the same way, like
+        pip install PyOpenGL_accelerate-3.1.5-cp37-cp37m-win_amd64.whl
+    
 version 21.1.0  2021-06-17
 ==========================
 Added functionality (0)

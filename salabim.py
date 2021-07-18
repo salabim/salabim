@@ -1,13 +1,13 @@
-#               _         _      _               ____   _     _     _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |   |___ /
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |     |_ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _  ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_)|_|(_)|____/
+#               _         _      _               ____   _     _     _  _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |   | || |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |   | || |_
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _ |__   _|
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_)|_|(_)   |_|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "21.1.3"
+__version__ = "21.1.4"
 import heapq
 import random
 import time
@@ -2997,14 +2997,13 @@ if Pythonista:
                         env.t = env._now
                 if not env.paused:
                     env.frametimes.append(time.time())
-
                 touchvalues = self.touches.values()
                 env.animation_pre_tick(env.t)
                 env.animation_pre_tick_sys(env.t)
                 env.animation_post_tick(env.t)
                 if env.retina:
                     with io.BytesIO() as fp:
-                        env.capture_image("RGB").save(fp, "BMP")
+                        env._capture_image("RGB").save(fp, "BMP")
                         img = ui.Image.from_data(fp.getvalue(), scene.get_screen_scale())
                     if self.bg is None:
                         self.bg = scene.SpriteNode(scene.Texture(img))
@@ -3013,16 +3012,14 @@ if Pythonista:
                         self.bg.z_position = 10000
                     else:
                         self.bg.texture = scene.Texture(img)
-                else:
-                    capture_image = env.capture_image("RGB")
+                else:               
+                    capture_image = env._capture_image("RGB")              
                     ims = scene.load_pil_image(capture_image)
                     scene.image(ims, 0, 0, *capture_image.size)
                     scene.unload_image(ims)
-
                 if env._video and (not env.paused):
-                    env.save_frame()
+                    env._save_frame()
                     env.video_t += env._speed / env._fps
-                    env.frame_number += 1
 
                 for uio in env.ui_objects:
                     ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True, retina_scale=True)
@@ -3030,9 +3027,8 @@ if Pythonista:
 
                     if uio.type == "entry":
                         raise NotImplementedError("AnimateEntry not supported on Pythonista")
-                    if uio.type == "button":
+                    if uio.type == "button":                
                         linewidth = uio.linewidth
-
                         scene.push_matrix()
                         scene.fill(env.pythonistacolor(uio.fillcolor))
                         scene.stroke(env.pythonistacolor(uio.linecolor))
@@ -5397,7 +5393,7 @@ class Environment(object):
 
         if video_mode is not None:
             if video_mode not in ("2d", "screen", "3d"):
-                raise TypeError("video_mode " + video_mode + " not recognized")
+                raise ValueError("video_mode " + video_mode + " not recognized")
             self._video_mode = video_mode
 
         if title is not None:
@@ -5540,6 +5536,8 @@ class Environment(object):
                 self._video = video
 
                 if video:
+                    if self._video_mode == "screen" and ImageGrab is None:
+                        raise ValueError("video_mode='screen' not supported on this platform (ImageGrab does not exist)")
                     if self._video_width == "auto":
                         if self._video_mode == "3d":
                             self._video_width_real = self._width3d
@@ -5723,12 +5721,10 @@ class Environment(object):
             self._video_out = None
             self._video = ""
 
-    def capture_image(self, mode="RGBA", video_mode=""):
-        """
-        if video_mode can be "2d", "3d" or "screen" the corresponding image will be scales and padded if required
-        if video_mode is "", the 2d (tkinter) window will be returned without any scaling or padding
-        """
+    def _capture_image(self, mode="RGBA", video_mode="2d"):
         if video_mode == "3d":
+            if not self._animate3d:
+                raise ValueError("video_mode=='3d', but animate3d is not True")
             self.an_objects3d.sort(key=lambda obj: (obj.layer(self.t), obj.sequence))
             for an in self.an_objects3d:
                 if an.visible(self.t):
@@ -5744,35 +5740,51 @@ class Environment(object):
             image = ImageGrab.grab()
         else:
             an_objects = sorted(self.an_objects, key=lambda obj: (-obj.layer(self.t), obj.sequence))  # has to be a copy!
-            image = Image.new(mode, (self._width, self._height), self.colorspec_to_tuple("bg"))
+            image = Image.new("RGBA", (self._width, self._height), self.colorspec_to_tuple("bg"))
             for ao in an_objects:
                 ao.make_pil_image(self.t)
                 if ao._image_visible:
                     image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image)
-        if video_mode != "":
-            image = resize_with_pad(image, self._video_width_real, self._video_height_real)
-        return image
+        return image.convert(mode)
 
-    def save_frame(self):
-        if self._video_mode == "3d":
-            if not self._animate3d:
-                raise TypeError("video_mode=='3d', but animate3d is not True")
-        if self._video_out == "gif":
-            self._images.append(self.capture_image("RGB", self._video_mode))
+    def insert_frame(self, image, number_of_frames=1):
+        """
+        Insert image as frame(s) into video
 
-        elif self._video_out == "png":
-            self._images.append(self.capture_image("RGBA", self._video_mode))
-        elif self._video_out == "snapshots":
-            serialized_video_name = self.video_name_format.format(self.frame_number)
-            if self._video_name.lower().endswith(".jpg"):
-                self.capture_image("RGB", self._video_mode).save(serialized_video_name)
+        Parameters
+        ----------
+        image : Pillow image, str or Path object
+            Image to be inserted
+
+        nuumber_of_frames: int
+            Number of 1/30 second long frames to be inserted
+        """
+        if self._video_out is None:
+            raise ValueError("video not set")
+        if isinstance(image, (Path, str)):
+            image = Image.open(image)
+
+        image = resize_with_pad(image, self._video_width_real, self._video_height_real)
+        for _ in range(number_of_frames):
+            if self._video_out == "gif":
+                self._images.append(image.convert("RGB"))
+            elif self._video_out == "png":
+                self._images.append(image.convert("RGBA"))
+            elif self._video_out == "snapshots":
+                serialized_video_name = self.video_name_format.format(self.frame_number)
+                if self._video_name.lower().endswith(".jpg"):
+                    image.convert("RGB").save(serialized_video_name)
+                else:
+                    image.convert("RGBA").save(serialized_video_name)
+                self.frame_number += 1
             else:
-                self.capture_image("RGBA", self._video_mode).save(serialized_video_name)
+                image = image.convert("RGB")
+                open_cv_image = cv2.cvtColor(numpy.array(image), cv2.COLOR_RGB2BGR)
+                self._video_out.write(open_cv_image)
 
-        else:
-            image = self.capture_image("RGB", self._video_mode)
-            open_cv_image = cv2.cvtColor(numpy.array(image), cv2.COLOR_RGB2BGR)
-            self._video_out.write(open_cv_image)
+    def _save_frame(self):
+        image = self._capture_image("RGBA", self._video_mode)
+        self.insert_frame(image)
 
     def add_audio(self):
         if not Windows:
@@ -6132,7 +6144,6 @@ class Environment(object):
             self.animation_parameters(video_width=value, animate=None)
         return self._video_width
 
-
     def video_height(self, value=None):
         """
         height of the video animation in screen coordinates
@@ -6152,7 +6163,6 @@ class Environment(object):
             self.animation_parameters(video_height=value, animate=None)
         return self._video_height
 
-
     def video_mode(self, value=None):
         """
         video_mode
@@ -6170,7 +6180,6 @@ class Environment(object):
         if value is not None:
             self.animation_parameters(video_mode=value, animate=None)
         return self._video_mode
-
 
     def position(self, value=None):
         """
@@ -6962,9 +6971,8 @@ class Environment(object):
 
             if self._video:
                 if not self.paused:
-                    self.save_frame()
+                    self._save_frame()
                     self.video_t += self._speed / self._fps
-                    self.frame_number += 1
             else:
                 if self._synced:
                     tick_duration = time.time() - tick_start
@@ -6974,7 +6982,7 @@ class Environment(object):
 
             g.canvas.update()
 
-    def snapshot(self, filename):
+    def snapshot(self, filename, video_mode="2d"):
         """
         Takes a snapshot of the current animated frame (at time = now()) and saves it to a file
 
@@ -6982,12 +6990,25 @@ class Environment(object):
         ----------
         filename : str
             file to save the current animated frame to. |n|
-            The following formats are accepted: .png, .jpg, .bmp, .ico, .gif and .tiff are supported.
+            The following formats are accepted: .png, .jpg, .bmp, .ico, .gif and .tiff.
             Other formats are not possible.
             Note that, apart from .JPG files. the background may be semi transparent by setting
             the alpha value to something else than 255.
+            
+        video_mode : str
+            specifies what to save |n|
+            if "2d" (default), the tkinter window will be saved |n|
+            if "3d", the OpenGL window will be saved (provided animate3d is True) |n|
+            if "screen" the complete screen will be saved (no need to be in animate mode)|n|
+            no scaling will be applied.
         """
+        if video_mode not in ("2d", "3d", "screen"):
+            raise ValueError("video_mode " + video_mode + " not recognized")
         can_animate(try_only=False)
+
+        if video_mode == "screen" and ImageGrab is None:
+            raise ValueError("video_mode='screen' not supported on this platform (ImageGrab does not exist)")
+    
         filename_path = Path(filename)
         extension = filename_path.suffix.lower()
         if extension in (".png", ".gif", ".bmp", ".ico", ".tiff"):
@@ -6997,7 +7018,7 @@ class Environment(object):
         else:
             raise ValueError("extension " + extension + "  not supported")
         filename_path.parent.mkdir(parents=True, exist_ok=True)
-        self.capture_image(mode).save(filename)
+        self._capture_image(mode, video_mode).save(filename)
 
     def modelname_width(self):
         if Environment.cached_modelname_width[0] != self._modelname:
@@ -7133,7 +7154,7 @@ class Environment(object):
         uio = AnimateButton(x=38 + 5 * 60, y=-21, text="Stop", width=50, action=self.env.an_quit, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = Animate(x0=38 + 1.5 * 60, y0=-35, text="", textcolor0="fg", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw")
+        uio = Animate(x0=38 + 1.5 * 60, y0=-35, text="", textcolor0="fg", anchor="N", fontsize0=15,screen_coordinates=True, xy_anchor="nw")
         uio.text = self.speedtext
         uio.in_topleft = True
 
@@ -7224,7 +7245,7 @@ class Environment(object):
         if self._synced:
             self.an_synced_buttons()
         else:
-            self.an_unsynced_buttons()
+            self.an_unsynced_buttons()  
 
     def clocktext(self, t):
         s = ""
@@ -10796,7 +10817,7 @@ class AnimateRectangle(_Vis):
 
     def __init__(
         self,
-        spec=(),
+        spec=(0,0,0,0),
         x=0,
         y=0,
         fillcolor="fg",
@@ -14487,8 +14508,7 @@ class _BlindVideoMaker(Component):
             self.env.animation_pre_tick_sys(self.env.t)  # required to update sys objects, like AnimateQueue
             self.env.animation_pre_tick_sys(self.env.t)
 
-            self.env.save_frame()
-            self.env.frame_number += 1
+            self.env._save_frame()
             yield self.hold(self.env._speed / self.env._fps)
 
 
@@ -17823,7 +17843,7 @@ class AudioSegment:
 
 
 class _APNG:
-    # The  _APNG class is derived from (more or less an excerpt from the py_APNG module
+    # The  _APNG class is derived from (more or less an excerpt) from the py_APNG module
     class Chunk(collections.namedtuple("Chunk", ["type", "data"])):
         pass
 
@@ -18536,7 +18556,7 @@ class Animate3dObj(Animate3dBase):
     z_translate : float
         translation in z direction (default: 1)
 
-    shos_warnings : bool
+    show_warnings : bool
         as pywavefront does not support all obj commands, reading the file sometimes leads
         to (many) warning log messages |n|
         with this flag, they can be turned off (the deafult)
@@ -18601,11 +18621,6 @@ class Animate3dObj(Animate3dBase):
         env=None,
         **kwargs
     ):
-        global pywavefront
-        import pywavefront
-
-        global visualization
-        from pywavefront import visualization
 
         super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
 
@@ -18622,19 +18637,36 @@ class Animate3dObj(Animate3dBase):
         self.x_scale = x_scale
         self.y_scale = y_scale
         self.z_scale = z_scale
+        self.filename = filename
+        self.show_warnings = show_warnings
 
-        self.register_dynamic_attributes("x y z x_angle y_angle z_angle x_translate y_translate z_translate x_scale y_scale z_scale")
+        self.register_dynamic_attributes("x y z x_angle y_angle z_angle x_translate y_translate z_translate x_scale y_scale z_scale filename show_warnings")
         self.x_offset = 0
         self.y_offset = 0
         self.z_offset = 0
-        obj_filename = Path(filename)
+
+        if "pywavefront" not in sys.modules:
+            global pywavefront
+            global visualization
+            try:       
+                import pywavefront
+                from pywavefront import visualization
+            except ImportError:
+                pywavefront = None
+
+
+    def draw(self, t):
+        if pywavefront is None:
+            raise ImportError('Animate3dObj requires pywavefront. Not found')
+
+        obj_filename = Path(self.filename(t))
         if not obj_filename.suffix:
             obj_filename = obj_filename.with_suffix(".obj")
         obj_filename = obj_filename.resolve()
 
         if obj_filename not in self.env.obj_filenames:
             save_logging_level = logging.root.level
-            if not show_warnings:
+            if not self.show_warnings(t):
                 logging.basicConfig(level=logging.ERROR)
 
             with open(obj_filename, "r") as obj_file:
@@ -18653,9 +18685,8 @@ class Animate3dObj(Animate3dBase):
             logging.basicConfig(level=save_logging_level)
 
             self.env.obj_filenames[obj_filename] = pywavefront.Wavefront(obj_filename, create_materials=create_materials)
-        self.obj = self.env.obj_filenames[obj_filename]
-
-    def draw(self, t):
+            
+        obj = self.env.obj_filenames[obj_filename]        
 
         gl.glMatrixMode(gl.GL_MODELVIEW)
         gl.glPushMatrix()
@@ -18665,7 +18696,7 @@ class Animate3dObj(Animate3dBase):
         gl.glRotate(self.x_angle(t), 1.0, 0.0, 0.0)
         gl.glTranslate(self.x_translate(t), self.y_translate(t), self.z_translate(t))
         gl.glScale(self.x_scale(t), self.y_scale(t), self.z_scale(t))
-        visualization.draw(self.obj)
+        visualization.draw(obj)
         gl.glPopMatrix()
 
 
@@ -20039,7 +20070,7 @@ def show_colornames():
 
 def arrow_polygon(size):
     """
-    creates a polygon tuple with a centerd arrow for use with sim.Animate
+    creates a polygon tuple with a centered arrow for use with sim.Animate
 
     Parameters
     ----------
@@ -20129,7 +20160,11 @@ def can_animate(try_only=True):
         from PIL import ImageDraw
         from PIL import ImageFont
         from PIL import GifImagePlugin
-        from PIL import ImageGrab
+        try:
+            from PIL import ImageGrab            
+        except ImportError:
+            ImageGrab = None
+ 
         if not Pythonista:
             from PIL import ImageTk
     except ImportError:
