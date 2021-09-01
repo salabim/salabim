@@ -1,13 +1,13 @@
-#               _         _      _               ____   _     _     _  _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |   | || |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |   | || |_
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _ |__   _|
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_)|_|(_)   |_|
+#               _         _      _               ____   _     _     ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |   | ___|
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |   |___ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _  ___) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_)|_|(_)|____/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "21.1.4"
+__version__ = "21.1.5"
 import heapq
 import random
 import time
@@ -721,7 +721,6 @@ fill is only available for non level and not stats_only monitors. |n|
         )
 
     def __call__(self, t=None):  # direct moneypatching __call__ doesn't work
-
         if not self._level:
             raise TypeError("get not available for non level monitors")
         if t is None:
@@ -731,7 +730,7 @@ fill is only available for non level and not stats_only monitors. |n|
             return self._tally  # even if monitor is off, the current value is valid
         if self._stats_only:
             raise NotImplementedError("__call__(t) not supported for stats_only monitors")
-        if t < self._t[0] or t > self.env._now:
+        if t < self._t[0]:
             return self.off
         i = bisect.bisect_left(list(zip(self._t, itertools.count())), (t, float("inf")))
         return self._x[i - 1]
@@ -1444,7 +1443,7 @@ fill is only available for non level and not stats_only monitors. |n|
             else:
                 return nan
 
-    def median(self, ex0=False):
+    def median(self, ex0=False, interpolation=None):
         """
         median of tallied values
 
@@ -1453,18 +1452,32 @@ fill is only available for non level and not stats_only monitors. |n|
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
 
+        interpolation : str
+            Default: 'linear' |n|
+            |n|
+            For non weighted monitors: |n|
+            This optional parameter specifies the interpolation method to use when the 50% percentile lies between two data points i < j: |n|
+            ‘linear’: i + (j - i) * fraction, where fraction is the fractional part of the index surrounded by i and j. (default for monitors that are not weighted not level|n|
+            ‘lower’: i. |n|
+            ‘higher’: j. (default for weighted and level monitors) |n|
+            ‘nearest’: i or j, whichever is nearest. |n|
+            ‘midpoint’: (i + j) / 2. |n|
+            |n|
+            For weighted and level monitors: |n|
+            This optional parameter specifies the interpolation method to use when the 50% percentile corresponds exactly to two data points i and j |n|
+            ‘linear’: (i + j) /2 |n|
+            ‘lower’: i. |n|
+            ‘higher’: j |n|
+            ‘midpoint’: (i + j) / 2. |n|
+
         Returns
         -------
-        median : float
-
-        Note
-        ----
-        If weights are applied, the weighted median is returned
+        median (50% percentile): float
         """
         self._block_stats_only()
-        return self.percentile(50, ex0=ex0)
+        return self.percentile(50, ex0=ex0, interpolation=interpolation)
 
-    def percentile(self, q, ex0=False):
+    def percentile(self, q, ex0=False, interpolation="linear"):
         """
         q-th percentile of tallied values
 
@@ -1477,45 +1490,92 @@ fill is only available for non level and not stats_only monitors. |n|
 
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
-
+            
+        interpolation : str
+            Default: 'linear' |n|
+            |n|
+            For non weighted monitors: |n|
+            This optional parameter specifies the interpolation method to use when the desired percentile lies between two data points i < j: |n|
+            ‘linear’: i + (j - i) * fraction, where fraction is the fractional part of the index surrounded by i and j. (default for monitors that are not weighted not level|n|
+            ‘lower’: i. |n|
+            ‘higher’: j. (default for weighted and level monitors) |n|
+            ‘nearest’: i or j, whichever is nearest. |n|
+            ‘midpoint’: (i + j) / 2. |n|
+            |n|
+            For weighted and level monitors: |n|
+            This optional parameter specifies the interpolation method to use when the percentile corresponds exactly to two data points i and j |n|
+            ‘linear’: (i + j) /2 |n|
+            ‘lower’: i. |n|
+            ‘higher’: j |n|
+            ‘midpoint’: (i + j) / 2. |n|
+            
         Returns
         -------
-        : float
-            q-th percentile |n|
-            0 returns the minimum, 50 the median and 100 the maximum
-
-        Note
-        ----
-        If weights are applied, the weighted percentile is returned
+        q-th percentile : float
+             0 returns the minimum, 50 the median and 100 the maximum
         """
-        # algorithm based on
-        # https://stats.stackexchange.com/questions/13169/defining-quantiles-over-a-weighted-sample
         self._block_stats_only()
-        q = max(0, min(q, 100)) / 100
+
+        q = max(0, min(q, 100))
+        if q == 0:
+            return self.minimum(ex0=ex0)
+        if q == 100:
+            return self.maximum(ex0=ex0)
+        q /= 100
         x, weight = self._xweight(ex0=ex0)
 
         if len(x) == 1:
             return x[0]
-        sumweight = sum(weight)
-        if not sumweight:
+
+        sum_weight = sum(weight)
+        if not sum_weight:
             return nan
-        xweight = sorted(zip(x, weight), key=lambda v: v[0])
-        n = len(xweight)
-        x_sorted, weight_sorted = zip(*xweight)
 
-        cum = 0
-        s = []
-        for k in range(n):
-            s.append((weight_sorted[k] + cum))
-            cum += weight_sorted[k]
+        x_sorted, weight_sorted = zip(*sorted(zip(x, weight), key=lambda v: v[0]))
+        n = len(x_sorted)
 
-        for k in range(n):
-            s[k] = s[k] / cum
+        if self._weight:
+            weight_cum = []
+            cum = 0
+            for k in range(n):
+                cum += weight_sorted[k]
+                weight_cum.append(cum / sum_weight)
+            for k in range(n):
+                if weight_cum[k] >= q:
+                    break
+            if weight_cum[k] != q:
+                return x_sorted[k]
 
-        for k in range(n):
-            if s[k + 1] >= q:
-                break
-        return interpolate(q, s[k], s[k + 1], x_sorted[k], x_sorted[k + 1])
+            if interpolation in ("linear", "midpoint"):
+                return (x_sorted[k] + x_sorted[k + 1]) / 2
+            if interpolation in ("lower"):
+                return x_sorted[k]
+            if interpolation == "higher":
+                return x_sorted[k + 1]
+            raise ValueError("incorrect interpolation method " + interpolation)
+
+        else:
+            weight_cum = []
+            for k in range(n):
+                weight_cum.append(k / (n - 1))
+            for k in range(n):
+                if weight_cum[k + 1] > q:
+                    break
+
+            if interpolation == "linear":
+                return interpolate(q, weight_cum[k], weight_cum[k + 1], x_sorted[k], x_sorted[k + 1])
+            if interpolation == "lower":
+                return x_sorted[k]
+            if interpolation == "higher":
+                return x_sorted[k + 1]
+            if interpolation == "midpoint":
+                return (x_sorted[k] + x_sorted[k + 1]) / 2
+            if interpolation == "nearest":
+                if q - weight_cum[k] <= weight_cum[k + 1] - q:
+                    return x_sorted[k]
+                else:
+                    return x_sorted[k + 1]
+            raise ValueError("incorrect interpolation method " + interpolation)
 
     def bin_number_of_entries(self, lowerbound, upperbound, ex0=False):
         """
@@ -2273,91 +2333,136 @@ fill is only available for non level and not stats_only monitors. |n|
         ----------
         linecolor : colorspec
             color of the line or points (default foreground color)
-
+    
         linewidth : int
             width of the line or points (default 1 for level, 3 for non level monitors)
-
+    
         fillcolor : colorspec
             color of the panel (default transparent)
-
+    
         bordercolor : colorspec
             color of the border (default foreground color)
-
+    
         borderlinewidth : int
             width of the line around the panel (default 1)
-
+    
         nowcolor : colorspec
             color of the line indicating now (default red)
-
+    
         titlecolor : colorspec
             color of the title (default foreground color)
-
+    
         titlefont : font
             font of the title (default null string)
-
+    
         titlefontsize : int
             size of the font of the title (default 15)
-
+    
         title : str
             title to be shown above panel |n|
             default: name of the monitor
-
+    
         x : int
             x-coordinate of panel, relative to xy_anchor, default 0
-
+    
         y : int
             y-coordinate of panel, relative to xy_anchor. default 0
-
+    
         offsetx : float
             offsets the x-coordinate of the panel (default 0)
-
+    
         offsety : float
             offsets the y-coordinate of the panel (default 0)
-
+    
         angle : float
             rotation angle in degrees, default 0
-
+    
         xy_anchor : str
             specifies where x and y are relative to |n|
             possible values are (default: sw): |n|
             ``nw    n    ne`` |n|
             ``w     c     e`` |n|
             ``sw    s    se``
-
+    
         vertical_offset : float
             the vertical position of x within the panel is
              vertical_offset + x * vertical_scale (default 0)
-
+    
         vertical_scale : float
             the vertical position of x within the panel is
             vertical_offset + x * vertical_scale (default 5)
-
+    
         horizontal_scale : float
-            for timescaled monitors the relative horizontal position of time t within the panel is on
+            the relative horizontal position of time t within the panel is on
             t * horizontal_scale, possibly shifted (default 1)|n|
-            for non timescaled monitors, the relative horizontal position of index i within the panel is on
-            i * horizontal_scale, possibly shifted (default 5)|n|
-
+    
         width : int
             width of the panel (default 200)
-
+    
         height : int
             height of the panel (default 75)
-
+    
+        vertical_map : function
+            when a y-value has to be plotted it will be translated by this function |n|
+            default: float |n|
+            when the function results in a TypeError or ValueError, the value 0 is assumed |n|
+            when y-values are non numeric, it is advised to provide an approriate map function, like: |n|
+            vertical_map = "unknown red green blue yellow".split().index
+    
+        labels : iterable
+            labels to be shown on the vertical axis (default: empty tuple) |n|
+            the placement of the labels is controlled by the vertical_map method
+    
+        label_color : colorspec
+            color of labels (default: foreground color)
+    
+        label_font : font
+            font of the labels (default null string)
+    
+        label_fontsize : int
+            size of the font of the labels (default 15)    
+    
+        label_anchor : str
+            specifies where the label coordinates (as returned by map_value) are relative to |n|
+            possible values are (default: sw): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+    
+        label_offsetx : float
+            offsets the x-coordinate of the label (default 0)
+    
+        label_offsety : float
+            offsets the y-coordinate of the label (default 0)
+    
+        label_linewidth : int
+            width of the label line (default 1)
+    
+        label_linecolor : colorspec
+            color of the label lines (default foreground color)
+    
         layer : int
             layer (default 0)
-
+    
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+    
         Returns
         -------
         reference to AnimateMonitor object : AnimateMonitor
 
         Note
         ----
+        All measures are in screen coordinates |n|
+        
+        Note
+        ----
         It is recommended to use sim.AnimateMonitor instead |n|
 
         All measures are in screen coordinates |n|
         """
-        self._block_stats_only()
         return AnimateMonitor(monitor=self, *args, **kwargs)
 
     def x(self, ex0=False, force_numeric=True):
@@ -2648,6 +2753,9 @@ class AnimateMonitor(object):
 
     Parameters
     ----------
+    monitor : Monitor
+        monitor to be animated
+        
     linecolor : colorspec
         color of the line or points (default foreground color)
 
@@ -2721,14 +2829,14 @@ class AnimateMonitor(object):
 
     vertical_map : function
         when a y-value has to be plotted it will be translated by this function |n|
-        default: value |n|
+        default: float |n|
         when the function results in a TypeError or ValueError, the value 0 is assumed |n|
         when y-values are non numeric, it is advised to provide an approriate map function, like: |n|
         vertical_map = "unknown red green blue yellow".split().index
 
     labels : iterable
         labels to be shown on the vertical axis (default: empty tuple) |n|
-        the placement of the labels is controlled by the map_value method
+        the placement of the labels is controlled by the vertical_map method
 
     label_color : colorspec
         color of labels (default: foreground color)
@@ -2810,6 +2918,7 @@ class AnimateMonitor(object):
     ):
 
         _checkismonitor(monitor)
+        monitor._block_stats_only()
 
         if title is None:
             title = monitor.name()
@@ -3012,8 +3121,8 @@ if Pythonista:
                         self.bg.z_position = 10000
                     else:
                         self.bg.texture = scene.Texture(img)
-                else:               
-                    capture_image = env._capture_image("RGB")              
+                else:
+                    capture_image = env._capture_image("RGB")
                     ims = scene.load_pil_image(capture_image)
                     scene.image(ims, 0, 0, *capture_image.size)
                     scene.unload_image(ims)
@@ -3027,7 +3136,7 @@ if Pythonista:
 
                     if uio.type == "entry":
                         raise NotImplementedError("AnimateEntry not supported on Pythonista")
-                    if uio.type == "button":                
+                    if uio.type == "button":
                         linewidth = uio.linewidth
                         scene.push_matrix()
                         scene.fill(env.pythonistacolor(uio.fillcolor))
@@ -4435,7 +4544,20 @@ class Queue(object):
             self.env.print_trace("", "", self.name() + " clear")
 
 
-class Animate3dBase:
+class _AddAttr:
+    """
+    Internal class used by Animatexxx classes, to add an add_attr method.
+    """
+
+    def add_attr(self, **kwargs):
+        for k, v in kwargs.items():
+            if hasattr(self, k):
+                raise AttributeError("attribute " + k + " already set")
+            setattr(self, k, v)
+        return self
+
+
+class Animate3dBase(_AddAttr):
     """
     Base class for a 3D animation object |n|
     When a class inherits from this base class, it will be added to the animation objects list to be shown
@@ -5184,11 +5306,13 @@ class Environment(object):
         animate : bool
             animate indicator |n|
             new animate indicator |n|
+            if '?', animation will be set, possible |n|
             if not specified, no change
 
         animate3d : bool
             animate3d indicator |n|
             new animate3d indicator |n|
+            if '?', 3D-animation will be set, possible |n|
             if not specified, no change
 
         synced : bool
@@ -5504,9 +5628,13 @@ class Environment(object):
                         self.audio_segments.append(self._audio)
                     self.set_start_animation()
         if animate3d is not None:
+            if animate3d == "?":
+                animate3d = can_animate3d(try_only=True)
             self._animate3d = animate3d
 
         if animate is not None:
+            if animate == "?":
+                animate = can_animate(try_only=True)
             if animate != self._animate:
                 frame_changed = True
                 self._animate = animate
@@ -6288,6 +6416,7 @@ class Environment(object):
         ----------
         value : bool
             new animate indicator |n|
+            if '?', animation will be set, if possible
             if not specified, no change
 
         Returns
@@ -6310,6 +6439,7 @@ class Environment(object):
         ----------
         value : bool
             new animate3d indicator |n|
+            if '?', 3D-animation will be set, if possible
             if not specified, no change
 
         Returns
@@ -6845,6 +6975,9 @@ class Environment(object):
 
     def do_simulate_and_animate(self):
         if Pythonista:
+            if self._animate3d:
+                self.running = False
+                raise ImportError("3d animation not supported under Pythonista")
             while self.running and self._animate:
                 pass
         else:
@@ -7008,7 +7141,7 @@ class Environment(object):
 
         if video_mode == "screen" and ImageGrab is None:
             raise ValueError("video_mode='screen' not supported on this platform (ImageGrab does not exist)")
-    
+
         filename_path = Path(filename)
         extension = filename_path.suffix.lower()
         if extension in (".png", ".gif", ".bmp", ".ico", ".tiff"):
@@ -7154,7 +7287,7 @@ class Environment(object):
         uio = AnimateButton(x=38 + 5 * 60, y=-21, text="Stop", width=50, action=self.env.an_quit, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = Animate(x0=38 + 1.5 * 60, y0=-35, text="", textcolor0="fg", anchor="N", fontsize0=15,screen_coordinates=True, xy_anchor="nw")
+        uio = Animate(x0=38 + 1.5 * 60, y0=-35, text="", textcolor0="fg", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw")
         uio.text = self.speedtext
         uio.in_topleft = True
 
@@ -7245,7 +7378,7 @@ class Environment(object):
         if self._synced:
             self.an_synced_buttons()
         else:
-            self.an_unsynced_buttons()  
+            self.an_unsynced_buttons()
 
     def clocktext(self, t):
         s = ""
@@ -9256,6 +9389,10 @@ class Animate:
 
                 offsetx = self.offsetx(t)
                 offsety = self.offsety(t)
+                if not self.screen_coordinates:
+                    offsetx = offsetx * self.env._scale
+                    offsety = offsety * self.env._scale
+
                 angle = self.angle(t)
                 as_points = self.as_points(t)
 
@@ -10114,7 +10251,7 @@ class AnimateSlider(object):
             self.installed = False
 
 
-class AnimateQueue(object):
+class AnimateQueue(_AddAttr):
     """
     Animates the component in a queue.
 
@@ -10560,7 +10697,7 @@ class AnimateCombined(collections.UserList):
         return self.__class__.__name__ + " (" + str(len(self.data)) + " items)"
 
 
-class _Vis(object):
+class _Vis(_AddAttr):
     pass
 
 
@@ -10817,7 +10954,7 @@ class AnimateRectangle(_Vis):
 
     def __init__(
         self,
-        spec=(0,0,0,0),
+        spec=(0, 0, 0, 0),
         x=0,
         y=0,
         fillcolor="fg",
@@ -18648,16 +18785,15 @@ class Animate3dObj(Animate3dBase):
         if "pywavefront" not in sys.modules:
             global pywavefront
             global visualization
-            try:       
+            try:
                 import pywavefront
                 from pywavefront import visualization
             except ImportError:
                 pywavefront = None
 
-
     def draw(self, t):
         if pywavefront is None:
-            raise ImportError('Animate3dObj requires pywavefront. Not found')
+            raise ImportError("Animate3dObj requires pywavefront. Not found")
 
         obj_filename = Path(self.filename(t))
         if not obj_filename.suffix:
@@ -18685,8 +18821,8 @@ class Animate3dObj(Animate3dBase):
             logging.basicConfig(level=save_logging_level)
 
             self.env.obj_filenames[obj_filename] = pywavefront.Wavefront(obj_filename, create_materials=create_materials)
-            
-        obj = self.env.obj_filenames[obj_filename]        
+
+        obj = self.env.obj_filenames[obj_filename]
 
         gl.glMatrixMode(gl.GL_MODELVIEW)
         gl.glPushMatrix()
@@ -20160,11 +20296,12 @@ def can_animate(try_only=True):
         from PIL import ImageDraw
         from PIL import ImageFont
         from PIL import GifImagePlugin
+
         try:
-            from PIL import ImageGrab            
+            from PIL import ImageGrab
         except ImportError:
             ImageGrab = None
- 
+
         if not Pythonista:
             from PIL import ImageTk
     except ImportError:
@@ -20220,7 +20357,7 @@ def can_animate3d(try_only=True):
             if try_only:
                 return False
             else:
-                raise ImportError("OpenGL is required for animation3d. Install with pip install OpenGL or see salabim manual")
+                raise ImportError("OpenGL is required for animation3d. Install with pip install PyOpenGL or see salabim manual")
         return True
     else:
         if try_only:

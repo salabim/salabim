@@ -1,5 +1,92 @@
 salabim changelog
 
+version 21.1.5  2021-
+==========================
+Changed functionality / bug fix (0)
+-----------------------------------
+The Monitor.percentile method has been completely rewritten, to fix bugs and
+introduce the interpolation parameter.
+
+For non weighted monitors, the method is now exactly equivalent to the numpy percentile
+function. So it is now possible to use the interpolation parameters as follows:
+    This optional parameter specifies the interpolation method to use when the
+      desired percentile lies between two data points i < j:
+    ‘linear’: i + (j - i) * fraction, where fraction is the fractional part of the index surrounded by i and j
+    ‘lower’: i.
+    ‘higher’: j.
+    ‘nearest’: i or j, whichever is nearest.
+    ‘midpoint’: (i + j) / 2.
+For weighted and level monitors the behaviour is quite different (there's no equivalent in numpy),
+as only tallied values will be returned,  apart from when the value is undetermined,
+i.e. on change of value. In that case, the interpolation parameter will be applied as follows:
+    ‘linear’, 'midpoint': mean of the two tallied values
+    ‘lower’: lower tallied value
+    ‘higher’: highed tallie value
+
+In all cases, interpolation defaults to 'linear'.
+
+The test_monitor.py file has been updated to test the new functionality.
+
+Added functionality (0)
+-----------------------
+The Monitor.median method now also supports the interpolation parameter
+  (see above description of percentile)
+
+
+Added functionality (1)
+-----------------------
+The classes
+  AnimateCircle, AnimateImage, AnimateLine, AnimatePolygon, AnimateRectangle, AnimateText,
+  Animate3dBar, Animate3dBox, Animate3dGrid, Animate3dLine, Animate3dObj, Animate3dRectangle, Animate3dSphere and
+  AnimateQueue
+now have an additional method: add_attr 
+
+This is useful to add attribute(s) to an animation object, without having to assign the object a name and 
+assign the attribute(s) in seperate line(s).
+So, instead of
+    for xx in range(10):
+        an = sim.AnimateRectangle(spec=lambda arg,t: (arg.xx, 0, arg.xx + 10,arg.xx + t * 10))
+        an.xx = xx * 20
+we can now say
+    for xx in range(10):
+        sim.AnimateRectangle(spec=lambda arg,t: (arg.xx, 0, arg.xx + 10, arg.xx + t * 10)).add_attr(xx=xx * 20)
+
+It is possible to assign several attributes at once, like:
+    sim.AnimateRectangle(spec=lambda arg,t: (arg.xx, arg.yy,arg.xx + 10,arg.xx + t * 10)).add_attr(xx=xx * 20, yy=xx * 5)
+, but also like
+    sim.AnimateRectangle(spec=lambda arg,t: (arg.xx, arg.yy,arg.xx + 10, arg.xx + t * 10)).add_attr(xx=xx * 20).add_attr(yy=xx * 5)
+
+The method add_attr just returns the "calling" object.
+
+Note that it is not allowed to add any attributes that are already defined. So
+    sim.AnimateRectangle(spec=(0, 0, 10, 10).add_attr(x=5)
+is not allowed as x is already defined by salabim.
+
+
+Added functionality (2)
+-----------------------
+The method env.animate() now can use '?', to enable animation, if possible.
+If not possible, animation is ignored.
+
+The method env.animate3d() now can use '?', to enable 3D-animation, if possible.
+If not possible, 3D-animation is ignored.
+
+Both functionalities are also available via env.animation_parameters().
+
+Bug fix (0)
+-----------
+The offsetx and offsety parameters of all animation objects were always in screen_coordinates, even
+if screen_coordinates == False. Fixed.
+
+Documentation bug fix (0)
+-------------------------
+Docstring of AnimateMonitor and Monitor.animate() updated.
+
+Bug fix (1)
+-----------
+Under Pythonista, 3D animation was just ignored, instead of issueing an error message
+(as Pythonista does not support OpenGL). Fixed.
+
 version 21.1.4  2021-07-18
 ==========================
 New functionality (0)
