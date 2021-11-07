@@ -16,41 +16,202 @@ Pythonista = platform.system() == "Darwin"
 
 
 def exp():
-    exp148()
+    exp134()
+
+def exp155():
+    class X(sim.Component):
+        def process(self):
+            while True:
+                print(env.now())
+                yield self.hold(1)
+
+    class DisplayMenuAtEnd(sim.Component):    
+        def process(self):
+            print('1')
+            env.an_menu()
+            print('2')
+
+    env = sim.Environment()
+    run_time = 5
+    DisplayMenuAtEnd(at=run_time, priority=1)
+    X()
+    env.animate(True)
+    env.run(run_time+7)
+        
     
+def exp154():
+
+
+
+    class Part(sim.Component):
+        def process(self):
+            while 1:
+                yield self.d
+            
+            pass
+            
+    class Interrupter(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(interrupt_iat)
+                
+    number_of_machines = 3 
+    interrupt_iat=10         
+    env = sim.Environment(trace=True)
+    machines = [sim.Resource('machine.', capacity=2) for _ in range(number_of_machines)]
+    Interrupter()
+    sim.ComponentGenerator(Part, iat=4)
+    env.run(50)
+    
+def exp153():
+    class X(sim.Component):
+        def process(self):
+            yield self.wait([c1.state, c2.state])
+        
+    class C(sim.Component):
+        def setup(self):
+            self.state = sim.State('state',False)
+            
+        def process(self):
+            self.state.set()
+            
+    env = sim.Environment(trace=True)
+    c1=C(at=3)
+    c2=C(at=5)
+    X()
+    env.run()
+    
+def exp152():
+    class Normal(sim.Component):
+        def process(self):
+            yield self.request(env.res)
+            yield self.hold(1)
+            
+    class Emergency(sim.Component):
+        def process(self):
+            yield self.request((env.res,1,-self.sequence_number()))
+            yield self.hold(1)
+            
+    env = sim.Environment(trace=True)
+    env.res = sim.Resource('res', capacity=0)
+    Normal(at=1)
+    Emergency(at=2)
+    Normal(at=3)
+    Emergency(at=4)
+    
+    env.run(10)
+    env.res.set_capacity(1)
+    env.run()
+
+def exp151():
+    
+    class X(sim.Component):
+        def greedy_request(self, resource, quantity):
+            prio = env.now()
+            for _ in range(quantity):
+                yield self.request((res, 1, prio))  
+                       
+        def process(self, n):
+            yield from self.greedy_request(res,n)  
+            self.release(res)
+                      
+            
+
+    env = sim.Environment(trace=True)
+    res = sim.Resource('res', 10)
+    print(res.occupancy.value)
+    X(n=10)
+    X(n=1)
+    env.run()
+    
+def exp150():
+    class X(sim.Component):
+        def process(self):
+            while True:
+                delta = sim.Uniform(-1, 2)()
+                env.mon_delta.tally(delta)
+                env.mon_total.value += delta
+                yield self.hold(1)
+
+    env = sim.Environment()
+    env.animate(True)
+    env.mon_total = sim.Monitor("total", level=True)
+    env.mon_delta = sim.Monitor("delta", level=True)
+    an_total = env.mon_total.animate(width=950, height=200, x=30, y=10, horizontal_scale=10, vertical_offset=0, vertical_scale=10, labels=range(0, 21, 5))
+    env.mon_delta.animate(
+        width=950,
+        height=200,
+        x=30,
+        y=10,
+        horizontal_scale=10,
+        vertical_offset=100,
+        vertical_scale=10,
+        labels=range(-10, 11, 5),
+        label_offsetx=955,
+        label_anchor="w",
+        label_color="red",
+        linecolor="red",
+        titlecolor="red",
+        title="            delta",
+    )
+    X()
+    env.run(10)
+    an_total.remove()
+    an_total = env.mon_total.animate(width=950, height=200, x=30, y=10, horizontal_scale=10, vertical_offset=-50, vertical_scale=10, labels=range(5, 26, 5))
+    env.run()
+
+
+def exp149():
+
+    components = {}
+
+    class RegisterComponent(sim.Component):
+        def __init__(self, name=None, *args, **kwargs):
+            if name is None:
+                name = type(self).__name__.lower() + "."
+            super().__init__(name, *args, **kwargs)
+            components[self.name()] = self
+
+    class Car(RegisterComponent):
+        pass
+
+    env = sim.Environment()
+    for i in range(5):
+        Car()
+    porsch0 = Car(name="Porche")
+    porsche = Car(name="Porche")
+    print(components)
+
+
 def exp148():
     env = sim.Environment()
     env.animate(True)
     for xx in range(10):
-        an = sim.AnimateRectangle(spec=lambda arg,t: (arg.xx,arg.yy,arg.xx+10,arg.xx+t*10)).add_attr(xx=xx*20, yy=xx*5)
+        an = sim.AnimateRectangle(spec=lambda arg, t: (arg.xx, arg.yy, arg.xx + 10, arg.xx + t * 10)).add_attr(xx=xx * 20, yy=xx * 5)
     env.run(10000)
 
 
 def exp147():
     env = sim.Environment()
-    env.m=sim.Monitor()
+    env.m = sim.Monitor()
     for value in range(101):
         env.m.tally(value)
 
     env.m.print_histogram()
-    
+
 
 def exp146():
     class X(sim.Component):
-
         def process(self):
-            for value in (4,1,1,3,6,3,0,7,2,2):
+            for value in (4, 1, 1, 3, 6, 3, 0, 7, 2, 2):
                 env.ml.tally(value)
                 env.m.tally(value)
                 yield self.hold(1)
 
     env = sim.Environment()
-    env.ml=Monitor()
+    env.ml = Monitor()
     X()
     env.run(10)
-    
-
-
 
 
 def exp145():

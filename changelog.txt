@@ -1,6 +1,62 @@
 salabim changelog
 
-version 21.1.5  2021-
+version 21.1.6  2021-
+==========================
+Changed functionality (0)
+-------------------------
+Labels in AnimateMonitor() / Monintor.animate() are now suppressed if the
+corresponding y-value is outside the 'y range'.
+
+Changed functionality (1)
+-------------------------
+The default for priority in Environment.run() is now inf (was 0).
+This makes that, by default, all components scheduled for the end moment will become active before
+the run ends
+
+Changed functionality (2)
+-------------------------
+When an_menu() was issued from a program, the simulation wasn't paused until the next tkinter tick.
+From this version, the simulation will pause exactly at the current time (just prior to the next event).
+This functionality is also available under Pythonista.
+
+Added checks (0)
+----------------
+A call to Component.wait is now more strictly checked for errors.
+
+Bugfix (0)
+----------
+In version 21.1.4 a bug was introduced that made it impossible to add audio to a video.
+Fixed.
+
+Bugfix (1)
+-----------
+Although State.animate was phased out already in version 2.3.0, the State.__init__ method still contained
+an animation_objects parameter, that is not used anymore.
+So, both the docstring, documentation and the parameter heading have been updated accordingly.
+
+Bugfix (2)
+----------
+Bug in Monitor.median caused an error when interpolation was not specified. Fixed.
+
+Bugfix (3)
+----------
+AnimateSlide did not observe the width and height parameters at all (apart from under Pythonista).
+Fixed.
+
+Documentation and docstring enhancement (0)
+-------------------------------------------
+All animation objects now have the remove() method documented.
+
+Documentation bugfix (0)
+------------------------
+The default value label_anchor parameter of AnimateMonitor / Monitor.animate was
+documented to be 'sw', where it should have been 'e'. Fixed.
+
+Internal change (0)
+-------------------
+Check for correct interpolation in Monitor.percentile() / Monitor.median() now done at start of the method, thus being more robust.
+
+version 21.1.5  2021-09-01
 ==========================
 Changed functionality / bug fix (0)
 -----------------------------------
@@ -39,14 +95,14 @@ The classes
   AnimateCircle, AnimateImage, AnimateLine, AnimatePolygon, AnimateRectangle, AnimateText,
   Animate3dBar, Animate3dBox, Animate3dGrid, Animate3dLine, Animate3dObj, Animate3dRectangle, Animate3dSphere and
   AnimateQueue
-now have an additional method: add_attr 
+now have additional method: add_attr .
 
 This is useful to add attribute(s) to an animation object, without having to assign the object a name and 
 assign the attribute(s) in seperate line(s).
 So, instead of
     for xx in range(10):
-        an = sim.AnimateRectangle(spec=lambda arg,t: (arg.xx, 0, arg.xx + 10,arg.xx + t * 10))
-        an.xx = xx * 20
+        an = sim.AnimateRectangle(spec=lambda arg,t: (arg.xx,0,arg.xx+10,arg.xx+t*10))
+        an.xx = xx
 we can now say
     for xx in range(10):
         sim.AnimateRectangle(spec=lambda arg,t: (arg.xx, 0, arg.xx + 10, arg.xx + t * 10)).add_attr(xx=xx * 20)
@@ -56,7 +112,7 @@ It is possible to assign several attributes at once, like:
 , but also like
     sim.AnimateRectangle(spec=lambda arg,t: (arg.xx, arg.yy,arg.xx + 10, arg.xx + t * 10)).add_attr(xx=xx * 20).add_attr(yy=xx * 5)
 
-The method add_attr just returns the "calling" object.
+The method add_attr just returns the "calling" object, thus allowing "daisy chanining".
 
 Note that it is not allowed to add any attributes that are already defined. So
     sim.AnimateRectangle(spec=(0, 0, 10, 10).add_attr(x=5)

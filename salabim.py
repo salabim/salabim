@@ -1,13 +1,13 @@
-#               _         _      _               ____   _     _     ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |   | ___|
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |   |___ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _  ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_)|_|(_)|____/
+#               _         _      _               ____   _     _      __
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |    / /_
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |   | '_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _ | (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|   |_____||_|(_)|_|(_) \___/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "21.1.5"
+__version__ = "21.1.6"
 import heapq
 import random
 import time
@@ -370,7 +370,10 @@ fill is only available for non level and not stats_only monitors. |n|
 
     def _block_stats_only(self):
         if self._stats_only:
-            function = inspect.getframeinfo(inspect.stack()[1][0]).function
+            frame = inspect.stack()[1][0]
+            function = inspect.getframeinfo(frame).function
+            if function == "__init__":
+                function = frame.f_locals["self"].__class__.__name__
             raise NotImplementedError(function + " not available for " + self.name() + " because it is stats_only")
 
     def stats_only(self):
@@ -1443,7 +1446,7 @@ fill is only available for non level and not stats_only monitors. |n|
             else:
                 return nan
 
-    def median(self, ex0=False, interpolation=None):
+    def median(self, ex0=False, interpolation="linear"):
         """
         median of tallied values
 
@@ -1474,7 +1477,6 @@ fill is only available for non level and not stats_only monitors. |n|
         -------
         median (50% percentile): float
         """
-        self._block_stats_only()
         return self.percentile(50, ex0=ex0, interpolation=interpolation)
 
     def percentile(self, q, ex0=False, interpolation="linear"):
@@ -1516,6 +1518,9 @@ fill is only available for non level and not stats_only monitors. |n|
         """
         self._block_stats_only()
 
+        if interpolation not in (("linear", "lower", "higher", "midpoint") if self._weight else ("linear", "lower", "higher", "midpoint", "nearest")):
+            raise ValueError("incorrect interpolation method " + str(interpolation))
+
         q = max(0, min(q, 100))
         if q == 0:
             return self.minimum(ex0=ex0)
@@ -1552,7 +1557,6 @@ fill is only available for non level and not stats_only monitors. |n|
                 return x_sorted[k]
             if interpolation == "higher":
                 return x_sorted[k + 1]
-            raise ValueError("incorrect interpolation method " + interpolation)
 
         else:
             weight_cum = []
@@ -1575,7 +1579,6 @@ fill is only available for non level and not stats_only monitors. |n|
                     return x_sorted[k]
                 else:
                     return x_sorted[k + 1]
-            raise ValueError("incorrect interpolation method " + interpolation)
 
     def bin_number_of_entries(self, lowerbound, upperbound, ex0=False):
         """
@@ -2424,7 +2427,7 @@ fill is only available for non level and not stats_only monitors. |n|
     
         label_anchor : str
             specifies where the label coordinates (as returned by map_value) are relative to |n|
-            possible values are (default: sw): |n|
+            possible values are (default: e): |n|
             ``nw    n    ne`` |n|
             ``w     c     e`` |n|
             ``sw    s    se``
@@ -2723,8 +2726,8 @@ class _ModeMonitor(Monitor):
         return self._tally
 
     @value.setter
-    def value(self, value):
-        raise ValueError("not allowed to use set value! Use setmode() instead")
+    def value(self, value):  # ***
+        raise ValueError("not possible to use mode.value = . Use set_mode instead")
 
 
 class _StatusMonitor(Monitor):
@@ -2849,7 +2852,7 @@ class AnimateMonitor(object):
 
     label_anchor : str
         specifies where the label coordinates (as returned by map_value) are relative to |n|
-        possible values are (default: sw): |n|
+        possible values are (default: e): |n|
         ``nw    n    ne`` |n|
         ``w     c     e`` |n|
         ``sw    s    se``
@@ -3013,28 +3016,28 @@ class AnimateMonitor(object):
         for label in labels:
             try:
                 label_y = vertical_map(label) * vertical_scale + vertical_offset
-
-                self.aos.append(
-                    AnimateText(
-                        text=str(label),
-                        textcolor=label_color,
-                        x=x,
-                        y=y,
-                        offsetx=offsetx + label_offsetx,
-                        offsety=offsety + label_offsety + label_y,
-                        angle=angle,
-                        text_anchor=label_anchor,
-                        screen_coordinates=True,
-                        fontsize=label_fontsize,
-                        font=label_font,
-                        layer=layer,
+                if 0 <= label_y <= height:
+                    self.aos.append(
+                        AnimateText(
+                            text=str(label),
+                            textcolor=label_color,
+                            x=x,
+                            y=y,
+                            offsetx=offsetx + label_offsetx,
+                            offsety=offsety + label_offsety + label_y,
+                            angle=angle,
+                            text_anchor=label_anchor,
+                            screen_coordinates=True,
+                            fontsize=label_fontsize,
+                            font=label_font,
+                            layer=layer,
+                        )
                     )
-                )
-                self.aos.append(
-                    AnimateLine(
-                        spec=(0, 0, width, 0), x=x, y=y, offsetx=offsetx, offsety=label_y, angle=angle, linewidth=label_linewidth, linecolor=label_linecolor
+                    self.aos.append(
+                        AnimateLine(
+                            spec=(0, 0, width, 0), x=x, y=y, offsetx=offsetx, offsety=label_y, angle=angle, linewidth=label_linewidth, linecolor=label_linecolor
+                        )
                     )
-                )
             except (ValueError, TypeError):
                 pass
 
@@ -3098,6 +3101,10 @@ if Pythonista:
                             env.t = env.start_animation_time + ((time.time() - env.start_animation_clocktime) * env._speed)
                     while (env.peek() < env.t) and env.running and env._animate:
                         env.step()
+                        if env.paused:  # ***
+                            env.t = env.start_animation_time = env._now
+                        break
+
                 else:
                     if (env._step_pressed or (not env.paused)) and env._animate:
                         env.step()
@@ -4623,6 +4630,9 @@ class Animate3dBase(_AddAttr):
         pass
 
     def remove(self):
+        """
+        removes the 3d animation oject
+        """
         if self in self.env.an_objects3d:
             self.env.an_objects3d.remove(self)
 
@@ -6889,7 +6899,7 @@ class Environment(object):
         """
         return self._current_component
 
-    def run(self, duration=None, till=None, priority=0, urgent=False):
+    def run(self, duration=None, till=None, priority=inf, urgent=False):
         """
         start execution of the simulation
 
@@ -6907,9 +6917,10 @@ class Environment(object):
 
         priority : float
             priority |n|
-            default: 0 |n|
+            default: inf |n|
             if a component has the same time on the event list, main is sorted accoring to
-            the priority.
+            the priority. The default value of inf makes that all components will finish before
+            the run is ended
 
         urgent : bool
             urgency indicator |n|
@@ -7009,6 +7020,10 @@ class Environment(object):
                         if self.root is not None:
                             self.root.quit()
                         return
+                    if self.paused:  # ***
+                        self.t = self.start_animation_time = self._now
+                        break
+
             else:
                 if self._step_pressed or (not self.paused):
                     self.step()
@@ -7106,6 +7121,7 @@ class Environment(object):
                 if not self.paused:
                     self._save_frame()
                     self.video_t += self._speed / self._fps
+                    self.frame_number += 1
             else:
                 if self._synced:
                     tick_duration = time.time() - tick_start
@@ -10172,8 +10188,8 @@ class AnimateSlider(object):
         self.x1 = 0
         self.y1 = 0
         self.sequence = self.env.serialize()
-        self.x = x - width / 2
-        self.y = y - height / 2
+        self.x = x 
+        self.y = y - fontsize
         self.width = width
         self.height = height
         self.linecolor = self.env.colorspec_to_tuple(linecolor)
@@ -10225,7 +10241,7 @@ class AnimateSlider(object):
         x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
         y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
         self.slider = tkinter.Scale(
-            self.env.root, from_=self.vmin, to=self.vmax, orient=tkinter.HORIZONTAL, label=self.label, resolution=self.resolution, command=self.action
+            self.env.root, from_=self.vmin, to=self.vmax, orient=tkinter.HORIZONTAL, label=self.label, resolution=self.resolution, command=self.action, length=self.width, width=self.height
         )
         self.slider.window = g.canvas.create_window(x, self.env._height - y, anchor=tkinter.NW, window=self.slider)
         self.slider.config(
@@ -10842,6 +10858,9 @@ class AnimateText(_Vis):
         self.aos = (ao0,)
 
     def remove(self):
+        """
+        removes the animation oject
+        """
         for ao in self.aos:
             ao.remove()
 
@@ -11033,6 +11052,9 @@ class AnimateRectangle(_Vis):
         self.aos = (ao0, ao1)
 
     def remove(self):
+        """
+        removes the animation oject
+        """
         for ao in self.aos:
             ao.remove()
 
@@ -11223,6 +11245,9 @@ class AnimatePolygon(_Vis):
         self.aos = (ao0, ao1)
 
     def remove(self):
+        """
+        removes the animation oject
+        """        
         for ao in self.aos:
             ao.remove()
 
@@ -11407,6 +11432,9 @@ class AnimateLine(_Vis):
         self.aos = (ao0, ao1)
 
     def remove(self):
+        """
+        removes the animation oject
+        """
         for ao in self.aos:
             ao.remove()
 
@@ -11801,6 +11829,9 @@ class AnimateCircle(_Vis):
         self.aos = (ao0, ao1)
 
     def remove(self):
+        """
+        removes the animation oject
+        """
         for ao in self.aos:
             ao.remove()
 
@@ -11988,6 +12019,9 @@ class AnimateImage(_Vis):
         self.aos = (ao0, ao1)
 
     def remove(self):
+        """
+        removes the animation oject
+        """
         for ao in self.aos:
             ao.remove()
 
@@ -13563,12 +13597,16 @@ class Component(object):
                 state = arg
             elif isinstance(arg, (tuple, list)):
                 state = arg[0]
+                if not isinstance(arg, State):
+                    raise TypeError("incorrect specifier", arg)
                 if len(arg) >= 2:
                     value = arg[1]
                 if len(arg) >= 3:
                     priority = arg[2]
+                if len(arg) >= 4:
+                    raise TypeError("incorrect specifier", arg)
             else:
-                raise TypeError("incorrect specifier", args)
+                raise TypeError("incorrect specifier", arg)
 
             for (statex, _, _) in self._waits:
                 if statex == state:
@@ -16901,38 +16939,24 @@ class State(object):
         -  "uint64" integer >= 0 <= 18446744073709551614 8 bytes do not use 18446744073709551615
         -  "float" float 8 bytes do not use -inf
 
-    animation_objects : list or tuple
-        overrides the default animation_object method |n|
-        the method should have a header like |n|
-        ``def animation_objects(self, value):`` |n|
-        and should return a list or tuple of animation objects, which
-        will be used when the state changes value. |n|
-        The default method displays a square of size 40. If the value
-        is a valid color, that will be the color of the square. Otherwise,
-        the square will be black with the value displayed in white in
-        the centre.
-
     env : Environment
         environment to be used |n|
         if omitted, default_env is used
     """
 
-    def __init__(self, name=None, value=False, type="any", monitor=True, animation_objects=None, env=None, *args, **kwargs):
+    def __init__(self, name=None, value=False, type="any", monitor=True, env=None, *args, **kwargs):
         if env is None:
             self.env = g.default_env
         else:
             self.env = env
         _set_name(name, self.env._nameserializeState, self)
         self._value = value
-        self._aos = []
         savetrace = self.env._trace
         self.env._trace = False
         self._waiters = Queue(name="waiters of " + self.name(), monitor=monitor, env=self.env)
         self._waiters._isinternal = True
         self.env._trace = savetrace
         self.value = _SystemMonitor(name="Value of " + self.name(), level=True, initial_tally=value, monitor=monitor, type=type, env=self.env)
-        if animation_objects is not None:
-            self.animation_objects = animation_objects.__get__(self, State)
         if self.env._trace:
             self.env.print_trace("", "", self.name() + " create", "value= " + str(self._value))
         self.setup(*args, **kwargs)
