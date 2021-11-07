@@ -1,6 +1,6 @@
 salabim changelog
 
-version 21.1.6  2021-
+version 21.1.6  2021-11-07
 ==========================
 Changed functionality (0)
 -------------------------
