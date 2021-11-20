@@ -81,7 +81,7 @@ class ItemFile(object):
             run_length = f.read_item_float() |n|
             run_name = f.read_item() |n|
 
-    Alternatively, the file can be opened and closed explicitely, like ::
+    Alternatively, the file can be opened and closed explicitly, like ::
 
         f = sim.ItemFile("experiment0.txt")
         run_length = f.read_item_float()
@@ -6062,7 +6062,7 @@ class Environment(object):
 
         Note
         ----
-        It is not possible to set this value explicitely.
+        It is not possible to set this value explicitly.
         """
         return self._y1
 
@@ -6076,7 +6076,7 @@ class Environment(object):
 
         Note
         ----
-        It is not possible to set this value explicitely.
+        It is not possible to set this value explicitly.
         """
         return self._scale
 
