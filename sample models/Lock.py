@@ -39,7 +39,7 @@ class Lock(sim.Component):
     def setup(self):
         self.usedlength = 0
         self.side = left
-        self.monitor_usedlength = sim.MonitorTimestamp(name="used length")
+        self.monitor_usedlength = sim.Monitor(level=True, name="used length")
         self.monitor_time_in_complex = sim.Monitor(name="time in complex")
 
     def get_usedlength(self):

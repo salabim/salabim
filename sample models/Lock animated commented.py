@@ -94,9 +94,7 @@ def do_animation():
     xbound = {left: -1.2 * locklength, right: 1.2 * locklength}  # x-coordinate of the limits of the screen
 
     # animation_parameters is a method of salabim.Environment to set animation parameters and to start the animation
-    env.animation_parameters(
-        x0=xbound[left], y0=-waterdepth, x1=xbound[right], modelname="Lock", speed=8, background_color="20%gray"
-    )
+    env.animation_parameters(animate=True, x0=xbound[left], y0=-waterdepth, x1=xbound[right], modelname="Lock", speed=8, background_color="20%gray")
 
     for side in [left, right]:
         sim.AnimateQueue(queue=wait[side], x=xdoor[side], y=10 + ylevel[side], direction="n")
@@ -107,9 +105,7 @@ def do_animation():
     # The first rectangle represents the water at the left side of the lock (fixed level)
     sim.AnimateRectangle(spec=(xbound[left], ylevel[left] - waterdepth, xdoor[left], ylevel[left]), fillcolor="aqua")
     # The second rectangle represents the water at the right side of the lock (fixed level)
-    sim.AnimateRectangle(
-        spec=(xdoor[right], ylevel[right] - waterdepth, xbound[right], ylevel[right]), fillcolor="aqua"
-    )
+    sim.AnimateRectangle(spec=(xdoor[right], ylevel[right] - waterdepth, xbound[right], ylevel[right]), fillcolor="aqua")
     # The third rectangle represents the water inside the lock, which will be switching
     sim.AnimateRectangle(spec=lock_water_rectangle, fillcolor="aqua")
     # The fourth rectangle is the left door, which will be apearing and dissapearing
@@ -119,31 +115,9 @@ def do_animation():
 
     # AnimateSlider is a class of Salabim to allow adjusting some parameters on the screen during the simulation
     # In this example, we can adjust the interarrival time and the ships mean length
+    sim.AnimateSlider(x=520, y=0, width=100, height=20, vmin=16, vmax=60, resolution=4, v=iat, label="iat", action=set_iat, xy_anchor="nw")
     sim.AnimateSlider(
-        x=520,
-        y=0,
-        width=100,
-        height=20,
-        vmin=16,
-        vmax=60,
-        resolution=4,
-        v=iat,
-        label="iat",
-        action=set_iat,
-        xy_anchor="nw",
-    )
-    sim.AnimateSlider(
-        x=660,
-        y=0,
-        width=100,
-        height=20,
-        vmin=10,
-        vmax=60,
-        resolution=5,
-        v=meanlength,
-        label="mean length",
-        action=set_meanlength,
-        xy_anchor="nw",
+        x=660, y=0, width=100, height=20, vmin=10, vmax=60, resolution=5, v=meanlength, label="mean length", action=set_meanlength, xy_anchor="nw"
     )
 
     # The class AnimateMonitor allows display monitors on the screen while running the simulation
@@ -180,7 +154,6 @@ def do_animation():
         xy_anchor="n",
         vertical_scale=0.5,
         horizontal_scale=5,
-        as_points=True,
         width=450,
         height=75,
         linewidth=4,
@@ -195,7 +168,6 @@ def do_animation():
         xy_anchor="n",
         vertical_scale=0.5,
         horizontal_scale=5,
-        as_points=True,
         width=450,
         height=75,
         linewidth=4,
@@ -203,9 +175,7 @@ def do_animation():
     )
 
     # There is another queue in the system, the one inside the lock while switching: lockqueue
-    sim.AnimateQueue(
-        queue=lockqueue, x=lambda: xdoor[-lock.sideq], y=lock_y, direction=lambda: "w" if lock.sideq == left else "e"
-    )
+    sim.AnimateQueue(queue=lockqueue, x=lambda: xdoor[-lock.sideq], y=lock_y, direction=lambda: "w" if lock.sideq == left else "e")
     #  Note that the y-coordinate is dynamic, making it possible that the queue moves up or down
 
 

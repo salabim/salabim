@@ -1,5 +1,343 @@
 salabim changelog
 
+version 21.1.6  2021-
+==========================
+Changed functionality (0)
+-------------------------
+Labels in AnimateMonitor() / Monintor.animate() are now suppressed if the
+corresponding y-value is outside the 'y range'.
+
+Changed functionality (1)
+-------------------------
+The default for priority in Environment.run() is now inf (was 0).
+This makes that, by default, all components scheduled for the end moment will become active before
+the run ends
+
+Changed functionality (2)
+-------------------------
+When an_menu() was issued from a program, the simulation wasn't paused until the next tkinter tick.
+From this version, the simulation will pause exactly at the current time (just prior to the next event).
+This functionality is also available under Pythonista.
+
+Added checks (0)
+----------------
+A call to Component.wait is now more strictly checked for errors.
+
+Bugfix (0)
+----------
+In version 21.1.4 a bug was introduced that made it impossible to add audio to a video.
+Fixed.
+
+Bugfix (1)
+-----------
+Although State.animate was phased out already in version 2.3.0, the State.__init__ method still contained
+an animation_objects parameter, that is not used anymore.
+So, both the docstring, documentation and the parameter heading have been updated accordingly.
+
+Bugfix (2)
+----------
+Bug in Monitor.median caused an error when interpolation was not specified. Fixed.
+
+Bugfix (3)
+----------
+AnimateSlide did not observe the width and height parameters at all (apart from under Pythonista).
+Fixed.
+
+Documentation and docstring enhancement (0)
+-------------------------------------------
+All animation objects now have the remove() method documented.
+
+Documentation bugfix (0)
+------------------------
+The default value label_anchor parameter of AnimateMonitor / Monitor.animate was
+documented to be 'sw', where it should have been 'e'. Fixed.
+
+Internal change (0)
+-------------------
+Check for correct interpolation in Monitor.percentile() / Monitor.median() now done at start of the method, thus being more robust.
+
+version 21.1.5  2021-09-01
+==========================
+Changed functionality / bug fix (0)
+-----------------------------------
+The Monitor.percentile method has been completely rewritten, to fix bugs and
+introduce the interpolation parameter.
+
+For non weighted monitors, the method is now exactly equivalent to the numpy percentile
+function. So it is now possible to use the interpolation parameters as follows:
+    This optional parameter specifies the interpolation method to use when the
+      desired percentile lies between two data points i < j:
+    ‘linear’: i + (j - i) * fraction, where fraction is the fractional part of the index surrounded by i and j
+    ‘lower’: i.
+    ‘higher’: j.
+    ‘nearest’: i or j, whichever is nearest.
+    ‘midpoint’: (i + j) / 2.
+For weighted and level monitors the behaviour is quite different (there's no equivalent in numpy),
+as only tallied values will be returned,  apart from when the value is undetermined,
+i.e. on change of value. In that case, the interpolation parameter will be applied as follows:
+    ‘linear’, 'midpoint': mean of the two tallied values
+    ‘lower’: lower tallied value
+    ‘higher’: highed tallie value
+
+In all cases, interpolation defaults to 'linear'.
+
+The test_monitor.py file has been updated to test the new functionality.
+
+Added functionality (0)
+-----------------------
+The Monitor.median method now also supports the interpolation parameter
+  (see above description of percentile)
+
+
+Added functionality (1)
+-----------------------
+The classes
+  AnimateCircle, AnimateImage, AnimateLine, AnimatePolygon, AnimateRectangle, AnimateText,
+  Animate3dBar, Animate3dBox, Animate3dGrid, Animate3dLine, Animate3dObj, Animate3dRectangle, Animate3dSphere and
+  AnimateQueue
+now have additional method: add_attr .
+
+This is useful to add attribute(s) to an animation object, without having to assign the object a name and 
+assign the attribute(s) in seperate line(s).
+So, instead of
+    for xx in range(10):
+        an = sim.AnimateRectangle(spec=lambda arg,t: (arg.xx,0,arg.xx+10,arg.xx+t*10))
+        an.xx = xx
+we can now say
+    for xx in range(10):
+        sim.AnimateRectangle(spec=lambda arg,t: (arg.xx, 0, arg.xx + 10, arg.xx + t * 10)).add_attr(xx=xx * 20)
+
+It is possible to assign several attributes at once, like:
+    sim.AnimateRectangle(spec=lambda arg,t: (arg.xx, arg.yy,arg.xx + 10,arg.xx + t * 10)).add_attr(xx=xx * 20, yy=xx * 5)
+, but also like
+    sim.AnimateRectangle(spec=lambda arg,t: (arg.xx, arg.yy,arg.xx + 10, arg.xx + t * 10)).add_attr(xx=xx * 20).add_attr(yy=xx * 5)
+
+The method add_attr just returns the "calling" object, thus allowing "daisy chanining".
+
+Note that it is not allowed to add any attributes that are already defined. So
+    sim.AnimateRectangle(spec=(0, 0, 10, 10).add_attr(x=5)
+is not allowed as x is already defined by salabim.
+
+
+Added functionality (2)
+-----------------------
+The method env.animate() now can use '?', to enable animation, if possible.
+If not possible, animation is ignored.
+
+The method env.animate3d() now can use '?', to enable 3D-animation, if possible.
+If not possible, 3D-animation is ignored.
+
+Both functionalities are also available via env.animation_parameters().
+
+Bug fix (0)
+-----------
+The offsetx and offsety parameters of all animation objects were always in screen_coordinates, even
+if screen_coordinates == False. Fixed.
+
+Documentation bug fix (0)
+-------------------------
+Docstring of AnimateMonitor and Monitor.animate() updated.
+
+Bug fix (1)
+-----------
+Under Pythonista, 3D animation was just ignored, instead of issueing an error message
+(as Pythonista does not support OpenGL). Fixed.
+
+version 21.1.4  2021-07-18
+==========================
+New functionality (0)
+---------------------
+Introduced Environment.insert_frame() that can insert a PIL image or file (specified as str or pathlib.Path)
+into the video stream.
+This is particularly useful to add an introduction and explanatory frames.
+Note that each frame is 1/30 seconds and you can specify the number of frames.
+The image is automatically scaled to fit the current video resolution.
+
+New functionality (1)
+---------------------
+The method Environment.snapshot() now has an extra parameter 'video_mode' that can be "2d" (the default),
+"3d" or "screen".
+Note that "3d" is only available if animate3d is True.
+The resulting image is never scaled.
+
+Changed functionality (0)
+-------------------------
+The method Environment.Animate3dObj now postpones the actual loading of the file till the moment it is
+required. That makes it possible to call Animate3dObj even if no 3d animation is activated and
+even possible.
+Also, the filename and show_warnings may now be changed dynamically.
+
+Internal changes (0)
+--------------------
+Changed the internals of _save_frame (now via insert_frame) and _capture_image.
+
+Internal changes (1)
+--------------------
+If ImageGrab is not available on a platform, video_mode 'screen' is not supported
+for video and snapshot and properly detected.
+
+
+version 21.1.3  2021-07-07
+==========================
+New functionality (0)
+---------------------
+From this version on, it is possible to select the "video_mode" of a video.
+You can choose from
+- "2d" to film the normal tkinter window
+- "3d" to film the OpenGL 3d animation window (only if animate3d is True)
+- "screen" to film the full screen (screen capture). This is particularly handy to make a video of both
+  the 2d and 3d windows.
+The method Environment.video_mode can be used to specify the video_mode. The default is "2d".
+Alternatively, the video_mode parameter of Environment.animation_parameters may be used as well.
+It is possible to change the video_mode during a recording.
+
+New functionality (1)
+---------------------
+It is now possible to specify the resolution of the to be recorded video.
+This can be done with Environment.video_width() and Environment.video_height().
+Alternatively, the video_width and video_height parameters of Environment.animation_parameters may be used as well.
+If the video_width/video_height is "auto" (the default), the resolution is taken from the video_mode at the time
+video recording was started.
+The captured images are always scaled to the given resolution, which might lead to horizontal or vertical
+black bars to pad the image.
+
+Added functionality (0)
+-----------------------
+The camera control keys in 3d animation now work also when the OpenGL window has the focus.
+
+
+version 21.1.2  2021-07-03
+==========================
+Bugfix (0)
+----------
+Version 21.1.1 tried erroneously to import ycecream. This dependency has been removed.
+
+BTW, my ycecream package is a very useful tool for debugging and benchmarking any Python program,
+including salabim models.
+See www.github.com/salabim/ycecream , if you are interested.
+
+
+version 21.1.1  2021-07-02
+==========================
+New functionality (0)
+---------------------
+Introduced Animate3dSphere to animate a sphere.
+
+Enhanced functionality (0)
+--------------------------
+Blind animation now also supports 3D animations. Note that OpenGL needs to be installed, though.
+
+Functional change (0)
+---------------------
+The way the mode monitor was implemented made that the garbage collector could never remove a component,
+thus causing a memory leak.
+In order to change the behaviour, it won't be possible to set the mode of a component with 
+    Component.mode.value = ...
+anymore (as was mentioned in the 20.0.4 release notes).
+You have to set the mode via one of the process control functions or with set_mode().
+
+Bugfix (0)
+----------
+A bug in version 21.1.0 required to have OpenGL installed, even when no 3D animation was used. Fixed.
+This bugfix also makes startup of non 3D animation models faster.
+
+Bugfix (1)
+----------
+Under certain conditions, the file/linenumber in the trace was not shown correctly in the trace. Fixed.
+
+Sample models update (0)
+------------------------
+Updated several models in the sample models folder.
+
+Documentation update (0)
+------------------------
+A section on how to install OpenGL under Windows has been added to the documentation.
+Here's the same text (slightly differently formatted):
+    If, after  
+       pip install PyOpenGL
+    you get a runtime error that glutInit is not defined, try to install from the
+    Unofficial Windows Binaries for Python Extension Packages site at
+    https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyopengl
+    Find the right 3.1.5 or later version for you
+    (e.g. for Python 3.7, 64 bits you use PyOpenGL-3.1.5-cp37-cp37m-win_amd64.whl) and download that.
+    Then issue
+        pip install wheelfile
+    ,like (for the above package)
+        pip install PyOpenGL-3.1.5-cp37-cp37m-win_amd64.whl
+    and it should work.
+    It is reecommended to install pyopengl_accelerate in the same way, like
+        pip install PyOpenGL_accelerate-3.1.5-cp37-cp37m-win_amd64.whl
+    
+version 21.1.0  2021-06-17
+==========================
+Added functionality (0)
+-----------------------
+This version introduces 3D animation. That's a very powerful feature that
+requires users at least to know how to do 2D animation.
+
+Note that the API is still work in progress and might change.
+
+Note that the documetation is not properly updated. Only the reference section
+contains is now up-to-date.
+I intend to update the documentation soon. Volunteers to help with that are welcome!
+
+The sample 3d models folder on GitHub contains a couple of demo models, that
+could be used as a start.
+
+Changed functionality (0)
+-------------------------
+When Stop is pressed from the menu, the program now correctly exits, instead of returning to main.
+
+Changed functionality (1)
+-------------------------
+Color name 'lightgrey' added, as this is present in the X11 color name standard, but was absent in salabim.
+Color name 'sandybrown' updated, to be in line with the X11 color name standard
+
+Bugfix (0)
+----------
+If video specified an extension with a coded, like .mp4+h264, the output file extension incorrectly
+contained the codec information.
+From this version on, the codec information is skipped in the resulting filename.
+
+
+version 21.0.4  2021-05-01
+==========================
+Bugfix (0)
+-----------
+When a non-level monitor was sliced, the stop value was included in the slice,
+so causing an overlap with a slice that started at that value.
+Fixed.
+
+Bugfix (1)
+-----------
+When run on a Chromebook (at least on a Lenovo Duet), the menu buttons were far too big. Fixed.
+
+Bugfix (2)
+-----------
+On Linux platforms fonts not having the .ttf extension (particularly .TTF) were not found. Fixed.
+
+Bugfix (3)
+-----------
+PeriodMonitors now get the stats_only flag from the parent monitor.
+PeriodMonitors now correctly tally the weight.
+
+version 21.0.3  2021-03-20
+==========================
+Added functionality (0)
+-----------------------
+Environment.snapshot() now also supports the .ico image file format.
+This may be useful when (mis)using salabim as an icon generator.
+
+Bug fix (0)
+----------
+Bug in initializing system monitors at init of a component (not setting env to self.env). Fixed.
+
+Bug fix (1)
+-----------
+When producing videos with blind_animation=True (to allow running without tkinter installed),
+the Environment.animation_pre_tick_sys() method was not called prior to saving a frame,
+causing problems with animating queues. Fixed.
+
 version 21.0.2  2021-01-25
 ==========================
 Improved functionality (0)
@@ -28,7 +366,7 @@ monitor was not set correctly. Fixed.
 
 version 21.0.1  2021-01-14
 ==========================
-Bug fix (0) 
+Bug fix (0)
 -----------
 Bug in Component._remove() fixed.
 
@@ -58,7 +396,7 @@ But beware that some important functionality is not available in stats_only moni
 You can define the stats_only status at creation time of the monitor, like:
     m = sim.Monitor('m', stats_only=True)
 
-But, it is also possible to reset a monitor with a different stats_only value. 
+But, it is also possible to reset a monitor with a different stats_only value.
 This can be useful if you want a system monitor, like Component.mode or Component.status to not keep individual
 tallied values:
     class Car(sim.Component):
@@ -135,12 +473,12 @@ Added functionality (2)
 sim.Environment() has now an extra parameter, blind_animation that can be used to create videos
 without showing the animation during production.
 This is particularly useful when running a simulation on a platform where tkinter is not supported,
-such a server. 
+such a server.
 This functionality can also be used to slightly increase the performance of video production.
     
 Example usage:
     try:
-        import tkinter  
+        import tkinter
         blind_animation = False
     except ImportError:
         blind_animation = True
@@ -168,7 +506,7 @@ sort_on_value=True.
 Improved functionality (1)
 --------------------------
 Monitor.print_histogram() with values now supports sorting on weight (=number of entries if
-all weights are 1) (for non level monitors) and sorting on duration (for level monitors).
+all weights are 1) (for non-level monitors) and sorting on duration (for level monitors).
 Therefore, two parameters have been added to print_histogram(): sort_on_weight and sort_on_duration.
 
 So,
@@ -185,13 +523,13 @@ may result in
     
 Improved functionality (2)
 --------------------------
-Monitor.values() now supports sorting on weight (=number of entries if all weights are 1) (for non level monitors) and sorting on duration (for level monitors).
+Monitor.values() now supports sorting on weight (=number of entries if all weights are 1) (for non-level monitors) and sorting on duration (for level monitors).
 Therefore, two parameters have been added to values(): sort_on_weight and sort_on_duration.
-So, in the above example, 
+So, in the above example,
     print(x0.status.values())
 may result in
     ['data', 'interrupted', 'passive', 'scheduled']
-, whereas 
+, whereas
     print(x0.status.values(sort_on_duration))
 may result in
     ['passive', 'scheduled', data', 'interrupted']
@@ -214,8 +552,8 @@ For instance, component.status.print_histogram(values=True) will print something
     data                         4.300  10.8 ********
     interrupted                  4      10   ********
     passive                     11.500  28.7 ***********************
-    requesting                  10.100  25.2 ********************   
-    scheduled                   10.100  25.3 ********************   
+    requesting                  10.100  25.2 ********************
+    scheduled                   10.100  25.3 ********************
 
 And of course, it is possible to get the duration a component was in a certain status, like
     passive_time = component.status.value_duration(sim.passive).
@@ -223,7 +561,7 @@ You can even get the status of the component at a moment in the past, with e.g.
     status_4_units_ago = c1.status(env.now() - 4)
 
 In line with this change, the various statutes (passive, scheduled, ...) are no longer functions,
-but just strings. So now, therefore it is also possible to say 
+but just strings. So now, therefore it is also possible to say
      passive_time = component.status.value_duration("passive")
 This will be quite transparent from the user. Only if the text representation of a status was required,
 status() had to be called, like
@@ -242,7 +580,7 @@ are arguably easier to understand.
 The package salabim now has a function statuses() that returns a tuple with all statuses a component can be in.
 So
     print(sim.statuses())
-will print    
+will print
     ('current', 'data', 'interrupted', 'passive', 'requesting', 'scheduled', 'standby', 'waiting')
 
 New functionality (1)
@@ -274,7 +612,7 @@ will print
 New functionality (4)
 ---------------------
 The values parameter of print_histogram() can now also be an iterable (i.e. tuple, list or set).
-In that case, the statistics of only these values will be shown. 
+In that case, the statistics of only these values will be shown.
 Example (with same monitor as above):
     x1.status.print_histogram(values = sim.statuses())
 will print
@@ -313,14 +651,14 @@ The function vertical_map should result in a float or raise a TypeError or Value
 E.g. to map "red" to the value 1, "blue" to 2, etc., you could provide a mapping function like:
     vertical_map = "unknown red blue green yellow".split().index
 Note that in this example any value other than red, blue, green or yellow would map to 0
-(via a ValueError exception). 
+(via a ValueError exception).
 This vertical_map function can also be used to map to a logarithmic scale:
-    vertical_map = lambda value_y: math.log(value_y) * 10   
+    vertical_map = lambda value_y: math.log(value_y) * 10
 
 New functionality (6)
 ---------------------
 AnimateMonitor and Monitor.animate can now show labels and corresponding lines.
-There is full control of the colours, linewidth, fonts, placement, etc. See the docstring or 
+There is full control of the colours, linewidth, fonts, placement, etc. See the docstring or
 documentation for details.
 There is a sample model (demo animation of labeled monitors.py) in the sample model folder
 to illustrate the usage of this new functionality with the new Component.status and
@@ -372,8 +710,8 @@ to save the monitor mon, and
         mon_retrieved = pickle.load(f)
 to retrieve the monitor, later.
 
-Both level and non level monitors are supported.
-Frozen monitors get the name of the original monitor padded with '.frozen' unless specified differently.  
+Both level and non-level monitors are supported.
+Frozen monitors get the name of the original monitor padded with '.frozen' unless specified differently.
 
 New functionality (2)
 ---------------------
@@ -394,7 +732,7 @@ with env.video('myvideo.mp4'):
     ...
     env.run(10)
     
-This will automatically close the file myvideo.mp4 upon leaving the with block. 
+This will automatically close the file myvideo.mp4 upon leaving the with block.
 
 Change in functionality (0)
 ---------------------------
@@ -427,7 +765,7 @@ That means we now rely on the automatic garbage collection, which can be slightl
 This change means that an animation object with a parent that terminates its process is not
 necessarily removed, as it can be still in a queue, or even just referenced by a variable.
 If you use the parent parameter in an Animate, AnimateQueue or AnimateMonitor this might change the
-behaviour. 
+behaviour.
 
 Added support files (0)
 -----------------------
@@ -477,7 +815,7 @@ This contrast to
     c.request(r1, r2, r3)
 , which will be honoured if r1, r2 AND r3 have at least a quantity of one available.
 
-The trace of request and honouring request has been updated accordingly.     
+The trace of request and honouring request has been updated accordingly.
 
 
 Changes in video production (0)
@@ -533,7 +871,7 @@ default environment instead of the overruled environment.
 
 Bugfix (1)
 -----------
-PeriodMonitor lacked an env parameter. Fixed. 
+PeriodMonitor lacked an env parameter. Fixed.
 
 
 Bugfix (2)
@@ -549,7 +887,7 @@ Fixed.
 
 Internal changes (0)
 --------------------
-In order to support the new oneof parameter of request, the data structure of _requests and _claims is now 
+In order to support the new oneof parameter of request, the data structure of _requests and _claims is now
 collections.OrderedDict instead of collections.defaultdict.
 
 version 20.0.1  2020-02-27
@@ -581,7 +919,7 @@ ordinary component, altough it is not recommended to use any the process methods
 Added functionality (0)
 -----------------------
 It is now possible to suppress line numbers in the trace.
-Particularly when the trace output is written to a file, this can result in dramatic (up to 50 times!) 
+Particularly when the trace output is written to a file, this can result in dramatic (up to 50 times!)
 performance increase, because the calculation of line numbers is very demanding.
 Now, therefore a method Environment.suppress_trace_linenumbers() has been introduced.
 Like:
@@ -618,7 +956,7 @@ Improved functionality (0)
 Normal video production (i.e. not .gif, .jpg, .bmp, .tiff, .png) is now done via a temporary file.
 That has the effect that if the video production is not closed properly, the video is not written at all,
 thus making the production process more stable.
-It is necessary to always close the video production with 
+It is necessary to always close the video production with
     env.video("")
     
 
@@ -702,7 +1040,7 @@ tracking. The method Environment.animation_parameters() has therefore now a new 
 which is False by default.
 Alternatively, the method Environment.animate_debug() can be used.
 
-Changed functionality (1) 
+Changed functionality (1)
 -------------------------
 sim.Environment() now automatically resets the simulation environment when run under Pythonista.
 A parameter 'do_reset' to sim.Environment() allows the user to force a reset as well, or to indicate
@@ -787,12 +1125,12 @@ In the trace, the time of rescheduling of Component initialization, activate, ho
 the time was always shown in the information field of the trace as 'scheduled for xxx'.
 From this version, also the delta time (if not 0 of inf) is shown as +xxx behind the action, e.g.
 
-   75+      1.000 main                 current                              
-   76                                  client.0 create                      
+   75+      1.000 main                 current
+   76                                  client.0 create
    76                                  client.0 activate                    scheduled for      1.000 @   59  process=process
-   77                                  client.1 create                      
+   77                                  client.1 create
    77                                  client.1 activate +1.000             scheduled for      2.000 @   59  process=process
-   78                                  client.2 create                      
+   78                                  client.2 create
    78                                  client.2 activate +3.000             scheduled for      4.000 @   59  process=process
 
 New functionality (2)
@@ -825,13 +1163,13 @@ After execution, the file output.txt contains:
     line#        time current component    action                               information
     ------ ---------- -------------------- -----------------------------------  -------------------------------
                                            line numbers refers to               test.py
-        8                                  default environment initialize       
-        8                                  main create                          
-        8       0.000 main                 current                              
-        9                                  x.0 create data component            
+        8                                  default environment initialize
+        8                                  main create
+        8       0.000 main                 current
+        9                                  x.0 create data component
 
 And the following output is generated:
-       12                                  x.1 create data component       
+       12                                  x.1 create data component
        
 Note that by issueing env.trace(False), the file is not closed, so that has to be done explicitely or with
 a context manager.
@@ -841,7 +1179,7 @@ Changed functionality (0)
 -------------------------
 The default priority of a requested resource is now inf, which means the lowest possible priority.
 In practice, this will hardly ever make a difference with the former behaviour that if no priority was given, it was
-added to the tail of the requesters 
+added to the tail of the requesters
 
 When a request is honoured, the component now enters the claimers queue with priority as it had in the requesters
 queue. Again, in practice this will hardly make any difference.
@@ -899,7 +1237,7 @@ This makes it possible to intermix floats/ints and distributions, without having
     ...
     yield self.hold(set_up_time)
     yield self.hold(processing_time)
-    yield self.hold(env.hours(reaction_time))    
+    yield self.hold(env.hours(reaction_time))
     
 Note that salabim also supports basic expressions for distributions, so it is even possible to do something like
     yield self.hold(2 * setup_time + processing_time)
@@ -923,9 +1261,9 @@ Examples:
     d = sim.External(random.lognormvariate, mu=5, sigma=1)
     d = sim.External(numpy.random.laplace, loc=5, scale=1)
     d = sim.SciPyDis(SciPy.beta, a=1, loc=4, scale=1)
-Then sampling with 
+Then sampling with
     d.sample()
-or 
+or
     d()
     
 If the size is given (only for numpy.random and scipy.stats distributions), salabim will return the sampled values successively. This can be useful to increase performance.
@@ -937,7 +1275,7 @@ If a time_unit parameter is given, the sampled values will be multiplied by the 
     d = sim.ScyPyDis(SciPy.norm, loc=2, time_unit='minutes')
     print(d.mean())
 will print out
-    120 
+    120
 
 New functionality (2)
 ---------------------
@@ -959,7 +1297,7 @@ Now, None will be handled as the null string ("")
 
 Improvement (1)
 ---------------
-When a distribution with a time unit was specified without an Environment was instantiated, a rather obscure error 
+When a distribution with a time unit was specified without an Environment was instantiated, a rather obscure error
 message was shown. Now, a clear error message will be shown, in that case.
 
 Implementation note (0)
@@ -973,7 +1311,7 @@ Related to this is an internal change in the way Environment seeds random.
 
 Implementation note (1)
 -----------------------
-Change in the way time_units are handled internally. 
+Change in the way time_units are handled internally.
 
 version 19.0.7  2019-08-12
 ==========================
@@ -1063,7 +1401,7 @@ the capacity of a resource by 1 can now be done with
 or
     res.capacity.value += 1
     
-The following standard salabim level monitors do support only *getting* the value and (for obvious reasons) 
+The following standard salabim level monitors do support only *getting* the value and (for obvious reasons)
 not *setting* the value:
 - Queue.length()
 - Resource.available_quantity()
@@ -1099,7 +1437,7 @@ Alternatively, the new parameter audio of Environment.animation_parameters() can
 mp3 to be played.
 It is recommended not to use variable bit rate (vbr) mp3 files, as the length can't be detected correctly.
 Note that audio is only played when the animation speed is equal to audio_speed, which is 1 by default.
-The audio_speed may be changed with Environment.audio_speed() or the new parameter audio_speed of 
+The audio_speed may be changed with Environment.audio_speed() or the new parameter audio_speed of
 Environment.animation_parameters().
 On other platforms than Windows or Pythonista, the audio functions are ignored.
 
@@ -1127,7 +1465,7 @@ Images with an alpha values of less than 255 are rendered quicker when numpy is 
 Improved performance (0)
 ------------------------
 Animation objects that are completely out of the frame are suppressed now. This results in better
-performance when many animation objects are not visible anyway. 
+performance when many animation objects are not visible anyway.
 
 
 Improved performance (1)
@@ -1161,7 +1499,7 @@ Note that clear_source cannot be applied if source is a list or a tuple.
 
 New functionality (1)
 ---------------------
-Non level monitors can now be filled from a list or tuple, like
+non-level monitors can now be filled from a list or tuple, like
     m = Monitor("my monitor", level=False, fill=(1,2,5,7,2,3))
 which is functionally equivalent to
     m = Monitor("my monitor", level=False)
@@ -1241,7 +1579,7 @@ in better performance and reduces the probability of a tkinter crash.
 
 Changed functionality (0)
 -------------------------
-The method Environment.animation_parameters() does no longer automatically enable animate, but 
+The method Environment.animation_parameters() does no longer automatically enable animate, but
 instead leaves the animate status unchanged. So, if the user now wants to start the animation as
 well when specifying other parameters, it is necessary to add animate=True.
 Or, better yet, specify the various parameters with their corresponding method and use
@@ -1271,14 +1609,14 @@ The docstring and the documentation have been updated accordingly.
 
 Bug fixes
 ---------
-Minor error in AnimateMonitor and Monitor.animate() for non level monitors fixed.
+Minor error in AnimateMonitor and Monitor.animate() for non-level monitors fixed.
 
 version 19.0.2  2019-03-25
 ==========================
 
 New functionality
 -----------------
-It is now possible to scale the output of non level monitor, which is most useful for the automatically
+It is now possible to scale the output of non-level monitor, which is most useful for the automatically
 registered length_of_stay monitor of queues. For instance, if the time unit of the simulation is days,
 the duration in the queue (q) is registered in days. Buf if a histogram in minutes is more appropriate,
 it is possible to say
@@ -1315,7 +1653,7 @@ is equivalent to
 Bug fixes
 ---------
 Minor error in run without a duration or till parameter fixed (was not correctly fixed in version 19.0.1)
-Bug in Queue.extend() fixed. 
+Bug in Queue.extend() fixed.
 Bug in Queue.clear() fixed.
 
 version 19.0.1 2019-03-02
@@ -1333,7 +1671,7 @@ Documentation update
 The documentation has been enhanced.
 A section on using monitors in other packages, like matplotlib has been added.
 This includes a hint to use
-    plt.plot(*waitingline.length.tx(), drawstyle="steps-post") 
+    plt.plot(*waitingline.length.tx(), drawstyle="steps-post")
 to generate a plot from a level monitor.
 
     
@@ -1431,7 +1769,7 @@ Apart from Monitor.merge(), monitors can now be merged also with the + operator,
     print((m0 + m1 + m2).mean())
 is equivalent to
     print(m0.merge(m1, m2).mean())
-It is also possible to use the sum function to merge a number of monitors. So, 
+It is also possible to use the sum function to merge a number of monitors. So,
     print(sum((m0, m1, m2)).mean())
 is equivalent to the constructs above.
 And if ms = (m0, m1, m2), it is also possible to use:
@@ -1447,17 +1785,17 @@ Examples:
     d1 = sim.Normal(4, 1) // 1  # integer samples of a normal distribution
     d2 = sim.IntUniform(1,5) * 10)  # to return 10, 20, 30, 40 or 50.
     d3 = (1 / sim.Uniform(1, 2))()  # to return values between 0.5 and 1 (not uniform!)
-    d4 = sim.Pdf((0, 1, 2, 3, 4, 5, 6), (18, 18, 18, 18, 18, 8,2), 'days') + 
+    d4 = sim.Pdf((0, 1, 2, 3, 4, 5, 6), (18, 18, 18, 18, 18, 8,2), 'days') +
         sim.Cdf((0,0, 8,10, 17, 90, 24, 100), 'hours')
         # this generates an arrival moment during a week, with emphasis on day 0-4.
-        # The distribution over the day concentrates between hour 8 and 17. 
+        # The distribution over the day concentrates between hour 8 and 17.
     d5 = sim.Uniform(1,2) * (10 + sim.Triangular(1,3,2) + sim.Normal(2,1)) ** 3  # over the top or what?
 
 An instance of the class _Expresssion can be used as any other distribution.
 For example, each expression below returns 10, 20, 30, 40 or 50.
-    d2.sample()  
+    d2.sample()
     sim.IntUniform(1,5) * 10).sample()
-    sim.IntUniform(1,5) * 10)()    
+    sim.IntUniform(1,5) * 10)()
     
 Like all distributions, the _Expression class supports the
 mean(), sample(), bounded_sample() and print_info() methods.
@@ -1517,12 +1855,12 @@ Complete overhaul of Monitor/MonitorTimestamp internals, resulting in more consi
 The documentation has been updated accordingly.
 MonitorTimestamp is phased out and replaced by level monitors, which are instances of Monitor.
 Timestamped monitors are now called level monitors, whereas non timestamped monitors are now called
-non level monitors.
-Non level monitors now always timestamp the entry, which makes slicing and more useful animation possible.
-It is no longer required (and possible) to indicate that a non level monitor is weighted. If a weight is
+non-level monitors.
+non-level monitors now always timestamp the entry, which makes slicing and more useful animation possible.
+It is no longer required (and possible) to indicate that a non-level monitor is weighted. If a weight is
 required, just tally with a weight != 1.
 
-Animation of non level monitors is now also shown on a timescale, thus making it easier to see
+Animation of non-level monitors is now also shown on a timescale, thus making it easier to see
 the relation with a level monitor, e.g. length and length_of_stay of a queue.
 
 This has a number of consequences for the API:
@@ -1532,14 +1870,14 @@ Merging of monitors not anymore part of the init, but is a separate method:
   m = Monitor(merge=(m1, m2, m3)) ==> m = m1.merge(m2, m3)
 
 It is no longer necessary (and possible) to specify weighted=True in init of Monitor.
-All non level monitors now support weighted, if required.
+All non-level monitors now support weighted, if required.
   m = Monitor(weighted=True) ==> m = Monitor()
     
-The (level monitor only) method .get() or direct call can now also be used to get the value of the level at a 
+The (level monitor only) method .get() or direct call can now also be used to get the value of the level at a
 specified time within the monitored period, e.g.
   print('queue length at time 100 was', q.length.get(100))
 or alternatively:
-  print('queue length at time 100 was', q.length(100))  
+  print('queue length at time 100 was', q.length(100))
   
 It is now possible to slice a monitor with Monitor.slice(), which has two applications:
 - to get statistics on a monitor with respect to a given time period, most likely a subrun
@@ -1576,10 +1914,10 @@ If the time unit is set, times can be specified in any dimension, like
    yield self.hold(env.seconds(20))
 The following methods for conversion to the current time unit are available:
   Environment.years()
-  Environment.weeks() 
-  Environment.days() 
+  Environment.weeks()
+  Environment.days()
   Environment.hours()
-  Environment.minutes() 
+  Environment.minutes()
   Environment.seconds()
   Environment.milliseconds()
   Environment.microseconds()
@@ -1595,7 +1933,7 @@ The following methods for conversion from time current time unit are available:
   Environment.to_hours()
   Environment.to_minutes()
   Environment.to_seconds()
-  Environment.to_milliseconds() 
+  Environment.to_milliseconds()
   Environment.to_microseconds()
 Example:
   env = sim.Environment(time_unit='hours')
@@ -1642,7 +1980,7 @@ version 2.3.4.2  2018-09-29
 Bug fixes
 ---------
 Serious bug in MonitorTimestamp caching mechanism resulted in sometimes not updating the statistics, when
-animation is off. Fixed.  
+animation is off. Fixed.
 
 
 version 2.3.4.1  2018-09-22
@@ -1663,8 +2001,8 @@ These period monitors can be used to get statistics about (timestamped) monitors
 For instance if the time unit is hours a period monitor with 24 periods of 1, will give 24 monitors
 containing data about hour 0-1, 1-2, ... 23-24 (modulo 24).
 It is not necessary that the durations are all the same.
-The most obvious use case of this new functionality is to get period information about the builtin 
-queue monitors length and length_of_stay. 
+The most obvious use case of this new functionality is to get period information about the builtin
+queue monitors length and length_of_stay.
   qlength_per_hours= sim.PeriodMonitor(q.length, periods=24 * [1])
   q_length_of_stay_per_hour = sim.PeriodMonitor(q.length_of_stay, periods=24 * [1])
 Then after a run, the histogram of the length of stay for hour 0-1 (modulo 24) can be printed with
@@ -1678,7 +2016,7 @@ Please note that this class is still experimental functionality that might chang
 
 It is now possible to indicate that after a specific component returns control to the event scheduler,
 standby component should not be activated. This is particularly useful when a data collection component
-becomes current every so often. In that case, activating standby component is not useful and will just 
+becomes current every so often. In that case, activating standby component is not useful and will just
 consume processing power.
 There are two ways to indicate that a component should skip standby activation:
 - Component.skip_standby()
@@ -1696,7 +2034,7 @@ Added the methods
 - Environment.screen_to_usercoordinates_y()
 - Environment.screen_to_usercoordinates_size()
 to convert between user and screen coordinates and vice versa.
-These methods are particularly useful for position and sizing AnimateButtons, AnimateSliders or AnimateEntries. 
+These methods are particularly useful for position and sizing AnimateButtons, AnimateSliders or AnimateEntries.
 
 
 Improved functionality
@@ -1823,7 +2161,7 @@ as introduced in version 2.3.2.4 has been changed into a more logical way.
 
 Now each of these methods has an additional parameter 'file'  which can be used
 to direct the output to that file. If file is omitted, the output goes to stdout.
-If as_str is True, the methods always return as a string rather than writing to a file.  
+If as_str is True, the methods always return as a string rather than writing to a file.
 
 Example:
     q=sim.Queue(name='queue')
@@ -1834,7 +2172,7 @@ Example:
 
 Bug fixes
 ---------
-A bug when Pillow (PIL) was not installed (correctly) and running without animation fixed.    
+A bug when Pillow (PIL) was not installed (correctly) and running without animation fixed.
     
 
 version 2.3.2.4  2018-08-07
@@ -1863,7 +2201,7 @@ A syntax error when run under Python 2.7 with 'yield from' fixed. Be advised tha
 drop Python 2.7 support in the future.
 
 
-version 2.3.2.3  2018-07-31 
+version 2.3.2.3  2018-07-31
 ===========================
 Bug fixes
 ---------
@@ -2066,7 +2404,7 @@ If we want to print the histogram of the combined (=summed) length of these queu
     MonitorTimestamp(name='combined processing length',
         merge=(a.processing.length, b.processing.length, c.processing.length)).print_histogram()
 and to print the histogram of the length_of_stay for all entries:
-    Monitor(name='combined processing length of stay', 
+    Monitor(name='combined processing length of stay',
         merge=(a.processing.length_of_stay, b.processing.length_of_stay, c.processing.length_of_stay)).print_histogram()
         
  
@@ -2077,7 +2415,7 @@ This is particularly useful for dichotomies, like failing probabilities:
         print('failed!')
 
 
-All methods 
+All methods
   print_histogram()
   print_histograms()
   print_statistics()
@@ -2085,13 +2423,13 @@ All methods
 now have an additional parameter as_str, that allows the output to be returned
 as a string, rather than print the information (the default is False, so just print):
 This is particularly useful for animation of that information (see demo queue animation.py) or to
-write directly to a file.        
+write directly to a file.
                         
 
 sim.Random() is a new class that makes a randomstream. It is essentially the same as sim.random.Random().
 
         
-Queue.name(value), Resource.name(value) and State.name(value) now also update the derived names.        
+Queue.name(value), Resource.name(value) and State.name(value) now also update the derived names.
 
 API changes
 -----------
@@ -2276,7 +2614,7 @@ will print:
     Histogram of normal distribution
                             all    excl.zero         zero
     -------------- ------------ ------------ ------------
-    entries           10000        10000            0    
+    entries           10000        10000            0
     mean                  9.989        9.989
     std.deviation         1.989        1.989
     
@@ -2287,19 +2625,19 @@ will print:
     maximum              17.597       17.597
     
                <=       entries     %  cum%
-            1             0       0     0   |                                                                              
-            2             1       0.0   0.0 |                                                                              
-            3             3       0.0   0.0 |                                                                              
-            4            14       0.1   0.2 |                                                                              
-            5            43       0.4   0.6 |                                                                              
-            6           153       1.5   2.1 *|                                                                             
-            7           439       4.4   6.5 ***  |                                                                         
-            8           925       9.2  15.8 *******     |                                                                  
-            9          1532      15.3  31.1 ************            |                                                      
-           10          1938      19.4  50.5 ***************                         |                                      
-           11          1895      18.9  69.4 ***************                                        |                       
-           12          1475      14.8  84.2 ***********                                                        |           
-           13           940       9.4  93.6 *******                                                                   |    
+            1             0       0     0   |
+            2             1       0.0   0.0 |
+            3             3       0.0   0.0 |
+            4            14       0.1   0.2 |
+            5            43       0.4   0.6 |
+            6           153       1.5   2.1 *|
+            7           439       4.4   6.5 ***  |
+            8           925       9.2  15.8 *******     |
+            9          1532      15.3  31.1 ************            |
+           10          1938      19.4  50.5 ***************                         |
+           11          1895      18.9  69.4 ***************                                        |
+           12          1475      14.8  84.2 ***********                                                        |
+           13           940       9.4  93.6 *******                                                                   |
            14           424       4.2  97.8 ***                                                                           |
            15           165       1.7  99.5 *                                                                              |
            16            34       0.3  99.8                                                                                |
@@ -2312,17 +2650,17 @@ individual values, by specifying values=True.
 This is especially useful when collecting the status of a component over time, like:
 
     Histogram of Status
-    duration            300    
-    entries              57    
+    duration            300
+    entries              57
     
     value                     duration        entries
-    idle                        88.558( 29.5%)      9( 15.8%) ***********************                                                         
-    produce A                   37.459( 12.5%)      9( 15.8%) *********                                                                       
-    produce B                    8.425(  2.8%)      2(  3.5%) **                                                                              
-    produce C                   44.352( 14.8%)     10( 17.5%) ***********                                                                     
-    produce D                   54.775( 18.3%)     12( 21.1%) **************                                                                  
-    store                       38.591( 12.9%)      8( 14.0%) **********                                                                      
-    transport                   27.841(  9.3%)      7( 12.3%) *******                                                                         
+    idle                        88.558( 29.5%)      9( 15.8%) ***********************
+    produce A                   37.459( 12.5%)      9( 15.8%) *********
+    produce B                    8.425(  2.8%)      2(  3.5%) **
+    produce C                   44.352( 14.8%)     10( 17.5%) ***********
+    produce D                   54.775( 18.3%)     12( 21.1%) **************
+    store                       38.591( 12.9%)      8( 14.0%) **********
+    transport                   27.841(  9.3%)      7( 12.3%) *******
     
 Monitor.value_number_of_entries() introduced. The method can be used to check how many entries have an x
 equal to value or an x that is in value.
@@ -2452,7 +2790,7 @@ version 2.2.19  2018-04-13
 ==========================
 New functionality
 -----------------
-Support for animated GIF production. If Environment.animation.parameters(video=...) of Environment.video() 
+Support for animated GIF production. If Environment.animation.parameters(video=...) of Environment.video()
 gets a filename with .gif as extension, an animated GIF is created.
 Note that GIF production does not require numpy nor opencv, and therefore Environment.can_video() does not
 have to be True to produce an animated GIF.
@@ -2468,7 +2806,7 @@ Two methods have been added to Environment to support GIF file production:
   Environment,video_pingpong()
                
                    
-For ordinary video files (non GIF), it is now possible to specify a codec, by adding a plus sign and 
+For ordinary video files (non GIF), it is now possible to specify a codec, by adding a plus sign and
 the name of the codec after the extension of the file, like
   video='myvideo.avi+DIVX'
   
@@ -2506,7 +2844,7 @@ Compare these two components:
             yield self.cancel()  # process ends here and r is NOT released!
             
 Also, all animation objects that have set the parent field to a component will be removed automatically
-when the process of that component ends. Again, this can be prevented by yield self.cancel().            
+when the process of that component ends. Again, this can be prevented by yield self.cancel().
 
 This information will be included in the documentation.
     
@@ -2620,13 +2958,13 @@ The API for animation has changed slightly:
 center is now refered to as 'c'  (although 'center' is still accepted)
 xy_anchor allows x0, x1, y0 and y1 in Animate and x and y in AnimateButton or AnimateSlider object, to be
 relative to each of the wind directions 'n', 'nw', 'w', 'sw', 's', 'se', 'e' or 'ne' or 'c' (for center).
-This makes it, for instance, possible to define a button relative to the top right hand corner of the 
+This makes it, for instance, possible to define a button relative to the top right hand corner of the
 animation frame:
 b = sim.AnimateButton(text='My button', x=-100, y=-20, xy_anchor='ne')
 
 All arguments of Environment.animation_parameters have now a corresponding function that
 can be used to set or query one of the animation parameters:
-  Environment.x0() to set/query x-coordinate of lower left corner of animation frame 
+  Environment.x0() to set/query x-coordinate of lower left corner of animation frame
   Environment.x1() to set/query x-coordinate of upper right corner of animation frame
   Environment.y0() to set/query y-coordinate of lower left corner of animation frame
   Environment.y1() to query y-coordinate of upper right corner of animation frame
@@ -2646,7 +2984,7 @@ The Poisson distribution is now supported.
 
 Enhancements
 ------------
-Text alignment in text Animate is significantly improved. Now the text is always aligned according to the 
+Text alignment in text Animate is significantly improved. Now the text is always aligned according to the
 (estimated) 'cap line', which is derived from a capital A.
 So, when aligning south, the descender of the g is below the baseline.
 When aligning north, top of the capline is the given y-position.
@@ -2666,7 +3004,7 @@ Bug fix
 Collected tallies for monitors were not cached properly, resulting in non optimal performance of Monitor.x() and
 querying the monitor, e.g. print_histogram.
 
-version 2.2.14  2018-02-02         
+version 2.2.14  2018-02-02
 ==========================
 New functionality
 -----------------
@@ -2693,7 +3031,7 @@ The input file is read per item, where blanks, linefeeds, tabs are treated as se
 Any text on a line after a # character is ignored.
 Any text within curly brackets ( {} ) is ignored (and treated as an item separator).
 Note that this strictly on a per line basis.
-If a blank is to be included in a string, use single or double quotes.    
+If a blank is to be included in a string, use single or double quotes.
 The recommended way to end a list of values is //
 
 So, a typical input file is:
@@ -2713,7 +3051,7 @@ So, a typical input file is:
      
      France {country} Europe {continent}
      
-     #end of file 
+     #end of file
 
 Instead of the filename as a parameter to ItemFile, also a string with the content can be given. In that
 case, at least one linefeed has to be in the content string. Usually, the content string will be triple
@@ -2733,7 +3071,7 @@ quoted. This can be very useful during testing as the input is part of the sourc
                 
     
      
-version 2.2.13A  2018-01-25        
+version 2.2.13A  2018-01-25
 ===========================
 Bug fix
 -------
@@ -2742,11 +3080,11 @@ also not under Python 2.7|.
 
 This intermediate version fixes that.
 
-version 2.2.13  2018-01-25        
+version 2.2.13  2018-01-25
 ==========================
 New functionality
 -----------------
-It is now possible to use arguments for the process generator of a component. Only keyword arguments are supported. 
+It is now possible to use arguments for the process generator of a component. Only keyword arguments are supported.
 Parameters can either be set at initialization of a component or the call to activate. E.g.:
 
     import salabim as sim
@@ -2778,7 +3116,7 @@ Optimization
 ------------
 Optimized animation perfomance by improving the interpolate function.
 
-version 2.2.12  2018-01-18        
+version 2.2.12  2018-01-18
 ==========================
 In the trace the line numbers are now prefixed by a letter to indicate
 in which file the line is in.
@@ -2814,7 +3152,7 @@ Significant updates to the documentation (structure).
 
 Optimizations by checking _trace flag before calling print_trace.
 
-version 2.2.11  2018-01-14         
+version 2.2.11  2018-01-14
 ==========================
 Enhanced trace output
 ---------------------
@@ -2850,38 +3188,38 @@ prints:
 
 line#         time current component    action                               information
 -----   ---------- -------------------- -----------------------------------  ------------------------------------------------
-   15                                   main create                          
-   15        0.000 main                 current                              
+   15                                   main create
+   15        0.000 main                 current
    16                                   resource.0 create                    capacity=1
-   18                                   x.0 create                           
+   18                                   x.0 create
    18                                   x.0 activate                         scheduled for      0.000 @    4  process=process
-   19                                   x.1 create                           
+   19                                   x.1 create
    19                                   x.1 activate                         scheduled for      0.000 @    4  process=process
-   20                                   y.0 create                           
+   20                                   y.0 create
    20                                   y.0 activate                         scheduled for      0.000 @   11  process=process
    22                                   main run                             scheduled for     50.000 @   22+
-    4        0.000 x.0                  current                              
+    4        0.000 x.0                  current
     5                                   x.0 hold                             scheduled for     10.000 @    5+ mode=one
-    4        0.000 x.1                  current                              
+    4        0.000 x.1                  current
     5                                   x.1 hold                             scheduled for     10.000 @    5+ mode=one
-   11        0.000 y.0                  current                              
+   11        0.000 y.0                  current
    12                                   y.0                                  request for 4 from resource.0
    12                                   y.0 request                          scheduled for     15.000 @   12+
-    5+      10.000 x.0                  current                              
+    5+      10.000 x.0                  current
     8                                   x.0 hold                             scheduled for     20.000!@    8+ mode=two
-    5+      10.000 x.1                  current                              
+    5+      10.000 x.1                  current
     7                                   x.1 passivate                        mode=one
-   12+      15.000 y.0                  current                              
+   12+      15.000 y.0                  current
    22                                   y.0                                  request failed
    13                                   x.1 activate                         scheduled for     15.000 @    7+ mode=one
-                                        y.0 ended                            
-    7+      15.000 x.1                  current                              
+                                        y.0 ended
+    7+      15.000 x.1                  current
     8                                   x.1 hold                             scheduled for     25.000!@    8+ mode=two
-    8+      20.000 x.0                  current                              
-                                        x.0 ended                            
-    8+      25.000 x.1                  current                              
-                                        x.1 ended                            
-   22+      50.000 main                 current                              
+    8+      20.000 x.0                  current
+                                        x.0 ended
+    8+      25.000 x.1                  current
+                                        x.1 ended
+   22+      50.000 main                 current
    
 Note that output line now starts with the line number in the source.
 If a + is behind the line number, that means the statement following that line.
@@ -2913,7 +3251,7 @@ Component.suppress_pause_at_trace
 
 Sampling from a distribution is now also possible by just calling the distribution, like:
     yield self.hold(inter_arrival_time())
-, which is equivalent to    
+, which is equivalent to
     yield self.hold(inter_arrival_time.sample())
 
 Documentation update
@@ -3001,7 +3339,7 @@ New queue functionality:
     as_list() can be used to get all components in a queue as a list.
     q[:] can be used to get all components in a queue a list.
 
-    The Queue methods union, difference, intersection, copy and move now support default (meaningful) names.  
+    The Queue methods union, difference, intersection, copy and move now support default (meaningful) names.
 
 New color functionality:
     The method Environment.animation_parameters now has an additional parameter, foregroundcolor.
@@ -3033,7 +3371,7 @@ By default, this setup method is dummy.
 
 Classes Monitor and MonitorTimestamp now contain base_name() and sequence_number() methods.
 
-The image method of the class Animate now just returns an image and not anymore a tuple of 
+The image method of the class Animate now just returns an image and not anymore a tuple of
 an image and a serial number.
 
 The function spec_to_image now supports the null string, in which case a dummy picture will be
@@ -3079,7 +3417,7 @@ which defines how a component is to be visualized.
 The default method shows a black square of 40x40 with the sequence_number in white in this square.
 But, it is possible and quite likely necessary to override the animation_objects method.
 The method should return a list or tuple containing the x-size, y-size and one or more animation objects.
-In order to animate a queue, the method Queue.animate should be called with the position of 
+In order to animate a queue, the method Queue.animate should be called with the position of
 the first component and the direction for subsequent components.
 Please have a look at the MMc model for a demonstration.
 
@@ -3138,12 +3476,12 @@ Queue.reset() has been renamed to Queue.reset_monitors()
 Resource.reset() has been renamed to Resource.reset_monitors()
 New method: State.reset_monitors()
 
-In Component.wait(), if the test value contains a $, the $ 
+In Component.wait(), if the test value contains a $, the $
 sign is now replaced by state.value() instead of str(state.value())
 This means that you can now say
     self.wait('light','$ in ("green","yellow")')
     
-Monitor can now store the tallied values in an array instead of a list. 
+Monitor can now store the tallied values in an array instead of a list.
 this results in less memory usage and faster execution speed.
 The array may be either integer, unsigned integer or float.
 Integer and unsigned integer is available in 1, 2, 4 or 8 byte versions.
@@ -3162,7 +3500,7 @@ When type='any' is given, the tallied values will be stored in a list.
 Monitor off is now tallied now with the attribute off of the timestamped monitor,
 which is dependent on the type.
 Note that the tallied values for Queue.length are in an uint32 array.
-The tallied values for Resource.capacity, Resource.claimed_quantity and 
+The tallied values for Resource.capacity, Resource.claimed_quantity and
 Resource.available_quantity are in a float array,
 The tallied values for State.value are in a list, unless a type is specified at init time.
 The MonitorTimestamp.x() method returns a numpy array for integer and float monitors.
@@ -3172,16 +3510,16 @@ unless overridden with force_numeric=False.
 
 The Monitor.x() and MonitorTimestamped.xduration() methods now uses caching to impove performance.
 
-The function type in Component.wait now uses three arguments instead of a tuple of value, 
+The function type in Component.wait now uses three arguments instead of a tuple of value,
 component and state.
 
 Redesigned font searching in order to support animation on Linux and to guarantee a consistent
 appearance over different platforms.
-Therefore, a small set of ttf fonts is included in the distribution. These should reside in 
+Therefore, a small set of ttf fonts is included in the distribution. These should reside in
 the same directory where salabim.py is located (PyPI automatically takes care of that).
 These fonts will be first searched. As of this moment, salabim is shipped with:
-- calibri.ttf           The preferred proportional font. Also accessible with font='std' or font='' 
-- arial.ttf 
+- calibri.ttf           The preferred proportional font. Also accessible with font='std' or font=''
+- arial.ttf
 - cour.ttf
 - DejaVuSansMono.ttf    The preferred monospaced font. Also accessible with font='mono'
 - mplus-1m-regular.ttf  The preferred narrow monospaced font. Also accessible with font='narrow'
@@ -3199,13 +3537,13 @@ Outphased:
 Use the equivalent default environment method instead, like
   env.run()
 
-version 2.2.4  2017-09-12 
+version 2.2.4  2017-09-12
 =========================
 Automatic naming of components, queues, etc. results in shorter names now.
 E.g., instead of 'client............11' the name is now 'client.11'.
 Also the name is not shortened anymore (was: 20 characters).
 
-The methods Monitor.print_statistics(), MonitorTimestamp.print_statistics(), 
+The methods Monitor.print_statistics(), MonitorTimestamp.print_statistics(),
 Queue.print_statistics, State.print_statistics and Resource.print_statistics()
 have an improved layout.
 
@@ -3224,7 +3562,7 @@ Therefore, salabim now has special code to handle null strings correctly.
 
 Minor bug with importing PIL under Pythonista fixed.
 
-version 2.2.2  2017-09-02 
+version 2.2.2  2017-09-02
 =========================
 Component.wait() now allows to check for":
 - a value
@@ -3257,7 +3595,7 @@ Bug in Component.request() corrected.
 This prevented Machine shop animated to work properly.
 
 
-version 2.2.0  2017-08-30 
+version 2.2.0  2017-08-30
 =========================
 Introduced a new process control method: wait.
 This functionality is similar but not equal to the waitevent and queueevent
@@ -3270,7 +3608,7 @@ The class State has a number of methods, which allow to control the state:
   set(value) sets the value. Normally used without argument, in which
           case True will be used.
   reset() resets the value to False=
-  trigger(value) sets the value (default True), triggers any components waiting, 
+  trigger(value) sets the value (default True), triggers any components waiting,
     and then immediately resets to a given value (default False).
     optionally, the number of components to be honored with the trigger
     value may be limited (if used, most like 1).
@@ -3347,7 +3685,7 @@ returns
     Queue(visitors)
 Getting information about one of the above class instances is now provided by
 the method print_info (formerly available via __repr__).
-E.g. 
+E.g.
     q=sim.Queue('visitors')
     print(q)
 prints something like
@@ -3384,8 +3722,8 @@ to super().__init__ if the component had to be initialized in some way.
 This is a rather awkward construction and difficult to grasp for beginners.
 Although this construction is still accepted, there is now a more elegant
 method: setup.
-If this method is present in the definition of a component, it will be called 
-after salabim has done all its initialization and even after the activate 
+If this method is present in the definition of a component, it will be called
+after salabim has done all its initialization and even after the activate
 statement, if applicable.
 The method may have arguments. If so, whencreating the component, it is
 required to use keyword arguments.
@@ -3393,15 +3731,15 @@ required to use keyword arguments.
 salabim any version                    salabim>=2.1.3
 --------------------------------------------------------------------
 class Car(sim.Component):              class Car(sim.Component):
-    def __init__(self,name,color):         def setup(self,color):                 
-        super().__init__(name=name)            self.color=color                    
+    def __init__(self,name,color):         def setup(self,color):
+        super().__init__(name=name)            self.color=color
         self.color=color               Car(name='BMW',color='red')
-Car(name='BMW',color=red)     
+Car(name='BMW',color=red)
                               
 Note that the __init__ construction is still available.
 
 All examples that used the __init__ construction have been updated
-accordingly.     
+accordingly.
 
 Both salabim and all examples now conform to PEP8 (with the exception
 of requirements on line length and visual indent).
@@ -3454,8 +3792,8 @@ Note, that this does not hold for cancellation of a component.
 version 2.1.0  2017-08-18
 =========================
 At creation of a component, it is now possible to specify a process other than self.process to start.
-The new process parameter for the init of a component is a string containing the name of the 
-(generation)function. 
+The new process parameter for the init of a component is a string containing the name of the
+(generation)function.
 Now, there also a check to see if process is a generator (i.e. contains at least one yield statement).
 
 If there is a process attribute in a component, but you do not want that to be activated,
@@ -3468,12 +3806,12 @@ With the function running_process, the name of the currently running process can
 For data components, None will be returned.
 
 
-New to salabim are monitors, which are very useful for collecting (statistical) data. 
+New to salabim are monitors, which are very useful for collecting (statistical) data.
 It is possible to tally values based on occurence, like the length of a ship, each time one is
 created. Or the length of stay for components leaving a queue.
 Another feature is a timestamped value. This is useful when collecting data on a time axis,
 like the length of a queue. Each time the queue length changes, the new length, together
-with time is then collected. This is a much more accurate and usually more efficient way of 
+with time is then collected. This is a much more accurate and usually more efficient way of
 collecting data than just sampling on a regular basis.
 
 Queue now supports monitoring of key statistics:
@@ -3496,8 +3834,8 @@ The timestamped monitors (marked with a *) can be also used to query the current
 Monitors can be disabled/enabled with monitor (on the level of a Resource, a Queue or an individual Monitor or
 MonitorTimeStamp).
 
-salabim <2.1.0                     salabim >= 2.1.0 
--------------------------------------------------------------------------------   
+salabim <2.1.0                     salabim >= 2.1.0
+-------------------------------------------------------------------------------
 Queue.reset_statistics()           Queue.reset() / Queue.monitor()
 Queue.minimum_length()             Queue.length.minimum()
 Queue.maximum_length()             Queue.length.maximum()
@@ -3516,7 +3854,7 @@ Queue.print_statistics()           Queue.print_histogram()
                                    Queue.length_of_stay.std()
                                    Queue.length_of_stay.median()
                                    Queue.length_of_stay.percentile()
-                                   Queue.length_of_stay.bin_count()                                   
+                                   Queue.length_of_stay.bin_count()
                                    Resource.availabe_quantity ==> MonitorTimeStamp
                                    Resource.claimed_quantity ==> MonitorTimeStamp
                                    Resource.capacity ==> MonitorTimeStamp
@@ -3532,7 +3870,7 @@ Defining a non timestamped monitor (class Monitor) is fairly straightforward.
 Defining a timestamped monitor is a bit more complicated. The Lock with monitor script shows an example.
 Furthermore, refer to the manual for details.
 
-As a consequence of this, Resource.capacity() can no longer be used to change the capacity. 
+As a consequence of this, Resource.capacity() can no longer be used to change the capacity.
 A new method Resource.set_capacity() is provided, instead.
 
 All examples have been updated to support or show the new functionality.
@@ -3553,8 +3891,8 @@ by the more versatile Component.activate() method.
 Component.activate() has an additional parameter keep_request, which controls whether
 pending requests are to be kept upon an activate.
 
-Environment.stop_run() and stop_run() has been phased out. 
-Use the much more logical Environment.main().activate() or env.main().activate() instead. 
+Environment.stop_run() and stop_run() has been phased out.
+Use the much more logical Environment.main().activate() or env.main().activate() instead.
 This allows the user to specify the time (including inf) of the main reactivation.
 The models 'Dining philosophers animated.py' and 'Elevator animated.py' have been
 updated accordingly.
@@ -3568,7 +3906,7 @@ The methods Component.get_priority and Component.set_priority are replaced by on
 
 'salabim release notes.txt' is now called 'Release notes.txt'.
 
-The github distribution now also contains the example scripts as used in the manual. 
+The github distribution now also contains the example scripts as used in the manual.
 
 version 2.0.1
 =========================
@@ -3603,7 +3941,7 @@ Major reorganization of the interface.
 All properties has been phased out and made place for a method. This is
 done in order to be more Pythonic and consistent. Also, overriding is now easier.
 
-Version 2.0.0                       Version 2.0.0                  
+Version 2.0.0                       Version 2.0.0
 ---------------------------------------------------------------------------------------
 Environment.peek                    Environment.peek()
 Environment.main                    Environment.main()
@@ -3619,7 +3957,7 @@ Component.request_failed            Component.request_failed()
 Component.name                      Component.name(txt)
 Component.base_name                 Component.base_name()
 Component.sequence_number           Componnt.sequence_number()
-Component.suppress_trace            Component.suppress_trace(value)   
+Component.suppress_trace            Component.suppress_trace(value)
 Component.mode                      Component.mode(value)
 Component.ispassive                 Component.ispassive()
 Component.iscurrent                 Component.iscurrent()
@@ -3630,7 +3968,7 @@ Component.creation_time             Component.creation_time()
 Component.scheduled_time            Component.scheduled_time()
 Component.mode_time                 Component.mode_time()
 Component.status                    Component.status()
-Component.now                       phased out, use Component.env.now() 
+Component.now                       phased out, use Component.env.now()
 Component.main                      phased out, use Component.env.main()
 Component.trace                     phased out, use Component.env.trace(value)
 Component.current_component         phased out, use Component.env.current_component()
@@ -3679,14 +4017,14 @@ AnimateSlider.v                     AnimateSlider.v(value)
 ***ATTENTION***
 Be very careful with adding the parentheses, particularly when using in
 logical tests, like:
-    if c.ispassive: #always True ! 
+    if c.ispassive: #always True !
     if c.status==passive #always False !
-    if trace: #always True 
-and never assign to one of these methods,like 
+    if trace: #always True
+and never assign to one of these methods,like
     env.trace=True #overrides the trace method of env
     c.name='Machine' # overrides the name method of the component c
     
-Nearly all existing models will need be updated. All sample files are now version 2 compatible.    
+Nearly all existing models will need be updated. All sample files are now version 2 compatible.
 
 Nearly only internal change: the possible values of the status of a component were up to version 2.0.0
 global variables, containing the name of the status. From this version the values of status are actually
@@ -3695,11 +4033,11 @@ scheduled and suspended. From an application point of view this does not change 
 Testing of the status is still done with (e.g.)
     if c.status()=sim.passive:
 or, better yet,
-    if c.ispassive():    
+    if c.ispassive():
 Only when the status has to be printed, be sure to *call* the status() method, thus
 print('current status of c=', c.status()())
 
-If the distribution Pdf gets now a distribution as an x-value, not the 
+If the distribution Pdf gets now a distribution as an x-value, not the
 distribution, but a sample of that this distribution will be returned.
 Example:
   d=sim.Pdf((Uniform(10,20),10,Uniform(20,30),80,Uniform(30,40),10))
@@ -3743,11 +4081,11 @@ version 1.1.2  2017-07-20
 =========================
 Under the hood restructuring of classes, thus enabling overriding.
 
-In order to support packaging (i.e make salabim a site_package), the simulation 
+In order to support packaging (i.e make salabim a site_package), the simulation
 environment is no longer automatically defined.
 It is now necessary to make an environment in the application, by:
     Environment()
-The Environment class has now an extra argument, is_default_env, which is True by 
+The Environment class has now an extra argument, is_default_env, which is True by
 default.
 Also, the global variable random has been phased out. Instead, salabim uses now
 the random class directly in all statistical sampling functions.
@@ -3755,10 +4093,10 @@ It is possible to set the seed of the random stream by means of
 - random_seed()
 - random.seed(), provided random is imported
 - Environment(random_seed=...)
-The standard random stream is now used in all distribution definitions, unless 
+The standard random stream is now used in all distribution definitions, unless
 a randomstream is explicitly specified.
 
-Other than in previous versions, reproducibility is only available if 
+Other than in previous versions, reproducibility is only available if
 a random seed value is specified, usually when defining an Environment.
 
 All sample programs are defined in such a way that they give reproducible results.
@@ -3795,10 +4133,10 @@ The animation of all sample models is completely restructured in order to separa
 code from the animation code. This leads to much easier to read and debug models. Also the same code can now
 be used for animation and production (non animated) applications.
 
-Introduced an attribute 'mode' for components, which can be set either with an assignment or as a parameter of: 
+Introduced an attribute 'mode' for components, which can be set either with an assignment or as a parameter of:
     initialization of a component
     passivate
-    activate 
+    activate
     reactivate
     hold
     activate
@@ -3812,7 +4150,7 @@ Also, the mode is now shown in a trace.
 The attribute passive_reason has been phased out, as mode offers similar functionality for passive components. Be aware that mode is not reset automatically!
 
 When the mode is set, either by an assignment or one of the above methods, the property mode_time is
-set to now. This is particularly useful for hold, in order to assess when the component started the 
+set to now. This is particularly useful for hold, in order to assess when the component started the
 hold, like in
   fraction=sim.interpolate(env.now,comp.mode_time,comp.scheduled_time,0,1)
 This technique is used in the sample models 'Lock animated' and 'Elevator animated'.
@@ -3873,7 +4211,7 @@ The function str_or_function had been phased out, as this can be achieved now by
 version 1.0.5  2017-06-14
 =========================
 Complete overhaul of the tkinter way objects are shown. Instead of deleting all canvas objects
-for each animation tick, salabim now tries to minimize the number of create_image calls, 
+for each animation tick, salabim now tries to minimize the number of create_image calls,
 by using itemconfig and coords and reusing canvas elements, if possible and necessary.
 The result is a much smoother animation, particularly at higher animation speeds.
 The above doesn't, unfortunately, apply to Pythonista.
@@ -3902,7 +4240,7 @@ Now all of the following methods of the class Animate may be overridden:
 The distribution now also contains a script called salabim_install, which will install salabim
 in the appropriate site-packages folder. Once installed, salabim can be used from whatever location!
  
-version 1.0.4  
+version 1.0.4
 =========================
 Animation interpolation can now be overridden (monkey patched) to allow for
 non linear interpolation or advanced animation techniques.
@@ -3957,7 +4295,7 @@ version 1.0.1  2017-03-13
 Iteration of components in a queue is completely reimplemented.
 Instead of the function components, iteration is now done the Pythonic way, like
   for comp in myqueue:
-Also, the algorithm now allows for very fast iteration even if components are leaving the queue 
+Also, the algorithm now allows for very fast iteration even if components are leaving the queue
 during the iteration. If there is a change (enter or leave or change of order) during the iteration, the iteration is guaranteed to deliver all components in the queue after the change correctly.
 Therefore, there is no need for specification of static and/or removals_possible as in the out phased
 components function.
@@ -3972,7 +4310,7 @@ So, therefore
     myqueue[0] is equivalent to q.head
     myqueue[-1] is equivalent to q.tail
 Nevertheless head and tail are still supported, to be more in line with Tomas/Must terminology.
-The function Queue.component_with_index has been phased-out.    
+The function Queue.component_with_index has been phased-out.
 
 Slicing of queues is now supported. So
   for c in myqueue[1:3]:
@@ -3984,14 +4322,14 @@ Also,
 will list the contents of myqueue, in reverse order. In contrast with the above mentioned reversed() this
 is just a static snapshot.
  	  
-If a static snapshot of the queue contents is required, use 
+If a static snapshot of the queue contents is required, use
   myqueue[:]
 now. In contrast to previous versions of salabim, this is not faster than the standard iteration.
 
-The functions Queue.contains(c) and Component.is_in_queue(q) have been phased out. Instead salabim 
+The functions Queue.contains(c) and Component.is_in_queue(q) have been phased out. Instead salabim
 now support the much more legible and Pythonic in construction, for example
   if comp in myqueue:
-or 
+or
   if comp not in queue:
   
 The length of a queue can be found with len(q). The old style Queue.length is still available.
@@ -4027,7 +4365,7 @@ It is highly recommended to use the pythonistic
   import salabim
 or
   import salabim as sim
-instead of 
+instead of
   from salabim import *
 In all examples, we now use
   import salabim as sim
@@ -4072,7 +4410,7 @@ version 0.9.16 2017-02-15
 =========================
 Bug when using Salabim without animation fixed.
 
-version 0.9.15 2017-01-14 
+version 0.9.15 2017-01-14
 =========================
 Improved way of animating circles. Also, now support for offset (most useful in combination with angle).
 Better support for transparency(alpha blending) for fill and line colors.
@@ -4147,7 +4485,7 @@ Please note that the randomstream salabim_random may be (and is recommended to b
 This version contains an extensive animation engine, that is not yet fully tested nor documented. This functionality will be soon available, along with several examples. The animation engine will be fully  available on CPython and Pythonista platforms with tkinter and PIL (Pillow) installed and and with limited functionality when PIL (Pillow) is not available like in PyPy.
 
 
-version 0.9.8  2016-11-13  
+version 0.9.8  2016-11-13
 =========================
 Introduced property base_name and sequence_number for components, queues and resources
 
@@ -4158,7 +4496,7 @@ When assigning a new name to a component, queue or resource, base_name and seque
 
 Bug fix for method release.
 
-version 0.9.7  2016-11-10  
+version 0.9.7  2016-11-10
 =========================
 The queue requests has been renamed to requesters.
 
@@ -4371,7 +4709,7 @@ The method hold now supports 'duration' as well as 'till' parameters (even both 
 activate, reactivate and reschedule now support 'at' as well 'delay' (even both are permitted)
 All transitions to current are via scheduled now.
 
-It is now possible to issue a new action in activate, reactivate and reschedule, even for the current component via reschedule. 
+It is now possible to issue a new action in activate, reactivate and reschedule, even for the current component via reschedule.
 
 The methods reactivate, activate, reschedule and hold now have an 'urgent' parameter, which, if True, will schedule
 this component before each component with the same scheduled time. When urgent=False (default), component are scheduled after all

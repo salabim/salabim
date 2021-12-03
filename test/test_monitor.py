@@ -1,8 +1,10 @@
+from PIL.Image import init
 import salabim as sim
 import pytest
 import tempfile
 import pickle
 from array import array
+import math
 
 
 def compare_output(out0, out1):
@@ -24,7 +26,7 @@ def test_monitor1():
             self.m = sim.Monitor("m", stats_only=stats_only)
 
         def process(self):
-            for v in range(0, 100):
+            for v in range(0, 101):
                 self.ml.tally(v)
                 self.m.tally(v)
                 yield self.hold(1)
@@ -51,38 +53,38 @@ def test_monitor1():
         env.x[i] = X(stats_only=i)
     Controller()
     env.run()
-    assert env.x[False].ml.mean() == pytest.approx(49.5)
-    assert env.x[False].ml.percentile(95) == 94
-    assert env.x[False].ml.maximum() == 99
+    assert env.x[False].ml.mean() == pytest.approx(50)
+    assert env.x[False].ml.percentile(95) == 95
+    assert env.x[False].ml.maximum() == 100
     assert env.x[False].ml.minimum() == 0
-    assert env.x[False].ml.duration() == pytest.approx(100)
-    assert env.x[False].ml.duration(ex0=True) == pytest.approx(99)
+    assert env.x[False].ml.duration() == pytest.approx(101)
+    assert env.x[False].ml.duration(ex0=True) == pytest.approx(100)
     assert env.x[False].ml.duration_zero() == pytest.approx(1)
 
-    assert env.x[False].m.mean() == 49.5
-    assert env.x[False].m.percentile(95) == 94
-    assert env.x[False].m.maximum() == 99
+    assert env.x[False].m.mean() == 50
+    assert env.x[False].m.percentile(95) == 95
+    assert env.x[False].m.maximum() == 100
     assert env.x[False].m.minimum() == 0
-    assert env.x[False].m.number_of_entries() == 100
-    assert env.x[False].m.number_of_entries(ex0=True) == 99
+    assert env.x[False].m.number_of_entries() == 101
+    assert env.x[False].m.number_of_entries(ex0=True) == 100
     assert env.x[False].m.number_of_entries_zero() == 1
 
-    assert env.x[True].ml.mean() == pytest.approx(49.5)
-    assert env.x[True].ml.maximum() == 99
+    assert env.x[True].ml.mean() == pytest.approx(50)
+    assert env.x[True].ml.maximum() == 100
     with pytest.raises(NotImplementedError):
         env.x[True].ml.percentile(95)
     assert env.x[True].ml.minimum() == 0
-    assert env.x[True].ml.duration() == pytest.approx(100)
-    assert env.x[True].ml.duration(ex0=True) == pytest.approx(99)
+    assert env.x[True].ml.duration() == pytest.approx(101)
+    assert env.x[True].ml.duration(ex0=True) == pytest.approx(100)
     assert env.x[True].ml.duration_zero() == pytest.approx(1)
 
-    assert env.x[True].m.mean() == 49.5
-    assert env.x[True].m.maximum() == 99
+    assert env.x[True].m.mean() == 50
+    assert env.x[True].m.maximum() == 100
     with pytest.raises(NotImplementedError):
         env.x[True].m.percentile(95)
     assert env.x[True].m.minimum() == 0
-    assert env.x[True].m.number_of_entries() == 100
-    assert env.x[True].m.number_of_entries(ex0=True) == 99
+    assert env.x[True].m.number_of_entries() == 101
+    assert env.x[True].m.number_of_entries(ex0=True) == 100
     assert env.x[True].m.number_of_entries_zero() == 1
 
     assert env.x[False].m.std() == pytest.approx(env.x[True].m.std())
@@ -97,7 +99,28 @@ def test_monitor2():
     env.m.tally(1, 2)
 
     assert env.m.mean() == 0.5
-    assert env.m.percentile(95) == pytest.approx(0.9)
+    assert env.m.percentile(50) == pytest.approx(0.5)
+    assert env.m.percentile(50, interpolation="lower") == pytest.approx(0)
+    assert env.m.percentile(50, interpolation="higher") == pytest.approx(1)
+
+    assert env.m.percentile(95) == pytest.approx(1)
+
+    assert env.m.maximum() == 1
+    assert env.m.minimum() == 0
+
+    env.m = sim.Monitor("m")
+    env.m.tally(0)
+    env.m.tally(0)
+    env.m.tally(1)
+    env.m.tally(1)
+
+    assert env.m.mean() == 0.5
+    assert env.m.percentile(50) == pytest.approx(0.5)
+    assert env.m.percentile(50, interpolation="lower") == pytest.approx(0)
+    assert env.m.percentile(50, interpolation="higher") == pytest.approx(1)
+
+    assert env.m.percentile(95) == pytest.approx(1)
+
     assert env.m.maximum() == 1
     assert env.m.minimum() == 0
 
@@ -106,30 +129,35 @@ def test_monitor2():
     env.m.tally(1)
 
     assert env.m.mean() == 0.5
-    assert env.m.percentile(95) == pytest.approx(0.9)
+    assert env.m.percentile(95) == pytest.approx(0.95)
     assert env.m.maximum() == 1
     assert env.m.minimum() == 0
     env.m = sim.Monitor("m")
 
-    env.m.tally("red", 1)
-    env.m.tally("blue", 2)
-    env.m.tally("green", 1)
-    env.m.tally("green", 3)
+    env.m.tally("red")
+    env.m.tally("blue")
+    env.m.tally("blue")
+    env.m.tally("green")
+    env.m.tally("green")
+    env.m.tally("green")
+    env.m.tally("green")
+    env.m.tally("green")
+
     env.m.tally("yellow")
     env.m.tally(2)
     env.m.tally(8)
 
-    assert env.m.mean() == 1
+    assert env.m.mean() == pytest.approx(10/11)
     assert env.m.percentile(95) == pytest.approx(5)
     assert env.m.maximum() == 8
     assert env.m.minimum() == 0
 
     assert env.m.value_weight("blue") == 2
-    assert env.m.value_weight(("blue", "green")) == 6
+    assert env.m.value_weight(("blue", "green")) == 7
     assert env.m.value_weight("purple") == 0
 
-    assert env.m.value_number_of_entries("blue") == 1
-    assert env.m.value_number_of_entries(("blue", "green")) == 3
+    assert env.m.value_number_of_entries("blue") == 2
+    assert env.m.value_number_of_entries(("blue", "green")) == 7
     assert env.m.value_number_of_entries("purple") == 0
 
 
@@ -204,11 +232,64 @@ def test_monitor_5():
 
     for m in all_monitors:
         assert m.stats_only()
+        
+def test_percentile():
+    class X(sim.Component):
+
+        def process(self):
+            for value in (4,1,1,3,6,3,0,7,2,2):
+                env.ml.tally(value)
+                env.m.tally(value)
+                yield self.hold(1)
+
+    env = sim.Environment()
+
+    env.m=sim.Monitor()
+    assert math.isnan(env.m.percentile(0))
+    env.ml=sim.Monitor(level=True)
+    assert env.ml.percentile(0)==0
+    env.ml=sim.Monitor(level=True, initial_tally=7)
+    assert env.ml.percentile(0)==7    
+    env.m.tally(1)
+    assert env.m.percentile(0) == env.m.percentile(50) == env.m.percentile(100) == env.m.percentile(-1) == env.m.percentile(101) == 1
+    env.ml.tally(1)
+    assert env.ml.percentile(0) == env.ml.percentile(50) == env.ml.percentile(100) == env.ml.percentile(-1) == env.ml.percentile(101) == 1
+
+    env.m=sim.Monitor()
+    env.ml=sim.Monitor(level=True)
+    X()
+    env.run(10)
+    env.m.tally(15)
+    assert env.m.mean() == 4
+    assert env.ml.mean() == 2.9
+    assert env.m.percentile(10) == 1
+    assert env.m.percentile(5) == 0.5
+    assert env.m.percentile(5, interpolation="lower") == 0
+    assert env.m.percentile(5, interpolation="higher") == 1
+    assert env.m.percentile(5, interpolation="midpoint") == 0.5
+    assert env.m.percentile(5, interpolation="linear") == 0.5
+    assert env.m.percentile(5, interpolation="nearest") == 0
+    assert env.m.percentile(4, interpolation="nearest") == 0
+    assert env.m.percentile(6, interpolation="nearest") == 1
+    with pytest.raises(ValueError):
+        env.m.percentile(5, interpolation="closest") == 1
+
+    assert env.ml.percentile(5)==0
+    assert env.ml.percentile(15)==1
+    assert env.ml.percentile(95)==7
+    assert env.ml.percentile(10)==0.5
+    assert env.ml.percentile(10, interpolation="lower") == 0
+    assert env.ml.percentile(10, interpolation="higher") == 1
+    assert env.ml.percentile(10, interpolation="midpoint") == 0.5
+    assert env.ml.percentile(10, interpolation="linear") == 0.5
+    with pytest.raises(ValueError):
+        env.ml.percentile(10, interpolation="nearest") == 1
+
 
 def test_pickle():
     class X(sim.Component):
         def process(self):
-            for v in range(1, 101):
+            for v in range(101):
                 env.ml.tally(v)
                 env.m.tally(v)
                 yield self.hold(1)
@@ -239,15 +320,14 @@ def test_pickle():
         env = sim.Environment()  # to reset env
         env.ml = pickle.load(open(tmp_path + "ml.pickle", "rb"))
         env.m = pickle.load(open(tmp_path + "m.pickle", "rb"))
-    assert env.ml.mean() == pytest.approx(50.5)
+    assert env.ml.mean() == pytest.approx(50)
     assert env.ml.percentile(95) == 95
     assert env.ml.maximum() == 100
-    assert env.ml.minimum() == 1
 
-    assert env.m.mean() == 50.5
+    assert env.m.mean() == pytest.approx(50)
     assert env.m.percentile(95) == 95
     assert env.m.maximum() == 100
-    assert env.m.minimum() == 1
+    assert env.m.minimum() == 0
 
 
 def test_values():
@@ -268,8 +348,8 @@ std.deviation         0.895        0.721
 
 minimum               0            1
 median                1            1
-90% percentile        2            2.300
-95% percentile        2.500        2.650
+90% percentile        2.100        2.400
+95% percentile        2.550        2.700
 maximum               3            3
 
            <=       entries     %  cum%
@@ -435,4 +515,4 @@ interrupted                  4       8   ******
 
 
 if __name__ == "__main__":
-    pytest.main(["-vv", "-s", __file__])
+    pytest.main(["-vv", "-s", "-x",  __file__])
