@@ -1,12 +1,4 @@
 import salabim as sim
-import math
-from pathlib import Path
-import functools
-
-gl = sim.gl
-glu = sim.glu
-glut = sim.glut
-
 
 class X(sim.Component):
     def animation3d_objects(self, id):
@@ -39,7 +31,7 @@ env.animate3d(True)
 sim.AnimateQueue(q, direction="e", x=100, y=100)
 sim.Animate3dQueue(q, x=20, y=0, z=0, direction="x+", id=1)
 sim.Animate3dQueue(q, x=0, y=20, z=0, direction="y+")
-sim.Animate3dQueue(q, x=0, y=0, z=20, direction="z+")
+q.animate3d(x=0, y=0, z=20, direction="z+")  # alternative for Animate3dQueue
 
 env.width3d(950)
 env.height3d(768)
