@@ -1,14 +1,6 @@
 import salabim as sim
 import math
 
-from pathlib import Path
-import functools
-
-gl = sim.gl
-glu = sim.glu
-glut = sim.glut
-
-
 env = sim.Environment(trace=False)
 
 do_animate = True

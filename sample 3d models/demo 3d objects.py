@@ -1,12 +1,9 @@
 import salabim as sim
 import math
 
-from pathlib import Path
-import functools
-
-gl = sim.gl
-glu = sim.glu
-glut = sim.glut
+import OpenGL.GL as gl
+import OpenGL.GLU as glu
+import OpenGL.GLUT as glut
 
 class AnimatePyramid(sim.Animate3dBase):
     def setup(self, x=0, y=0, z=0, x_angle=0, y_angle=0, z_angle=0, side_length=1, color="white", shaded=False):
@@ -119,6 +116,8 @@ env.view.z_center = 0
 env.view.field_of_view_y = 50
 
 env.show_camera_position()
+
+sim.Animate3dSphere(x=60, y=60, z=60, radius=10, number_of_slices=32)
 
 sim.Animate3dRectangle(x0=10, y0=10, x1=40, y1=40, z=-20, color="yellow")
 sim.Animate3dLine(x0=0, y0=0,z0=0, x1=50, y1=50, z1=50, color="purple")

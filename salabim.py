@@ -1,13 +1,13 @@
-#               _         _      _               ____   _     _      __
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |    / /_
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |   | '_ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _ | (_) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|   |_____||_|(_)|_|(_) \___/
+#               _         _      _               ____   _     _     _____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |   |___  |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |      / /
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _   / /
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_)|_|(_) /_/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "21.1.6"
+__version__ = "21.1.7"
 import heapq
 import random
 import time
@@ -28,7 +28,6 @@ import ctypes
 import shutil
 import subprocess
 import tempfile
-import traceback
 import struct
 import binascii
 import operator
@@ -59,6 +58,14 @@ if Pythonista:
 
 inf = float("inf")
 nan = float("nan")
+
+
+class QueueFullError(Exception):
+    pass
+
+
+class SimulationStopped(Exception):
+    pass
 
 
 class ItemFile(object):
@@ -2726,7 +2733,7 @@ class _ModeMonitor(Monitor):
         return self._tally
 
     @value.setter
-    def value(self, value):  # ***
+    def value(self, value):
         raise ValueError("not possible to use mode.value = . Use set_mode instead")
 
 
@@ -3082,7 +3089,7 @@ if Pythonista:
                             uio._v = uio.vmin + round(-0.5 + xsel / uio.xdelta) * uio.resolution
                             uio._v = max(min(uio._v, uio.vmax), uio.vmin)
                             if uio.action is not None:
-                                uio.action(uio._v)
+                                uio.action(str(uio._v))
                                 break  # new items might have been installed
 
         def draw(self):
@@ -3101,9 +3108,9 @@ if Pythonista:
                             env.t = env.start_animation_time + ((time.time() - env.start_animation_clocktime) * env._speed)
                     while (env.peek() < env.t) and env.running and env._animate:
                         env.step()
-                        if env.paused:  # ***
+                        if env.paused:
                             env.t = env.start_animation_time = env._now
-                        break
+                            break
 
                 else:
                     if (env._step_pressed or (not env.paused)) and env._animate:
@@ -3114,9 +3121,6 @@ if Pythonista:
                 if not env.paused:
                     env.frametimes.append(time.time())
                 touchvalues = self.touches.values()
-                env.animation_pre_tick(env.t)
-                env.animation_pre_tick_sys(env.t)
-                env.animation_post_tick(env.t)
                 if env.retina:
                     with io.BytesIO() as fp:
                         env._capture_image("RGB").save(fp, "BMP")
@@ -3129,7 +3133,10 @@ if Pythonista:
                     else:
                         self.bg.texture = scene.Texture(img)
                 else:
+                    env.animation_pre_tick(env.t)
+                    env.animation_pre_tick_sys(env.t)
                     capture_image = env._capture_image("RGB")
+                    env.animation_post_tick(env.t)
                     ims = scene.load_pil_image(capture_image)
                     scene.image(ims, 0, 0, *capture_image.size)
                     scene.unload_image(ims)
@@ -3138,6 +3145,8 @@ if Pythonista:
                     env.video_t += env._speed / env._fps
 
                 for uio in env.ui_objects:
+                    if not uio.installed:
+                        uio.install()
                     ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True, retina_scale=True)
                     uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True, retina_scale=True)
 
@@ -3215,6 +3224,8 @@ class Qmember:
         pass
 
     def insert_in_front_of(self, m2, c, q, priority):
+        if q._length >= q.capacity._tally:
+            raise QueueFullError(q.name() + " has reached capacity " + str(q.capacity._tally))
         m1 = m2.predecessor
         m1.successor = self
         m2.predecessor = self
@@ -3254,6 +3265,11 @@ class Queue(object):
         if omitted, the name will be derived from the class
         it is defined in (lowercased)
 
+    capacity : float
+        mximum number of components the queueu can contain. |n|
+        if exceeded, an OverflowError will be raised |n|
+        default: inf
+        
     monitor : bool
         if True (default) , both length and length_of_stay are monitored |n|
         if False, monitoring is disabled.
@@ -3263,7 +3279,7 @@ class Queue(object):
         if omitted, default_env will be used
     """
 
-    def __init__(self, name=None, monitor=True, fill=None, env=None, *args, **kwargs):
+    def __init__(self, name=None, monitor=True, fill=None, capacity=inf, env=None, *args, **kwargs):
         if env is None:
             self.env = g.default_env
         else:
@@ -3287,6 +3303,7 @@ class Queue(object):
         self.departure_rate(reset=True)
         self.length = _SystemMonitor("Length of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="uint32", env=self.env)
         self.length_of_stay = Monitor("Length of stay in " + self.name(), monitor=monitor, type="float", env=self.env)
+        self.capacity = Monitor("Capacity of ", level=True, initial_tally=capacity, monitor=monitor, type="float", env=env)
         if fill is not None:
             savetrace = self.env._trace
             self.env._trace = False
@@ -3437,7 +3454,7 @@ class Queue(object):
 
     def all_monitors(self):
         """
-        returns all mononitors belonging to the queue
+        returns all monitors belonging to the queue
 
         Returns
         -------
@@ -4472,7 +4489,7 @@ class Queue(object):
         self.env._trace = save_trace
         return q1
 
-    def copy(self, name=None, monitor=monitor):
+    def copy(self, name=None, copy_capacity=False, monitor=monitor):
         """
         returns a copy of a queue
 
@@ -4485,6 +4502,10 @@ class Queue(object):
         monitor : bool
             if True, monitor the queue |n|
             if False (default), do not monitor the queue
+
+        copy_capacity : bool
+            if True, the capacity will be copied |n|
+            if False (default), the resulting queue will always be unrestricted
 
         Returns
         -------
@@ -4499,7 +4520,9 @@ class Queue(object):
         self.env._trace = False
         if name is None:
             name = "copy of " + self.name()
-        q1 = type(self)(name=name, env=self.env)
+        q1 = type(self)(name=name, monitor=monitor, env=self.env)
+        if copy_capacity:
+            q1.capacity._tally = self.capacity._tally
         mx = self._head.successor
         while mx != self._tail:
             Qmember().insert_in_front_of(q1._tail, mx.component, q1, mx.priority)
@@ -4507,7 +4530,7 @@ class Queue(object):
         self.env._trace = save_trace
         return q1
 
-    def move(self, name=None, monitor=monitor):
+    def move(self, name=None, monitor=monitor, copy_capacity=False):
         """
         makes a copy of a queue and empties the original
 
@@ -4520,16 +4543,21 @@ class Queue(object):
             if True, monitor the queue |n|
             if False (default), do not monitor the yqueue
 
+        copy_capacity : bool
+            if True, the capacity will be copied |n|
+            if False (default), the new queue will always be unrestricted
+
         Returns
         -------
         queue containing all elements of self: Queue
+        the capacity of the original queue will not be changed
 
         Note
         ----
         Priorities will be kept |n|
         self will be emptied
         """
-        q1 = self.copy(name, monitor=monitor)
+        q1 = self.copy(name, monitor=monitor, copy_capacity=copy_capacity)
         self.clear()
         return q1
 
@@ -4785,6 +4813,7 @@ class Environment(object):
         *args,
         **kwargs
     ):
+
         if name is None:
             if isdefault_env:
                 name = "default environment"
@@ -4812,7 +4841,6 @@ class Environment(object):
             self.print_trace("", "", self.name() + " initialize")
         self.env = self
         # just to allow main to be created; will be reset later
-        self._time_to_str_format = "{:10.3f}"
         self._nameserializeComponent = {}
         self._now = 0
         self._offset = 0
@@ -4905,6 +4933,8 @@ class Environment(object):
         self._video_out = None
         self._video_repeat = 1
         self._video_pingpong = False
+        if Pythonista:
+            fonts()  # this speeds up for strange reasons
         self.an_modelname()
 
         self.an_clocktext()
@@ -5238,10 +5268,10 @@ class Environment(object):
             else:
                 c._process(**c._process_kwargs)
                 self._terminate(c)
-        except Exception:
-            self._animate = False
-            traceback.print_exc()
-            sys.exit()
+        except Exception as e:  # ***
+            if self._animate:
+                self.an_quit()
+            raise e
 
     def _terminate(self, c):
         if c._process_isgenerator:
@@ -5674,6 +5704,8 @@ class Environment(object):
                 self._video = video
 
                 if video:
+                    self._video_repeat_real = self._video_repeat
+                    self._video_pingpong_real = self._video_pingpong
                     if self._video_mode == "screen" and ImageGrab is None:
                         raise ValueError("video_mode='screen' not supported on this platform (ImageGrab does not exist)")
                     if self._video_width == "auto":
@@ -5804,6 +5836,11 @@ class Environment(object):
                             self.root.overrideredirect(1)
                         self.root.geometry(f"+{self._position[0]}+{self._position[1]}")
 
+                        self.root.bind("-", lambda self: g.animation_env.an_half())
+                        self.root.bind("+", lambda self: g.animation_env.an_double())
+                        self.root.bind("<space>", lambda self: g.animation_env.an_menu_go())
+                        self.root.bind("s", lambda self: g.animation_env.an_single_step())
+
                         g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
                         g.canvas.configure(background=self.colorspec_to_hex("bg", False))
                         g.canvas.pack()
@@ -5822,23 +5859,31 @@ class Environment(object):
         if self._video_out:
             if self._video_out == "gif":
                 if self._images:
-                    if self._video_pingpong:
+                    if self._video_pingpong_real:
                         self._images.extend(self._images[::-1])
                     if Pythonista:
                         import images2gif
 
-                        images2gif.writeGif(self._video_name, self._images, duration=1 / self._fps, repeat=self._video_repeat)
+                        images2gif.writeGif(self._video_name, self._images, duration=1 / self._fps, repeat=self._video_repeat_real)
                     else:
-                        self._images[0].save(
-                            self._video_name, save_all=True, append_images=self._images[1:], loop=self._video_repeat, duration=1000 / self._fps, optimize=False
-                        )
+                        if self._video_repeat_real == 1:  # in case of repeat == 1, loop should not be specified (otherwise, it might show twice)
+                            self._images[0].save(self._video_name, save_all=True, append_images=self._images[1:], duration=1000 / self._fps, optimize=False)
+                        else:
+                            self._images[0].save(
+                                self._video_name,
+                                save_all=True,
+                                append_images=self._images[1:],
+                                loop=self._video_repeat_real,
+                                duration=1000 / self._fps,
+                                optimize=False,
+                            )
 
                     del self._images
             elif self._video_out == "png":
 
-                if self._video_pingpong:
+                if self._video_pingpong_real:
                     self._images.extend(self._images[::-1])
-                this_apng = _APNG(num_plays=self._video_repeat)
+                this_apng = _APNG(num_plays=self._video_repeat_real)
                 for image in self._images:
                     with io.BytesIO() as png_file:
                         image.save(png_file, "PNG", optimize=True)
@@ -6578,7 +6623,11 @@ class Environment(object):
 
         Note
         ----
-        If video is the null string, the video (if any) will be closed.
+        If video is the null string, the video (if any) will be closed. |n|
+        |n|
+        The values of video_width, video_height, video_mode, video_repeat, video_pingpong
+        are used. Any change after that will be ignored and only applied to
+        another Environment.video call.
         """
         if value is not None:
             self.animation_parameters(video=value, animate=None)
@@ -6608,7 +6657,7 @@ class Environment(object):
 
     def video_pingpong(self, value=None):
         """
-        video pingponf
+        video pingpong
 
         Parameters
         ----------
@@ -6972,7 +7021,7 @@ class Environment(object):
                 self.do_simulate()
         if self.stopped:
             self.quit()
-            sys.exit()
+            raise SimulationStopped
 
     def do_simulate(self):
         if self._blind_animation:
@@ -6994,6 +7043,8 @@ class Environment(object):
         else:
             self.root.after(0, self.simulate_and_animate_loop)
             self.root.mainloop()
+            if self._animate and self.running:
+                raise SimulationStopped
 
     def simulate_and_animate_loop(self):
         while True:
@@ -7020,7 +7071,7 @@ class Environment(object):
                         if self.root is not None:
                             self.root.quit()
                         return
-                    if self.paused:  # ***
+                    if self.paused:
                         self.t = self.start_animation_time = self._now
                         break
 
@@ -7303,15 +7354,15 @@ class Environment(object):
         uio = AnimateButton(x=38 + 5 * 60, y=-21, text="Stop", width=50, action=self.env.an_quit, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = Animate(x0=38 + 1.5 * 60, y0=-35, text="", textcolor0="fg", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw")
+        uio = Animate(x0=38 + 1.5 * 60, y0=-35, text="", textcolor0="fg", anchor="N", fontsize0=15, font="", screen_coordinates=True, xy_anchor="nw")
         uio.text = self.speedtext
         uio.in_topleft = True
 
-        uio = Animate(x0=38 + 3 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw")
+        uio = Animate(x0=38 + 3 * 60, y0=-35, text="", anchor="N", fontsize0=15, font="", screen_coordinates=True, xy_anchor="nw")
         uio.text = self.syncedtext
         uio.in_topleft = True
 
-        uio = Animate(x0=38 + 4 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw")
+        uio = Animate(x0=38 + 4 * 60, y0=-35, text="", anchor="N", fontsize0=15, font="", screen_coordinates=True, xy_anchor="nw")
         uio.text = self.tracetext
         uio.in_topleft = True
 
@@ -7346,9 +7397,11 @@ class Environment(object):
 
     def an_half(self):
         self._speed /= 2
+        self.set_start_animation()
 
     def an_double(self):
         self._speed *= 2
+        self.set_start_animation()
 
     def an_go(self):
         self.paused = False
@@ -7387,6 +7440,19 @@ class Environment(object):
 
     def an_step(self):
         self._step_pressed = True
+
+    def an_single_step(self):
+        self._step_pressed = True
+        self.step()
+        self.paused=True
+        self.t=self._now
+        self.set_start_animation()
+
+    def an_menu_go(self):
+        if self.paused:
+            self.an_go()
+        else:
+            self.an_menu()
 
     def an_menu(self):
         self.paused = True
@@ -8041,8 +8107,9 @@ class Environment(object):
         also the legend for line numbers will be printed |n|
         not that the header is only printed if trace=True
         """
-        self.print_trace("      time", "current component", "action", "information", "line#")
-        self.print_trace(10 * "-", 20 * "-", 35 * "-", 48 * "-", 6 * "-")
+        len_s1 = len(self.time_to_str(0))
+        self.print_trace((len_s1 - 4) * " " + "time", "current component", "action", "information", "line#")
+        self.print_trace(len_s1 * "-", 20 * "-", 35 * "-", 48 * "-", 6 * "-")
         for ref in range(len(self._source_files)):
             for fullfilename, iref in self._source_files.items():
                 if ref == iref:
@@ -8112,6 +8179,7 @@ class Environment(object):
         if the current component's suppress_trace is True, nothing is printed |n|
 
         """
+        len_s1 = len(self.time_to_str(0))
         if self._trace:
             if not (hasattr(self, "_current_component") and self._current_component._suppress_trace):
                 if s0 is None:
@@ -8127,7 +8195,7 @@ class Environment(object):
 
                         s0 = self._frame_to_lineno(_get_caller_frame())
                 self.last_s0 = s0
-                line = pad(s0, 7) + pad(s1, 10) + " " + pad(s2, 20) + " " + pad(s3, max(len(s3), 36)) + " " + s4.strip()
+                line = pad(s0, 7) + pad(s1, len_s1) + " " + pad(s2, 20) + " " + pad(s3, max(len(s3), 36)) + " " + s4.strip()
                 if _optional:
                     self._buffered_trace = line
                 else:
@@ -8144,29 +8212,42 @@ class Environment(object):
                         print(line)
                     logging.debug(line)
 
-    def time_to_str_format(self, format=None):
+    def time_to_str(self, t):
         """
-        sets / gets the the format to display times in trace, animation, etc.
-
         Parameters
         ----------
-        format : str
-            specifies how the time should be displayed in trace, animation, etc. |n|
-            the format specifier should result in 10 characters. Examples: |n|
-            "{:10.3f}", "{:10.4f}", "{:10.0f}" and "{:8.1f} h" |n|
-            Make sure that the returned length is exactly 10 characters.
+        t : float
+            time to be converted to string in trace and animation
 
         Returns
         -------
-        current specifier (initialized to "{:10.3f}")
-        """
-        if format is not None:
-            self._time_to_str_format = format
-        return self._time_to_str_format
+        t in required format : str
+            default: f"{t:10.3f}"
 
-    def time_to_str(self, t):
-        s = self._time_to_str_format.format(t)
-        return rpad(s, 10)
+        Note
+        ----
+        May be overrridden. Make sure that the method always returns the same length!
+        """
+        return f"{t:10.3f}"
+
+    def duration_to_str(self, duration):
+        """
+        Parameters
+        ----------
+        duration : float
+            duration to be converted to string in trace
+
+        Returns
+        -------
+        duration in required format : str
+            default: f"{duration:.3f}"
+
+        Note
+        ----
+        May be overrridden.
+        """
+
+        return f"{duration:.3f}"
 
     def beep(self):
         """
@@ -9726,6 +9807,7 @@ class Animate:
                     self._image_ident = (text, fontname, fontsize, angle, textcolor, max_lines)
                     if self._image_ident != self._image_ident_prev:
                         font, heightA = getfont(fontname, fontsize)
+
                         lines = []
                         for item in deep_flatten(text):
                             for line in item.splitlines():
@@ -9991,23 +10073,7 @@ class AnimateButton(object):
     On other platforms, the tkinter functionality is used.
     """
 
-    def __init__(
-        self,
-        x=0,
-        y=0,
-        width=80,
-        height=30,
-        linewidth=0,
-        fillcolor="fg",
-        linecolor="fg",
-        color="bg",
-        text="",
-        font="",
-        fontsize=15,
-        action=None,
-        env=None,
-        xy_anchor="sw",
-    ):
+    def __init__(self, x=0, y=0, width=80, fillcolor="fg", color="bg", text="", font="", fontsize=15, action=None, env=None, xy_anchor="sw"):
 
         self.env = g.default_env if env is None else env
         self.type = "button"
@@ -10018,14 +10084,14 @@ class AnimateButton(object):
         self.x1 = 0
         self.y1 = 0
         self.sequence = self.env.serialize()
+        self.height = 30
         self.x = x - width / 2
-        self.y = y - height / 2
+        self.y = y - self.height / 2
         self.width = width
-        self.height = height
         self.fillcolor = self.env.colorspec_to_tuple(fillcolor)
-        self.linecolor = self.env.colorspec_to_tuple(linecolor)
+        self.linecolor = self.env.colorspec_to_tuple("fg")
         self.color = self.env.colorspec_to_tuple(color)
-        self.linewidth = linewidth
+        self.linewidth = 0
         self.font = font
         self.fontsize = fontsize
         self.text0 = text
@@ -10040,25 +10106,26 @@ class AnimateButton(object):
         return self.text0
 
     def install(self):
-        x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
-        y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
-        if Chromebook:  # the Chromebook settings are not accurate for anything else than the menu buttons
-            my_font = tkinter.font.Font(size=int(self.fontsize * 0.45))
-            my_width = int(0.6 * self.width / self.fontsize)
-            y = y + 8
-        else:
-            my_font = tkinter.font.Font(size=int(self.fontsize * 0.7))
-            my_width = int(1.85 * self.width / self.fontsize)
+        if not Pythonista:
+            x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
+            y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
+            if Chromebook:  # the Chromebook settings are not accurate for anything else than the menu buttons
+                my_font = tkinter.font.Font(size=int(self.fontsize * 0.45))
+                my_width = int(0.6 * self.width / self.fontsize)
+                y = y + 8
+            else:
+                my_font = tkinter.font.Font(size=int(self.fontsize * 0.7))
+                my_width = int(1.85 * self.width / self.fontsize)
 
-        self.button = tkinter.Button(self.env.root, text=self.lasttext, command=self.action, anchor=tkinter.CENTER)
-        self.button.configure(
-            font=my_font,
-            width=my_width,
-            foreground=self.env.colorspec_to_hex(self.color, False),
-            background=self.env.colorspec_to_hex(self.fillcolor, False),
-            relief=tkinter.FLAT,
-        )
-        self.button_window = g.canvas.create_window(x + self.width, self.env._height - y - self.height, anchor=tkinter.NE, window=self.button)
+            self.button = tkinter.Button(self.env.root, text=self.lasttext, command=self.action, anchor=tkinter.CENTER)
+            self.button.configure(
+                font=my_font,
+                width=my_width,
+                foreground=self.env.colorspec_to_hex(self.color, False),
+                background=self.env.colorspec_to_hex(self.fillcolor, False),
+                relief=tkinter.FLAT,
+            )
+            self.button_window = g.canvas.create_window(x + self.width, self.env._height - y - self.height, anchor=tkinter.NE, window=self.button)
         self.installed = True
 
     def remove(self):
@@ -10129,7 +10196,7 @@ class AnimateSlider(object):
 
     action : function
          function executed when the slider value is changed (default None) |n|
-         the function should one arguments, being the new value |n|
+         the function should have one argument, being the new value |n|
          if None (default), no action
 
     xy_anchor : str
@@ -10188,7 +10255,7 @@ class AnimateSlider(object):
         self.x1 = 0
         self.y1 = 0
         self.sequence = self.env.serialize()
-        self.x = x 
+        self.x = x
         self.y = y - fontsize
         self.width = width
         self.height = height
@@ -10221,13 +10288,15 @@ class AnimateSlider(object):
         Current value of the slider : float
         """
         if value is not None:
-            if Pythonista:
-                self._v = value
-            else:
-                if self.env._animate:
-                    self.slider.set(value)
-                else:
+            if self.env._animate:
+                if Pythonista:
                     self._v = value
+                    if self.action is not None:
+                        self.action(str(value))
+                else:
+                    self.slider.set(value)
+            else:
+                self._v = value
 
         if Pythonista:
             return self._v
@@ -10238,20 +10307,30 @@ class AnimateSlider(object):
                 return self._v
 
     def install(self):
-        x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
-        y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
-        self.slider = tkinter.Scale(
-            self.env.root, from_=self.vmin, to=self.vmax, orient=tkinter.HORIZONTAL, label=self.label, resolution=self.resolution, command=self.action, length=self.width, width=self.height
-        )
-        self.slider.window = g.canvas.create_window(x, self.env._height - y, anchor=tkinter.NW, window=self.slider)
-        self.slider.config(
-            font=(self.font, int(self.fontsize * 0.8)),
-            foreground=self.env.colorspec_to_hex("fg", False),
-            background=self.env.colorspec_to_hex("bg", False),
-            highlightbackground=self.env.colorspec_to_hex("bg", False),
-        )
-        self.slider.set(self._v)
+        if not Pythonista:
+            x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
+            y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
+            self.slider = tkinter.Scale(
+                self.env.root,
+                from_=self.vmin,
+                to=self.vmax,
+                orient=tkinter.HORIZONTAL,
+                label=self.label,
+                resolution=self.resolution,
+                command=self.action,
+                length=self.width,
+                width=self.height,
+            )
+            self.slider.window = g.canvas.create_window(x, self.env._height - y, anchor=tkinter.NW, window=self.slider)
+            self.slider.config(
+                font=(self.font, int(self.fontsize * 0.8)),
+                foreground=self.env.colorspec_to_hex("fg", False),
+                background=self.env.colorspec_to_hex("bg", False),
+                highlightbackground=self.env.colorspec_to_hex("bg", False),
+            )
+
         self.installed = True
+        self.v(self._v)
 
     def remove(self):
         """
@@ -10659,7 +10738,7 @@ class AnimateCombined(collections.UserList):
     -----
     The AnimateCombined class acts as a list, where objects can be added or deleted with all usual list methods. |n|
     When an attribute of an AnimateCombined is assigned, it will propagate to all members. |n|
-    When an attribute of an AnimateCombined is queried, the value if the first member will be returned |n|
+    When an attribute of an AnimateCombined is queried, the value of the first member will be returned |n|
     """
 
     def __setattr__(self, key, value):
@@ -10808,7 +10887,7 @@ class AnimateText(_Vis):
         y=0,
         fontsize=15,
         textcolor="fg",
-        font="",
+        font="mono",
         text_anchor="sw",
         angle=0,
         visible=True,
@@ -11247,7 +11326,7 @@ class AnimatePolygon(_Vis):
     def remove(self):
         """
         removes the animation oject
-        """        
+        """
         for ao in self.aos:
             ao.remove()
 
@@ -12661,11 +12740,11 @@ class Component(object):
                 scheduled_time_str = "ends on no events left  "
                 extra = " "
             else:
-                scheduled_time_str = "scheduled for " + self.env.time_to_str(scheduled_time - self.env._offset)
+                scheduled_time_str = "scheduled for " + self.env.time_to_str(scheduled_time - self.env._offset).strip()
             if (scheduled_time == self.env._now) or (scheduled_time == inf):
                 delta = ""
             else:
-                delta = " +" + self.env.time_to_str(scheduled_time - self.env._now).strip()
+                delta = f" +{self.env.duration_to_str(scheduled_time - self.env._now)}"
             if self.overridden_lineno:
                 lineno = ""
             else:
@@ -13081,7 +13160,7 @@ class Component(object):
                 the requesters queue |n|
 
         priority : float
-            priority |n|
+            priority of the fail event|n|
             default: 0 |n|
             if a component has the same time on the event list, this component is sorted accoring to
             the priority.
@@ -13467,7 +13546,7 @@ class Component(object):
                 the waiters queue |n|
 
         priority : float
-            priority |n|
+            priority of the fail event|n|
             default: 0 |n|
             if a component has the same time on the event list, this component is sorted accoring to
             the priority.
@@ -13597,7 +13676,7 @@ class Component(object):
                 state = arg
             elif isinstance(arg, (tuple, list)):
                 state = arg[0]
-                if not isinstance(arg, State):
+                if not isinstance(state, State):
                     raise TypeError("incorrect specifier", arg)
                 if len(arg) >= 2:
                     value = arg[1]
@@ -14681,7 +14760,6 @@ class _BlindVideoMaker(Component):
         while True:
             self.env.t = self.env._now
             self.env.animation_pre_tick_sys(self.env.t)  # required to update sys objects, like AnimateQueue
-            self.env.animation_pre_tick_sys(self.env.t)
 
             self.env._save_frame()
             yield self.hold(self.env._speed / self.env._fps)
@@ -20113,17 +20191,17 @@ def fonts():
 
         salabim_dir = Path(__file__).parent
         cur_dir = Path.cwd()
-        dirs = [salabim_dir]
+        dir_recursives = [(salabim_dir, False)]
         if cur_dir != salabim_dir:
-            dirs.append(cur_dir)
+            dir_recursives.append((cur_dir, False))
         if Windows:
-            dirs.append(Path("c:/windows/fonts"))
+            dir_recursives.append((Path("c:/windows/fonts"), True))
         else:
-            dirs.append(Path("/usr/share/fonts"))  # for linux
-            dirs.append(Path("/system/fonts"))  # for android
+            dir_recursives.append((Path("/usr/share/fonts"), True))  # for linux
+            dir_recursives.append((Path("/system/fonts"), True))  # for android
 
-        for dir in dirs:
-            for file_path in dir.glob("**/*.*"):
+        for dir, recursive in dir_recursives:
+            for file_path in dir.glob("**/*.*" if recursive else "*.*"):
                 if file_path.suffix.lower() == ".ttf":
                     file = str(file_path)
                     fn = os.path.basename(file).split(".")[0]
@@ -20150,7 +20228,7 @@ def fonts():
 
 
 def standardfonts():
-    return {"": "calibri", "std": "calibri", "mono": "DejaVuSansMono", "narrow": "mplus-1m-regular"}
+    return {"": "Calibri", "std": "Calibri", "mono": "DejaVuSansMono", "narrow": "mplus-1m-regular"}
 
 
 def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
@@ -20172,7 +20250,6 @@ def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
     result = None
 
     for ifont in fontlist:
-
         try:
             result = ImageFont.truetype(font=ifont, size=int(fontsize))
             break
@@ -20189,10 +20266,11 @@ def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
                 break
         if filename != "":
             try:
-                result = ImageFont.truetype(font=filename, size=int(fontsize))
+                #  refer to https://github.com/python-pillow/Pillow/issues/3730 for explanation (in order to load >= 500 fonts)
+                result = ImageFont.truetype(font=io.BytesIO(open(filename, "rb").read()), size=int(fontsize))
                 break
             except Exception:
-                pass
+                raise
 
     if result is None:
         result = ImageFont.load_default()  # last resort

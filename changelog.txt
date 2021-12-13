@@ -1,6 +1,143 @@
 salabim changelog
 
-version 21.1.6  2021-
+version 21.1.7  2021-12-13
+==========================
+Added functionality (1)
+-----------------------
+During an animation, it is now possible to:
+- press <space> to toggle between run and pause (with menu button shown)
+  ,so it is not necessary to press the Menu/Go mouse button
+- press - to halve the animation speed
+- press + to double the animation speed
+- press s to single step
+  this can very useful, particularly when trace is on
+You will love this!
+
+Added functionality (0)
+-----------------------
+Queues can now have limited capacity, by setting the capacity parameter of Queue(), e.g.
+    q = sim.Queue('q', capacity=5)
+If a queue exceeds that capacity, a QueueFullError exception will be raised.
+So, it is possible to do
+    try:
+        c.enter(q)
+    except sim.QueueFullError:
+        experienced_full += 1
+     
+Queue.capacity is a level monitor that can be changed like
+    q.capacity.value = 10
+, so it is also possible to make a normal unrestricted queue into a queue with a 
+limited capacity.
+    q = sim.Queue('q')
+    ...
+    q.capacity.value = 5
+Important: if the queue contains more components than the new capacity, all
+components will stay in the queue.
+
+The methods union, intersection, difference, symmetric_diffence, and the operator +, -, ^, |, &
+will not use the capacity in any way.
+
+The methods copy and move do not copy the capacity by default, but may do so if
+copy_capacity=True is given with the call.
+
+Changed functionality (0)
+-------------------------
+When an animation is stopped, either by the user or an error, now a SimulationStopped exception is raised.
+This makes that a simulation will not continue in that case, as it did before.
+
+If you just want to be able to stop a run from the animation menu in a clean way, use something like
+try:
+    env.run()
+    queue.print_histograms()
+except sim.SimulationStopped:
+    pass
+    
+Changed functionality (1)
+-------------------------
+The s1 parameter in print_trace was always padded to a length of 10.
+
+From now on this length is dynamically defined, although it is highly recommended that the method
+always returns the same length string.
+
+In relation to this, the Environment.time_to_str_format() method has been phased out.
+
+The same functionality as env.time_to_str_format("{:10.4f}") can be obtained with:
+    sim.Enviroment.time_to_str = lambda self, t: f"{t:10.4f}"
+or
+    class MyEnvironment(sim.Component):
+        def time_to_str(self, t):
+            return f"{t:10.4f}"
+    ...
+    env = MyEnvironment()
+
+With this change in functionality, it is possible to show the time even as a proper date/time, like
+    sim.Enviroment.time_to_str = lambda self, t: datetime.datetime.utcfromtimestamp(t).strftime("%Y-%m-%d %H:%M:%S")
+
+Note that the Environment.time_to_str() method is also used to show the current time in animations.
+
+Related to this change is a new method Environment.duration_to_str, that is used whenever a duration has
+to be printed in a trace.
+This method defaults to a 0.3f formatted string, but may be overridden.
+
+Removed functionality (2)
+-------------------------
+The height, linecolor and linewidth parameters of AnimateButton were completely ignored 
+(apart from in the Pythonista implementation).
+Therefore, these have been removed completely.
+The documentation/docstring will be updated accordingly.
+
+Pythonista specific improvements / bugfixes (0)
+----------------------------------------------
+Using one of the standard fonts now do not have to call fonts(), thus avoiding a significant delay.
+
+AnimateSlider() now calls the action function (if any) at start up, as with the tkinter version.
+
+The action function in AnimateSlider gets a string as parameter now instead of a float, as with the tkinter version.
+
+Bugfix (0)
+----------
+A serious bug prevented animations to run properly under Pythonista. Fixed.
+
+Bugfix (1)
+----------
+Bug in the interpretation of multiple states in Component.wait() fixed.
+
+Bugfix (2)
+----------
+When producing an animated gif or png video, pingpong was always applied, regardless of the pingpong parameter. Fixed.
+
+Bug fix (3)
+-----------
+When video_repeat was 1 (for animated GIF videos), the video was played twice on certain platforms.
+Fixed.
+
+Bug fix (4)
+-----------
+The maximum number of fonts that could be use in one animation was approximately 500.
+From this version on, the number of fonts that can be handled is only limited by the available memory.
+
+Speed improvement(0)
+--------------------
+If a font can't be located directly, the salabim and current directory are not searched recursively anymore.
+
+Documentation update (0)
+------------------------
+The docstring for Environment.video() now makes clear that the
+  video_width
+  video_height
+  video_mode
+  video_repeat
+  video_pingpong
+parameters at the time Environment.video is called are used. Any change after will be ignored and only applied to
+another Environment.video call.
+
+Documentation update (0)
+------------------------
+The docstring for Component.request() and Component.wait() now makes clear that the
+priority parameter refers to the fail event.
+
+
+version 21.1.6  2021-11-07
 ==========================
 Changed functionality (0)
 -------------------------
