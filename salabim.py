@@ -3267,7 +3267,7 @@ class Queue(object):
 
     capacity : float
         mximum number of components the queueu can contain. |n|
-        if exceeded, an OverflowError will be raised |n|
+        if exceeded, a QueueFullError will be raised |n|
         default: inf
         
     monitor : bool
