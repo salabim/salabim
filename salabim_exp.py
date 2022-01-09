@@ -15,9 +15,169 @@ import numpy as np
 Pythonista = platform.system() == "Darwin"
 
 
-def exp():
-    exp134()
 
+def exp():
+    exp123()
+    
+def exp162():
+    class X(sim.Component):
+        def process(self):
+            yield self.hold(5)
+            yield self.hold(1)
+    env = sim.Environment()
+    env.animate(True)
+    X()
+    env.run(10)
+    print('ok')
+
+def exp161():
+    class X0(sim.Component):
+        def process(self):
+            yield self.request((res,6))
+            yield self.hold(10)
+            self.release((res,6))
+            yield self.hold(10)
+
+    class X1(sim.Component):
+        def process(self):
+            yield self.hold(1)
+            yield self.request((res,5,1))
+            yield self.hold(10)
+
+    class X2(sim.Component):
+        def process(self):
+            yield self.hold(1)
+            yield self.request((res,1,1))
+            yield self.hold(10)
+
+
+    env = sim.Environment(trace=True)
+    res = sim.Resource("res", capacity=10, honor_only_first=True)
+    X0()
+    X1()
+    X2()
+    X2()
+    X2()
+    X2()
+    X2()
+    env.run()
+
+def exp160():
+    class X(sim.Component):
+        def process(self):
+            while env.now()<15:
+                yield self.hold(1)
+                pos = env.now() * 20
+                sim.AnimateText(x=pos, y=pos, text=str(env.now()))
+                if 5 <= env.now() <= 10:
+                    env.animate(False)
+                if env.now() >= 10:
+                    env.animate(True)
+
+
+
+    env = sim.Environment(trace=True)
+
+    env.animate(True)
+    x=X()
+    try:
+        env.run()
+        print(x.status())
+
+
+    except sim.SimulationStopped:
+        pass
+
+
+
+def exp159():
+    class X(sim.Component):
+        def process(self):
+            yield self.hold(5)
+            yield env.main().activate()
+            yield self.hold(2)
+            yield self.hold(3)
+            
+    class Y(sim.Component):
+        def process(self):
+            for i in range(20):
+                yield self.hold(1)
+
+    env = sim.Environment(trace=True)
+
+    x=X()
+    Y()
+    env.run()
+    print(x.status())
+    x.activate()
+    env.run()
+        
+def exp158():
+    class X(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(0.1)
+
+    def action():
+        env.main().activate()
+
+    while True:
+        env = sim.Environment(trace=False)
+        sim.AnimateText(text=lambda: f"{env.now():10.4f}", x=100, y=100)
+        sim.AnimateButton(text="reset", x=100, y=700, action=action)
+        X()
+        env.animate(True)
+        env.run()
+
+
+
+
+def exp157():
+    class X(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(10)
+                print(env.main().scheduled_time())
+
+    class Y(sim.Component):
+        def process(self):
+            yield self.hold(5)
+            yield self.hold(15)
+            env.main().activate(at=50)
+            yield self.hold(till=35)
+            env.main().passivate()
+            yield self.hold(till=55)
+            env.main().activate(at=70)
+
+
+    env = sim.Environment(trace=True)
+    X()
+    Y()
+    env.animate(True)
+    env.run(40)
+
+
+def exp156():
+    class X(sim.Component):
+        def process(self):
+            try:
+                self.enter(q)
+            except OverflowError:
+                pass
+
+
+    env = sim.Environment(trace=True)
+    sim.ComponentGenerator(X, iat=1)
+    X()
+    q=sim.Queue('q',capacity=5)
+    env.run(1)
+    q.capacity.value=4
+    env.run(10)
+    q.capacity.value=6
+    env.run(10)
+    q.print_info()
+    print(q.capacity.xt())
+            
 def exp155():
     class X(sim.Component):
         def process(self):
@@ -36,7 +196,7 @@ def exp155():
     DisplayMenuAtEnd(at=run_time, priority=1)
     X()
     env.animate(True)
-    env.run(run_time+7)
+    env.run(run_time )
         
     
 def exp154():
@@ -722,7 +882,7 @@ def test124():
     env.run(sim.inf)
 
 
-def test123():
+def exp123():
     env = sim.Environment()
     d = sim.Map(sim.Normal(0, 3), lambda x: x if x > 0 else 0)
     for _ in range(10):
@@ -736,6 +896,11 @@ def test123():
     d = sim.Map(sim.Pdf("abcdef", 1), lambda x: ord(x))
     for _ in range(10):
         print(d.sample())
+    d = sim.Distribution("Map(Uniform(1, 10),int)")
+    for _ in range(10):
+        print(d.sample())
+
+
 
 
 def test122():

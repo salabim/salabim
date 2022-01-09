@@ -1,13 +1,13 @@
-#               _         _      _               ____   _     _     _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ / |   / |   |___  |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || |   | |      / /
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | | _ | | _   / /
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_|(_)|_|(_) /_/
+#               _         _      _               ____   ____       ___       ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \     / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |   | | | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _ | |_| |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_) \___/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "21.1.7"
+__version__ = "22.0.0"
 import heapq
 import random
 import time
@@ -35,6 +35,8 @@ import copy
 import numbers
 import platform
 import functools
+import traceback
+import contextlib
 
 from pathlib import Path
 
@@ -66,7 +68,6 @@ class QueueFullError(Exception):
 
 class SimulationStopped(Exception):
     pass
-
 
 class ItemFile(object):
     """
@@ -279,7 +280,7 @@ class Monitor(object):
 
     fill : list or tuple
         can be used to fill the tallied values (all at time now). |n|
-fill is only available for non level and not stats_only monitors. |n|
+        fill is only available for non level and not stats_only monitors. |n|
 
     env : Environment
         environment where the monitor is defined |n|
@@ -1499,7 +1500,7 @@ fill is only available for non level and not stats_only monitors. |n|
 
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
-            
+
         interpolation : str
             Default: 'linear' |n|
             |n|
@@ -1517,7 +1518,7 @@ fill is only available for non level and not stats_only monitors. |n|
             ‘lower’: i. |n|
             ‘higher’: j |n|
             ‘midpoint’: (i + j) / 2. |n|
-            
+
         Returns
         -------
         q-th percentile : float
@@ -1929,7 +1930,7 @@ fill is only available for non level and not stats_only monitors. |n|
         indent = pad("", ll)
 
         if show_header:
-            result.append(indent + "Statistics of {} at {}".format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
+            result.append(indent + f"Statistics of {self.name()} at {fn(self.env._now - self.env._offset, 13, 3)}")
 
         if show_legend:
             result.append(indent + "                        all    excl.zero         zero")
@@ -1940,27 +1941,23 @@ fill is only available for non level and not stats_only monitors. |n|
             return return_or_print(result, as_str, file)
         if self._weight:
             result.append(
-                pad(self.name(), ll)
-                + pad(self.weight_legend, 14)
-                + "{}{}{}".format(fn(self.sys_weight(), 13, 3), fn(self.sys_weight(ex0=True), 13, 3), fn(self.sys_weight_zero(), 13, 3))
+                f"{pad(self.name(), ll)}{pad(self.weight_legend, 14)}{fn(self.sys_weight(), 13, 3)}{fn(self.sys_weight(ex0=True), 13, 3)}{fn(self.sys_weight_zero(), 13, 3)}"
             )
         else:
             result.append(
-                pad(self.name(), ll)
-                + pad("entries", 14)
-                + "{}{}{}".format(fn(self.number_of_entries(), 13, 3), fn(self.number_of_entries(ex0=True), 13, 3), fn(self.number_of_entries_zero(), 13, 3))
+                f"{pad(self.name(), ll)}{pad('entries', 14)}{fn(self.number_of_entries(), 13, 3)}{fn(self.number_of_entries(ex0=True), 13, 3)}{fn(self.number_of_entries_zero(), 13, 3)}"
             )
 
-        result.append(indent + "mean          {}{}".format(fn(self.mean(), 13, 3), fn(self.mean(ex0=True), 13, 3)))
+        result.append(f"{indent}mean          {fn(self.mean(), 13, 3)}{fn(self.mean(ex0=True), 13, 3)}")
 
-        result.append(indent + "std.deviation {}{}".format(fn(self.std(), 13, 3), fn(self.std(ex0=True), 13, 3)))
+        result.append(f"{indent}std.deviation {fn(self.std(), 13, 3)}{fn(self.std(ex0=True), 13, 3)}")
         result.append("")
-        result.append(indent + "minimum       {}{}".format(fn(self.minimum(), 13, 3), fn(self.minimum(ex0=True), 13, 3)))
+        result.append(f"{indent}minimum       {fn(self.minimum(), 13, 3)}{fn(self.minimum(ex0=True), 13, 3)}")
         if not self._stats_only:
-            result.append(indent + "median        {}{}".format(fn(self.percentile(50), 13, 3), fn(self.percentile(50, ex0=True), 13, 3)))
-            result.append(indent + "90% percentile{}{}".format(fn(self.percentile(90), 13, 3), fn(self.percentile(90, ex0=True), 13, 3)))
-            result.append(indent + "95% percentile{}{}".format(fn(self.percentile(95), 13, 3), fn(self.percentile(95, ex0=True), 13, 3)))
-        result.append(indent + "maximum       {}{}".format(fn(self.maximum(), 13, 3), fn(self.maximum(ex0=True), 13, 3)))
+            result.append(f"{indent}median        {fn(self.percentile(50), 13, 3)}{fn(self.percentile(50, ex0=True), 13, 3)}")
+            result.append(f"{indent}90% percentile{fn(self.percentile(90), 13, 3)}{fn(self.percentile(90, ex0=True), 13, 3)}")
+            result.append(f"{indent}95% percentile{fn(self.percentile(95), 13, 3)}{fn(self.percentile(95, ex0=True), 13, 3)}")
+        result.append(f"{indent}maximum       {fn(self.maximum(), 13, 3)}{fn(self.maximum(ex0=True), 13, 3)}")
         return return_or_print(result, as_str, file)
 
     def histogram_autoscale(self, ex0=False):
@@ -2157,15 +2154,15 @@ fill is only available for non level and not stats_only monitors. |n|
             if values or values_is_iterable:
                 nentries = len(x)
                 if self._weight:
-                    result.append(pad(self.weight_legend, 13) + "{}".format(fn(weight_total, 13, 3)))
+                    result.append(f"{pad(self.weight_legend, 13)}{fn(weight_total, 13, 3)}")
                 if not self._level:
-                    result.append(pad("entries", 13) + "{}".format(fn(nentries, 13, 3)))
+                    result.append(f"{pad('entries', 13)}{fn(nentries, 13, 3)}")
                 result.append("")
                 if self._level:
-                    result.append("value                " + rpad(self.weight_legend, 13) + "     %")
+                    result.append(f"value                {rpad(self.weight_legend, 13)}     %")
                 else:
                     if self._weight:
-                        result.append("value                " + rpad(self.weight_legend, 13) + "     % entries     %")
+                        result.append(f"value                {rpad(self.weight_legend, 13)}     % entries     %")
                     else:
                         result.append("value               entries     %")
 
@@ -2173,7 +2170,7 @@ fill is only available for non level and not stats_only monitors. |n|
                     unique_values = []
                     for v in values:
                         if v in unique_values:
-                            raise ValueError("value " + str(v) + " used more than once")
+                            raise ValueError(f"value {v} used more than once")
                         unique_values.append(v)
 
                     if sort_on_weight or sort_on_duration or sort_on_value:
@@ -2274,7 +2271,7 @@ fill is only available for non level and not stats_only monitors. |n|
                             s = ("*" * n) + (" " * (scale - n))
                             s = s[: ncum - 1] + "|" + s[ncum + 1 :]
 
-                        result.append("{} {}{}{} {}".format(fn(ub, 13, 3), fn(count, 13, 3), fn(perc * 100, 6, 1), fn(cumperc * 100, 6, 1), s))
+                        result.append(f"{fn(ub, 13, 3)} {fn(count, 13, 3)}{fn(perc * 100, 6, 1)}{fn(cumperc * 100, 6, 1)} {s}")
         result.append("")
         return return_or_print(result, as_str=as_str, file=file)
 
@@ -2343,122 +2340,132 @@ fill is only available for non level and not stats_only monitors. |n|
         ----------
         linecolor : colorspec
             color of the line or points (default foreground color)
-    
+
         linewidth : int
             width of the line or points (default 1 for level, 3 for non level monitors)
-    
+
         fillcolor : colorspec
             color of the panel (default transparent)
-    
+
         bordercolor : colorspec
             color of the border (default foreground color)
-    
+
         borderlinewidth : int
             width of the line around the panel (default 1)
-    
+
         nowcolor : colorspec
             color of the line indicating now (default red)
-    
+
         titlecolor : colorspec
             color of the title (default foreground color)
-    
+
         titlefont : font
             font of the title (default null string)
-    
+
         titlefontsize : int
             size of the font of the title (default 15)
-    
+
         title : str
             title to be shown above panel |n|
             default: name of the monitor
-    
+
         x : int
             x-coordinate of panel, relative to xy_anchor, default 0
-    
+
         y : int
             y-coordinate of panel, relative to xy_anchor. default 0
-    
+
         offsetx : float
             offsets the x-coordinate of the panel (default 0)
-    
+
         offsety : float
             offsets the y-coordinate of the panel (default 0)
-    
+
         angle : float
             rotation angle in degrees, default 0
-    
+
         xy_anchor : str
             specifies where x and y are relative to |n|
             possible values are (default: sw): |n|
             ``nw    n    ne`` |n|
             ``w     c     e`` |n|
             ``sw    s    se``
-    
+
         vertical_offset : float
             the vertical position of x within the panel is
              vertical_offset + x * vertical_scale (default 0)
-    
+
         vertical_scale : float
             the vertical position of x within the panel is
             vertical_offset + x * vertical_scale (default 5)
-    
+
         horizontal_scale : float
             the relative horizontal position of time t within the panel is on
             t * horizontal_scale, possibly shifted (default 1)|n|
-    
+
         width : int
             width of the panel (default 200)
-    
+
         height : int
             height of the panel (default 75)
-    
+
         vertical_map : function
             when a y-value has to be plotted it will be translated by this function |n|
             default: float |n|
             when the function results in a TypeError or ValueError, the value 0 is assumed |n|
             when y-values are non numeric, it is advised to provide an approriate map function, like: |n|
             vertical_map = "unknown red green blue yellow".split().index
-    
+
         labels : iterable
             labels to be shown on the vertical axis (default: empty tuple) |n|
             the placement of the labels is controlled by the vertical_map method
-    
+
         label_color : colorspec
             color of labels (default: foreground color)
-    
+
         label_font : font
             font of the labels (default null string)
-    
+
         label_fontsize : int
             size of the font of the labels (default 15)    
-    
+
         label_anchor : str
             specifies where the label coordinates (as returned by map_value) are relative to |n|
             possible values are (default: e): |n|
             ``nw    n    ne`` |n|
             ``w     c     e`` |n|
             ``sw    s    se``
-    
+
         label_offsetx : float
             offsets the x-coordinate of the label (default 0)
-    
+
         label_offsety : float
             offsets the y-coordinate of the label (default 0)
-    
+
         label_linewidth : int
             width of the label line (default 1)
-    
+
         label_linecolor : colorspec
             color of the label lines (default foreground color)
-    
+
         layer : int
             layer (default 0)
-    
+
         parent : Component
             component where this animation object belongs to (default None) |n|
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-    
+
+        screen_coordinates : bool
+            use screen_coordinates |n|
+            normally, the scale parameters are use for positioning and scaling
+            objects. |n|
+            if True, screen_coordinates will be used instead.
+
+        over3d : bool  
+            if True, this object will be rendered to the OpenGL window |n|
+            if False (default), the normal 2D plane will be used.
+
         Returns
         -------
         reference to AnimateMonitor object : AnimateMonitor
@@ -2466,7 +2473,7 @@ fill is only available for non level and not stats_only monitors. |n|
         Note
         ----
         All measures are in screen coordinates |n|
-        
+
         Note
         ----
         It is recommended to use sim.AnimateMonitor instead |n|
@@ -2765,7 +2772,7 @@ class AnimateMonitor(object):
     ----------
     monitor : Monitor
         monitor to be animated
-        
+
     linecolor : colorspec
         color of the line or points (default foreground color)
 
@@ -2884,6 +2891,10 @@ class AnimateMonitor(object):
         if given, the animation object will be removed
         automatically when the parent component is no longer accessible
 
+    over3d : bool  
+        if True, this object will be rendered to the OpenGL window |n|
+        if False (default), the normal 2D plane will be used.
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -2924,6 +2935,7 @@ class AnimateMonitor(object):
         label_offsety=0,
         label_linewidth=1,
         label_linecolor="fg",
+        over3d=None,
         layer=0,
     ):
 
@@ -2939,8 +2951,11 @@ class AnimateMonitor(object):
         if horizontal_scale is None:
             horizontal_scale = 1
 
-        offsetx += monitor.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True)
-        offsety += monitor.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True)
+        if over3d is None:
+            over3d = default_over3d()
+
+        offsetx += monitor.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True, over3d=over3d)
+        offsety += monitor.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True, over3d=over3d)
 
         self.aos = []
         if parent is not None:
@@ -2961,6 +2976,7 @@ class AnimateMonitor(object):
                 linecolor=bordercolor,
                 screen_coordinates=True,
                 layer=layer,
+                over3d=over3d,
             )
         )
         self.aos.append(
@@ -2977,6 +2993,7 @@ class AnimateMonitor(object):
                 fontsize=titlefontsize,
                 font=titlefont,
                 layer=layer,
+                over3d=over3d,
             )
         )
 
@@ -2995,6 +3012,7 @@ class AnimateMonitor(object):
                 offsety0=offsety,
                 angle0=angle,
                 screen_coordinates=True,
+                over3d=over3d,
             )
         )
         self.aos.append(
@@ -3018,6 +3036,7 @@ class AnimateMonitor(object):
                 linewidth=linewidth,
                 t_scale=horizontal_scale,
                 layer=layer,
+                over3d=over3d,
             )
         )
         for label in labels:
@@ -3038,11 +3057,20 @@ class AnimateMonitor(object):
                             fontsize=label_fontsize,
                             font=label_font,
                             layer=layer,
+                            over3d=over3d,
                         )
                     )
                     self.aos.append(
                         AnimateLine(
-                            spec=(0, 0, width, 0), x=x, y=y, offsetx=offsetx, offsety=label_y, angle=angle, linewidth=label_linewidth, linecolor=label_linecolor
+                            spec=(0, 0, width, 0),
+                            x=x,
+                            y=y,
+                            offsetx=offsetx,
+                            offsety=label_y,
+                            angle=angle,
+                            linewidth=label_linewidth,
+                            linecolor=label_linecolor,
+                            over3d=over3d,
                         )
                     )
             except (ValueError, TypeError):
@@ -3267,9 +3295,9 @@ class Queue(object):
 
     capacity : float
         mximum number of components the queueu can contain. |n|
-        if exceeded, an OverflowError will be raised |n|
+        if exceeded, a QueueFullError will be raised |n|
         default: inf
-        
+
     monitor : bool
         if True (default) , both length and length_of_stay are monitored |n|
         if False, monitoring is disabled.
@@ -3428,11 +3456,6 @@ class Queue(object):
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance |n|
             default: self (instance itself)
-
-        parent : Component
-            component where this animation object belongs to (default None) |n|
-            if given, the animation object will be removed
-            automatically when the parent component is no longer accessible
 
         Returns
         -------
@@ -3659,7 +3682,7 @@ class Queue(object):
         statistics (if as_str is True) : str
         """
         result = []
-        result.append("Statistics of {} at {}".format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
+        result.append(f"Statistics of {self.name()} at {fn(self.env._now - self.env._offset, 13, 3)}")
         result.append(self.length.print_statistics(show_header=False, show_legend=True, do_indent=True, as_str=True))
 
         result.append("")
@@ -4860,6 +4883,8 @@ class Environment(object):
         self._pendingstandbylist = []
 
         self.an_objects = []
+        self.an_objects_over3d = []
+
         self.an_objects3d = []
         self.ui_objects = []
         self.sys_objects = []
@@ -5148,27 +5173,43 @@ class Environment(object):
 
         self._bind("p", functools.partial(self.camera_print))
 
-    def show_camera_position(self):
+    def show_camera_position(self, over3d=None):
         """
-        show camera position on the tkinter window
+        show camera position on the tkinter window or over3d window
 
-        The 7 camera settings will be shown in the top left corner. 
+        The 7 camera settings will be shown in the top left corner.
+        Parameters
+        ----------
+        over3d : bool
+            if False (default), present on 2D screen |n|
+            if True, present on 3D overlay 
         """
-
+        if over3d is None:
+            over3d = default_over3d()
+        top = self.height3d() - 40 if over3d else self.height() - 90
         for i, prop in enumerate("x_eye y_eye z_eye x_center y_center z_center field_of_view_y".split()):
-            ao = AnimateRectangle(spec=(0, 0, 75, 35), fillcolor="30%gray", x=5 + i * 80, y=self.height() - 90, screen_coordinates=True)
+            ao = AnimateRectangle(spec=(0, 0, 75, 35), fillcolor="30%gray", x=5 + i * 80, y=top, screen_coordinates=True, over3d=over3d)
             ao = AnimateText(
-                text=lambda arg, t: f"{arg.label}", x=5 + i * 80 + 70, y=self.height() - 90 + 15, text_anchor="se", textcolor="white", screen_coordinates=True
+                text=lambda arg, t: f"{arg.label}",
+                x=5 + i * 80 + 70,
+                y=top + 15,
+                font="calibri",
+                text_anchor="se",
+                textcolor="white",
+                screen_coordinates=True,
+                over3d=over3d,
             )
             ao.label = "fovy" if prop == "field_of_view_y" else prop
 
             ao = AnimateText(
                 text=lambda arg, t: f"{getattr(self.view,arg.prop)(t):11.3f}",
                 x=5 + i * 80 + 70,
-                y=self.height() - 90,
+                y=top,
+                font="calibri",
                 text_anchor="se",
                 textcolor="white",
                 screen_coordinates=True,
+                over3d=over3d,
             )
             ao.prop = prop
 
@@ -5268,7 +5309,7 @@ class Environment(object):
             else:
                 c._process(**c._process_kwargs)
                 self._terminate(c)
-        except Exception as e:  # ***
+        except Exception as e:
             if self._animate:
                 self.an_quit()
             raise e
@@ -5394,7 +5435,7 @@ class Environment(object):
             position of the 3d animation window |n|
             At init of the environment, the position will be set to (0, 0) |n|
             This has to be set before the 3d animation starts as the window can only be postioned at initialization
-            
+
         title : str
             title of the canvas window |n|
             if omitted, no change. At init of the environment, the title will be
@@ -5550,9 +5591,13 @@ class Environment(object):
             self._position3d = position3d
 
         if video_width is not None:
+            if self._video:
+                raise ValueError("video_width may not be changed while recording video")
             self._video_width = video_width
 
         if video_height is not None:
+            if self._video:
+                raise ValueError("video_height may not be changed while recording video")
             self._video_height = video_height
 
         if video_mode is not None:
@@ -5571,9 +5616,9 @@ class Environment(object):
                 frame_changed = True
 
         if fps is not None:
-            if self._fps != fps:
-                self._fps = fps
-                fps_changed = True
+            if self._video:
+                raise ValueError("video_repeat may not be changed while recording video")
+            self._fps = fps
 
         if x0 is not None:
             if self._x0 != x0:
@@ -5667,6 +5712,7 @@ class Environment(object):
                         self._audio.t0 = self.frame_number / self._fps
                         self.audio_segments.append(self._audio)
                     self.set_start_animation()
+
         if animate3d is not None:
             if animate3d == "?":
                 animate3d = can_animate3d(try_only=True)
@@ -5691,12 +5737,15 @@ class Environment(object):
                 frame_changed = False  # no animation required, so leave running animation_env untouched
 
         if video_repeat is not None:
+            if self._video:
+                raise ValueError("video_repeat may not be changed while recording video")
             self._video_repeat = video_repeat
 
         if video_pingpong is not None:
+            if self._video:
+                raise ValueError("video_pingpong may not be changed while recording video")
             self._video_pingpong = video_pingpong
 
-        video_opened = False
         if video is not None:
             if video != self._video:
                 if self._video:
@@ -5704,8 +5753,6 @@ class Environment(object):
                 self._video = video
 
                 if video:
-                    self._video_repeat_real = self._video_repeat
-                    self._video_pingpong_real = self._video_pingpong
                     if self._video_mode == "screen" and ImageGrab is None:
                         raise ValueError("video_mode='screen' not supported on this platform (ImageGrab does not exist)")
                     if self._video_width == "auto":
@@ -5732,7 +5779,6 @@ class Environment(object):
                     if not self._blind_animation:
                         can_animate(try_only=False)
 
-                    video_opened = True
                     video_path = Path(video)
                     extension = video_path.suffix.lower()
                     self._video_name = video
@@ -5782,15 +5828,7 @@ class Environment(object):
                             if Windows:
                                 self._audio.stop()
 
-        if (self._video != "") and (not video_opened):
-            if width_changed:
-                raise ValueError("width changed while recording video.")
-            if height_changed:
-                raise ValueError("height changed while recording video.")
-            if fps_changed:
-                raise ValueError("fps changed while recording video.")
-
-        if self._video != "":
+        if self._video:
             self.video_t = self._now
 
         if frame_changed:
@@ -5840,6 +5878,8 @@ class Environment(object):
                         self.root.bind("+", lambda self: g.animation_env.an_double())
                         self.root.bind("<space>", lambda self: g.animation_env.an_menu_go())
                         self.root.bind("s", lambda self: g.animation_env.an_single_step())
+                        self.root.bind("<Control-c>", lambda self: g.animation_env.an_quit())
+
 
                         g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
                         g.canvas.configure(background=self.colorspec_to_hex("bg", False))
@@ -5859,21 +5899,21 @@ class Environment(object):
         if self._video_out:
             if self._video_out == "gif":
                 if self._images:
-                    if self._video_pingpong_real:
+                    if self._video_pingpong:
                         self._images.extend(self._images[::-1])
                     if Pythonista:
                         import images2gif
 
-                        images2gif.writeGif(self._video_name, self._images, duration=1 / self._fps, repeat=self._video_repeat_real)
+                        images2gif.writeGif(self._video_name, self._images, duration=1 / self._fps, repeat=self._video_repeat)
                     else:
-                        if self._video_repeat_real == 1:  # in case of repeat == 1, loop should not be specified (otherwise, it might show twice)
+                        if self._video_repeat == 1:  # in case of repeat == 1, loop should not be specified (otherwise, it might show twice)
                             self._images[0].save(self._video_name, save_all=True, append_images=self._images[1:], duration=1000 / self._fps, optimize=False)
                         else:
                             self._images[0].save(
                                 self._video_name,
                                 save_all=True,
                                 append_images=self._images[1:],
-                                loop=self._video_repeat_real,
+                                loop=self._video_repeat,
                                 duration=1000 / self._fps,
                                 optimize=False,
                             )
@@ -5881,9 +5921,9 @@ class Environment(object):
                     del self._images
             elif self._video_out == "png":
 
-                if self._video_pingpong_real:
+                if self._video_pingpong:
                     self._images.extend(self._images[::-1])
-                this_apng = _APNG(num_plays=self._video_repeat_real)
+                this_apng = _APNG(num_plays=self._video_repeat)
                 for image in self._images:
                     with io.BytesIO() as png_file:
                         image.save(png_file, "PNG", optimize=True)
@@ -6269,7 +6309,7 @@ class Environment(object):
         """
         if value is not None:
             self.animation_parameters(width3d=value, animate=None)
-        return self._width
+        return self._width3d
 
     def height3d(self, value=None):
         """
@@ -6287,7 +6327,7 @@ class Environment(object):
         """
         if value is not None:
             self.animation_parameters(height3d=value, animate=None)
-        return self._height
+        return self._height3d
 
     def width(self, value=None):
         """
@@ -6862,7 +6902,7 @@ class Environment(object):
         self._offset = self._now - new_now
 
         if self._trace:
-            self.print_trace("", "", "now reset to {:0.3f}".format(new_now), "(all times are reduced by {:0.3f})".format(self._offset - offset_before))
+            self.print_trace("", "", f"now reset to {new_now:0.3f}", f"(all times are reduced by {(self._offset - offset_before):0.3f})")
 
     def trace(self, value=None):
         """
@@ -7021,6 +7061,8 @@ class Environment(object):
                 self.do_simulate()
         if self.stopped:
             self.quit()
+            if self._video:
+                self.video_close()            
             raise SimulationStopped
 
     def do_simulate(self):
@@ -7040,10 +7082,14 @@ class Environment(object):
                 raise ImportError("3d animation not supported under Pythonista")
             while self.running and self._animate:
                 pass
+            if self.stopped:
+                raise SimulationStopped
         else:
             self.root.after(0, self.simulate_and_animate_loop)
             self.root.mainloop()
             if self._animate and self.running:
+                if self._video:
+                    self.video_close()
                 raise SimulationStopped
 
     def simulate_and_animate_loop(self):
@@ -7194,7 +7240,7 @@ class Environment(object):
             Other formats are not possible.
             Note that, apart from .JPG files. the background may be semi transparent by setting
             the alpha value to something else than 255.
-            
+
         video_mode : str
             specifies what to save |n|
             if "2d" (default), the tkinter window will be saved |n|
@@ -7444,8 +7490,8 @@ class Environment(object):
     def an_single_step(self):
         self._step_pressed = True
         self.step()
-        self.paused=True
-        self.t=self._now
+        self.paused = True
+        self.t = self._now
         self.set_start_animation()
 
     def an_menu_go(self):
@@ -7469,7 +7515,7 @@ class Environment(object):
                 fps = (len(self.frametimes) - 1) / (self.frametimes[-1] - self.frametimes[0])
             else:
                 fps = 0
-            s += "fps={:.1f}".format(fps)
+            s += f"fps={fps:.1f}"
 
         if self._show_time:
             if s != "":
@@ -7490,7 +7536,7 @@ class Environment(object):
             return "= off"
 
     def speedtext(self, t):
-        return "speed = {:.3f}".format(self._speed)
+        return f"speed = {self._speed:.3f}"
 
     def set_start_animation(self):
         self.frametimes = collections.deque(maxlen=30)
@@ -7515,9 +7561,12 @@ class Environment(object):
                             if start_time < self._audio.duration:
                                 self._audio.play(start=start_time)
 
-    def xy_anchor_to_x(self, xy_anchor, screen_coordinates, retina_scale=False):
+    def xy_anchor_to_x(self, xy_anchor, screen_coordinates, over3d=False, retina_scale=False):
         scale = 2 if (retina_scale and self.retina) else 1
-
+        if over3d:
+            width = self._width3d
+        else:
+            width = self._width
         if xy_anchor in ("nw", "w", "sw"):
             if screen_coordinates:
                 return 0
@@ -7526,30 +7575,34 @@ class Environment(object):
 
         if xy_anchor in ("n", "c", "center", "s"):
             if screen_coordinates:
-                return (self._width / 2) / scale
+                return (width / 2) / scale
             else:
                 return ((self._x0 + self._x1) / 2) / scale
 
         if xy_anchor in ("ne", "e", "se", ""):
             if screen_coordinates:
-                return self._width / scale
+                return width / scale
             else:
                 return self._x1 / scale
 
         raise ValueError("incorrect xy_anchor", xy_anchor)
 
-    def xy_anchor_to_y(self, xy_anchor, screen_coordinates, retina_scale=False):
+    def xy_anchor_to_y(self, xy_anchor, screen_coordinates, over3d=False, retina_scale=False):
         scale = 2 if (retina_scale and self.retina) else 1
+        if over3d:
+            height = self._height3d
+        else:
+            height = self._height
 
         if xy_anchor in ("nw", "n", "ne"):
             if screen_coordinates:
-                return self._height / scale
+                return height / scale
             else:
                 return self._y1 / scale
 
         if xy_anchor in ("w", "c", "center", "e"):
             if screen_coordinates:
-                return (self._height / 2) / scale
+                return (height / 2) / scale
             else:
                 return ((self._y0 + self._y1) / 2) / scale
 
@@ -7667,9 +7720,9 @@ class Environment(object):
     def colorspec_to_hex(self, colorspec, withalpha=True):
         v = self.colorspec_to_tuple(colorspec)
         if withalpha:
-            return "#{:02x}{:02x}{:02x}{:02x}".format(int(v[0]), int(v[1]), int(v[2]), int(v[3]))
+            return f"#{int(v[0]):02x}{int(v[1]):02x}{int(v[2]):02x}{int(v[3]):02x}"
         else:
-            return "#{:02x}{:02x}{:02x}".format(int(v[0]), int(v[1]), int(v[2]))
+            return f"#{int(v[0]):02x}{int(v[1]):02x}{int(v[2]):02x}"
 
     def colorspec_to_gl_color(self, colorspec):
         color_tuple = self.colorspec_to_tuple(colorspec)
@@ -8344,7 +8397,7 @@ class Animate:
     rectangle0 : tuple
         the rectangle (xlowerleft,ylowerleft,xupperright,yupperright) at time t0 |n|
 
-    image : str or PIL image
+    image : str, pathlib.Path or PIL image
         the image to be displayed |n|
         This may be either a filename or a PIL image
 
@@ -8462,6 +8515,10 @@ class Animate:
     width1 : float
        width of the image to be displayed at time t1 (default: width0) |n|
 
+    over3d : bool  
+        if True, this object will be rendered to the OpenGL window |n|
+        if False (default), the normal 2D plane will be used.
+
     Note
     ----
     one (and only one) of the following parameters is required:
@@ -8527,7 +8584,7 @@ class Animate:
         layer=0,
         keep=True,
         visible=True,
-        screen_coordinates=False,
+        screen_coordinates=None,
         t0=None,
         x0=0,
         y0=0,
@@ -8572,6 +8629,7 @@ class Animate:
         fontsize1=None,
         width1=None,
         xy_anchor="",
+        over3d=None,
         env=None,
     ):
 
@@ -8582,6 +8640,8 @@ class Animate:
         self._image_y = 0
         self.canvas_object = None
         self.canvas_object_overflow_image = None
+        self.over3d = _default_over3d if over3d is None else over3d
+        self.screen_coordinates = screen_coordinates
 
         self.type = self.settype(circle0, line0, polygon0, rectangle0, points0, image, text)
         if self.type == "":
@@ -8610,8 +8670,8 @@ class Animate:
         if image is None:
             self.width0 = 0  # just to be able to interpolate
         else:
-            self.image0 = spec_to_image(image)
-            self.width0 = None if width0 is None else width0  # None means original size
+            self.image0 = image
+            self.width0 = width0  # None means original size
 
         self.as_points0 = as_points
         self.font0 = font
@@ -8679,7 +8739,10 @@ class Animate:
             self.caller = self.env._frame_to_lineno(_get_caller_frame(), add_filename=True)
         else:
             self.caller = "?. use env.animate_debug(True) to get the originating Animate location"
-        self.env.an_objects.append(self)
+        if over3d:
+            self.env.an_objects_over3d.append(self)
+        else:
+            self.env.an_objects.append(self)
 
     def update(
         self,
@@ -8929,10 +8992,10 @@ class Animate:
             self.text0 = text
         if max_lines is not None:
             self.max_lines0 = max_lines
+
         self.width0 = self.width() if width0 is None else width0
         if image is not None:
-            self.image0 = spec_to_image(image)
-            self.width0 = self.image0.size[0] if width0 is None else width0
+            self.image0 = image
 
         if font is not None:
             self.font0 = font
@@ -8992,8 +9055,12 @@ class Animate:
         """
         if self in self.env.ui_objects:
             self.env.ui_objects.remove(self)
+
         if self in self.env.an_objects:
             self.env.an_objects.remove(self)
+
+        if self in self.env.an_objects_over3d:
+            self.env.an_objects_over3d.remove(self)
 
     def x(self, t=None):
         """
@@ -9259,7 +9326,16 @@ class Animate:
             default behaviour: linear interpolation between self.width0 and self.width1 |n|
             if None, the original width of the image will be used
         """
-        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.width0, self.width1)
+        width0 = self.width0
+        width1 = self.width1
+        if width0 is None and width1 is None:
+            return None
+        if width0 is None:
+            width0 = spec_to_image_width(self.image0)
+        if width1 is None:
+            width1 = spec_to_image_width(self.image0)
+
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, width0, width1)
 
     def fontsize(self, t=None):
         """
@@ -9481,8 +9557,8 @@ class Animate:
                 y = self.y(t)
                 xy_anchor = self.xy_anchor(t)
                 if xy_anchor:
-                    x += self.env.xy_anchor_to_x(xy_anchor, screen_coordinates=self.screen_coordinates)
-                    y += self.env.xy_anchor_to_y(xy_anchor, screen_coordinates=self.screen_coordinates)
+                    x += self.env.xy_anchor_to_x(xy_anchor, screen_coordinates=self.screen_coordinates, over3d=self.over3d)
+                    y += self.env.xy_anchor_to_y(xy_anchor, screen_coordinates=self.screen_coordinates, over3d=self.over3d)
 
                 offsetx = self.offsetx(t)
                 offsety = self.offsety(t)
@@ -9687,9 +9763,8 @@ class Animate:
                     self._image_y = qy + self.minry - linewidth + (offsetx * sina + offsety * cosa)
 
                 elif self.type == "image":
-                    image = self.image(t)
-                    if isinstance(image, (tuple, list)):
-                        image = image[0]  # ignore serial number (for compatibility with pre 2.2.9 versions)
+                    spec = self.image(t)
+                    image = spec_to_image(spec)
                     width = self.width(t)
                     if width is None:
                         width = image.size[0]
@@ -9712,7 +9787,7 @@ class Animate:
                         offsety = offsety * self.env._scale
 
                     alpha = int(self.alpha(t))
-                    self._image_ident = (image, width, height, angle, alpha)
+                    self._image_ident = (spec, width, height, angle, alpha)
                     if self._image_ident != self._image_ident_prev:
                         im1 = image.resize((int(width), int(height)), Image.ANTIALIAS)
                         self.imwidth, self.imheight = im1.size
@@ -9882,9 +9957,16 @@ class Animate:
                     self._image_y = qy + ey - imrheight / 2
                 else:
                     raise ValueError("Internal error: animate type" + self.type + "not recognized.")
+                if self.over3d:
+                    width = self.env._width3d
+                    height = self.env._height3d
+                else:
+                    width = self.env._width
+                    height = self.env._height
+
                 self._image_visible = (
-                    (self._image_x <= self.env._width)
-                    and (self._image_y <= self.env._height)
+                    (self._image_x <= width)
+                    and (self._image_y <= height)
                     and (self._image_x + self._image.size[0] >= 0)
                     and (self._image_y + self._image.size[1] >= 0)
                 )
@@ -9892,7 +9974,9 @@ class Animate:
                 self._image_visible = False
         except Exception as e:
             self.env._animate = False
-            raise type(e)(str(e) + " [from " + self.type + " animation object created in line " + self.caller + "]")
+            self.env.running = False
+            traceback.print_exc()
+            raise type(e)(str(e) + " [from " + self.type + " animation object created in line " + self.caller + "]") from e
 
     def remove_background(self, im):
         pixels = im.load()
@@ -10450,6 +10534,7 @@ class AnimateQueue(_AddAttr):
         id=None,
         arg=None,
         parent=None,
+        over3d=None,
     ):
         _checkisqueue(queue)
         self._queue = queue
@@ -10479,6 +10564,7 @@ class AnimateQueue(_AddAttr):
         self.titlecolor = titlecolor
         self.title = title
         self.layer = layer
+        self.over3d = _default_over3d if over3d is None else over3d
         self.aotitle = AnimateText(
             text=lambda: self.vtitle,
             textcolor=lambda: self.vtitlecolor,
@@ -10490,6 +10576,7 @@ class AnimateQueue(_AddAttr):
             fontsize=lambda: self.vtitlefontsize,
             font=lambda: self.vtitlefont,
             layer=lambda: self.vlayer,
+            over3d=self.over3d,
         )
         self.env.sys_objects.append(self)
 
@@ -10510,8 +10597,8 @@ class AnimateQueue(_AddAttr):
         self.vtitlefontsize = _call(self.titlefontsize, t, self.arg)
         self.vtitlecolor = _call(self.titlecolor, t, self.arg)
         self.vlayer = _call(self.layer, t, self.arg)
-        x += self._queue.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True)
-        y += self._queue.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True)
+        x += self._queue.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True, over3d=self.over3d)
+        y += self._queue.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True, over3d=self.over3d)
         if direction == "e":
             self.vx = x + (-25 if titleoffsetx is None else titleoffsetx)
             self.vy = y + (25 if self.titleoffsety is None else titleoffsety)
@@ -10538,11 +10625,16 @@ class AnimateQueue(_AddAttr):
             if (max_length is not None) and n >= max_length:
                 break
             if c not in prev_aos:
+                if self.over3d:
+                    c_animation_objects = c.animation_objects_over3d
+                else:
+                    c_animation_objects = c.animation_objects
+
                 nargs = c.animation_objects.__code__.co_argcount
                 if nargs == 1:
-                    animation_objects = self.current_aos[c] = c.animation_objects()
+                    animation_objects = self.current_aos[c] = c_animation_objects()
                 else:
-                    animation_objects = self.current_aos[c] = c.animation_objects(self.id)
+                    animation_objects = self.current_aos[c] = c_animation_objects(self.id)
             else:
                 animation_objects = self.current_aos[c] = prev_aos[c]
                 del prev_aos[c]
@@ -10663,7 +10755,7 @@ class Animate3dQueue:
 
         direction = _call(self.direction, t, self.arg).lower()
         if direction not in ("x+ x- y+ y- z+ z-").split():
-            raise ValueError(f"direction {direction} nor recognized")
+            raise ValueError(f"direction {direction} not recognized")
 
         reverse = _call(self.reverse, t, self.arg)
 
@@ -10867,6 +10959,16 @@ class AnimateText(_Vis):
         if given, the animation object will be removed
         automatically when the parent component is no longer accessible
 
+    screen_coordinates : bool
+        use screen_coordinates |n|
+        normally, the scale parameters are use for positioning and scaling
+        objects. |n|
+        if True, screen_coordinates will be used instead.
+
+    over3d : bool  
+        if True, this object will be rendered to the OpenGL window |n|
+        if False (default), the normal 2D plane will be used.        
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -10900,6 +11002,7 @@ class AnimateText(_Vis):
         offsetx=0,
         offsety=0,
         max_lines=0,
+        over3d=None,
     ):
         self.env = g.default_env if env is None else env
 
@@ -10932,8 +11035,12 @@ class AnimateText(_Vis):
             self.xy_anchor = xy_anchor
         if not hasattr(self, "layer"):
             self.layer = layer
+
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        self.over3d = _default_over3d if over3d is None else over3d
+        self.screen_coordinates = screen_coordinates
+
+        ao0 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, over3d=self.over3d, env=env, parent=parent)
         self.aos = (ao0,)
 
     def remove(self):
@@ -11077,6 +11184,7 @@ class AnimateRectangle(_Vis):
         visible=True,
         env=None,
         screen_coordinates=False,
+        over3d=None,
     ):
 
         self.env = g.default_env if env is None else env
@@ -11125,8 +11233,11 @@ class AnimateRectangle(_Vis):
         if not hasattr(self, "layer"):
             self.layer = layer
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(rectangle0=(), vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
-        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        self.over3d = _default_over3d if over3d is None else over3d
+        self.screen_coordinates = screen_coordinates
+
+        ao0 = _AnimateVis(rectangle0=(), vis=self, screen_coordinates=screen_coordinates, over3d=self.over3d, env=env, parent=parent)
+        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, over3d=self.over3d, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -11232,6 +11343,16 @@ class AnimatePolygon(_Vis):
         if given, the animation object will be removed
         automatically when the parent component is no longer accessible
 
+    screen_coordinates : bool
+        use screen_coordinates |n|
+        normally, the scale parameters are use for positioning and scaling
+        objects. |n|
+        if True, screen_coordinates will be used instead.
+
+    over3d : bool  
+        if True, this object will be rendered to the OpenGL window |n|
+        if False (default), the normal 2D plane will be used.
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -11271,6 +11392,7 @@ class AnimatePolygon(_Vis):
         visible=True,
         env=None,
         screen_coordinates=False,
+        over3d=None,
     ):
         self.env = g.default_env if env is None else env
 
@@ -11318,8 +11440,11 @@ class AnimatePolygon(_Vis):
         if not hasattr(self, "layer"):
             self.layer = layer
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(polygon0=(), vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
-        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        self.over3d = _default_over3d if over3d is None else over3d
+        self.screen_coordinates = screen_coordinates
+
+        ao0 = _AnimateVis(polygon0=(), vis=self, screen_coordinates=screen_coordinates, over3d=self.over3d, env=env, parent=parent)
+        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, over3d=self.over3d, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -11421,6 +11546,16 @@ class AnimateLine(_Vis):
         if given, the animation object will be removed
         automatically when the parent component is no longer accessible
 
+    screen_coordinates : bool
+        use screen_coordinates |n|
+        normally, the scale parameters are use for positioning and scaling
+        objects. |n|
+        if True, screen_coordinates will be used instead.
+
+    over3d : bool  
+        if True, this object will be rendered to the OpenGL window |n|
+        if False (default), the normal 2D plane will be used.        
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -11459,6 +11594,7 @@ class AnimateLine(_Vis):
         visible=True,
         env=None,
         screen_coordinates=False,
+        over3d=None,
     ):
         self.env = g.default_env if env is None else env
 
@@ -11505,8 +11641,10 @@ class AnimateLine(_Vis):
             self.layer = layer
         self.fillcolor = ""
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(line0=(), vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
-        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        self.over3d = _default_over3d if over3d is None else over3d
+        self.screen_coordinates = screen_coordinates
+        ao0 = _AnimateVis(line0=(), vis=self, screen_coordinates=screen_coordinates, over3d=self.over3d, env=env, parent=parent)
+        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, over3d=self.over3d, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -11608,6 +11746,16 @@ class AnimatePoints(_Vis):
         if given, the animation object will be removed
         automatically when the parent component is no longer accessible
 
+    screen_coordinates : bool
+        use screen_coordinates |n|
+        normally, the scale parameters are use for positioning and scaling
+        objects. |n|
+        if True, screen_coordinates will be used instead.
+
+    over3d : bool  
+        if True, this object will be rendered to the OpenGL window |n|
+        if False (default), the normal 2D plane will be used.
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -11645,6 +11793,7 @@ class AnimatePoints(_Vis):
         visible=True,
         env=None,
         screen_coordinates=False,
+        over3d=True,
     ):
         self.env = g.default_env if env is None else env
 
@@ -11689,8 +11838,10 @@ class AnimatePoints(_Vis):
             self.layer = layer
         self.fillcolor = ""
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(line0=(), as_points=True, vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
-        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        self.over3d = _default_over3d if over3d is None else over3d
+        self.screen_coordinates = screen_coordinates
+        ao0 = _AnimateVis(line0=(), as_points=True, vis=self, screen_coordinates=screen_coordinates, over3d=self.over3d, env=env, parent=parent)
+        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, over3d=self.over3d, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -11804,6 +11955,16 @@ class AnimateCircle(_Vis):
         if given, the animation object will be removed
         automatically when the parent component is no longer accessible
 
+    screen_coordinates : bool
+        use screen_coordinates |n|
+        normally, the scale parameters are use for positioning and scaling
+        objects. |n|
+        if True, screen_coordinates will be used instead.
+
+    over3d : bool  
+        if True, this object will be rendered to the OpenGL window |n|
+        if False (default), the normal 2D plane will be used.
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -11846,6 +12007,7 @@ class AnimateCircle(_Vis):
         visible=True,
         env=None,
         screen_coordinates=False,
+        over3d=None,
     ):
         self.env = g.default_env if env is None else env
 
@@ -11901,9 +12063,10 @@ class AnimateCircle(_Vis):
         if not hasattr(self, "layer"):
             self.layer = layer
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(circle0=(), vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
-
-        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        self.over3d = _default_over3d if over3d is None else over3d
+        self.screen_coordinates = screen_coordinates
+        ao0 = _AnimateVis(circle0=(), vis=self, screen_coordinates=screen_coordinates, over3d=self.over3d, env=env, parent=parent)
+        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, over3d=self.over3d, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -11921,10 +12084,10 @@ class AnimateImage(_Vis):
 
     Parameters
     ----------
-    image : str
+    image : str, pathlib.Path or PIL Image
         image to be displayed |n|
         if used as function or method or in direct assigmnent,
-        the image should be a PIL image (most likely via spec_to_image)
+        the image should be a file containing an image or a PIL image
 
     x : float
         position of anchor point (default 0)
@@ -12008,6 +12171,16 @@ class AnimateImage(_Vis):
         if given, the animation object will be removed
         automatically when the parent component is no longer accessible
 
+    screen_coordinates : bool
+        use screen_coordinates |n|
+        normally, the scale parameters are used for positioning and scaling
+        objects. |n|
+        if True, screen_coordinates will be used instead.
+
+    over3d : bool  
+        if True, this object will be rendered to the OpenGL window |n|
+        if False (default), the normal 2D plane will be used.
+
     Note
     ----
     All measures are in screen coordinates |n|
@@ -12046,12 +12219,13 @@ class AnimateImage(_Vis):
         visible=True,
         env=None,
         screen_coordinates=False,
+        over3d=None,
     ):
         self.env = g.default_env if env is None else env
 
         # the checks hasattr are req'd to not override methods of inherited classes
         if not hasattr(self, "spec"):
-            self.spec = spec_to_image(spec)
+            self.image = spec
         if not hasattr(self, "width"):
             self.width = width
         if not hasattr(self, "x"):
@@ -12092,8 +12266,10 @@ class AnimateImage(_Vis):
             self.layer = layer
 
         self.arg = self if arg is None else arg
-        ao0 = _AnimateVis(image="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
-        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, env=env, parent=parent)
+        self.over3d = _default_over3d if over3d is None else over3d
+        self.screen_coordinates = screen_coordinates
+        ao0 = _AnimateVis(image="", vis=self, screen_coordinates=screen_coordinates, over3d=self.over3d, env=env, parent=parent)
+        ao1 = _AnimateVis(text="", vis=self, screen_coordinates=screen_coordinates, over3d=self.over3d, env=env, parent=parent)
         ao1.dependent = True
         self.aos = (ao0, ao1)
 
@@ -12147,7 +12323,7 @@ class _AnimateVis(Animate):
         )
 
     def image(self, t):
-        return _call(self.vis.spec, t, self.vis.arg)
+        return _call(self.vis.image, t, self.vis.arg)
 
     def fillcolor(self, t):
         return _call(self.vis.fillcolor, t, self.vis.arg)
@@ -12516,6 +12692,33 @@ class Component(object):
         ao0 = AnimateRectangle(text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg")
         return (size_x, size_y, ao0)
 
+    def animation_objects_over3d(self, id):
+        """
+        defines how to display a component in AnimateQueue in over3d mode
+
+        Parameters
+        ----------
+        id : any
+            id as given by AnimateQueue. Note that by default this the reference to the AnimateQueue object.
+
+        Returns
+        -------
+        List or tuple containg |n|
+            size_x : how much to displace the next component in x-direction, if applicable |n|
+            size_y : how much to displace the next component in y-direction, if applicable |n|
+            animation objects : instances of Animate class |n|
+            default behaviour: |n|
+            square of size 40 (displacements 50), with the sequence number centered.
+
+        Note
+        ----
+        If you override this method, be sure to use the same header, either with or without the id parameter. |n|
+        """
+        size_x = 50
+        size_y = 50
+        ao0 = AnimateRectangle(text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg", over3d=True)
+        return (size_x, size_y, ao0)
+
     def animation3d_objects(self, id):
         """
         defines how to display a component in Animate3dQueue
@@ -12731,7 +12934,7 @@ class Component(object):
 
     def _reschedule(self, scheduled_time, priority, urgent, caller, extra="", s0=None):
         if scheduled_time < self.env._now:
-            raise ValueError("scheduled time ({:0.3f}) before now ({:0.3f})".format(scheduled_time, self.env._now))
+            raise ValueError(f"scheduled time ({scheduled_time:0.3f}) before now ({self.env._now:0.3f})")
         self._scheduled_time = scheduled_time
         if scheduled_time != inf:
             self._push(scheduled_time, priority, urgent)
@@ -13389,10 +13592,14 @@ class Component(object):
 
     def honor_all(self):
         for r in self._requests:
+            if r._honor_only_first and r._requesters[0] != self:
+                return []
+            self_prio = self.priority(r._requesters)
+            if r._honor_only_highest_priority and self_prio != r._requesters._head.successor.priority:
+                return []
             if self._requests[r] > 0:
                 if self._requests[r] > (r._capacity - r._claimed_quantity + 1e-8):
                     return []
-                    break
             else:
                 if -self._requests[r] > r._claimed_quantity + 1e-8:
                     return []
@@ -13400,6 +13607,12 @@ class Component(object):
 
     def honor_any(self):
         for r in self._requests:
+            if r.honor_only_first and r._requesters[0] != self:
+                continue
+            self_prio = self.priority(r._requesters)
+            if r.honor_only_highest_priority and self_prio != r._requesters._head.successor.priority:
+                continue
+
             if self._requests[r] > 0:
                 if self._requests[r] <= (r._capacity - r._claimed_quantity + 1e-8):
                     return [r]
@@ -16286,10 +16499,10 @@ class Cdf(_Distribution):
             if not spec:
                 raise ValueError("uneven number of parameters specified")
             if x < lastx:
-                raise ValueError("x value {} is smaller than previous value {}".format(x, lastx))
+                raise ValueError(f"x value {x} is smaller than previous value {lastx}")
             cum = spec.pop(0)
             if cum < lastcum:
-                raise ValueError("cumulative value {} is smaller than previous value {}".format(cum, lastcum))
+                raise ValueError(f"cumulative value {cum} is smaller than previous value {lastcum}")
             self._x.append(x)
             self._cum.append(cum)
             lastx = x
@@ -16873,16 +17086,16 @@ class Distribution(_Distribution):
             sp = spec.split(",")
             if len(sp) == 1:
                 c1 = sp[0]
-                spec = "Constant({})".format(c1)
+                spec = f"Constant({c1})"
             elif len(sp) == 2:
                 c1 = sp[0]
                 c2 = sp[1]
-                spec = "Uniform({},{})".format(c1, c2)
+                spec = f"Uniform({c1}, {c2})"
             elif len(sp) == 3:
                 c1 = sp[0]
                 c2 = sp[1]
                 c3 = sp[2]
-                spec = "Triangular({},{},{})".format(c1, c2, c3)
+                spec = f"Triangular({c1}, {c2}, {c3})"
             else:
                 raise ValueError("incorrect specifier", spec_orig)
 
@@ -16931,7 +17144,10 @@ class Distribution(_Distribution):
             _checkrandomstream(randomstream)
             self.randomstream = randomstream
         self._distribution = d
-        self._mean = d._mean
+        try:
+            self._mean = d._mean
+        except AttributeError:
+            self._mean = nan
 
     def __repr__(self):
         return self._distribution.__repr__()
@@ -17387,7 +17603,7 @@ class State(object):
         statistics (if as_str is True) : str
         """
         result = []
-        result.append("Statistics of {} at {}".format(self.name(), fn(self.env._now - self.env._offset, 13, 3)))
+        result.append(f"Statistics of {self.name()} at {fn(self.env._now - self.env._offset, 13, 3)}")
         result.append(self.waiters().length.print_statistics(show_header=False, show_legend=True, do_indent=True, as_str=True))
         result.append("")
         result.append(self.waiters().length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True, as_str=True))
@@ -17429,22 +17645,44 @@ class Resource(object):
         if the resource is actually just a level. |n|
         if False, claims belong to a component.
 
+    honor_only_first : bool
+        if True, only the first component of requesters will be honoured (default: False)
+
+    honor_only_highest_priority : bool
+        if True, only component with the priority of the first requester will be honoured (default: False)
+        Note: only respected if honor_only_first is False
+
     monitor : bool
-        if True (default) , the requesters queue, the claimers queue,
+        if True (default), the requesters queue, the claimers queue,
         the capacity, the available_quantity and the claimed_quantity are monitored |n|
         if False, monitoring is disabled.
-
+        
     env : Environment
         environment to be used |n|
         if omitted, default_env is used
     """
 
-    def __init__(self, name=None, capacity=1, anonymous=False, preemptive=False, monitor=True, env=None, *args, **kwargs):
+    def __init__(
+        self,
+        name=None,
+        capacity=1,
+        anonymous=False,
+        preemptive=False,
+        honor_only_first=False,
+        honor_only_highest_priority=False,
+        monitor=True,
+        env=None,
+        *args,
+        **kwargs
+    ):
         if env is None:
             self.env = g.default_env
         else:
             self.env = env
         self._capacity = capacity
+        self._honor_only_first = honor_only_first
+        self._honor_only_highest_priority = honor_only_highest_priority
+
         _set_name(name, self.env._nameserializeResource, self)
         savetrace = self.env._trace
         self.env._trace = False
@@ -17560,7 +17798,7 @@ class Resource(object):
         statistics (if as_str is True) : str
         """
         result = []
-        result.append("Statistics of {} at {:13.3f}".format(self.name(), self.env._now - self.env._offset))
+        result.append(f"Statistics of {self.name()} at {(self.env._now - self.env._offset):13.3f}")
         show_legend = True
         for q in [self.requesters(), self.claimers()]:
             result.append(q.length.print_statistics(show_header=False, show_legend=show_legend, do_indent=True, as_str=True))
@@ -17723,17 +17961,29 @@ class Resource(object):
         if self._anonymous:
             if not self._trying:
                 self._trying = True
-                mx = self._requesters._head.successor
+                mx = mx_first = self._requesters._head.successor
+                mx_first_priority = mx_first.priority
                 while mx != self._requesters._tail:
+                    if self._honor_only_first and mx != mx_first:
+                        break
+                    if self._honor_only_highest_priority and mx.priority != mx_first_priority:
+                        break
                     c = mx.component
                     mx = mx.successor
                     c._tryrequest()
                     if c not in self._requesters:
                         mx = self._requesters._head.successor  # start again
+
                 self._trying = False
         else:
-            mx = self._requesters._head.successor
+            mx = mx_first = self._requesters._head.successor
+            mx_first_priority = mx_first.priority
+
             while mx != self._requesters._tail:
+                if self._honor_only_first and mx != mx_first:
+                    break
+                if self._honor_only_highest_priority and mx.priority != mx_first_priority:
+                    break
                 if self._minq > (self._capacity - self._claimed_quantity + 1e-8):
                     break  # inpossible to honor any more requests
                 c = mx.component
@@ -18148,7 +18398,7 @@ class _APNG:
 
     def append(self, png, **options):
         if not isinstance(png, _APNG.PNG):
-            raise TypeError("Expect an instance of `PNG` but got `{}`".format(png))
+            raise TypeError(f"Expected an instance of `PNG` but got `{png}`")
         control = _APNG.FrameControl(**options)
         if control.width is None:
             control.width = png.width
@@ -18272,6 +18522,9 @@ def hex_to_rgb(v):
     raise ValueError("Incorrect value" + str(v))
 
 
+spec_to_image_cache = {}
+
+
 def spec_to_image(spec):
     """
     convert an image specification to an image
@@ -18287,18 +18540,24 @@ def spec_to_image(spec):
     -------
     image : PIL.Image.Image
     """
-    if isinstance(spec, str):
-        if can_animate(try_only=True):
+    can_animate(try_only=True)  # to load PIL
+    if isinstance(spec, (str, Path)):
+        if spec not in spec_to_image_cache:
             if spec == "":
                 im = Image.new("RGBA", (1, 1), (0, 0, 0, 0))  # (0, 0) raises an error on some platforms
             else:
                 im = Image.open(spec)
                 im = im.convert("RGBA")
-            return im
-        else:
-            return None  # will never be used!
+            spec_to_image_cache[spec] = im
+
+        return spec_to_image_cache[spec]
     else:
         return spec
+
+
+def spec_to_image_width(spec):
+    image = spec_to_image(spec)
+    return image.size[0]
 
 
 def _time_unit_lookup(descr):
@@ -18596,18 +18855,14 @@ def statuses():
     return tuple("current data interrupted passive requesting scheduled standby waiting".split(" "))
 
 
-for status in statuses():
-    globals()[status] = status
-"""
-data = "data"
 current = "current"
-standby = "standby"
-passive = "passive"
+data = "data"
 interrupted = "interrupted"
-scheduled = "scheduled"
+passive = "passive"
 requesting = "requesting"
+scheduled = "scheduled"
+standby = "standby"
 waiting = "waiting"
-"""
 
 
 def random_seed(seed=None, randomstream=None, set_numpy_random_seed=True):
@@ -18745,6 +19000,62 @@ class _AnimateExtro(Animate3dBase):
         self.layer = math.inf
 
     def draw(self, t):
+        if self.env.an_objects_over3d:
+            for ao in self.env.an_objects_over3d:
+                ao.make_pil_image(t)
+
+                if ao._image_visible:
+                    ao.x1 = ao._image_x
+                    ao.x2 = ao._image_x + ao._image.size[0]
+                    ao.y1 = ao._image_y
+                    ao.y2 = ao._image_y + ao._image.size[1]
+
+            overlap = False
+            for ao1 in self.env.an_objects_over3d:
+                if ao1._image_visible:
+                    for ao2 in self.env.an_objects_over3d:
+                        if ao2._image_visible:
+                            x_match = (ao2.x2 > ao1.x1 and ao2.x2 < ao1.x2) or (ao2.x1 > ao1.x1 and ao2.x1 < ao1.x2)
+                            y_match = (ao2.y2 > ao1.y1 and ao2.y2 < ao1.y2) or (ao2.y1 > ao1.y1 and ao2.y1 < ao1.y2)
+                            if x_match and y_match:
+                                overlap = True
+                                break
+
+            #        print("overlap", overlap)
+
+            gl.glEnable(gl.GL_TEXTURE_2D)
+            gl.glEnable(gl.GL_BLEND)
+            gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+
+            gl.glMatrixMode(gl.GL_PROJECTION)
+            gl.glLoadIdentity()
+
+            gl.glOrtho(0, self.env._width3d, 0, self.env._height3d, -1, 1)
+            #            print(overlap)
+            if overlap:
+                overlay_image = Image.new("RGBA", (self.env._width3d, self.env._height3d), (0, 0, 0, 0))
+                for ao in self.env.an_objects_over3d:
+                    if ao._image_visible:
+                        overlay_image.paste(ao._image, (int(ao._image_x), int(self.env._height3d - ao._image_y - ao._image.size[1])), ao._image)
+                    imdata = overlay_image.tobytes("raw", "RGBA", 0, -1)
+
+                w = overlay_image.size[0]
+                h = overlay_image.size[1]
+
+                gl.glRasterPos(0, 0)
+                gl.glDrawPixels(w, h, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, imdata)
+
+            else:
+                for ao in self.env.an_objects_over3d:
+                    if ao._image_visible:
+                        imdata = ao._image.tobytes("raw", "RGBA", 0, -1)
+                        w = ao._image.size[0]
+                        h = ao._image.size[1]
+                        gl.glRasterPos(int(ao._image_x), int(ao._image_y))
+                        gl.glDrawPixels(w, h, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, imdata)
+
+            gl.glDisable(gl.GL_BLEND)
+
         glut.glutSwapBuffers()
         glut.glutMainLoopEvent()
 
@@ -18758,7 +19069,7 @@ class Animate3dObj(Animate3dBase):
     filename : str or Path
         obj file to be read (default extension .obj) |n|
         if there are .mtl or .jpg required by this file, they should be available
-        
+
     x : float
         x position (default 0)
 
@@ -18913,8 +19224,8 @@ class Animate3dObj(Animate3dBase):
                 obj_file_path = Path(obj_filename).resolve().parent
                 save_cwd = os.getcwd()
                 os.chdir(obj_file_path)
-                for l in obj_file:
-                    if l.startswith("mtllib "):
+                for f in obj_file:
+                    if f.startswith("mtllib "):
                         mtllib_filename = Path(l[7:].strip())
                         if mtllib_filename.is_file():
                             create_materials = True
@@ -18961,7 +19272,7 @@ class Animate3dRectangle(Animate3dBase):
 
     color : colorspec
         color of the rectangle (default "white")
-        
+
     visible : bool
         visible |n|
         if False, animation object is not shown, shown otherwise
@@ -19042,7 +19353,7 @@ class Animate3dLine(Animate3dBase):
 
     color : colorspec
         color of the line (default "white")
-        
+
     visible : bool
         visible |n|
         if False, animation object is not shown, shown otherwise
@@ -19116,7 +19427,7 @@ class Animate3dGrid(Animate3dBase):
 
     color : colorspec
         color of the line (default "white")
-        
+
     visible : bool
         visible |n|
         if False, animation object is not shown, shown otherwise
@@ -19195,13 +19506,13 @@ class Animate3dBox(Animate3dBase):
     ----------
     x_len : float
         length of the box in x direction (deffult 1)
-        
+
     y_len : float 
         length of the box in y direction (default 1)
-        
+
     z_len : float
         length of the box in z direction (default 1)
-        
+
     x : float
         x position of the box (default 0)
 
@@ -19526,7 +19837,7 @@ class Animate3dCylinder(Animate3dBase):
 
     rotation_angle : float
         rotation of the bar in degrees (default 0)
-        
+
     show_lids : bool
         if True (default), the lids will be drawn
         if False, tyhe cylinder will be open at both sides
@@ -20266,8 +20577,12 @@ def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
                 break
         if filename != "":
             try:
-                #  refer to https://github.com/python-pillow/Pillow/issues/3730 for explanation (in order to load >= 500 fonts)
-                result = ImageFont.truetype(font=io.BytesIO(open(filename, "rb").read()), size=int(fontsize))
+                if Pythonista:
+                    result = ImageFont.truetype(filename, size=int(fontsize))
+                else:
+
+                    #  refer to https://github.com/python-pillow/Pillow/issues/3730 for explanation (in order to load >= 500 fonts)
+                    result = ImageFont.truetype(font=io.BytesIO(open(filename, "rb").read()), size=int(fontsize))
                 break
             except Exception:
                 raise
@@ -20303,7 +20618,7 @@ def show_colornames():
     """
     names = sorted(colornames())
     for name in names:
-        print("{:22s}{}".format(name, colornames()[name]))
+        print(f"{name:22s}{colornames()[name]}")
 
 
 def arrow_polygon(size):
@@ -20531,6 +20846,51 @@ def default_env():
     default environment : Environment
     """
     return g.default_env
+
+
+@contextlib.contextmanager
+def over3d(val=True):
+    """
+    context manager to change temporarily default_over3d
+    
+    Parameters
+    ----------
+    val : bool
+        temporary value of default_over3d
+        default: True
+        
+    Notes
+    -----
+    Use as |n|
+    with over3d(): |n|
+        an = AnimateText('test')       
+    """
+    save_default_over3d = default_over3d()
+    default_over3d(val)
+    yield
+    default_over3d(save_default_over3d)
+
+
+_default_over3d = False
+
+
+def default_over3d(val=None):
+    """
+    Set default_over3d
+    
+    Parameters
+    ----------
+    val : bool
+        if not None, set the default_over3d to val
+        
+    Returns
+    -------
+    Current (new) value of default_over3d
+    """
+    global _default_over3d
+    if val is not None:
+        _default_over3d = val
+    return _default_over3d
 
 
 def reset():

@@ -1,5 +1,90 @@
 salabim changelog
 
+version 22.0.0  2022-01-09
+==========================
+Added functionality (0)
+-----------------------
+It is now possible to add a 2D overlay to a 3d animation. This overlay can be extremely useful
+for showing status information, like the time. And logos and ...
+Particularly videos can be much more professional and instructive.
+
+All normal 2d animation objects are available for overlaying:
+Animate, AnimateCircle, AnimateImage, AnimateLine, AnimatePolygon,
+AnimatePoints, AnimateRectangle and AnimateText
+Also, the AnimateMonitor and AnimateQueue support overlaying.
+All these classes have an optional parameter over3d.
+
+Note that the optional parameter defaults to False, but can be overridden with the
+sim.default_override() function. On top of that, it is possible to use the
+sim.over3d() context manager to temporarily override the default like,
+    with sim.over3d():
+        AnimateCircle(radius=50, x=100, y=100)
+        AnimateRectangle((-20, -20, 20, 20), x=100, y=100)
+These two animation objects will now be shown as an overlay on the 3d animation.
+
+For AnimateQueue, the Component.animation_objects_over3d method should specify the objects
+, just like Component.animation_objects for ordinary 2d animations.
+By default, this is a defined as a square (same as in ordinary 2d).
+
+Changed functionality (0)
+-------------------------
+From now on, there are several ways that resource requests are honoured (specifified in Resource parameters):
+    honor_only_first: if True, only the first of the requesters queue will be honoured
+    honor_only_highest_priority: if True, only components with the priority of the first in requesters will be honoured
+As both parameters are False by default, existing models will still work as before.
+
+Changed functionality (1)
+-------------------------
+The way AnimateImage and Animate(image=...) handles the given image spec has been changed,
+and is much more robust now.
+That means that an image will not be read util really required. So, if animation is not activated,
+the image file will not be opened (and could be even absent).
+Also, read images from a file will be cached automatically, so it is very easy to cycle through
+several images without a performance problems.
+It is now possible to say
+    an = sim.AnimateImage(spec="a.png")
+    ...
+    an.spec = "b.png"
+, so no more need to use sim.spec_to_image(), although that function still exists.
+
+Related to this is that in case no width is given, the width of the image will be
+assessed as late as possible.
+The method .width() of an image animation object will return None if no width is specified.
+If it is required to get the actual (physical) width of a spec, there's now the function
+    sim.spec_to_image_width()
+
+Changed fuctionality (2)
+------------------------
+To avoid confusion, it is not allowed anymore to change
+  fps
+  video_width
+  video_height
+  video_mode
+  video_repeat
+  video_pingpong
+when a video is being recorded.
+
+Changed functionality (3)
+------------------------
+When a simulation raised a SimulationStopped exception, a video being recorder will be closed automatically.
+
+Added functionality (0)
+-----------------------
+An animation can now be stopped with Ctrl-C.
+
+Bugfix (0)
+----------
+Under Pythonista, changing fonts didn't work properly in version 21.1.7. Fixed.
+
+Bugfix (1)
+----------
+If Map was used in a specification of a Distribution, an attribute error was raised. Fixed.
+
+Internal change (0)
+-------------------
+Salabim now uses f-strings extensively (mainly automatically converted by flynt).
+This makes reading and maintaining the source easier (and arguably faster).
+
 version 21.1.7  2021-12-13
 ==========================
 Added functionality (1)
