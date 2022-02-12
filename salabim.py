@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___       ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \     / _ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |   | | | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _ | |_| |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_) \___/
+#               _         _      _               ____   ____       ___      _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \    / |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |   | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _ | |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_)|_|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "22.0.0"
+__version__ = "22.0.1"
 import heapq
 import random
 import time
@@ -40,6 +40,11 @@ import contextlib
 
 from pathlib import Path
 
+try:
+    from ycecream import yc
+except ImportError:
+    pass
+
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
 PyDroid = sys.platform == "linux" and any("pydroid" in v for v in os.environ.values())
@@ -68,6 +73,7 @@ class QueueFullError(Exception):
 
 class SimulationStopped(Exception):
     pass
+
 
 class ItemFile(object):
     """
@@ -486,6 +492,108 @@ class Monitor(object):
                     new._weight.append(weight)
                 new._t.append(t)
                 new._x.append(x)
+        new.monitor(False)
+        new.isgenerated = True
+        return new
+
+    def t_multiply(self, factor, name=None):
+        if name is None:
+            name = "mapped"
+
+        if not self._level:
+            raise TypeErrror("t_multiply can't be applied to non level monitors")
+
+        if factor <= 0:
+            raise TypeError(f"factor {factor} <= 0")
+
+        new = _SystemMonitor(name=name, type=self.xtype, level=self._level, env=self.env)
+        new._x = []
+        new._t = []
+        for x in self._x:
+            new._x.append(x)
+        for t in self._t:
+            new._t.append(t * factor)
+
+        new.start = self.start * factor
+        new.monitor(False)
+        new._t[-1] = new._t[-1] * factor
+        new.isgenerated = True
+        return new
+
+    def x_map(self, func, monitors=[], name=None):
+        """
+        maps a function to the x-values of the given monitors (static method)
+
+        Parameters
+        ----------
+        func : function
+           a function that accepts n x-values, where n is the number of monitors
+           note that the function will not be called during the time any of the monitors is off
+
+        monitors : list/tuple of additional monitors
+           monitor(s) to be mapped |n|
+           only allowed for level monitors-
+
+        name : str
+            name of the mapped monitor |n|
+            default: "mapped"
+
+        Returns
+        -------
+        mapped monitor : Monitor, type 'any'
+        """
+        if name is None:
+            name = "mapped"
+
+        if monitors is not None:
+            monitors = [self] + monitors
+        else:
+            monitors = [self]
+        if not all(m._level == self._level for m in monitors):
+            raise TypeError("not possible to mix level and non level monitors")
+        if not all(m.env == self.env for m in monitors):
+            raise TypeError("not all monitors have this environment")
+
+        new = _SystemMonitor(name=name, type="any", level=self._level, env=self.env)
+
+        for m in monitors:
+            m._x_any = []
+            for x in m._x:
+                m._x_any.append(new.off if x == m.off else x)
+
+        if new._level:
+            new._x = []
+
+            curx = [new.off] * len(monitors)
+            new._t = array.array("d")
+            for t, index, x in heapq.merge(*[zip(monitors[index]._t, itertools.repeat(index), monitors[index]._x_any) for index in range(len(monitors))]):
+                curx[index] = x
+
+                if any(val == new.off for val in curx):
+                    result = new.off
+                else:
+                    result = func(*curx)
+
+                if new._t and (t == new._t[-1]):
+                    new._x[-1] = result
+                else:
+                    new._t.append(t)
+                    new._x.append(result)
+            new.start = new._t[0]
+        else:
+            new._x = []
+            new._t = array.array("d")
+
+            for x, t in zip(monitors[0]._x_any, monitors[0]._t):
+                if x == new.off:
+                    new._x.append(new.off)
+                else:
+                    new._x.append(func(x))
+                new._t.append(t)
+
+        for m in monitors:
+            del m._x_any
+
         new.monitor(False)
         new.isgenerated = True
         return new
@@ -1857,7 +1965,7 @@ class Monitor(object):
             ex0 = bool(ex0)
             return self.sumw[ex0]
         else:
-            self.x, weight = self._xweight(ex0=ex0)
+            _, weight = self._xweight(ex0=ex0)
             return sum(weight)
 
     def weight_zero(self):
@@ -3419,6 +3527,7 @@ class Queue(object):
         Animates the components in the queue in 3D.
 
         Parameters
+        ----------
         x : float
             x-position of the first component in the queue |n|
             default: 0
@@ -4895,12 +5004,14 @@ class Environment(object):
         self.view = _AnimateIntro()
         _AnimateExtro()
         self._gl_initialized = False
+        self._camera_auto_print = False
         self.obj_filenames = {}
         self.running = False
         self._maximum_number_of_bitmaps = 4000
         self.t = 0
         self.video_t = 0
         self.frame_number = 0
+        self._exclude_from_animation = "only in video"
         self._audio = None
         self._audio_speed = 1
         self._animate_debug = False
@@ -5059,6 +5170,82 @@ class Environment(object):
         if key in self._opengl_key_press_special_bind:
             self._opengl_key_press_special_bind[key]()
 
+    def camera_move(self, spec="", lag=1, offset=0, enabled=True):
+        """
+        Moves the camera according to the given spec, which is normally a collection of camera_print
+        outputs.
+
+        Parameters
+        ----------
+        spec : str
+            output normally obtained from camera_auto_print lines
+            
+        lag : float
+            lag time (for smooth camera movements) (default: 1))
+
+        offset : float
+            the duration (can be negative) given is added to the times given in spec. Default: 0 
+            \
+        enabled : bool
+            if True (default), move camera according to spec/lag |n|
+            if False, freeze camera movement
+        """
+        if not has_numpy():
+            raise ImportError("camera move requires numpy")
+
+        props = "x_eye y_eye z_eye x_center y_center z_center field_of_view_y".split()
+
+        build_values = collections.defaultdict(list)
+        build_times = collections.defaultdict(list)
+        values = collections.defaultdict(list)
+        times = collections.defaultdict(list)
+
+        if enabled:
+
+            for prop in props:
+                build_values[prop].append(getattr(self.view, prop)(t=offset))
+                build_times[prop].append(offset)
+
+            for prop in props:
+                setattr(self.view, prop, lambda arg, t, prop=prop: numpy.interp(t, times[prop], values[prop]))  # default argument prop is evaluated at start!
+
+            for line in spec.split("\n"):
+                line = line.strip()
+                if line.startswith("view("):
+                    line = line[5:]
+                    line0, line1 = line.split(")  # t=")
+                    time = float(line1) + offset
+                    parts = line0.replace(" ", "").split(",")
+                    for part in parts:
+                        prop, value = part.split("=")
+                        if prop in props:
+                            build_times[prop].append(time)
+                            build_values[prop].append(float(value))
+                        else:
+                            raise ValueError(f"incorrect line in spec: {line}")
+
+            for prop in props:
+                pending_value = build_values[prop][0]
+                pending_time = build_times[prop][0]
+                values[prop].append(pending_value)
+                times[prop].append(pending_time)
+                build_values[prop].append(build_values[prop][-1])
+                build_times[prop].append(build_times[prop][-1] + lag)
+
+                for value, time in zip(build_values[prop], build_times[prop]):
+                    if time > pending_time:
+                        values[prop].append(pending_value)
+                        times[prop].append(pending_time)
+
+                    values[prop].append(interpolate(time, times[prop][-1], pending_time, values[prop][-1], pending_value))
+                    times[prop].append(time)
+                    pending_value = value
+                    pending_time = time + lag
+
+        else:
+            for prop in props:
+                setattr(self.view, prop, getattr(self.view, prop)(self.t))
+
     def camera_rotate(self, event=None, delta_angle=None):
         adjusted_x = self.view.x_eye(self.t) - self.view.x_center(self.t)
         adjusted_y = self.view.y_eye(self.t) - self.view.y_center(self.t)
@@ -5067,21 +5254,32 @@ class Environment(object):
         self.view.x_eye = self.view.x_center(self.t) + cos_rad * adjusted_x + sin_rad * adjusted_y
         self.view.y_eye = self.view.y_center(self.t) - sin_rad * adjusted_x + cos_rad * adjusted_y
 
+        if self._camera_auto_print:
+            self.camera_print(props="x_eye y_eye")
+
     def camera_zoom(self, event=None, factor_xy=None, factor_z=None):
         self.view.x_eye = self.view.x_center(self.t) - (self.view.x_center(self.t) - self.view.x_eye(self.t)) * factor_xy
         self.view.y_eye = self.view.y_center(self.t) - (self.view.y_center(self.t) - self.view.y_eye(self.t)) * factor_xy
         self.view.z_eye = self.view.z_center(self.t) - (self.view.z_center(self.t) - self.view.z_eye(self.t)) * factor_z
+        if self._camera_auto_print:
+            self.camera_print(props="x_eye y_eye z_eye")
 
     def camera_xy_center(self, event=None, x_dis=None, y_dis=None):
         self.view.x_center = self.view.x_center(self.t) + x_dis
         self.view.y_center = self.view.y_center(self.t) + y_dis
+        if self._camera_auto_print:
+            self.camera_print(props="x_center y_center")
 
     def camera_xy_eye(self, event=None, x_dis=None, y_dis=None):
         self.view.x_eye = self.view.x_eye(self.t) + x_dis
         self.view.y_eye = self.view.y_eye(self.t) + y_dis
+        if self._camera_auto_print:
+            self.camera_print(props="x_eye y_eye")
 
     def camera_field_of_view(self, event=None, factor=None):
         self.view.field_of_view_y = self.view.field_of_view_y(self.t) * factor
+        if self._camera_auto_print:
+            self.camera_print(props="field_of_view_y")
 
     def camera_tilt(self, event=None, delta_angle=None):
         x_eye = self.view.x_eye(self.t)
@@ -5103,6 +5301,8 @@ class Environment(object):
 
         self.view.x_center = x_eye + (dxy_new / dxy) * (x_center - x_eye)
         self.view.y_center = y_eye + (dxy_new / dxy) * (y_center - y_eye)
+        if self._camera_auto_print:
+            self.camera_print(props="x_center y_center")
 
     def camera_rotate_axis(self, event=None, delta_angle=None):
         adjusted_x = self.view.x_center(self.t) - self.view.x_eye(self.t)
@@ -5111,11 +5311,17 @@ class Environment(object):
         sin_rad = math.sin(math.radians(delta_angle))
         self.view.x_center = self.view.x_eye(self.t) + cos_rad * adjusted_x + sin_rad * adjusted_y
         self.view.y_center = self.view.y_eye(self.t) - sin_rad * adjusted_x + cos_rad * adjusted_y
+        if self._camera_auto_print:
+            self.camera_print(props="x_eye y_eye")
 
-    def camera_print(self, event=None):
-        print(
-            f"view(x_eye={self.view.x_eye(self.t)}, y_eye={self.view.y_eye(self.t)}, z_eye={self.view.z_eye(self.t)}, x_center={self.view.x_center(self.t)}, y_center={self.view.y_center(self.t)}, z_center={self.view.z_center(self.t)}, field_of_view_y={self.view.field_of_view_y(self.t)})"
-        )
+    def camera_print(self, event=None, props=None):
+        if props is None:
+            props = "x_eye y_eye z_eye x_center y_center z_center field_of_view_y"
+        s = "view("
+        items = []
+        for prop in props.split():
+            items.append(f"{getattr(self.view,prop)(self.t):.4f}")
+        print("view(" + (",".join(f"{prop}={getattr(self.view,prop)(self.t):.4f}" for prop in props.split())) + f")  # t={self.t:.4f}")
 
     def _bind(self, tkinter_event, func):
         self.root.bind(tkinter_event, func)
@@ -5139,7 +5345,32 @@ class Environment(object):
                 opengl_key = (glut.GLUT_KEY_RIGHT, spec_key)
             self._opengl_key_press_special_bind[opengl_key] = func
 
-    def camera_control(self):
+    def camera_auto_print(self, value=None):
+        """
+        queries or set camera_auto_print
+
+        Parameters
+        ----------
+        value : boolean
+            if None (default), no action |n|
+            if True, camera_print will be called on each camera control keypress |n|
+            if False, no automatic camera_print
+            
+        Returns
+        -------
+        Current status : bool
+
+        Note
+        ----
+        The camera_auto_print functionality is useful to get the spec for camera_move()
+        """
+        if value is not None:
+            self._camera_auto_print = value
+            if value:
+                self.camera_print()
+        return self._camera_auto_print
+
+    def _camera_control(self):
         self._bind("<Left>", functools.partial(self.camera_rotate, delta_angle=-1))
         self._bind("<Right>", functools.partial(self.camera_rotate, delta_angle=+1))
 
@@ -5178,6 +5409,7 @@ class Environment(object):
         show camera position on the tkinter window or over3d window
 
         The 7 camera settings will be shown in the top left corner.
+
         Parameters
         ----------
         over3d : bool
@@ -5377,6 +5609,7 @@ class Environment(object):
         video_mode=None,
         position=None,
         position3d=None,
+        visible=None,
     ):
 
         """
@@ -5528,6 +5761,10 @@ class Environment(object):
             if the none string, the audio will be stopped |n|
             default: no change |n|
             for more information, see Environment.audio()
+
+        visible : bool
+            if True (start condition), the animation window will be visible |n|
+            if False, the animation window will be hidden ('withdrawn')
 
         Note
         ----
@@ -5880,7 +6117,6 @@ class Environment(object):
                         self.root.bind("s", lambda self: g.animation_env.an_single_step())
                         self.root.bind("<Control-c>", lambda self: g.animation_env.an_quit())
 
-
                         g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
                         g.canvas.configure(background=self.colorspec_to_hex("bg", False))
                         g.canvas.pack()
@@ -5891,6 +6127,13 @@ class Environment(object):
 
                     if self._show_menu_buttons:
                         self.an_menu_buttons()
+        if visible is not None:
+            if Pythonista:
+                raise ValueError("Pythonista does not support visible=False")
+            if visible and self.root.wm_state() == "withdrawn":
+                self.root.deiconify()
+            if not visible and self.root.wm_state() != "withdrawn":
+                self.root.withdraw()
 
     def video_close(self):
         """
@@ -5948,12 +6191,10 @@ class Environment(object):
         if video_mode == "3d":
             if not self._animate3d:
                 raise ValueError("video_mode=='3d', but animate3d is not True")
-            self.an_objects3d.sort(key=lambda obj: (obj.layer(self.t), obj.sequence))
-            for an in self.an_objects3d:
-                if an.visible(self.t):
-                    an.draw(self.t)
+
             width = self._width3d
             height = self._height3d
+
             # https://stackoverflow.com/questions/41126090/how-to-write-pyopengl-in-to-jpg-image
             gl.glPixelStorei(gl.GL_PACK_ALIGNMENT, 1)
             data = gl.glReadPixels(0, 0, width, height, gl.GL_RGB, gl.GL_UNSIGNED_BYTE)
@@ -6006,7 +6247,9 @@ class Environment(object):
                 self._video_out.write(open_cv_image)
 
     def _save_frame(self):
+        self._exclude_from_animation = "not in video"
         image = self._capture_image("RGBA", self._video_mode)
+        self._exclude_from_animation = "only in video"
         self.insert_frame(image)
 
     def add_audio(self):
@@ -6348,6 +6591,27 @@ class Environment(object):
             self.animation_parameters(width=value, animate=None)
         return self._width
 
+    def visible(self, value=None):
+        """
+        controls visibility of the animation window
+
+        Parameters
+        ----------
+        value : bool
+            if True, the animation window will be visible |n|
+            if False, the animation window will be hidden ('withdrawn')
+            if None (default), no change
+
+        Returns
+        -------
+        current visibility : bool
+        """
+        self.animation_parameters(visible=value)
+        if Pythonista:
+            return True
+        else:
+            return self.root.wm_state() != "withdrawn"
+
     def video_width(self, value=None):
         """
         width of the video animation in screen coordinates
@@ -6646,7 +6910,19 @@ class Environment(object):
         def __exit__(self, type, value, traceback):
             self.env.video_close()
 
-    def video(self, value=None):
+    def is_videoing(self):
+        """
+        video recording status
+        
+        returns
+        -------
+        video recording status : bool |n|
+            True, if video is being recorded |n|
+            False, otherwise
+        """
+        return bool(self._video)
+
+    def video(self, value):
         """
         video name
 
@@ -6654,23 +6930,20 @@ class Environment(object):
         ----------
         value : str, list or tuple
             new video name |n|
-            if not specified, no change |n|
             for explanation see animation_parameters()
-
-        Returns
-        -------
-        video : str, list or tuple
 
         Note
         ----
-        If video is the null string, the video (if any) will be closed. |n|
-        |n|
-        The values of video_width, video_height, video_mode, video_repeat, video_pingpong
-        are used. Any change after that will be ignored and only applied to
-        another Environment.video call.
+        If video is the null string ro None, the video (if any) will be closed. |n|
+        The call can be also used as a context manager, which automatically opens and
+        closes a file. E.g. ::
+
+            with video("test.mp4"):
+                env.run(100)
         """
-        if value is not None:
-            self.animation_parameters(video=value, animate=None)
+        if value is None:
+            value = ""
+        self.animation_parameters(video=value, animate=None)
         return self._Video(env=self)
 
     def video_repeat(self, value=None):
@@ -7062,7 +7335,7 @@ class Environment(object):
         if self.stopped:
             self.quit()
             if self._video:
-                self.video_close()            
+                self.video_close()
             raise SimulationStopped
 
     def do_simulate(self):
@@ -7096,7 +7369,7 @@ class Environment(object):
         while True:
             if self._animate3d and not self._gl_initialized:
                 self.animation3d_init()
-                self.camera_control()
+                self._camera_control()
                 self.start_animation_clocktime = time.time()
                 self.start_animation_time = self.t
 
@@ -7191,10 +7464,13 @@ class Environment(object):
 
             if self._animate3d:
                 t = self.t
+                self._exclude_from_animation = "*"  # makes that both video and non video over2d animation objects are shown
                 self.an_objects3d.sort(key=lambda obj: (obj.layer(t), obj.sequence))
                 for an in self.an_objects3d:
-                    if an.visible(t):
+                    visible = an.visible(self.t)
+                    if visible:
                         an.draw(t)
+                self._exclude_from_animation = "only in video"
 
             self.animation_post_tick(self.t)
 
@@ -9547,7 +9823,8 @@ class Animate:
     def make_pil_image(self, t):
         try:
             visible = self.visible(t)
-
+            if self.env._exclude_from_animation == visible:
+                visible = False
             if (t >= self.t0) and ((t <= self.t1) or self.keep) and visible:
                 self._image_x_prev = self._image_x
                 self._image_y_prev = self._image_y
@@ -11324,10 +11601,10 @@ class AnimatePolygon(_Vis):
     textcolor : colorspec
         color of the text (default foreground_color)
 
-    textoffsetx : float
+    text_offsetx : float
         extra x offset to the text_anchor point
 
-    textoffsety : float
+    text_offsety : float
         extra y offset to the text_anchor point
 
     fontsize : float
@@ -11527,10 +11804,10 @@ class AnimateLine(_Vis):
     textcolor : colorspec
         color of the text (default foreground_color)
 
-    textoffsetx : float
+    text_offsetx : float
         extra x offset to the text_anchor point
 
-    textoffsety : float
+    text_offsety : float
         extra y offset to the text_anchor point
 
     fontsize : float
@@ -11727,10 +12004,10 @@ class AnimatePoints(_Vis):
     textcolor : colorspec
         color of the text (default foreground_color)
 
-    textoffsetx : float
+    text_offsetx : float
         extra x offset to the text_anchor point
 
-    textoffsety : float
+    text_offsety : float
         extra y offset to the text_anchor point
 
     fontsize : float
@@ -11936,10 +12213,10 @@ class AnimateCircle(_Vis):
     textcolor : colorspec
         color of the text (default foreground_color)
 
-    textoffsetx : float
+    text_offsetx : float
         extra x offset to the text_anchor point
 
-    textoffsety : float
+    text_offsety : float
         extra y offset to the text_anchor point
 
     fontsize : float
@@ -12152,10 +12429,10 @@ class AnimateImage(_Vis):
     textcolor : colorspec
         color of the text (default foreground_color)
 
-    textoffsetx : float
+    text_offsetx : float
         extra x offset to the text_anchor point
 
-    textoffsety : float
+    text_offsety : float
         extra y offset to the text_anchor point
 
     fontsize : float
@@ -12948,10 +13225,7 @@ class Component(object):
                 delta = ""
             else:
                 delta = f" +{self.env.duration_to_str(scheduled_time - self.env._now)}"
-            if self.overridden_lineno:
-                lineno = ""
-            else:
-                lineno = self.lineno_txt(add_at=True)
+            lineno = self.lineno_txt(add_at=True)
             self.env.print_trace(
                 "",
                 "",
@@ -13181,7 +13455,8 @@ class Component(object):
 
         self.set_mode(mode)
         if self.env._trace:
-            self.env.print_trace("", "", self.name() + " passivate", merge_blanks(self._modetxt()))
+            lineno = self.lineno_txt(add_at=True)
+            self.env.print_trace("", "", self.name() + " passivate", merge_blanks(lineno, self._modetxt()))
         self.status._value = passive
 
     def interrupt(self, mode=None):
@@ -13216,7 +13491,8 @@ class Component(object):
                 self._interrupt_level = 1
                 self.status._value = interrupted
                 extra = ""
-            self.env.print_trace("", "", self.name() + " interrupt" + extra, merge_blanks(self._modetxt()))
+            lineno = self.lineno_txt(add_at=True)
+            self.env.print_trace("", "", self.name() + " interrupt" + extra, merge_blanks(lineno, self._modetxt()))
 
     def resume(self, all=False, mode=None, priority=0, urgent=False):
         """
@@ -13262,13 +13538,14 @@ class Component(object):
                 self.env.print_trace("", "", self.name() + " resume (interrupted." + str(self._interrupt_level) + ")", merge_blanks(self._modetxt()))
             else:
                 self.status._value = self._interrupted_status
-                self.env.print_trace("", "", self.name() + " resume (" + self.status() + ")", merge_blanks(self._modetxt()))
+                lineno = self.lineno_txt(add_at=True)
+                self.env.print_trace("", "", self.name() + " resume (" + self.status() + ")", merge_blanks(lineno, self._modetxt()))
                 if self.status.value == passive:
-                    self.env.print_trace("", "", self.name() + " passivate", merge_blanks(self._modetxt()))
+                    self.env.print_trace("", "", self.name() + " passivate", merge_blanks(lineno, self._modetxt()))
                 elif self.status.value == standby:
                     self._scheduled_time = self.env._now
                     self.env._standbylist.append(self)
-                    self.env.print_trace("", "", self.name() + " standby", merge_blanks(self._modetxt()))
+                    self.env.print_trace("", "", self.name() + " standby", merge_blanks(lineno, self._modetxt()))
                 elif self.status.value in (scheduled, waiting, requesting):
                     if self.status.value == waiting:
                         if self._waits:
@@ -13346,7 +13623,8 @@ class Component(object):
             if self.env._buffered_trace:
                 self.env._buffered_trace = False
             else:
-                self.env.print_trace("", "", "standby", self._modetxt())
+                lineno = self.lineno_txt(add_at=True)
+                self.env.print_trace("", "", "standby", merge_blanks(lineno, self._modetxt()))
         self.status._value = standby
 
     def request(self, *args, **kwargs):
@@ -14705,10 +14983,15 @@ class Component(object):
     def lineno_txt(self, add_at=False):
         if self.env._suppress_trace_linenumbers:
             return ""
+        if self.overridden_lineno:
+            return ""
+
         plus = "+"
         if self == self.env._main:
             frame = self.frame
         else:
+            if self.isdata():
+                return "N/A"
             if self._process_isgenerator:
                 frame = self._process.gi_frame
                 if frame.f_lasti == -1:  # checks whether generator is created
@@ -14716,8 +14999,23 @@ class Component(object):
             else:
                 gs = inspect.getsourcelines(self._process)
                 s0 = self.env.filename_lineno_to_str(self._process.__code__.co_filename, gs[1]) + " "
-                return s0
-        return ("@" if add_at else "") + self.env._frame_to_lineno(frame) + plus
+                return f"{'@' if add_at else ''}{s0}"
+        return f"{'@' if add_at else ''}{self.env._frame_to_lineno(frame)}{plus}"
+
+    def line_number(self):
+        """
+        current line number of the process
+
+        Returns
+        -------
+        Current line number : str
+            for data components, "" will be returned
+        """
+        save_suppress_trace_linenumbers = self.env._suppress_trace_linenumbers
+        self.env._suppress_trace_linenumbers = False
+        s = self.lineno_txt().strip()
+        self.env._suppress_trace_linenumbers = save_suppress_trace_linenumbers
+        return s
 
 
 class ComponentGenerator(Component):
@@ -16569,6 +16867,7 @@ class Pdf(_Distribution):
     ----------
     spec : list, tuple or dict
         either
+
         -   if no probabilities specified: |n|
             list/tuple with x-values and corresponding probability
             dict where the keys are re x-values and the values are probabilities
@@ -17252,7 +17551,7 @@ class State(object):
         self.env._trace = savetrace
         self.value = _SystemMonitor(name="Value of " + self.name(), level=True, initial_tally=value, monitor=monitor, type=type, env=self.env)
         if self.env._trace:
-            self.env.print_trace("", "", self.name() + " create", "value= " + str(self._value))
+            self.env.print_trace("", "", self.name() + " create", "value = " + repr(self._value))
         self.setup(*args, **kwargs)
 
     def setup(self):
@@ -17416,7 +17715,7 @@ class State(object):
         This method is identical to reset, except the default value is True.
         """
         if self.env._trace:
-            self.env.print_trace("", "", self.name() + " set", "value = " + str(value))
+            self.env.print_trace("", "", self.name() + " set", "value = " + repr(value))
         if self._value != value:
             self._value = value
             self.value.tally(value)
@@ -17438,7 +17737,7 @@ class State(object):
         This method is identical to set, except the default value is False.
         """
         if self.env._trace:
-            self.env.print_trace("", "", self.name() + " reset", "value = " + str(value))
+            self.env.print_trace("", "", self.name() + " reset", "value = " + repr(value))
         if self._value != value:
             self._value = value
             self.value.tally(value)
@@ -17656,7 +17955,7 @@ class Resource(object):
         if True (default), the requesters queue, the claimers queue,
         the capacity, the available_quantity and the claimed_quantity are monitored |n|
         if False, monitoring is disabled.
-        
+
     env : Environment
         environment to be used |n|
         if omitted, default_env is used
@@ -18944,6 +19243,7 @@ class _AnimateIntro(Animate3dBase):
         self.lights_light = None
         self.lights_pname = None
         self.lights_param = (-1, -1, 1, 0)
+        self.lag = 1
 
         self.register_dynamic_attributes("field_of_view_y z_near z_far x_eye y_eye z_eye x_center y_center z_center")
         self.register_dynamic_attributes("model_lights_pname model_lights_param lights_light lights_pname lights_param")
@@ -19226,7 +19526,7 @@ class Animate3dObj(Animate3dBase):
                 os.chdir(obj_file_path)
                 for f in obj_file:
                     if f.startswith("mtllib "):
-                        mtllib_filename = Path(l[7:].strip())
+                        mtllib_filename = Path(f[7:].strip())
                         if mtllib_filename.is_file():
                             create_materials = True
                         break
@@ -20852,18 +21152,19 @@ def default_env():
 def over3d(val=True):
     """
     context manager to change temporarily default_over3d
-    
+
     Parameters
     ----------
     val : bool
-        temporary value of default_over3d
+        temporary value of default_over3d |n|
         default: True
-        
+
     Notes
     -----
-    Use as |n|
-    with over3d(): |n|
-        an = AnimateText('test')       
+    Use as ::
+    
+        with over3d():
+            an = AnimateText('test')       
     """
     save_default_over3d = default_over3d()
     default_over3d(val)
@@ -20877,12 +21178,12 @@ _default_over3d = False
 def default_over3d(val=None):
     """
     Set default_over3d
-    
+
     Parameters
     ----------
     val : bool
         if not None, set the default_over3d to val
-        
+
     Returns
     -------
     Current (new) value of default_over3d

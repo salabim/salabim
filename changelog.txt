@@ -1,5 +1,137 @@
 salabim changelog
 
+version 22.0.1  2022-02-12
+==========================
+
+Added functionality (0)
+-----------------------
+Monitors now have an x_map method, which makes it possible to create a new monitor:
+- for non level monitors: apply a function to each x-value
+- for level monitors: apply a function to several x-values
+Examples:
+    q = sim.Queue()
+    ...
+    stay_in_hours = q.length_of_stay.x_map(lambda x: x * 3600)
+    
+    containers20 = sim.Monitor(level=True)
+    containers40 = sim.Monitor(level=True)
+    ...
+    teu = containers20.map(lambda n20, n40: (n20 + 2 * n40) / (n1 + n2), monitors=[containers40], name="teu")
+    
+Also new for this version is t_multiply for level monitors.
+With this method, all t values will be multiplied with a given, positive factor.
+Example:
+    m = sim.Monitor('m', level=True)
+    m.tally(1)
+    env.run(1)
+    m.tally(2)
+    env.run(1)
+    m.tally(3)
+    env.run(8)
+    print(m.bin_duration(2, 3))
+    m10 = m.t_multiply(10)
+    print(m10.bin_duration(2, 3))
+will print
+    8.0
+    80.0    
+        
+Added functionality (1)
+-----------------------
+The method Component.line_number() will return the line_number in the process where the
+component will become current next.
+This can be extremely useful when debugging a complex model by observing the animation.
+For data components, the string "N/A" will be returned.
+
+Added functionality (2)
+------------------------
+The method Environment.camera_auto_print() can be used to enable/disable printing
+of the changed camera parameters on a given key.
+If this parameter is True, the method camera_print will be called upon each and every camera
+control key, like Up, z, Ctrl-Down, etc.
+This is useful to make the specification for Environment.camera_move() method (see below).
+
+The output of camera_print, now also includes a timestamp (as a comment), like 
+    view(x_eye=-102.5950, y_eye=-97.3592, z_eye=100, x_center=50, y_center=50, z_center=0, field_of_view_y=50)  # t=0
+    view(x_eye=-200,y_eye=-200)  # t=2
+    view(x_eye=-100,y_eye=-100)  # t=5
+    
+Added functionality (3)
+-----------------------
+The new method Environment.camera_move() can be used to automatically follow a number of recorded
+camera positions. These are usualy recorded with Environment.camera_camera_auto_print(True).
+The captured output can be used as a specification to this method.
+The movement will be lagged by the (simulation) time specified with lag, so a nice smooth movement
+is the result, which is particularly useful for presentation quality videos.
+
+Normally, the spec parameter will be a triple quoted string, like:
+    env.camera_move("""\
+view(x_eye=-102.5950, y_eye=-97.3592, z_eye=100, x_center=50, y_center=50, z_center=0, field_of_view_y=50)  # t=0
+view(x_eye=-200,y_eye=-200)  # t=2
+view(x_eye=-100,y_eye=-100)  # t=5
+""", lag=1.5)
+
+Added functionality (4)
+-----------------------
+It is now possible to make the tkinter animation window invisible with the visible parameter of
+Environment.animation():
+    env.animation_parameters(visible=False)
+The same can be realized with Environment.visible:
+    env.visible(False)
+With the latter method, you can also query the current status.
+
+This functionality can be useful when doing realtime simulations with a custom GUI or similar.
+
+Added functionality (5)
+-----------------------
+It is now possible to exclude certain animation objects from a video by setting 
+visible to "not in video". Those animation objects are still shown in the normal animation window. 
+E.g.
+    sim.AnimateText(text="this will be visible in the animation window, but not in the video", x=10, y=10, visible="not in video")
+
+Similarly, it also possible to exclude certain animation objects from the animation
+window, but leave it in the video.
+E.g.
+    sim.AnimateText(text="this will be visible in the video, but not in the animation window", x=10, y=10, visible="only in video")
+
+Note that this functionality does not apply to 3D animation objects (including over3d animation objects).
+
+Added functionality (6)
+-----------------------
+The method Environment.is_videoing() can be used to check whether a video is being recorded.
+This can be useful when running dependent on whether a video is recorded. E.g.
+    filename = ... # if filename == "", run infinitely, otherwise, run for 5 time units.
+    with video(filename):
+        if env.is_videoing():
+            env.run(5)
+        else:
+            env.run(sim.inf)
+    
+Improved functionality (0)
+--------------------------
+The trace facility now also shows the (next) line number for passivate and standby calls.
+The same holds for components that are being interrupted or resumed.
+
+Improved functionality (1)
+--------------------------
+The value of a state in the trace is now printed with repr() instead of str(), so it's easier to
+see the value (particularly for the null string of strings with only blanks), e.g.
+   32                                  s2 create                            value = ''
+instead of
+   32                                  s2 create                            value = 
+
+Bugfix (0)
+----------
+A bug in Monitor.sysweight() made that Monitor.x() didn't work properly. Fixed.
+
+Bugfix (1)
+----------
+The line number of an activated process that was not a generator object (i.e. without a yield) was misaligned. Fixed.
+
+Documentation fix (0)
+---------------------
+In several Animation classes the text_offsetx and text_offsety parameters were incorrectly documented as
+textoffsetx and textoffsety. Fixed.
+
 version 22.0.0  2022-01-09
 ==========================
 Added functionality (0)
@@ -66,7 +198,7 @@ when a video is being recorded.
 
 Changed functionality (3)
 ------------------------
-When a simulation raised a SimulationStopped exception, a video being recorder will be closed automatically.
+When a simulation raised a SimulationStopped exception, a video being recorded will be closed automatically.
 
 Added functionality (0)
 -----------------------
