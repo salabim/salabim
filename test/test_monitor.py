@@ -147,7 +147,7 @@ def test_monitor2():
     env.m.tally(2)
     env.m.tally(8)
 
-    assert env.m.mean() == pytest.approx(10/11)
+    assert env.m.mean() == pytest.approx(10 / 11)
     assert env.m.percentile(95) == pytest.approx(5)
     assert env.m.maximum() == 8
     assert env.m.minimum() == 0
@@ -217,11 +217,12 @@ def test_monitor4():
     with pytest.raises(NotImplementedError):
         env.x[True].ml(0.5)
 
+
 def test_monitor_5():
     env = sim.Environment()
     r = sim.Resource()
     s = sim.State()
-    q=sim.Queue()
+    q = sim.Queue()
     all_monitors = r.all_monitors() + s.all_monitors() + q.all_monitors()
     assert len(all_monitors) == 8 + 3 + 2
     for m in all_monitors:
@@ -232,31 +233,31 @@ def test_monitor_5():
 
     for m in all_monitors:
         assert m.stats_only()
-        
+
+
 def test_percentile():
     class X(sim.Component):
-
         def process(self):
-            for value in (4,1,1,3,6,3,0,7,2,2):
+            for value in (4, 1, 1, 3, 6, 3, 0, 7, 2, 2):
                 env.ml.tally(value)
                 env.m.tally(value)
                 yield self.hold(1)
 
     env = sim.Environment()
 
-    env.m=sim.Monitor()
+    env.m = sim.Monitor()
     assert math.isnan(env.m.percentile(0))
-    env.ml=sim.Monitor(level=True)
-    assert env.ml.percentile(0)==0
-    env.ml=sim.Monitor(level=True, initial_tally=7)
-    assert env.ml.percentile(0)==7    
+    env.ml = sim.Monitor(level=True)
+    assert env.ml.percentile(0) == 0
+    env.ml = sim.Monitor(level=True, initial_tally=7)
+    assert env.ml.percentile(0) == 7
     env.m.tally(1)
     assert env.m.percentile(0) == env.m.percentile(50) == env.m.percentile(100) == env.m.percentile(-1) == env.m.percentile(101) == 1
     env.ml.tally(1)
     assert env.ml.percentile(0) == env.ml.percentile(50) == env.ml.percentile(100) == env.ml.percentile(-1) == env.ml.percentile(101) == 1
 
-    env.m=sim.Monitor()
-    env.ml=sim.Monitor(level=True)
+    env.m = sim.Monitor()
+    env.ml = sim.Monitor(level=True)
     X()
     env.run(10)
     env.m.tally(15)
@@ -274,10 +275,10 @@ def test_percentile():
     with pytest.raises(ValueError):
         env.m.percentile(5, interpolation="closest") == 1
 
-    assert env.ml.percentile(5)==0
-    assert env.ml.percentile(15)==1
-    assert env.ml.percentile(95)==7
-    assert env.ml.percentile(10)==0.5
+    assert env.ml.percentile(5) == 0
+    assert env.ml.percentile(15) == 1
+    assert env.ml.percentile(95) == 7
+    assert env.ml.percentile(10) == 0.5
     assert env.ml.percentile(10, interpolation="lower") == 0
     assert env.ml.percentile(10, interpolation="higher") == 1
     assert env.ml.percentile(10, interpolation="midpoint") == 0.5
@@ -325,6 +326,7 @@ def test_pickle():
     assert env.ml.maximum() == 100
 
     assert env.m.mean() == pytest.approx(50)
+    assert env.m.median() == pytest.approx(50)
     assert env.m.percentile(95) == 95
     assert env.m.maximum() == 100
     assert env.m.minimum() == 0
@@ -514,5 +516,50 @@ interrupted                  4       8   ******
     )
 
 
+def test_map():
+    class X1(sim.Component):
+        def process(self):
+            m1.tally("x1.0")
+            yield self.hold(2)
+            m1.tally("x1.2")
+            yield self.hold(2)
+            m1.tally("x1.4")
+
+    class X2(sim.Component):
+        def process(self):
+            yield self.hold(1)
+            m2.tally("x2.1")
+            yield self.hold(1)
+            m2.tally("x2.3")
+            yield self.hold(1)
+            m2.tally("x2.4")
+
+    class M2Spoiler(sim.Component):
+        def process(self):
+            yield self.hold(1.5)
+            m2.monitor(False)
+            yield self.hold(2)
+            m2.monitor(True)
+
+    inf = sim.inf
+    env = sim.Environment()
+    X1()
+    X2()
+    M2Spoiler()
+    m = sim.Monitor("m", level=False)
+    m.tally(45.6)
+    m.tally(6)
+    m.tally(5.8)
+    m1 = sim.Monitor("m1", level=True, initial_tally="x1.0")
+    m2 = sim.Monitor("m2", level=True, initial_tally="x2.0")
+    env.run(10)
+    m3 = m1.x_map(lambda x1, x2: f"({x1},{x2})", [m2])
+    assert m3.xt(force_numeric=False) == (
+        ["(x1.0,x2.0)", "(x1.0,x2.1)", -inf, -inf, "(x1.2,x2.4)", "(x1.4,x2.4)", -inf, -inf],
+        array("d", [0.0, 1.0, 1.5, 2.0, 3.5, 4.0, 10.0, 10.0]),
+    )
+    assert m.x_map(int).x() == [45, 6, 5]
+
+
 if __name__ == "__main__":
-    pytest.main(["-vv", "-s", "-x",  __file__])
+    pytest.main(["-vv", "-s", "-x", __file__])
