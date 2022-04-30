@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \    / |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |   | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _ | |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_)|_|
+#               _         _      _               ____   ____       ___      ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \    |___ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |     __) |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _  / __/
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_)|_____|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "22.0.1"
+__version__ = "22.0.2"
 import heapq
 import random
 import time
@@ -37,6 +37,7 @@ import platform
 import functools
 import traceback
 import contextlib
+import datetime
 
 from pathlib import Path
 
@@ -501,7 +502,7 @@ class Monitor(object):
             name = "mapped"
 
         if not self._level:
-            raise TypeErrror("t_multiply can't be applied to non level monitors")
+            raise TypeError("t_multiply can't be applied to non level monitors")
 
         if factor <= 0:
             raise TypeError(f"factor {factor} <= 0")
@@ -625,7 +626,7 @@ class Monitor(object):
         """
         self._block_stats_only()
         self_env = self.env
-        self.env = Environment(to_freeze=True, name=self.env.name() + ".copy", time_unit=self.env.get_time_unit())
+        self.env = Environment(to_freeze=True, name=self.env.name() + ".copy.", time_unit=self.env.get_time_unit())
         m = copy.deepcopy(self)
         self.env = self_env
         m.isgenerated = True
@@ -3257,10 +3258,10 @@ if Pythonista:
                 if not env.paused:
                     env.frametimes.append(time.time())
                 touchvalues = self.touches.values()
-                if env.retina:
+                if env.retina > 1:
                     with io.BytesIO() as fp:
                         env._capture_image("RGB").save(fp, "BMP")
-                        img = ui.Image.from_data(fp.getvalue(), scene.get_screen_scale())
+                        img = ui.Image.from_data(fp.getvalue(), env.retina)
                     if self.bg is None:
                         self.bg = scene.SpriteNode(scene.Texture(img))
                         self.add_child(self.bg)
@@ -4882,6 +4883,12 @@ class Environment(object):
         "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds", "n/a" |n|
         default: "n/a"
 
+    datetime0: bool or datetime.datetime
+        display time and durations as datetime.datetime/datetime.timedelta |n|
+        if falsy (default), disabled |n|
+        if True, the t=0 will correspond to 1 January 1970 |n|
+        if no time_unit is specified, but datetime0 is not falsy, time_unit will be set to seconds
+
     name : str
         name of the environment |n|
         if the name ends with a period (.),
@@ -4907,7 +4914,7 @@ class Environment(object):
         If numpy is not installed, this parameter is ignored |n|
         if False, numpy.random.seed is not called.
 
-    reset : bool
+    do_reset : bool
         if True, reset the simulation environment |n|
         if False, do not reset the simulation environment |n|
         if None (default), reset the simulation environment when run under Pythonista, otherwise no reset
@@ -4936,6 +4943,7 @@ class Environment(object):
         random_seed=None,
         set_numpy_random_seed=True,
         time_unit="n/a",
+        datetime0=False,
         name=None,
         print_trace_header=True,
         isdefault_env=True,
@@ -4945,7 +4953,6 @@ class Environment(object):
         *args,
         **kwargs
     ):
-
         if name is None:
             if isdefault_env:
                 name = "default environment"
@@ -4953,6 +4960,9 @@ class Environment(object):
         self._nameserializeMonitor = {}  # required here for to_freeze functionality
         self._time_unit = _time_unit_lookup(time_unit)
         self._time_unit_name = time_unit
+        if datetime0 is None:
+            datetime0 = False
+        self.datetime0(datetime0)
         if "to_freeze" in kwargs:
             self.isfrozen = True
             return
@@ -5033,14 +5043,13 @@ class Environment(object):
         if Pythonista:
             self._width, self._height = ui.get_screen_size()
             if retina:
-                self._width = int(self._width) * 2
-                self._height = int(self._height) * 2
-                self.retina = True
+                self.retina = int(scene.get_screen_scale())
             else:
-                self._width = int(self._width)
-                self._height = int(self._height)
-                self.retina = False
+                self.retina = 1
+            self._width = int(self._width) * self.retina
+            self._height = int(self._height) * self.retina
         else:
+            self.retina = 1  # not sure whether this is required
             self._width = 1024
             self._height = 768
         self.root = None
@@ -5179,13 +5188,13 @@ class Environment(object):
         ----------
         spec : str
             output normally obtained from camera_auto_print lines
-            
+
         lag : float
             lag time (for smooth camera movements) (default: 1))
 
         offset : float
             the duration (can be negative) given is added to the times given in spec. Default: 0 
-            \
+
         enabled : bool
             if True (default), move camera according to spec/lag |n|
             if False, freeze camera movement
@@ -5355,7 +5364,7 @@ class Environment(object):
             if None (default), no action |n|
             if True, camera_print will be called on each camera control keypress |n|
             if False, no automatic camera_print
-            
+
         Returns
         -------
         Current status : bool
@@ -5551,20 +5560,18 @@ class Environment(object):
             if self._trace and not self._suppress_trace_linenumbers:
                 gi_code = c._process.gi_code
                 gs = inspect.getsourcelines(gi_code)
-                s0 = self.filename_lineno_to_str(gi_code.co_filename, len(gs[0]) + gs[1] - 1) + "+"
+                s0 = c.overridden_lineno or self.filename_lineno_to_str(gi_code.co_filename, len(gs[0]) + gs[1] - 1) + "+"
             else:
                 s0 = None
         else:
             if self._trace and not self._suppress_trace_linenumbers:
                 gs = inspect.getsourcelines(c._process)
-                s0 = self.filename_lineno_to_str(c._process.__code__.co_filename, len(gs[0]) + gs[1] - 1) + "+"
+                s0 = c.overridden_lineno or self.filename_lineno_to_str(c._process.__code__.co_filename, len(gs[0]) + gs[1] - 1) + "+"
             else:
                 s0 = None
         for r in list(c._claims):
             c._release(r, s0=s0)
         if self._trace:
-            if c.overridden_lineno:
-                s0 = c.overridden_lineno
             self.print_trace("", "", c.name() + " ended", s0=s0)
         c.status._value = data
         c._scheduled_time = inf
@@ -6913,7 +6920,7 @@ class Environment(object):
     def is_videoing(self):
         """
         video recording status
-        
+
         returns
         -------
         video recording status : bool |n|
@@ -7177,6 +7184,10 @@ class Environment(object):
         if self._trace:
             self.print_trace("", "", f"now reset to {new_now:0.3f}", f"(all times are reduced by {(self._offset - offset_before):0.3f})")
 
+        if self._datetime0:
+            self._datetime0 += datetime.timedelta(seconds=self.to_seconds(self._offset - offset_before))
+            self.print_trace("", "", "", f"(t=0 ==> to {self.time_to_str(0)})")
+
     def trace(self, value=None):
         """
         trace status
@@ -7261,7 +7272,7 @@ class Environment(object):
         """
         return self._current_component
 
-    def run(self, duration=None, till=None, priority=inf, urgent=False):
+    def run(self, duration=None, till=None, priority=inf, urgent=False, cap_now=None):
         """
         start execution of the simulation
 
@@ -7292,6 +7303,10 @@ class Environment(object):
             in front of all components scheduled
             for the same time and priority
 
+        cap_now : bool
+            indicator whether times (till, duration) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+
         Note
         ----
         if neither till nor duration is specified, the main component will be reactivated at
@@ -7299,7 +7314,6 @@ class Environment(object):
         if you want to run till inf (particularly when animating), issue run(sim.inf) |n|
         only issue run() from the main level
         """
-
         self.end_on_empty_eventlist = False
         extra = ""
         if till is None:
@@ -7324,7 +7338,7 @@ class Environment(object):
 
         self._main.frame = _get_caller_frame()
         self._main.status._value = scheduled
-        self._main._reschedule(scheduled_time, priority, urgent, "run", extra=extra)
+        self._main._reschedule(scheduled_time, priority, urgent, "run", cap_now, extra=extra)
 
         self.running = True
         while self.running:
@@ -7628,7 +7642,7 @@ class Environment(object):
         else:
             fillcolor = "red"
             color = "white"
-        uio = AnimateButton(x=38 + 5 * 60, y=-21, text="Stop", width=50, action=self.env.quit, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
+        uio = AnimateButton(x=38 + 5 * 60, y=-21, text="Stop", width=50, action=self.env.an_quit, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
         uio.in_topleft = True
 
         uio = Animate(x0=38 + 3 * 60, y0=-35, text="", anchor="N", fontsize0=15, screen_coordinates=True, xy_anchor="nw")
@@ -7838,7 +7852,7 @@ class Environment(object):
                                 self._audio.play(start=start_time)
 
     def xy_anchor_to_x(self, xy_anchor, screen_coordinates, over3d=False, retina_scale=False):
-        scale = 2 if (retina_scale and self.retina) else 1
+        scale = self.retina if (retina_scale and self.retina > 1) else 1
         if over3d:
             width = self._width3d
         else:
@@ -7864,7 +7878,7 @@ class Environment(object):
         raise ValueError("incorrect xy_anchor", xy_anchor)
 
     def xy_anchor_to_y(self, xy_anchor, screen_coordinates, over3d=False, retina_scale=False):
-        scale = 2 if (retina_scale and self.retina) else 1
+        scale = self.retina if (retina_scale and self.retina > 1) else 1
         if over3d:
             height = self._height3d
         else:
@@ -8296,7 +8310,7 @@ class Environment(object):
         self._check_time_unit_na()
         if callable(t):
             t = t()
-        return t * _time_unit_lookup(time_unit) / self.env._time_unit
+        return t * _time_unit_lookup(time_unit) / self._time_unit
 
     def to_years(self, t):
         """
@@ -8506,7 +8520,6 @@ class Environment(object):
         ----
         if self.trace is False, nothing is printed |n|
         if the current component's suppress_trace is True, nothing is printed |n|
-
         """
         len_s1 = len(self.time_to_str(0))
         if self._trace:
@@ -8551,12 +8564,18 @@ class Environment(object):
         Returns
         -------
         t in required format : str
-            default: f"{t:10.3f}"
+            default: f"{t:10.3f}" if datetime0 is False |n|
+            or date in the format "Day YYYY-MM-DD hh:mm:dd" otherwise
 
         Note
         ----
         May be overrridden. Make sure that the method always returns the same length!
         """
+        if self._datetime0:
+            if t == inf:
+                return f"{'inf':23}"
+            date = self.t_to_datetime(t)
+            return f"{('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')[date.weekday()]} {date.strftime('%Y-%m-%d %H:%M:%S')}"
         return f"{t:10.3f}"
 
     def duration_to_str(self, duration):
@@ -8569,14 +8588,135 @@ class Environment(object):
         Returns
         -------
         duration in required format : str
-            default: f"{duration:.3f}"
+            default: f"{duration:.3f}" if datetime0 is False
+            or duration in the format "hh:mm:dd" or "d hh:mm:ss"
 
         Note
         ----
         May be overrridden.
         """
-
+        if self._datetime0:
+            if duration == inf:
+                return "inf"
+            duration = self.to_seconds(duration)
+            days, rem = divmod(duration, 86400)
+            hours, rem = divmod(rem, 3600)
+            minutes, seconds = divmod(rem, 60)
+            if days:
+                return f"{int(days)} {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
+            else:
+                return f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
         return f"{duration:.3f}"
+
+    def datetime_to_t(self, datetime):
+        """
+        Parameters
+        ----------
+        datetime : datetime.datetime
+
+        Returns
+        -------
+        datetime translated to simulation time in the current time_unit : float
+
+        Raises
+        ------
+        ValueError
+            if datetime0 is False
+        """
+        if self._datetime0:
+            return self.seconds(datetime - self._datetime0).total_seconds()
+        raise ValueError("datetime_to_t only possible if datetime0 is given")
+
+    def timedelta_to_duration(self, timedelta):
+        """
+        Parameters
+        ----------
+        timedelta : datetime.timedelta
+
+        Returns
+        -------
+        timedelta translated to simulation duration in the current time_unit : float
+
+        Raises
+        ------
+        ValueError
+            if datetime0 is False
+        """
+        if self._datetime0:
+            return self.seconds(timedelta.total_seconds())
+        raise ValueError("timestamp_to_duration only possible if datetime0 is given")
+
+    def t_to_datetime(self, t):
+        """
+        Parameters
+        ----------
+        t : float
+            time to convert
+
+        Returns
+        -------
+        t (in the current time unit) translated to the corresponding datetime : float
+
+        Raises
+        ------
+        ValueError
+            if datetime0 is False
+        """
+        if self._datetime0:
+            if t == inf:
+                return t
+            return self._datetime0 + datetime.timedelta(seconds=self.to_seconds(t))
+        raise ValueError("datetime_to_t only possible if datetime0 is given")
+
+    def duration_to_timedelta(self, duration):
+        """
+        Parameters
+        ----------
+        duration : float
+
+        Returns
+        -------
+        timedelta corresponding to duration : datetime.timedelta
+
+        Raises
+        ------
+        ValueError
+            if time unit is not set
+        """
+        if self._time_unit:
+            return datetime.timedelta(seconds=self.to_seconds(duration))
+        raise ValueError("timestamp_to_duration only possible if time unit is given")
+
+    def datetime0(self, datetime0=None):
+        """
+        Gets and/or sets datetime0
+
+        Parameters
+        ----------
+        datetime0: bool or datetime.datetime
+            if omitted, nothing will be set |n|
+            if falsy, disabled |n|
+            if True, the t=0 will correspond to 1 January 1970 |n|
+            if no time_unit is specified, but datetime0 is not falsy, time_unit will be set to seconds
+            
+        Returns
+        -------
+        current value of datetime0 : bool or datetime.datetime
+        """
+        if datetime0 is not None:
+            if datetime0:
+                if datetime0 == True:
+                    self._datetime0 = datetime.datetime(1970, 1, 1)
+                else:
+                    if not isinstance(datetime0, datetime.datetime):
+                        raise ValueError(f"datetime0 should be datetime.datetime or True, not {type(datetime0)}")
+                    self._datetime0 = datetime0
+                if self._time_unit is None:
+                    self._time_unit = _time_unit_lookup("seconds")
+                    self._time_unit_name = "seconds"
+            else:
+                self._datetime0 = False
+        return self._datetime0
 
     def beep(self):
         """
@@ -12813,6 +12953,10 @@ class Component(object):
         if omitted, the mode will be "". |n|
         also mode_time will be set to now.
 
+    cap_now : bool
+        indicator whether times (at, delay) in the past are allowed. If, so now() will be used.
+        default: sys.default_cap_now(), usualy False        
+
     env : Environment
         environment where the component is defined |n|
         if omitted, default_env will be used
@@ -12832,6 +12976,7 @@ class Component(object):
         suppress_pause_at_step=False,
         skip_standby=False,
         mode="",
+        cap_now=None,
         env=None,
         **kwargs
     ):
@@ -12927,7 +13072,7 @@ class Component(object):
                     at = at()
                 scheduled_time = at + self.env._offset + delay
             self.status._value = scheduled
-            self._reschedule(scheduled_time, priority, urgent, "activate", extra=extra)
+            self._reschedule(scheduled_time, priority, urgent, "activate", cap_now, extra=extra)
         self.setup(**kwargs)
 
     def __del__(self):
@@ -13131,9 +13276,9 @@ class Component(object):
         result.append("  suppress_pause_at_step=" + str(self._suppress_pause_at_step))
         result.append("  status=" + self.status())
         result.append("  mode=" + self.mode())
-        result.append("  mode_time=" + self.env.time_to_str(self._mode_time))
-        result.append("  creation_time=" + self.env.time_to_str(self._creation_time))
-        result.append("  scheduled_time=" + self.env.time_to_str(self._scheduled_time))
+        result.append("  mode_time=" + self.env.time_to_str(self.mode_time()))
+        result.append("  creation_time=" + self.env.time_to_str(self.creation_time()))
+        result.append("  scheduled_time=" + self.env.time_to_str(self.scheduled_time()))
         if len(self._qmembers) > 0:
             result.append("  member of queue(s):")
             for q in sorted(self._qmembers, key=lambda obj: obj.name().lower()):
@@ -13209,9 +13354,14 @@ class Component(object):
             self._waits = []
             self._failed = True
 
-    def _reschedule(self, scheduled_time, priority, urgent, caller, extra="", s0=None):
+    def _reschedule(self, scheduled_time, priority, urgent, caller, cap_now, extra="", s0=None):
         if scheduled_time < self.env._now:
-            raise ValueError(f"scheduled time ({scheduled_time:0.3f}) before now ({self.env._now:0.3f})")
+            if cap_now is None:
+                cap_now = _default_cap_now
+            if cap_now:
+                scheduled_time = self.env._now
+            else:
+                raise ValueError(f"scheduled time ({scheduled_time:0.3f}) before now ({self.env._now:0.3f})")
         self._scheduled_time = scheduled_time
         if scheduled_time != inf:
             self._push(scheduled_time, priority, urgent)
@@ -13234,7 +13384,7 @@ class Component(object):
                 s0=s0,
             )
 
-    def activate(self, at=None, delay=0, priority=0, urgent=False, process=None, keep_request=False, keep_wait=False, mode=None, **kwargs):
+    def activate(self, at=None, delay=0, priority=0, urgent=False, process=None, keep_request=False, keep_wait=False, mode=None, cap_now=None, **kwargs):
         """
         activate component
 
@@ -13283,6 +13433,10 @@ class Component(object):
             this affects only components that are waiting. |n|
             if True, the waits will be kept and thus the status will remain waiting |n|
             if False (the default), the wait(s) will be canceled and the status will become scheduled
+
+        cap_now : bool
+            indicator whether times (at, delay) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
 
         mode : str preferred
             mode |n|
@@ -13355,9 +13509,9 @@ class Component(object):
             scheduled_time = at + self.env._offset + delay
 
         self.status._value = scheduled
-        self._reschedule(scheduled_time, priority, urgent, "activate", extra=extra)
+        self._reschedule(scheduled_time, priority, urgent, "activate", cap_now, extra=extra)
 
-    def hold(self, duration=None, till=None, priority=0, urgent=False, mode=None):
+    def hold(self, duration=None, till=None, priority=0, urgent=False, mode=None, cap_now=None):
         """
         hold the component
 
@@ -13396,6 +13550,10 @@ class Component(object):
             if nothing specified, the mode will be unchanged. |n|
             also mode_time will be set to now, if mode is set.
 
+        cap_now : bool
+            indicator whether times (duration, till) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+
         Note
         ----
         if to be used for the current component, use ``yield self.hold(...)``. |n|
@@ -13426,7 +13584,7 @@ class Component(object):
             else:
                 raise ValueError("both duration and till specified")
         self.status._value = scheduled
-        self._reschedule(scheduled_time, priority, urgent, "hold")
+        self._reschedule(scheduled_time, priority, urgent, "hold", cap_now)
 
     def passivate(self, mode=None):
         """
@@ -13558,7 +13716,7 @@ class Component(object):
                         reason = "request"
                     elif self.status.value == scheduled:
                         reason = "hold"
-                    self._reschedule(self.env._now + self._remaining_duration, priority, urgent, reason)
+                    self._reschedule(self.env._now + self._remaining_duration, priority, urgent, reason, False)
                 else:
                     raise Exception(self.name() + " unexpected interrupted_status", self.status.value())
         else:
@@ -13682,6 +13840,10 @@ class Component(object):
             if nothing specified, the mode will be unchanged. |n|
             also mode_time will be set to now, if mode is set.
 
+        cap_now : bool
+            indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False            
+
         Note
         ----
         Not allowed for data components or main.
@@ -13714,6 +13876,7 @@ class Component(object):
         mode = kwargs.pop("mode", None)
         urgent = kwargs.pop("urgent", False)
         schedule_priority = kwargs.pop("priority", 0)
+        cap_now = kwargs.pop("cap_now", None)
 
         self.oneof_request = kwargs.pop("oneof", False)
         called_from = kwargs.pop("called_from", "request")
@@ -13814,7 +13977,7 @@ class Component(object):
 
         if self._requests:
             self.status._value = requesting
-            self._reschedule(scheduled_time, schedule_priority, urgent, "request")
+            self._reschedule(scheduled_time, schedule_priority, urgent, "request", cap_now)
 
     def isbumped(self, resource=None):
         """
@@ -13940,7 +14103,7 @@ class Component(object):
             self._remove()
             honoredstr = r_honor[0].name() + (len(r_honor) > 1) * " ++"
             self.status._value = scheduled
-            self._reschedule(self.env._now, 0, False, "request honor " + honoredstr, s0=self.env.last_s0)
+            self._reschedule(self.env._now, 0, False, "request honor " + honoredstr, False, s0=self.env.last_s0)
             for r in anonymous_resources:
                 r._tryrequest()
             return True
@@ -14077,6 +14240,10 @@ class Component(object):
             if nothing specified, the mode will be unchanged. |n|
             also mode_time will be set to now, if mode is set.
 
+        cap_now : bool
+            indicator whether times (fail_at, fail_duration) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+
         Note
         ----
         Not allowed for data components or main.
@@ -14127,6 +14294,7 @@ class Component(object):
         mode = kwargs.pop("mode", None)
         urgent = kwargs.pop("urgent", False)
         schedule_priority = kwargs.pop("priority", 0)
+        cap_now = kwargs.pop("cap_now", None)
 
         if kwargs:
             raise TypeError("wait() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
@@ -14199,7 +14367,7 @@ class Component(object):
 
         if self._waits:
             self.status._value = waiting
-            self._reschedule(scheduled_time, schedule_priority, urgent, "wait")
+            self._reschedule(scheduled_time, schedule_priority, urgent, "wait", cap_now)
 
     def _trywait(self):
         if self.status.value == interrupted:
@@ -14243,7 +14411,7 @@ class Component(object):
             self._waits = []
             self._remove()
             self.status._value = scheduled
-            self._reschedule(self.env._now, 0, False, "wait honor", s0=self.env.last_s0)
+            self._reschedule(self.env._now, 0, False, "wait honor", False, s0=self.env.last_s0)
 
         return honored
 
@@ -14893,7 +15061,7 @@ class Component(object):
                 raise ValueError("setting remaining_duration not allowed for standby component (" + self.name() + ")")
             else:
                 self._remove()
-                self._reschedule(value + self.env._now, priority, urgent, "set remaining_duration", extra="")
+                self._reschedule(value + self.env._now, priority, urgent, "set remaining_duration", False, extra="")
 
         if self.status.value in (passive, interrupted):
             return self._remaining_duration
@@ -15030,7 +15198,7 @@ class ComponentGenerator(Component):
     ----------
     component_class : callable, usually a subclass of Component or Pdf or Cdf distribution
         the type of components to be generated |n|
-        in case of a distribution, the Pdf or Cdf should return a subclass of Component
+        in case of a distribution, the Pdf or Cdf should return a callable
 
     generator_name : str
         name of the component generator. |n|
@@ -15081,6 +15249,12 @@ class ComponentGenerator(Component):
         if False (default), no force for time = till |n|
         if True, force the last generated component at time = till |n|
 
+    disturbance : callable (usually a distribution)
+        for each component to be generated, the disturbance call (sampling) is added
+        to the actual generation time. |n|
+        disturbance may only be used together with iat. The force_at parameter is not 
+        allowed in that case.
+
     suppress_trace : bool
         suppress_trace indicator |n|
         if True, the component generator events will be excluded from the trace |n|
@@ -15092,6 +15266,10 @@ class ComponentGenerator(Component):
         if True, if this component generator becomes current, do not pause when stepping |n|
         If False (default), the component generator will be paused when stepping |n|
         Can be queried or set later with the suppress_pause_at_step method.
+
+    cap_now : bool
+        indicator whether times (activation) in the past are allowed. If, so now() will be used.
+        default: sys.default_cap_now(), usualy False
 
     env : Environment
         environment where the component is defined |n|
@@ -15117,18 +15295,34 @@ class ComponentGenerator(Component):
         force_till=False,
         suppress_trace=False,
         suppress_pause_at_step=False,
+        disturbance=None,
+        #        cap_now=None,
         env=None,
         **kwargs
     ):
         if generator_name is None:
-            generator_name = str(component_class).split(".")[-1][:-2] + ".generator."
+            if inspect.isclass(component_class) and issubclass(component_class, Component):
+                generator_name = str(component_class).split(".")[-1][:-2] + ".generator."
+            elif isinstance(component_class, _Distribution):
+                generator_name = str(component_class) + ".generator."
+            else:
+                generator_name = component_class.__name__ + ".generator."
         if env is None:
             env = g.default_env
         self.overridden_lineno = env._frame_to_lineno(_get_caller_frame())
-        if not isinstance(component_class, _Distribution) and not issubclass(component_class, Component):
-            raise ValueError("component_class must be a Component subclass or distribution")
+
+        if not callable(component_class):
+            raise ValueError("component_class must be a callable")
         self.component_class = component_class
         self.iat = iat
+        self.disturbance = disturbance
+        self.force_at = force_at
+
+        if disturbance:  # falsy values are interpreted as no disturbance
+            if iat is None:
+                raise ValueError("disturbance can only be used with an iat")
+            if not issubclass(component_class, Component):
+                raise ValueError("component_class haas to be a Component subclass if disturbance is specified.")
         if callable(at):
             at = at()
         if callable(delay):
@@ -15167,6 +15361,8 @@ class ComponentGenerator(Component):
             if self.iat is None:
                 if till == inf or self.number == inf:
                     raise ValueError("iat not specified --> till and number need to be specified")
+                if disturbance is not None:
+                    raise ValueError("iat not specified --> disturbance not allowed")
 
                 samples = sorted([Uniform(at, till)() for _ in range(self.number)])
                 if force_at or force_till:
@@ -15187,15 +15383,19 @@ class ComponentGenerator(Component):
                 if force_till:
                     raise ValueError("force_till is not allowed for iat generators")
                 if not force_at:
-                    if callable(self.iat):
-                        at += self.iat()
-                    else:
-                        at += +self.iat
+                    if not self.disturbance:
+                        if callable(self.iat):
+                            at += self.iat()
+                        else:
+                            at += self.iat
                 if at > self.till:
                     at = self.till
                     process = "do_finalize"
                 else:
-                    process = "do_iat"
+                    if self.disturbance:
+                        process = "do_iat_disturbance"
+                    else:
+                        process = "do_iat"
         self.kwargs = kwargs
 
         super().__init__(name=generator_name, env=env, process=process, at=at, suppress_trace=suppress_trace, suppress_pause_at_step=suppress_pause_at_step)
@@ -15218,7 +15418,7 @@ class ComponentGenerator(Component):
                 self.component_class(**self.kwargs)
             n += 1
             if n >= self.number:
-                self.env.print_trace("", "", str(n) + " components generated")
+                self.env.print_trace("", "", f"{n} components generated")
                 return
             if callable(self.iat):
                 t = self.env._now + self.iat()
@@ -15226,6 +15426,36 @@ class ComponentGenerator(Component):
                 t = self.env._now + self.iat
             if t > self.till:
                 yield self.activate(process="do_finalize", at=self.till)
+
+            yield self.hold(till=t)
+
+    def do_iat_disturbance(self):
+        n = 0
+        while True:
+            if callable(self.iat):
+                iat = self.iat()
+            else:
+                iat = self.iat
+            if callable(self.disturbance):
+                disturbance = self.disturbance()
+            else:
+                disturbance = self.disturbance
+            if self.force_at:
+                at = self.env._now + disturbance
+            else:
+                at = self.env._now + iat + disturbance
+            if at > self.till:
+                yield self.activate(process="do_finalize", at=self.till)
+            if isinstance(self.component_class, _Distribution):
+                component_class = self.component_class()
+            else:
+                component_class = self.component_class
+            component_class(at=at, **self.kwargs)
+            n += 1
+            if n >= self.number:
+                self.env.print_trace("", "", str(n) + " components generated")
+                return
+            t = self.env._now + iat
 
             yield self.hold(till=t)
 
@@ -15260,9 +15490,9 @@ class ComponentGenerator(Component):
         result.append("  suppress_pause_at_step=" + str(self._suppress_pause_at_step))
         result.append("  status=" + self.status.value)
         result.append("  mode=" + self._modetxt().strip())
-        result.append("  mode_time=" + self.env.time_to_str(self._mode_time))
-        result.append("  creation_time=" + self.env.time_to_str(self._creation_time))
-        result.append("  scheduled_time=" + self.env.time_to_str(self._scheduled_time))
+        result.append("  mode_time=" + self.env.time_to_str(self.mode_time()))
+        result.append("  creation_time=" + self.env.time_to_str(self.creation_time()))
+        result.append("  scheduled_time=" + self.env.time_to_str(self.scheduled_time()))
         return return_or_print(result, as_str, file)
 
 
@@ -18949,6 +19179,56 @@ def interpolate(t, t0, t1, v0, v1):
         return _i(p, v0, v1)
 
 
+def interp(x, x_arr, y_arr):
+    """
+    linear interpolatation
+
+    Parameters
+    ----------
+    x : float
+        target x-value
+
+    x_arr : list of float
+        values on the x-axis
+
+    y_arr : list of float
+        values on the y-axis |n|
+        should be same length as x_arr
+
+    Returns
+    -------
+    interpolated value : float
+
+    Notes
+    -----
+    If x < x_arr[0], y_arr[0] will be returned |n|
+    If x > x_arr[-1], y_arr[-1] will be returned |n|
+
+    This function is similar to the numpy interp function. In fact,
+    if numpy is installed this function will use numpy.interp.
+    """
+    if len(x_arr) != len(y_arr):
+        raise ValueError("lengths of x_arr and y_arr are not the same")
+    if len(x_arr) == 0:
+        raise ValueError("length of x_arr and y_arr must be >0")
+
+    if has_numpy:
+        return numpy.interp(x, x_arr, y_arr)
+    xiprev = None
+    for xi, yi in zip(x_arr, y_arr):
+        if xi >= x:
+            break
+        xiprev = xi
+        yiprev = yi
+    else:
+        return yi
+
+    if xiprev is None:
+        return yi
+
+    return yiprev + (yi - yiprev) * (x - xiprev) / (xi - xiprev)
+
+
 def _set_name(name, _nameserialize, object):
     if name is None:
         name = object_to_str(object).lower() + "."
@@ -21162,7 +21442,7 @@ def over3d(val=True):
     Notes
     -----
     Use as ::
-    
+
         with over3d():
             an = AnimateText('test')       
     """
@@ -21192,6 +21472,52 @@ def default_over3d(val=None):
     if val is not None:
         _default_over3d = val
     return _default_over3d
+
+
+@contextlib.contextmanager
+def cap_now(val=True):
+    """
+    context manager to change temporarily default_cap_now
+
+    Parameters
+    ----------
+    val : bool
+        temporary value of default_cap_now |n|
+        default: True
+
+    Notes
+    -----
+    Use as ::
+
+        with cap_now():
+            an = AnimateText('test')       
+    """
+    save_default_cap_now = default_cap_now()
+    default_cap_now(val)
+    yield
+    default_cap_now(save_default_cap_now)
+
+
+_default_cap_now = False
+
+
+def default_cap_now(val=None):
+    """
+    Set default_cap_now
+
+    Parameters
+    ----------
+    val : bool
+        if not None, set the default_cap_now to val
+
+    Returns
+    -------
+    Current (new) value of default_cap_now
+    """
+    global _default_cap_now
+    if val is not None:
+        _default_cap_now = val
+    return _default_cap_now
 
 
 def reset():

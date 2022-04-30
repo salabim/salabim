@@ -1,5 +1,94 @@
 salabim changelog
 
+version 22.0.2  2022-04-30
+==========================
+Added functionality (0)
+-----------------------
+All methods that set a scheduled time now have a parameter cap_now:
+- Environment.run
+- Component.hold
+- Componentactivate
+- Component.request
+- Component.wait
+- creation of a new component
+
+Normally, a scheduled time in the past raises a exception.
+If cap_now is True, a scheduled time in the past will change that time into now. E.g.
+    yield self.hold(sim.Normal(2,1))
+would normally raise an exception after a couple of samples. But
+    yield self.hold(sim.Normal(2,1), cap_now=True) 
+would cap the negative samples to 0, thus avoiding an exception.
+Be careful using this feature as you might miss a serious problem.
+
+It is even possible to set cap_now globaly with sim.default_cap_now(True).
+
+And there's a context manager sim.cap_now to temporarily override the global default_cap_now:
+    with sim.cap_now():
+        yield self.hold(-1)
+This will hold for a duration of 0!
+
+The documentation has a section on this functionality, now.
+
+Added functionality (1)
+-----------------------
+The ComponentGenerator() class now suppports a disturbance for iat type generators.
+This can be very useful to define a recurring event (e.g. a regular arrival of a bus),
+which deviates from the 'timetable'. Like
+    sim.ComponentGenerator(Bus, iat=60, disturbance=sim.Uniform(-1, 5))
+
+Added functionality (2)
+-----------------------
+ComponentGenerator now supports any callable as the component_class.
+If disturbance is specified (see above), component_class has to be a subclass of
+ComponentClass, however.
+
+Added functionality (3)
+-----------------------
+The function interp offers the same basic functionality as numpy.interp. In fact it uses numpy if available.
+This can be very useful for animations where the location changes at certain point in time, like
+    AnimationRectangle((-10,-10,10,10), x=100, y=lambda t: sim.interp(t, (0,10,20,30),(100,200,500,1000)))
+
+Added functionality (4)
+-----------------------
+Salabim can now optionally show times and durations as dates/timedeltas. 
+Therefore, sim.Environment() had a new parameter datetime0.
+If datetime0 is set to True, the base date will be 1 January 1970. Alternatively, a
+datetime.datatime date can be given.
+Note that if no time unit is specified, and datetime0 is given, the time unit will
+be set to seconds automatically.
+If datetime0 is set, the methods Environment.time_to_str and Environment.duration_to_str
+will return a nicely formatted date/time or duration,
+like Fri 2022-04-29 20:55:06 for a date/time or 00:04:45 for a duration.
+Note that these are used in the trace and in animations (to show the time).
+Of course, it is still possible to override these two methods.
+
+Furthermore, the following methods are added to salabim
+- Environment.datetime_to_t
+- Environment.timedelta_to_duration
+- Environment.t_to_datetime
+- Environment.duration_to_timedelta
+- Environment.datetime0
+
+Particulary datetime_to_t can be very useful to read information from an
+external source (file, API, ...) and translated into simulation time.
+In order to output these times, just use t_to_datetime with an
+appropriate format.
+
+Also, the method Environment.reset_now is now also datetime0 aware.
+
+The documentation has a section on this functionality, now.
+
+Added functionality (5)
+-----------------------
+Under Pythonista, salabim can now also run correctly in retina mode (native resolution)
+on iPhones and other screens with a scale factor that is not 2.
+Note that the buttons are still not shown.
+
+Bug fix (0)
+-----------
+When stopping an animation from the menu (with the Stop button), the SimulationStopped exception
+was incorrectly not raised in case synced is False. Fixed. 
+    
 version 22.0.1  2022-02-12
 ==========================
 
@@ -16,7 +105,7 @@ Examples:
     containers20 = sim.Monitor(level=True)
     containers40 = sim.Monitor(level=True)
     ...
-    teu = containers20.map(lambda n20, n40: (n20 + 2 * n40) / (n1 + n2), monitors=[containers40], name="teu")
+    teu = containers20.x_map(lambda n20, n40: (n20 + 2 * n40) / (n1 + n2), monitors=[containers40], name="teu")
     
 Also new for this version is t_multiply for level monitors.
 With this method, all t values will be multiplied with a given, positive factor.
