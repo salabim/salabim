@@ -7,7 +7,7 @@
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "22.0.2"
+__version__ = "22.0.3"
 import heapq
 import random
 import time
@@ -3179,6 +3179,7 @@ class AnimateMonitor(object):
                             angle=angle,
                             linewidth=label_linewidth,
                             linecolor=label_linecolor,
+                            screen_coordinates=True,
                             over3d=over3d,
                         )
                     )
@@ -14041,9 +14042,10 @@ class Component(object):
             if self._requests[r] > 0:
                 if self._requests[r] > (r._capacity - r._claimed_quantity + 1e-8):
                     return []
-            else:
-                if -self._requests[r] > r._claimed_quantity + 1e-8:
-                    return []
+            # 2022-05-08: Commenting this block out leads to expected negative claims for anonymous resources when doing several put requests for anonymous resources
+            # else:
+            #     if -self._requests[r] > r._claimed_quantity :
+            #         return []
         return list(self._requests.keys())
 
     def honor_any(self):
