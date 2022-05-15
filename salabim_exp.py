@@ -11,45 +11,530 @@ import os
 import platform
 from ycecream import yc
 import numpy as np
+import datetime
 
 Pythonista = platform.system() == "Darwin"
 
 
-
 def exp():
-    exp123()
-    
+    exp173()
+
+
+def exp173():
+    class X(sim.Component):
+        def process(self):
+            v0 = v1 = 10
+            while True:
+                v0 = max(0, min(500, v0 + sim.Uniform(-1, 1)() * 10))
+                level_monitor.tally(v0)
+                v1 = max(0, min(500, v1 + sim.Uniform(-1, 1)() * 10))
+                non_level_monitor.tally(v1)
+                yield self.hold(1)
+
+    env = sim.Environment()
+    env.animate(True)
+    env.speed(8)
+
+    level_monitor = sim.Monitor("level_monitor", level=True)
+    non_level_monitor = sim.Monitor("non_level_monitor")
+    X()
+    sim.AnimateMonitor(
+        level_monitor,
+        linewidth=3,
+        x=100,
+        y=100,
+        width=900,
+        height=250,
+        vertical_scale=lambda arg, t: min(50, 250 / arg.monitor.maximum()),
+        labels=lambda arg, t: [i for i in range(0, int(arg.monitor.maximum()), 10)],
+        horizontal_scale=lambda t: min(10, 900 / t),
+    )
+    sim.AnimateMonitor(
+        non_level_monitor,
+        linewidth=5,
+        x=100,
+        y=400,
+        width=900,
+        height=250,
+        vertical_scale=lambda arg, t: min(50, 250 / arg.monitor.maximum()),
+        labels=lambda arg, t: [i for i in range(0, int(arg.monitor.maximum()), 10)],
+        horizontal_scale=lambda t: min(10, 900 / t),
+    )
+    env.run()
+
+
+def exp172():
+    class X(sim.Component):
+        def process(self):
+            while True:
+                v = sim.IntUniform(0, 5)() * 10
+                m.tally(v)
+                m1.tally(v)
+                yield self.hold(1)
+
+    env = sim.Environment()
+    env.animate(True)
+    m = sim.Monitor("m", level=True)
+    m1 = sim.Monitor("m1")
+    X()
+    #    sim.AnimateMonitor(m, title="abc")
+    #    sim.AnimateMonitor(m, title=lambda t: f"def({t})")
+    #    a=sim.AnimateMonitor(m, title=lambda arg, t: f"ghi({arg.hallo}, {t})",arg=s, width=lambda t:1000-51*t, height=300,x=lambda t: 40 * t, fillcolor=lambda t: "red" if t<5 else "blue")
+    #    a=sim.AnimateMonitor(m, title=lambda arg, t:f"TITLE {t}", width=lambda t:1000-51*t, height=300,x=lambda t: 40 * t)
+    a = sim.AnimateMonitor(
+        m,
+        visible=lambda t: int(t) % 2,
+        angle=lambda t: t,
+        title=lambda arg, t: f"TITLE {t:5.2f}",
+        labels=(0, 10, 20, 30, 40, 50),
+        x=100,
+        width=900,
+        height=250,
+        vertical_scale=5,
+        horizontal_scale=10,
+        nowcolor=lambda t: "red" if t < 5 else "blue",
+    )
+    #    a=sim.AnimateMonitor(m1, title=lambda arg, t:f"TITLE {t}", y=lambda t:350+10*t,width=1000,  height=300, horizontal_scale=lambda t:10+t,nowcolor=lambda t: "red" if t<5 else "blue")
+
+    env.run(10)
+    a.labels = labels = (0, 25, 50)
+    env.run(10)
+    a.labels = labels = (0, 16, 32, 50)
+    env.run(10)
+    a.remove()
+    env.run(1000)
+
+
+def exp171():
+    env = sim.Environment(datetime0=datetime.datetime(2022, 1, 1), trace=True, time_unit="days")
+    #    env=sim.Environment(datetime0=False, trace=True, time_unit="days")
+    print(env._time_unit)
+    env.run(2)
+    print(env.time_to_str(env.now()) + "|")
+    print(env.time_to_str(sim.inf) + "|")
+    print(env.duration_to_timedelta(4))
+    env.reset_now()
+
+    class WorkLoadGenerator(sim.Component):
+        def process(self):
+            with open("workload.txt", "r") as f:
+                for line in f.readlines():
+                    workload_date_str = line[:19]
+                    workload_datetime = datetime.datetime.strptime(workload_date_str, "%Y-%m-%d %H:%M:%S")
+                    yield self.hold(till=env.datetime_to_t(workload_datetime))
+                    # generate workload
+
+    env = sim.Environment(datetime0=True, trace=True)
+    WorkLoadGenerator()
+    env.run()
+
+    env = sim.Environment(time_unit="days", datetime0=datetime.datetime(2022, 4, 29))
+    env.trace(True)
+    env.run(1)  # this is one day
+
+
+def exp170():
+    class X(sim.Component):
+        def process(self):
+            def solve():
+                if False:
+                    yield from solve()
+
+            yield from solve()
+            env.main().activate()
+
+    env = sim.Environment()
+    env.animate(True)
+    env.synced(False)
+
+    X()
+    env.run(sim.inf)
+
+    env.animate(True)
+    env.synced(True)
+    env.run(sim.inf)
+
+
+def exp169():
+    class X(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(1)
+
+    env = sim.Environment()
+    env.animate(True)
+    env.trace(True)
+    env.synced(False)
+    X()
+    env.run(sim.inf)
+
+
+def exp168():
+    class X(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(1)
+
+    class Interrupter(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(4)
+                x.interrupt()
+                yield self.hold(1)
+                x.resume()
+
+    env = sim.Environment(trace=True)
+    x = X()
+    Interrupter()
+    env.run(40)
+    x.status.print_histogram(values=True)
+    print(x.status.value_duration("interrupted"))
+
+
+def exp167():
+    class DisIter(sim._Distribution):
+        def __init__(self, iterable, env=None):
+            self.iterable = iter(iterable)
+
+        def sample(self):
+            sample = next(self.iterable, None)
+            if sample is None:
+                raise ValueError("iterable exhausted")
+            return sample
+
+    class X(sim.Component):
+        def process(self):
+            yield self.hold(20)
+
+    class Y:
+        pass
+
+    env = sim.Environment(trace=True)
+    sim.ComponentGenerator(X, iat=10, disturbance=sim.Uniform(1), till=50, force_at=True)
+    #    sim.ComponentGenerator(X, iat=DisIter([1,1,1,1,1]), disturbance=0.3,cap_now=True)
+    env.run(100)
+
+
+def exp166():
+    class X(sim.Component):
+        def process(self):
+            for i in range(100):
+                for over3d in (False, True):
+                    sim.AnimateText(text=str(i), x=200, y=i * 20, textcolor="green", visible="not in video", over3d=over3d)
+                    sim.AnimateText(text=str(i), x=100, y=i * 20, textcolor="red", visible="only in video", over3d=over3d)
+                yield self.hold(1)
+
+    env = sim.Environment()
+    X()
+
+    env.animate(True)
+    env.animate3d(True)
+    env.position3d((1025, 0))
+
+    env.view(x_eye=-529.7288, y_eye=-550.3268, z_eye=393.4118, x_center=50.0000, y_center=50.0000, z_center=0.0000, field_of_view_y=10.0000)  # t=9.9491
+    sim.Animate3dBox(x_len=lambda t: 10 + t, y_len=10, z_len=10, x=0, y=0, z=0, x_ref=1, y_ref=1, z_ref=1, color="red", shaded=True, visible="only in video")
+    sim.Animate3dBox(
+        x_len=lambda t: 10 + t, y_len=10, z_len=10, x=0, y=0, z=0, x_ref=-1, y_ref=-1, z_ref=-1, color="green", edge_color="white", visible="not in video"
+    )
+
+    sim.AnimateCircle(
+        radius=6,
+        fillcolor="red",
+        text="REC",
+        text_offsetx=22,
+        textcolor="fg",
+        font="mono",
+        x=-35,
+        y=-22,
+        xy_anchor="ne",
+        visible=lambda: ((time.time() % 1 < 0.5) and env.is_videoing() and "not in video"),
+    )
+    with env.video(""):
+        print(env.is_videoing())
+        env.run(3)
+        env.video_mode("3d")
+        env.run(3)
+
+
+def exp165():
+    sim.can_animate3d()
+
+    env = sim.Environment(trace=False)
+    #    env.animation3d_init()
+    do_animate = True
+    do_animate3d = True
+
+    env.x0(0)
+    env.x1(380)
+    env.y0(0)
+
+    env.width3d(950)
+    env.height3d(768)
+    env.position3d((0, 100))
+    env.background_color("black")
+    env.width(950)
+    env.height(768)
+    env.position((960, 100))
+
+    env.animate(do_animate)
+    env.animate3d(do_animate)
+    env.show_fps(True)
+    sim.Animate3dGrid(x_range=range(0, 101, 10), y_range=range(0, 101, 10))
+
+    env.view.x_eye = -100
+    env.view.y_eye = -100
+    env.view.z_eye = 100
+    env.view.x_center = 50
+    env.view.y_center = 50
+    env.view.z_center = 0
+    env.view.field_of_view_y = 50
+
+    env.show_camera_position()
+    #    env.camera_control()
+
+    sim.Animate3dSphere(x=60, y=60, z=60, radius=10, number_of_slices=32)
+
+    sim.Animate3dRectangle(x0=10, y0=10, x1=40, y1=40, z=-20, color="yellow")
+    sim.Animate3dLine(x0=0, y0=0, z0=0, x1=50, y1=50, z1=50, color="purple")
+
+    sim.Animate3dBar(x0=10, y0=10, z0=10, x1=40, y1=10, z1=10)
+    sim.Animate3dBar(x0=10, y0=10, z0=10, x1=10, y1=40, z1=10)
+    sim.Animate3dBar(x0=10, y0=10, z0=10, x1=10, y1=10, z1=40)
+    sim.Animate3dBar(x0=10, y0=10, z0=40, x1=10, y1=10, z1=10)
+
+    sim.Animate3dBar(x0=10, y0=10, z0=10, x1=10, y1=40, z1=10)
+    sim.Animate3dBar(x0=40, y0=40, z0=10, x1=40, y1=10, z1=10)
+    sim.Animate3dBar(x0=40, y0=40, z0=10, x1=10, y1=40, z1=10)
+
+    sim.Animate3dBar(x0=10, y0=10, z0=40, x1=40, y1=10, z1=40)
+    sim.Animate3dBar(x0=10, y0=10, z0=40, x1=10, y1=40, z1=40)
+    sim.Animate3dBar(x0=40, y0=40, z0=40, x1=40, y1=10, z1=40)
+    sim.Animate3dBar(x0=40, y0=40, z0=40, x1=10, y1=40, z1=40)
+
+    sim.Animate3dBar(x0=10, y0=10, z0=10, x1=10, y1=10, z1=40)
+    sim.Animate3dBar(x0=10, y0=40, z0=10, x1=10, y1=40, z1=40)
+    sim.Animate3dBar(x0=40, y0=10, z0=10, x1=40, y1=10, z1=40)
+    sim.Animate3dBar(x0=40, y0=40, z0=10, x1=40, y1=40, z1=40)
+
+    sim.Animate3dCylinder(x0=0, y0=50, z0=0, x1=0, y1=50, z1=40, number_of_sides=8, radius=10, show_lids=False, color="green")
+
+    sim.Animate3dBox(x_len=10, y_len=10, z_len=10, x=0, y=0, z=0, x_ref=1, y_ref=1, z_ref=1, color="red", shaded=True)
+    sim.Animate3dBox(x_len=10, y_len=10, z_len=10, x=0, y=0, z=0, x_ref=-1, y_ref=-1, z_ref=-1, color="blue", edge_color="white")
+
+    env.view(x_eye=-102.59501523905122, y_eye=-97.35929330786617, z_eye=100, x_center=50, y_center=50, z_center=0, field_of_view_y=10)  # t=1.665048599243164
+    env.camera_auto_print(True)
+    env.camera_move(
+        """\
+view(x_eye=-102.5950,y_eye=-97.3593,z_eye=100.0000,x_center=50.0000,y_center=50.0000,z_center=0.0000,field_of_view_y=10.0000)  # t=0.0000
+view(field_of_view_y=11.1111)  # t=4.5963
+view(field_of_view_y=12.3457)  # t=4.7949
+view(field_of_view_y=13.7174)  # t=4.9926
+view(field_of_view_y=15.2416)  # t=5.1239
+view(field_of_view_y=16.9351)  # t=5.3295
+view(field_of_view_y=18.8168)  # t=5.5006
+view(field_of_view_y=20.9075)  # t=5.6818
+view(field_of_view_y=23.2306)  # t=5.8401
+view(field_of_view_y=25.8117)  # t=5.9804
+view(field_of_view_y=28.6797)  # t=6.1807
+view(field_of_view_y=31.8664)  # t=6.3549
+view(field_of_view_y=35.4071)  # t=6.6974
+view(field_of_view_y=39.3412)  # t=6.9483
+view(field_of_view_y=43.7124)  # t=7.3397
+view(x_eye=-105.1435,y_eye=-94.6737)  # t=8.3734
+view(x_eye=-107.6448,y_eye=-91.9440)  # t=8.8074
+view(x_eye=-110.0981,y_eye=-89.1711)  # t=9.2869
+view(x_eye=-112.5026,y_eye=-86.3558)  # t=9.7139
+view(x_eye=-114.8576,y_eye=-83.4990)  # t=10.1206
+view(x_eye=-117.1623,y_eye=-80.6015)  # t=10.5025
+view(x_eye=-119.4162,y_eye=-77.6642)  # t=10.9584
+view(x_eye=-121.6184,y_eye=-74.6881)  # t=11.2653
+view(x_eye=-123.7684,y_eye=-71.6739)  # t=11.6096
+view(x_eye=-125.8654,y_eye=-68.6227)  # t=11.8866
+view(x_eye=-108.2789,y_eye=-56.7605,z_eye=100.0000)  # t=12.7295
+view(x_eye=-92.4510,y_eye=-46.0844,z_eye=100.0000)  # t=13.1205
+view(x_eye=-94.1062,y_eye=-43.5837)  # t=13.7187
+view(x_eye=-95.7175,y_eye=-41.0544)  # t=14.1318
+view(x_eye=-97.2844,y_eye=-38.4974)  # t=14.3119
+view(x_eye=-98.8065,y_eye=-35.9135)  # t=14.4877
+view(x_eye=-100.2832,y_eye=-33.3034)  # t=14.6567
+view(x_eye=-100.2832,y_eye=-33.3034,z_eye=90.0000)  # t=15.1176
+view(x_eye=-100.2832,y_eye=-33.3034,z_eye=81.0000)  # t=15.3591
+view(x_eye=-100.2832,y_eye=-33.3034,z_eye=72.9000)  # t=15.7827
+view(x_eye=-100.2832,y_eye=-33.3034,z_eye=65.6100)  # t=16.0167
+view(x_eye=-100.2832,y_eye=-33.3034,z_eye=59.0490)  # t=16.2729
+view(x_eye=-100.2832,y_eye=-33.3034,z_eye=53.1441)  # t=16.5423
+view(x_eye=-100.2832,y_eye=-33.3034,z_eye=47.8297)  # t=16.8177
+view(x_eye=-100.2832,y_eye=-33.3034,z_eye=43.0467)  # t=17.1245
+view(x_eye=-100.2832,y_eye=-33.3034,z_eye=38.7420)  # t=17.5944
+view(field_of_view_y=39.3412)  # t=19.4049
+""",
+        lag=1,
+        offset=-3,
+        enabled=True,
+    )
+
+    try:
+        env.run(sim.inf)
+    except sim.SimulationStopped:
+        pass
+
+
+def exp164():
+    class MyEnvironment(sim.Environment):
+        def print_trace(self, s1="", s2="", s3="", s4="", s0=None, **kwargs):
+
+            if s1:
+                self.last_s1 = s1
+            else:
+                s1 = self.last_s1 if hasattr(self, "last_s1") else ""
+            super().print_trace(s1=s1, s2=s2, s3=s3, s4=s4, s0=s0, **kwargs)
+
+    class FollowComponent(sim.Component):
+        def animation_objects(self, id):
+            if id == follow_queue:
+                an = sim.AnimateRectangle(
+                    (0, 0, 200, 20),
+                    text=lambda arg, t: f"{self.name()}|{self.line_number()}|{self.status()}",
+                    text_anchor="sw",
+                    fillcolor="red",
+                    textcolor="white",
+                    font="narrow",
+                )
+                return 210, 25, an
+            else:
+                return super().animation_objects(id)
+
+    class X1(FollowComponent):
+        def process(self):
+            while True:
+                yield self.hold(1, mode="mode!")
+                yield self.hold(2)
+                if env.now() > 20:
+                    break
+
+    class X2(FollowComponent):
+        def process(self):
+            yield self.hold(2.5)
+            while True:
+                yield self.hold(2)
+                if not x1.isdata():
+                    x1.interrupt()
+                yield self.hold(3)
+                if x1.isinterrupted():
+                    x1.resume()
+
+    class X3(FollowComponent):
+        def process(self):
+            yield self.hold(5, mode="hold")
+            yield self.passivate(mode="passivate!")
+
+    class X4(FollowComponent):
+        def process(self):
+            while env.now() < 4:
+                yield self.standby()
+
+    env = MyEnvironment(trace=True)
+    env.suppress_trace_standby(False)
+
+    follow_queue = sim.Queue("follow_queue")
+    my_q = sim.Queue("my_q")
+
+    x1 = X1()
+    x2 = X2()
+    x3 = X3()
+    x4 = X4()
+
+    x1.enter(follow_queue)
+    x1.enter(my_q)
+    x2.enter(follow_queue)
+    x3.enter(follow_queue)
+    x4.enter(follow_queue)
+
+    sim.AnimateQueue(follow_queue, x=50, y=50, direction="n", id=follow_queue)
+    sim.AnimateQueue(my_q, x=400, y=50, direction="e")
+    env.animate(True)
+
+    env.run(1000)
+
+
+def exp163():
+    class X1(sim.Component):
+        def process(self):
+            m1.tally("x1.0")
+            yield self.hold(2)
+            m1.tally("x1.2")
+            yield self.hold(2)
+            m1.tally("x1.4")
+
+    class X2(sim.Component):
+        def process(self):
+            yield self.hold(1)
+            m2.tally("x2.1")
+            yield self.hold(1)
+            m2.tally("x2.3")
+            yield self.hold(1)
+            m2.tally("x2.4")
+
+    class M2Spoiler(sim.Component):
+        def process(self):
+            yield self.hold(1.5)
+            m2.monitor(False)
+            yield self.hold(2)
+            m2.monitor(True)
+
+    env = sim.Environment()
+    X1()
+    X2()
+    M2Spoiler()
+    m = sim.Monitor("m", level=False)
+    m.tally(45.6)
+    m.tally(6)
+    m.tally(5.8)
+    m1 = sim.Monitor("m1", level=True, initial_tally="x1.0")
+    m2 = sim.Monitor("m2", level=True, initial_tally="x2.0")
+    env.run(10)
+    m3 = m1.x_map(lambda x1, x2: f"({x1},{x2})", [m2])
+    print(m1.xt())
+    print(m2.xt())
+    print(m3.xt(force_numeric=False))
+    print(m.x())
+    print(m.x_map(int).x())
+
+
 def exp162():
     class X(sim.Component):
         def process(self):
             yield self.hold(5)
             yield self.hold(1)
+
     env = sim.Environment()
     env.animate(True)
+    env.video("a.mp4`")
     X()
-    env.run(10)
-    print('ok')
+    env.run()
+    print("ok")
+    env.video_close()
+
 
 def exp161():
     class X0(sim.Component):
         def process(self):
-            yield self.request((res,6))
+            yield self.request((res, 6))
             yield self.hold(10)
-            self.release((res,6))
+            self.release((res, 6))
             yield self.hold(10)
 
     class X1(sim.Component):
         def process(self):
             yield self.hold(1)
-            yield self.request((res,5,1))
+            yield self.request((res, 5, 1))
             yield self.hold(10)
 
     class X2(sim.Component):
         def process(self):
             yield self.hold(1)
-            yield self.request((res,1,1))
+            yield self.request((res, 1, 1))
             yield self.hold(10)
-
 
     env = sim.Environment(trace=True)
     res = sim.Resource("res", capacity=10, honor_only_first=True)
@@ -62,10 +547,13 @@ def exp161():
     X2()
     env.run()
 
+    env = sim.Environment()
+
+
 def exp160():
     class X(sim.Component):
         def process(self):
-            while env.now()<15:
+            while env.now() < 15:
                 yield self.hold(1)
                 pos = env.now() * 20
                 sim.AnimateText(x=pos, y=pos, text=str(env.now()))
@@ -74,20 +562,16 @@ def exp160():
                 if env.now() >= 10:
                     env.animate(True)
 
-
-
     env = sim.Environment(trace=True)
 
     env.animate(True)
-    x=X()
+    x = X()
     try:
         env.run()
         print(x.status())
 
-
     except sim.SimulationStopped:
         pass
-
 
 
 def exp159():
@@ -97,7 +581,7 @@ def exp159():
             yield env.main().activate()
             yield self.hold(2)
             yield self.hold(3)
-            
+
     class Y(sim.Component):
         def process(self):
             for i in range(20):
@@ -105,13 +589,14 @@ def exp159():
 
     env = sim.Environment(trace=True)
 
-    x=X()
+    x = X()
     Y()
     env.run()
     print(x.status())
     x.activate()
     env.run()
-        
+
+
 def exp158():
     class X(sim.Component):
         def process(self):
@@ -128,8 +613,6 @@ def exp158():
         X()
         env.animate(True)
         env.run()
-
-
 
 
 def exp157():
@@ -149,7 +632,6 @@ def exp157():
             yield self.hold(till=55)
             env.main().activate(at=70)
 
-
     env = sim.Environment(trace=True)
     X()
     Y()
@@ -165,19 +647,19 @@ def exp156():
             except OverflowError:
                 pass
 
-
     env = sim.Environment(trace=True)
     sim.ComponentGenerator(X, iat=1)
     X()
-    q=sim.Queue('q',capacity=5)
+    q = sim.Queue("q", capacity=5)
     env.run(1)
-    q.capacity.value=4
+    q.capacity.value = 4
     env.run(10)
-    q.capacity.value=6
+    q.capacity.value = 6
     env.run(10)
     q.print_info()
     print(q.capacity.xt())
-            
+
+
 def exp155():
     class X(sim.Component):
         def process(self):
@@ -185,105 +667,103 @@ def exp155():
                 print(env.now())
                 yield self.hold(1)
 
-    class DisplayMenuAtEnd(sim.Component):    
+    class DisplayMenuAtEnd(sim.Component):
         def process(self):
-            print('1')
+            print("1")
             env.an_menu()
-            print('2')
+            print("2")
 
     env = sim.Environment()
     run_time = 5
     DisplayMenuAtEnd(at=run_time, priority=1)
     X()
     env.animate(True)
-    env.run(run_time )
-        
-    
+    env.run(run_time)
+
+
 def exp154():
-
-
-
     class Part(sim.Component):
         def process(self):
             while 1:
                 yield self.d
-            
+
             pass
-            
+
     class Interrupter(sim.Component):
         def process(self):
             while True:
                 yield self.hold(interrupt_iat)
-                
-    number_of_machines = 3 
-    interrupt_iat=10         
+
+    number_of_machines = 3
+    interrupt_iat = 10
     env = sim.Environment(trace=True)
-    machines = [sim.Resource('machine.', capacity=2) for _ in range(number_of_machines)]
+    machines = [sim.Resource("machine.", capacity=2) for _ in range(number_of_machines)]
     Interrupter()
     sim.ComponentGenerator(Part, iat=4)
     env.run(50)
-    
+
+
 def exp153():
     class X(sim.Component):
         def process(self):
             yield self.wait([c1.state, c2.state])
-        
+
     class C(sim.Component):
         def setup(self):
-            self.state = sim.State('state',False)
-            
+            self.state = sim.State("state", False)
+
         def process(self):
             self.state.set()
-            
+
     env = sim.Environment(trace=True)
-    c1=C(at=3)
-    c2=C(at=5)
+    c1 = C(at=3)
+    c2 = C(at=5)
     X()
     env.run()
-    
+
+
 def exp152():
     class Normal(sim.Component):
         def process(self):
             yield self.request(env.res)
             yield self.hold(1)
-            
+
     class Emergency(sim.Component):
         def process(self):
-            yield self.request((env.res,1,-self.sequence_number()))
+            yield self.request((env.res, 1, -self.sequence_number()))
             yield self.hold(1)
-            
+
     env = sim.Environment(trace=True)
-    env.res = sim.Resource('res', capacity=0)
+    env.res = sim.Resource("res", capacity=0)
     Normal(at=1)
     Emergency(at=2)
     Normal(at=3)
     Emergency(at=4)
-    
+
     env.run(10)
     env.res.set_capacity(1)
     env.run()
 
+
 def exp151():
-    
     class X(sim.Component):
         def greedy_request(self, resource, quantity):
             prio = env.now()
             for _ in range(quantity):
-                yield self.request((res, 1, prio))  
-                       
+                yield self.request((res, 1, prio))
+
         def process(self, n):
-            yield from self.greedy_request(res,n)  
+            yield from self.greedy_request(res, n)
             self.release(res)
-                      
-            
 
     env = sim.Environment(trace=True)
-    res = sim.Resource('res', 10)
+    res = sim.Resource("res", 10)
     print(res.occupancy.value)
     X(n=10)
     X(n=1)
     env.run()
-    
+
+
 def exp150():
     class X(sim.Component):
         def process(self):
@@ -520,7 +1000,7 @@ def exp140():
 
     class X(sim.Component):
         def process(self):
-            passrr
+            pass
 
     env = sim.Environment(trace=True)
 
@@ -899,8 +1379,6 @@ def exp123():
     d = sim.Distribution("Map(Uniform(1, 10),int)")
     for _ in range(10):
         print(d.sample())
-
-
 
 
 def test122():
@@ -2582,7 +3060,7 @@ def test63():
                 mt.tally(i)
                 try:
                     x = int(i)
-                except:
+                except Exception:
                     x = 1.5
                 yield self.hold(2.1 * x)
             env.main().activate()
@@ -2709,6 +3187,9 @@ def test60():
     env.run(10)
     occupancy = r.claimed_quantity.mean() / r.capacity.mean()
     r.print_statistics()
+    print(r.available_quantity.bin_duration(0, sim.inf))
+    print(r.claimed_quantity.bin_duration(0, sim.inf))
+
     env.run(urgent=True)
 
 

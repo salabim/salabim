@@ -1,5 +1,126 @@
 salabim changelog
 
+version 22.0.3  2022-05-15
+==========================
+Added functionality (0)
+-----------------------
+AnimateMonitor is completely rebuilt to allow dynamic attributes.
+From now on, *ALL* attributes can be specified as a constant, a function of t or a method witn t as
+argument. 
+This is particularly useful for dynamic ranges, both horizontally and vertically.
+
+Now AnimateMonitor also supports visible and over3d (both dynamic) and screen_coordinates.
+
+it is possible to get the monitor associated with AnimateMonitor via the monitor() method. 
+This can be handy in writing dynamic lambda function, e.g. to get the maximum of a monitor.
+(see example below)
+
+Example:
+
+    import salabim as sim
+
+
+    class X(sim.Component):
+        def process(self):
+            v0 = v1 = 10
+            while True:
+                v0 = max(0, min(500, v0 + sim.Uniform(-1, 1)() * 10))
+                level_monitor.tally(v0)
+                v1 = max(0, min(500, v1 + sim.Uniform(-1, 1)() * 10))
+                non_level_monitor.tally(v1)
+                yield self.hold(1)
+
+
+    env = sim.Environment()
+    env.speed(10)
+
+    sim.AnimateText("Demonstration dynamic AnimateMonitor", fontsize=20, y=700, x=100)
+
+    level_monitor = sim.Monitor("level_monitor", level=True)
+    non_level_monitor = sim.Monitor("non_level_monitor")
+    X()
+    sim.AnimateMonitor(
+        level_monitor,
+        linewidth=3,
+        x=100,
+        y=100,
+        width=900,
+        height=250,
+        vertical_scale=lambda arg, t: min(50, 250 / arg.monitor().maximum()),
+        labels=lambda arg, t: [i for i in range(0, int(arg.monitor().maximum()), 10)],
+        horizontal_scale=lambda t: min(10, 900 / t),
+    )
+    sim.AnimateMonitor(
+        non_level_monitor,
+        linewidth=5,
+        x=100,
+        y=400,
+        width=900,
+        height=250,
+        vertical_scale=lambda arg, t: min(50, 250 / arg.monitor().maximum()),
+        labels=lambda arg, t: [i for i in range(0, int(arg.monitor().maximum()), 10)],
+        horizontal_scale=lambda t: min((10, 900 / t)),
+    )
+
+    env.animate(True)
+    env.run(120)
+
+Enjoy this new feature!
+
+Changed functionality (0)
+-------------------------
+The behaviour of setting/getting attributes in AnimateCombined is changed.
+
+If you query an attribute of a combined animation object, it will now return the 
+value of the attribute, only if all combining animation objects (that have this attribute)
+are the equal.
+If they are not equal or no attribute is found at all, a ValueError will be raised.
+
+If you set an attribute, it will set that attribute only for combining animation
+objects that have indeed that attribute present. It is not an error if no
+attribute is found at all.
+
+Examples:
+    an0 = sim.AnimateRectangle(spec=(-10,-10,10,10))
+    an1 = sim.AnimateCircle(radius=5, fillcolor="white")
+    an2 = sim.AnimateCircle(radius=10, fillcolor="red")
+
+    an = sim.AnimateCombined([an0, an1, an2])
+
+    an.x = 5  # will set x=0 for an0, an1 and an2
+    an.radius = 7  # will set radius=7 for an1 and an2, but not an0
+
+    print(an.x)  # will print 5 as x==5 for an0, an1 and an2
+    print(an.radius)
+      # will print 7 as radius==7 for an1 and an2 (an0 does not have a radius and is ignored)
+
+    print(an.fillcolor)
+      # will raise a ValueError because an0, an1 and an2 do not have the same fillcolor
+
+    print(an.image)
+      # will raise a ValueError because neither an0, an1 nor an2 have an image attribute
+
+Changed functionality (1)
+-------------------------
+sim.Resource now has an initial_claimed_quantity parameter, that can be used only
+for anonymous resources. If not zero, the resource starts with a quantity in it.
+
+Example:
+    r = sim.Resource("r", capacity=100, initial_claimed_quantity=50, anonymous=True)
+
+Changed functionality (2)
+-------------------------
+The over3d parameter of
+   sim.AnimateText, sim.AnimateLine, sim.AnimatePoints, sim.AnimatePolygon,
+   sim.AnimateImage, sim.AnimateRectangle
+is now dynamic.
+
+Bugfix (0)
+-----------
+There was a bug in AnimateLine, AnimateRectangle and AnimatePolygon that prevented from using as_points properly.
+Fixed.
+
+
 version 22.0.2  2022-04-30
 ==========================
 Added functionality (0)
