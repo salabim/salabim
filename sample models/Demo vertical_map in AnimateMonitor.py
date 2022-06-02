@@ -105,8 +105,5 @@ Interrupter()
 
 for x in xs:
     x.activate()
-env.video_repeat(0)
 
-env.video("x.gif")
 env.run(till=50)
-env.video_close()
