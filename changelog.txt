@@ -1,5 +1,70 @@
 salabim changelog
 
+version 22.0.4  2022-06-02
+==========================
+Changed functionality (0)
+-------------------------
+When an animation window was closed with the X button in the upper right-hand corner.
+the application used to crash. 
+From this version on, the simulation will turn off the animation and raise a
+SimulationStopped exception.
+
+Animation functionality (0)
+---------------------------
+All animation primitives *) now have a show() method that can be used
+to show an animation objects that had been removed. 
+It is possible to use show for animation objects that are already shown
+
+All animation primitives *) now have a remove() method that can be used
+take an animation object off the animation objects set.
+This is different from setting visible to False, as it is not checked
+anymore.
+It is possible to use remove for animation objects that are already removed.
+
+All animation primitives *) now have a isremoved() method, that returns
+True if the animation object is on the animation objects set. False,
+otherwise.
+
+All animation primitives *) now have a (dynamic) keep parameter method that can be used
+to remove an animation object once the values becomes False.
+Note that even if you set keep=True, later, the animation object will not be
+reshown as the animation object is not checked anymore.
+If you want an animation object which was removed by keep=False, use the
+show() method (at the same time making sure that keep=True).
+
+*) AnimateCircle, AnimateImage, AnimateLine, AnimatePolygon, AnimatePoints, AnimateRectangle, AnimateText,
+   Animate3dBar, Animate3dBase, Animate3dBox, Animate3dGrid, Animate3dLine, Animate3dObj,
+   Animate3dRectangle, Animate3dSphere,
+   AnimateQueue, Animate3dQueue and AnimateMonitor
+  
+Animation functionality (1)
+---------------------------
+AnimateCombined now acts like a set instead of a list.
+
+Animation internals (0)
+-----------------------
+The animation engine is internally changed rather dramatically.
+Previously AnimateLine, AnimateRectangle, etc. delegated to Animate.
+Now Animate delegates to AnimateLine, AnimateRectangle, ...
+Animate itself is not used internally anymore.
+This change made it possible to use the more versatile dynamic attribute method and is
+potentially safer.
+This change should have no impact on existing models. But, you never know ...
+
+Bugfix (0)
+----------
+A bug introduced in version 22.0.3 made it impossible to use vertical_map properly in AnimateMonitor.
+Fixed.
+
+Bugfix (1)
+----------
+A bug in over3d animation fixed.
+
+Bugfix (2)
+----------
+In version 22.0.3 the add_attr method in animation primitives *) was removed by mistake. Fixed.
+
+
 version 22.0.3  2022-05-15
 ==========================
 Added functionality (0)

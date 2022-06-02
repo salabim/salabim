@@ -17,7 +17,164 @@ Pythonista = platform.system() == "Darwin"
 
 
 def exp():
-    exp173()
+    exp177()
+
+def exp177():
+    class Machine(sim.Component):
+        def setup(self, y, color):
+            self.color = color
+            sim.AnimateRectangle(spec=(0,0,50,50), x=100, y=y, text=self.name(), fillcolor=lambda arg, t: arg.color, arg=self)
+
+        def process(self):
+            yield self.hold(5)
+            self.color='red'
+
+    class Ticker(sim.Component):
+        def process(self):
+            while True:
+                print(env.now())
+                yield self.hold(1)
+
+    env=sim.Environment()
+    Machine(color="blue", y=100, at=0)
+    Machine(color="green", y=200, at=1)
+    Machine(color="yellow", y=300, at=2)
+    Machine(color="orange", y=400, at=3)
+    Ticker()
+    env.animate(True)
+    try:
+        env.run(10000)
+    except sim.SimulationStopped:
+        print("exception")
+    env.run(10000)
+    print("end")
+
+
+def exp176():
+    class X(sim.Component):
+        def animation_objects(self, id):
+            if id==1:
+                an0 = sim.AnimateRectangle(spec=(-30,-30,30,30), offsety=-30, text=self.name(), fillcolor="blue")
+                return 70,70,an0
+            else:
+                an0 = sim.AnimateRectangle(spec=(-30,-30,30,30), offsety=-30, text=self.name(), fillcolor="green", visible=lambda t: int(t%2)==0)
+                an1 = sim.AnimateCircle(radius=20,text=self.name(), offsety=-30, fillcolor="red", visible=lambda t: int(t%2)==1)
+                return lambda t: 70 if (int(t)%2)==0 else 45,lambda t: 70 if (int(t)%2)==0 else 45 , an0,an1
+
+        def process(self):
+            self.enter(q)
+            yield self.hold(sim.Uniform(5,10))
+            self.leave(q)
+
+    class Y(sim.Component):
+        def process(self):
+            yield self.hold(8)
+            an_q_length.remove()
+            an_q.remove()
+            yield self.hold(8)
+            an_q_length.show()
+            an_q.show()
+
+    env = sim.Environment()
+    q=sim.Queue('q')
+    an_q = sim.AnimateQueue(q, x=lambda t: 100+ 10*t, y=100, direction= lambda t: 'e' if int(t%2)==0 else 'n', keep=lambda t: not (4<t<5))
+    an_q1 = sim.AnimateQueue(q, x=1000, y=200, direction= 'w', id=1)
+
+
+    sim.ComponentGenerator(X, iat=sim.Uniform(1,2))
+    Y()
+
+    sim.AnimateText("This is a text", font="Calibri", fontsize=25,x=100, y=300)
+    an_q_length=sim.AnimateMonitor(q.length, x=100,y=400, width=900, height=200, horizontal_scale=10, vertical_map=lambda x: float(x), keep=lambda t: not (4<t<5))
+    env.animate(True)
+
+
+    env.run(1000)
+
+def exp175():
+
+    env = sim.Environment()
+    env.animate(True)
+    env.modelname("test")
+
+    an=sim.Animate(line0=(0,0,300,300), line1=(1000,700,0,0), t0=3, t1=2211, linecolor0="green", linewidth0=7, keep=True)
+
+    an1 = sim.AnimateText("an1", x=100, y=700, angle=lambda t:0*t)
+    an2 = sim.AnimateText("an2", x=100, y=600)
+    an3 = sim.Animate(text="an3", x0=100, y0=500)
+    an1.abc=12
+    an2.abc=12
+    anc=sim.AnimateCombined((an1,an2), textcolor="red")
+    an3.update(textcolor0="red")
+    an.update(linecolor0="red")
+    env.run(4)
+    env.modelname("")
+    env.run(till=8)
+    env.modelname("xxxxxxx")
+    anc.remove()
+    an3.remove()
+    an.remove()
+    env.run(till=12)
+    anc.show()
+    an3.show()
+    an.show()
+    env.run(till=14)
+#    an.remove()
+    an1.remove()
+#    an1.show()
+    env.run(till=16)
+#    an.show()
+    an1.show()
+    print(an1._image_visible)
+
+
+    env.run(10000)
+
+
+
+def exp174():
+    class MyAnimateRectangle(sim.AnimateRectangle):
+        def fillcolor(self,t):
+            return "red"
+
+    env = sim.Environment()
+    env.animate(True)
+    env.animate_debug(True)
+
+    sim.AnimateRectangle((100,100,200,200),x=lambda t: 100+10*t,text="This is a rectangle")
+    ao1=MyAnimateRectangle((500,500,600,600),x=lambda t: 100+10*t,text=lambda arg,t:f"This is a rectangle {t:3.1f}")
+    ao2=MyAnimateRectangle((0,0,100,100),x=lambda t: 100+10*t, y=600, text=lambda arg,t:f"This is also rectangle{arg.abc}{t:3.1f}", fillcolor="orange", textcolor="blue", keep=lambda t: t<4 or t>6)
+    ao2.abc='abc'
+    sim.AnimateCircle(radius=50, radius1=100, angle=lambda t:45+5*t, x=400,y=400, linecolor='blue', arc_angle0=90, draw_arc=True, fillcolor="")
+    sim.AnimatePoints((100,600, 150,600,200,650,250,600), as_points=lambda t: int(t % 2)==0, linewidth=7, linecolor="blue")
+    sim.AnimateLine((0,0,500,500), x=lambda t: 100+10*t,text="This is a line")
+    ao3= sim.AnimateText(lambda t: f"this is a text {t}", x=100, y=500)
+
+    x0=800
+    y0=500
+    sim.AnimateImage('transparent.png',x=x0,y=y0, textcolor="red", fontsize=40, angle=lambda t: 10*t, anchor="c")
+    sim.AnimateLine((-100,0,100,0), x=x0, y=y0,linecolor="red")
+    sim.AnimateLine((0,-100,0,100), x=x0, y=y0,linecolor="red")
+
+    sim.AnimatePolygon((10,50, 50,50, 50,10,100,100, 0,400), x=lambda t:10*t, angle=lambda t:5*t)
+    sim.Animate(text="Hallo", x0=0, y0=0, x1=1000, y1=700, t0=4, t1=10, keep=False)
+
+    sim.Animate(image='transparent.png',x0=100,y0=50)
+    env.modelname("ab")
+
+    sim.Animate(polygon0=(50,50,1000,23), polygon1=(300,10,0,560),linewidth0=10,t1=10)
+    sim.Animate(circle0=12, circle1=100, x0=400, y0=100,t1=10,fillcolor0="orange")
+
+    env.run(8)
+
+    ao2.show()
+    ao1.fillcolor="green"
+    ao1.spec=(400,400,500,500)
+    ao1.textcolor='blue'
+
+    env.run(4)
+    ao1.remove()
+    env.run(10000)
 
 
 def exp173():
@@ -30,6 +187,7 @@ def exp173():
                 v1 = max(0, min(500, v1 + sim.Uniform(-1, 1)() * 10))
                 non_level_monitor.tally(v1)
                 yield self.hold(1)
+                print(env.now())
 
     env = sim.Environment()
     env.animate(True)
@@ -45,8 +203,8 @@ def exp173():
         y=100,
         width=900,
         height=250,
-        vertical_scale=lambda arg, t: min(50, 250 / arg.monitor.maximum()),
-        labels=lambda arg, t: [i for i in range(0, int(arg.monitor.maximum()), 10)],
+        vertical_scale=lambda arg, t: min(50, 250 / arg.monitor().maximum()),
+        labels=lambda arg, t: [i for i in range(0, int(arg.monitor().maximum()), 10)],
         horizontal_scale=lambda t: min(10, 900 / t),
     )
     sim.AnimateMonitor(
@@ -56,8 +214,8 @@ def exp173():
         y=400,
         width=900,
         height=250,
-        vertical_scale=lambda arg, t: min(50, 250 / arg.monitor.maximum()),
-        labels=lambda arg, t: [i for i in range(0, int(arg.monitor.maximum()), 10)],
+        vertical_scale=lambda arg, t: min(50, 250 / arg.monitor().maximum()),
+        labels=lambda arg, t: [i for i in range(0, int(arg.monitor().maximum()), 10)],
         horizontal_scale=lambda t: min(10, 900 / t),
     )
     env.run()
