@@ -1,5 +1,133 @@
 salabim changelog
 
+version 22.0.5  2022-07-24  
+==========================
+Improved functionality (0)
+--------------------------
+Now a call to sim.reset() will destroy a previous tkinter canvas window (if any).
+That makes it much easier to use salabim in an interactive environment like iPython or Jupyter.
+
+Added functionality (0)
+-----------------------
+The new function searchsorted offers (nearly) the same functionality as
+numpy.searchsorted.
+If numpy is installed the function delegates to numpy.searchsorted.
+
+Added functionality (1)
+-----------------------
+The new function arange offers (nearly) the same functionality as
+numpy.arange.
+If numpy is installed the function delegates to numpy.arange.
+
+Added functionality (3)
+-----------------------
+The new function linspace offers similar functionality as numpy.linspace.
+The function returns a list, rather than an array, which
+is usually more practical in a salabim model.
+
+Added functionality (4)
+-----------------------
+The function interp now also supports lists and tuples.
+This can be useful to interpolate lines and polygons directly.
+The function now uses internally a binary search (bisect).
+Furthermore, the function does not delegate to numpy anymore as this is just slower.
+
+Added functionality (5)
+-----------------------
+The new method Environment.color_interp() can be used to
+interpolate colors, interp() style. E.g.
+    sim.color_interp(t, (0, 10, 20), ('red', 'blue', 'green'))
+This allows for more than two times/colors to be specified as opposed to Environment.colorinterpolate
+which supports only two times/colors (with a different API).
+
+Added functionality (6)
+-----------------------
+The new method Monitor.start_time() will return the creation time or the last time of a reset
+of this monitor.
+
+Added functionality (7)
+-----------------------
+AnimateMonitor() and Monitor.animate() now have a parameter as_points, which allows the user
+to override the default for tallied points, which is False for level monitors and
+True for non level monitors. 
+
+New functionality (0)
+---------------------
+It is now possible to get the actual animation time with
+Environment.t()
+Note that in a simulation step, env.t() is always equal to env.now(), even if animation is off.
+
+Changed functionality (0)
+-------------------------
+When animating and requesting any of the level monitor statistics, these ended at env.now(),
+but in practice, it is better to end these with env.t.
+Changed behaviour, so it is now possible to have a dynamic mean, std, percentile, etc.
+up to the current animation time.
+
+Internal changes / change in functionality (0)
+----------------------------------------------
+In version 20.0.3 the internals of the parent parameter in all Animatexxx was changed.
+Unfortunately, this change is not guaranteed to work.
+Therefore, from this version on, the animation object(s) of which a component is parent
+will be removed at the very moment that component becomes a data component (i.e.
+terminates).
+The new method Component.remove_animation_children() can be used also to remove all the
+animation objects of which the component is parent.
+
+Perfomance improvement (0)
+--------------------------
+When calling make_pil_image with self.type == "text" and no text to display,
+the attributes x, y, angle, ... were evaluated always.
+Now, the method returns immediately by placing the check code at the top
+of the method.
+
+Bugfix (0)
+----------
+When Environment.reset_now() was called, animations could be wrong, because the time communicated
+to dynamic attributes was not set correctly.
+Fixed.
+
+Bugfix (1)
+----------
+A bug in Monitor.reset() made that the start attribute of a monitor was not set properly when
+a reset_now() had been issued. Fixed.
+
+Documentation of 3D camera control keys
+---------------------------------------
+<Left>          rotate camera -1 degree
+<Right>         rotate camera +1 degree
+
+<Up>            zoom in 0.9 * 
+<Down>          zoom out 1.1 *
+
+<z>             lower the camera 0.9 *
+<Z>             raise the camera 1.1 *
+
+<Shift-Up>      move camera in z-plane 0.9 *
+<Shift-Down>    move camera in z-plane 1.1 *
+
+<Alt-Left>      move camera x - 10
+<Alt-Right>     move camera x + 10
+<Alt-Down>      move camera y - 10
+<Alt><Up>       move camera y + 10 
+
+<Control-Left>  center x - 10
+<Control-Right> center x + 10
+<Control-Down>  center y - 10
+<Control-Down>  center y + 10
+
+<o>             field of view * 0.9
+<O>             field of view * 1.1
+
+<t>             tilt camera +1 degree
+<T>             tilt camera -1 degree
+
+<r>             rotate camera axis +1 degree
+<R>             rotate camera axis -1 degree
+
+<p>             print current camera control settings
+
+
 version 22.0.4  2022-06-02
 ==========================
 Changed functionality (0)

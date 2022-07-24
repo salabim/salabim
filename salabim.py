@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      _  _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \    | || |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |   | || |_
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _ |__   _|
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_)   |_|
+#               _         _      _               ____   ____       ___      ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \    | ___|
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |   |___ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _  ___) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_)|____/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "22.0.4"
+__version__ = "22.0.5"
 import heapq
 import random
 import time
@@ -41,10 +41,6 @@ import datetime
 
 from pathlib import Path
 
-try:
-    from ycecream import yc
-except ImportError:
-    pass
 
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
@@ -76,7 +72,7 @@ class SimulationStopped(Exception):
     pass
 
 
-class ItemFile(object):
+class ItemFile:
     """
     define an item file to be used with read_item, read_item_int, read_item_float and read_item_bool
 
@@ -230,7 +226,7 @@ class ItemFile(object):
                 yield result
 
 
-class Monitor(object):
+class Monitor:
     """
     Monitor object
 
@@ -633,7 +629,7 @@ class Monitor(object):
         m._name = self.name() + ".frozen" if name is None else name
         m.env._now = self.env._now
         m.env._offset = self.env._offset
-        m.env.t = self.env.t
+        m.env._t = self.env._t
         return m
 
     def slice(self, start=None, stop=None, modulo=None, name=None):
@@ -970,7 +966,7 @@ class Monitor(object):
             self._monitor = monitor
         if stats_only is not None:
             self._stats_only = stats_only
-
+        self.start = self.env._now
         if self._stats_only:  # all values for ex0=False and ex0=True
             self.mun = [0] * 2
             self.n = [0] * 2
@@ -998,7 +994,6 @@ class Monitor(object):
                 self._t.append(self.env._now)
             else:
                 self._weight = False  # weights are only stored if there is a non 1 weight
-            self.start = self.env._now - self.env._offset  # not self.env.now() to support frozen monitors
             Monitor.cached_xweight = {(ex0, force_numeric): (0, 0) for ex0 in (False, True) for force_numeric in (False, True)}  # invalidate the cache
 
         self.monitor(monitor)
@@ -1039,6 +1034,15 @@ class Monitor(object):
                     else:
                         self._tally_off()  # can't use tally() here because self._tally should be untouched
         return self.monitor
+
+    def start_time(self):
+        """
+        Returns
+        -------
+        Start time of the monitor : float
+             either the time of creation or latest reset
+        """
+        return self.start - self.env._offset
 
     def tally(self, value, weight=1):
         """
@@ -2560,6 +2564,10 @@ class Monitor(object):
         layer : int
             layer (default 0)
 
+        as_points : bool
+            allows to override the as_points setting of tallies, which is
+            by default False for level monitors and True for non level monitors
+
         parent : Component
             component where this animation object belongs to (default None) |n|
             if given, the animation object will be removed
@@ -2726,7 +2734,7 @@ class Monitor(object):
         t = array.array("d")
         if add_now:
             addx = [x[-1]]
-            addt = [self.env._now]
+            addt = [self.env._t]
         else:
             addx = []
             addt = []
@@ -2776,7 +2784,7 @@ class Monitor(object):
 
     def _xweight(self, ex0=False, force_numeric=True):
         if self._level:
-            thishash = hash((self, len(self._x), max(self.env.t, self.env._now)))
+            thishash = hash((self, len(self._x), max(self.env._t, self.env._now)))
         else:
             thishash = hash((self, len(self._x)))
         if Monitor.cached_xweight[(ex0, force_numeric)][0] == thishash:
@@ -2797,7 +2805,7 @@ class Monitor(object):
                     weightall.append(t - lastt)
                 lastt = t
 
-            weightall.append(self.env._now - lastt)
+            weightall.append(self.env._t - lastt)
 
             weight = array.array("d")
             if typecode:
@@ -3095,6 +3103,10 @@ class AnimateMonitor(DynamicClass):
     layer : int
         layer (default 0)
 
+    as_points : bool
+        allows to override the line/point setting, which is by default False for level
+        monitors and True for non level monitors
+
     parent : Component
         component where this animation object belongs to (default None) |n|
         if given, the animation object will be removed
@@ -3155,6 +3167,7 @@ class AnimateMonitor(DynamicClass):
         label_offsety=0,
         label_linewidth=1,
         label_linecolor="fg",
+        as_points=None,
         over3d=None,
         layer=0,
         visible=True,
@@ -3214,6 +3227,7 @@ class AnimateMonitor(DynamicClass):
         self.visible = visible
         self.keep = keep
         self.arg = self if arg is None else arg
+        self.as_points = not monitor._level if as_points is None else as_points
         self._monitor = monitor
         self.as_level = monitor._level
         self.over3d = over3d
@@ -3272,7 +3286,7 @@ class AnimateMonitor(DynamicClass):
             angle=lambda: self.angle_t,
             linewidth=lambda t: self.linewidth(t),
             linecolor=lambda t: self.linecolor(t),
-            as_points=not self.as_level,
+            as_points=self.as_points,
             layer=lambda: self.layer_t,
             over3d=self.over3d,
             visible=lambda: self.visible_t,
@@ -3326,7 +3340,7 @@ class AnimateMonitor(DynamicClass):
             value = self._monitor._x[-1]
         else:
             value = 0
-        lastt = t
+        lastt = t + self._monitor.env._offset
         if self.as_level:
             result.append(self.t_to_x(lastt))
             result.append(self.value_to_y(value))
@@ -3346,7 +3360,7 @@ class AnimateMonitor(DynamicClass):
         return result
 
     def now_line(self, t):
-        t -= self._monitor.start
+        t -= self._monitor.start - self._monitor.env._offset
         t = min(t, self.width_div_horizontal_scale_t)
         x = t * self.horizontal_scale_t
         return x, 0, x, self.height_t
@@ -3370,7 +3384,7 @@ class AnimateMonitor(DynamicClass):
         self.horizontal_scale_t = self.horizontal_scale(t)
         self.linewidth_t = self.linewidth(t)
         self.t_start = self._monitor.start
-        self.width_div_horizontal_scale_t = self.width(t) / self.horizontal_scale(t)
+        self.width_div_horizontal_scale_t = self.width_t / self.horizontal_scale_t
         self.displacement_t = self.width_div_horizontal_scale_t - (t - self.t_start)
 
         labels = []
@@ -3385,7 +3399,7 @@ class AnimateMonitor(DynamicClass):
             except (ValueError, TypeError):
                 pass
 
-        for label, label_y, ao_label_text, ao_label_line in itertools.zip_longest(labels, label_ys, self.ao_label_texts[:], self.ao_label_lines[:]):
+        for (label, label_y, ao_label_text, ao_label_line) in itertools.zip_longest(labels, label_ys, self.ao_label_texts[:], self.ao_label_lines[:]):
             if label is None:
                 ao_label_text = self.ao_label_texts.pop()
                 ao_label_line = self.ao_label_lines.pop()
@@ -3435,7 +3449,7 @@ class AnimateMonitor(DynamicClass):
     def show(self):
         """
         show (unremove)
-        
+
         It is possible to use this method if already shown
         """
         self.ao_frame.show()
@@ -3500,16 +3514,16 @@ if Pythonista:
 
                 if env._synced or env._video:  # video forces synced
                     if env._video:
-                        env.t = env.video_t
+                        env._t = env.video_t
                     else:
                         if env.paused:
-                            env.t = env.start_animation_time
+                            env._t = env.start_animation_time
                         else:
-                            env.t = env.start_animation_time + ((time.time() - env.start_animation_clocktime) * env._speed)
-                    while (env.peek() < env.t) and env.running and env._animate:
+                            env._t = env.start_animation_time + ((time.time() - env.start_animation_clocktime) * env._speed)
+                    while (env.peek() < env._t) and env.running and env._animate:
                         env.step()
                         if env.paused:
-                            env.t = env.start_animation_time = env._now
+                            env._t = env.start_animation_time = env._now
                             break
 
                 else:
@@ -3517,7 +3531,7 @@ if Pythonista:
                         env.step()
                         if not env._current_component._suppress_pause_at_step:
                             env._step_pressed = False
-                        env.t = env._now
+                        env._t = env._now
                 if not env.paused:
                     env.frametimes.append(time.time())
                 touchvalues = self.touches.values()
@@ -3533,8 +3547,8 @@ if Pythonista:
                     else:
                         self.bg.texture = scene.Texture(img)
                 else:
-                    env.animation_pre_tick(env.t)
-                    env.animation_pre_tick_sys(env.t)
+                    env.animation_pre_tick(env.t())
+                    env.animation_pre_tick_sys(env.t())
                     capture_image = env._capture_image("RGB", include_topleft=True)
                     env.animation_post_tick(env.t)
                     ims = scene.load_pil_image(capture_image)
@@ -3646,7 +3660,7 @@ class Qmember:
         q.number_of_arrivals += 1
 
 
-class Queue(object):
+class Queue:
     """
     Queue object
 
@@ -3743,6 +3757,10 @@ class Queue(object):
             if "n", waiting line runs northeards (i.e. from bottom to top) |n|
             if "e", waiting line runs eastwards (i.e. from left to right) (default) |n|
             if "s", waiting line runs southwards (i.e. from top to bottom)
+            if "t", waiting line runs follows given trajectory
+
+        trajectory : Trajectory
+            trajectory to be followed if direction == "t"
 
         reverse : bool
             if False (default), display in normal order. If True, reversed.
@@ -5016,6 +5034,8 @@ class Animate3dBase(DynamicClass):
         if parent is not None:
             if not isinstance(parent, Component):
                 raise ValueError(repr(parent) + " is not a component")
+            parent._animation_children.add(self)
+
         self.sequence = self.env.serialize()
         self.env.an_objects3d.add(self)
         self.register_dynamic_attributes("visible keep layer")
@@ -5043,7 +5063,7 @@ class Animate3dBase(DynamicClass):
     def show(self):
         """
         show (unremove)
-        
+
         It is possible to use this method if already shown
         """
         self.env.an_objects3d.add(self)
@@ -5058,7 +5078,7 @@ class Animate3dBase(DynamicClass):
         return self in self.env.an_objects3d
 
 
-class Environment(object):
+class Environment:
     """
     environment object
 
@@ -5183,6 +5203,7 @@ class Environment(object):
         # just to allow main to be created; will be reset later
         self._nameserializeComponent = {}
         self._now = 0
+        self._t = 0
         self._offset = 0
         self._main = Component(name="main", env=self, process=None)
         self._main.status._value = current
@@ -5216,7 +5237,7 @@ class Environment(object):
         self.obj_filenames = {}
         self.running = False
         self._maximum_number_of_bitmaps = 4000
-        self.t = 0
+        self._t = 0
         self.video_t = 0
         self.frame_number = 0
         self._exclude_from_animation = "only in video"
@@ -5414,7 +5435,7 @@ class Environment(object):
                 build_times[prop].append(offset)
 
             for prop in props:
-                setattr(self.view, prop, lambda arg, t, prop=prop: numpy.interp(t, times[prop], values[prop]))  # default argument prop is evaluated at start!
+                setattr(self.view, prop, lambda arg, t, prop=prop: interp(t, times[prop], values[prop]))  # default argument prop is evaluated at start!
 
             for line in spec.split("\n"):
                 line = line.strip()
@@ -5451,50 +5472,56 @@ class Environment(object):
 
         else:
             for prop in props:
-                setattr(self.view, prop, getattr(self.view, prop)(self.t))
+                setattr(self.view, prop, getattr(self.view, prop)(self.t()))
 
     def camera_rotate(self, event=None, delta_angle=None):
-        adjusted_x = self.view.x_eye(self.t) - self.view.x_center(self.t)
-        adjusted_y = self.view.y_eye(self.t) - self.view.y_center(self.t)
+        t = self.t()
+        adjusted_x = self.view.x_eye(t) - self.view.x_center(t)
+        adjusted_y = self.view.y_eye(t) - self.view.y_center(t)
         cos_rad = math.cos(math.radians(delta_angle))
         sin_rad = math.sin(math.radians(delta_angle))
-        self.view.x_eye = self.view.x_center(self.t) + cos_rad * adjusted_x + sin_rad * adjusted_y
-        self.view.y_eye = self.view.y_center(self.t) - sin_rad * adjusted_x + cos_rad * adjusted_y
+        self.view.x_eye = self.view.x_center(t) + cos_rad * adjusted_x + sin_rad * adjusted_y
+        self.view.y_eye = self.view.y_center(t) - sin_rad * adjusted_x + cos_rad * adjusted_y
 
         if self._camera_auto_print:
             self.camera_print(props="x_eye y_eye")
 
     def camera_zoom(self, event=None, factor_xy=None, factor_z=None):
-        self.view.x_eye = self.view.x_center(self.t) - (self.view.x_center(self.t) - self.view.x_eye(self.t)) * factor_xy
-        self.view.y_eye = self.view.y_center(self.t) - (self.view.y_center(self.t) - self.view.y_eye(self.t)) * factor_xy
-        self.view.z_eye = self.view.z_center(self.t) - (self.view.z_center(self.t) - self.view.z_eye(self.t)) * factor_z
+        t = self.t()
+        self.view.x_eye = self.view.x_center(t) - (self.view.x_center(t) - self.view.x_eye(t)) * factor_xy
+        self.view.y_eye = self.view.y_center(t) - (self.view.y_center(t) - self.view.y_eye(t)) * factor_xy
+        self.view.z_eye = self.view.z_center(t) - (self.view.z_center(t) - self.view.z_eye(t)) * factor_z
         if self._camera_auto_print:
             self.camera_print(props="x_eye y_eye z_eye")
 
     def camera_xy_center(self, event=None, x_dis=None, y_dis=None):
-        self.view.x_center = self.view.x_center(self.t) + x_dis
-        self.view.y_center = self.view.y_center(self.t) + y_dis
+        t = self.t()
+        self.view.x_center = self.view.x_center(t) + x_dis
+        self.view.y_center = self.view.y_center(t) + y_dis
         if self._camera_auto_print:
             self.camera_print(props="x_center y_center")
 
     def camera_xy_eye(self, event=None, x_dis=None, y_dis=None):
-        self.view.x_eye = self.view.x_eye(self.t) + x_dis
-        self.view.y_eye = self.view.y_eye(self.t) + y_dis
+        t = self.t()
+        self.view.x_eye = self.view.x_eye(t) + x_dis
+        self.view.y_eye = self.view.y_eye(t) + y_dis
         if self._camera_auto_print:
             self.camera_print(props="x_eye y_eye")
 
     def camera_field_of_view(self, event=None, factor=None):
-        self.view.field_of_view_y = self.view.field_of_view_y(self.t) * factor
+        t = self.t()
+        self.view.field_of_view_y = self.view.field_of_view_y(t) * factor
         if self._camera_auto_print:
             self.camera_print(props="field_of_view_y")
 
     def camera_tilt(self, event=None, delta_angle=None):
-        x_eye = self.view.x_eye(self.t)
-        y_eye = self.view.y_eye(self.t)
-        z_eye = self.view.z_eye(self.t)
-        x_center = self.view.x_center(self.t)
-        y_center = self.view.y_center(self.t)
-        z_center = self.view.z_center(self.t)
+        t = self.t()
+        x_eye = self.view.x_eye(t)
+        y_eye = self.view.y_eye(t)
+        z_eye = self.view.z_eye(t)
+        x_center = self.view.x_center(t)
+        y_center = self.view.y_center(t)
+        z_center = self.view.z_center(t)
 
         dx = x_eye - x_center
         dy = y_eye - y_center
@@ -5512,23 +5539,25 @@ class Environment(object):
             self.camera_print(props="x_center y_center")
 
     def camera_rotate_axis(self, event=None, delta_angle=None):
-        adjusted_x = self.view.x_center(self.t) - self.view.x_eye(self.t)
-        adjusted_y = self.view.y_center(self.t) - self.view.y_eye(self.t)
+        t = self.t()
+        adjusted_x = self.view.x_center(t) - self.view.x_eye(t)
+        adjusted_y = self.view.y_center(t) - self.view.y_eye(t)
         cos_rad = math.cos(math.radians(delta_angle))
         sin_rad = math.sin(math.radians(delta_angle))
-        self.view.x_center = self.view.x_eye(self.t) + cos_rad * adjusted_x + sin_rad * adjusted_y
-        self.view.y_center = self.view.y_eye(self.t) - sin_rad * adjusted_x + cos_rad * adjusted_y
+        self.view.x_center = self.view.x_eye(t) + cos_rad * adjusted_x + sin_rad * adjusted_y
+        self.view.y_center = self.view.y_eye(t) - sin_rad * adjusted_x + cos_rad * adjusted_y
         if self._camera_auto_print:
             self.camera_print(props="x_eye y_eye")
 
     def camera_print(self, event=None, props=None):
+        t = self.t()
         if props is None:
             props = "x_eye y_eye z_eye x_center y_center z_center field_of_view_y"
         s = "view("
         items = []
         for prop in props.split():
-            items.append(f"{getattr(self.view,prop)(self.t):.4f}")
-        print("view(" + (",".join(f"{prop}={getattr(self.view,prop)(self.t):.4f}" for prop in props.split())) + f")  # t={self.t:.4f}")
+            items.append(f"{getattr(self.view,prop)(t):.4f}")
+        print("view(" + (",".join(f"{prop}={getattr(self.view,prop)(t):.4f}" for prop in props.split())) + f")  # t={t:.4f}")
 
     def _bind(self, tkinter_event, func):
         self.root.bind(tkinter_event, func)
@@ -5726,6 +5755,7 @@ class Environment(object):
                     t = inf
             c._on_event_list = False
             self.env._now = t
+            self.env._t = t
 
             self._current_component = c
 
@@ -5771,6 +5801,7 @@ class Environment(object):
             c._release(r, s0=s0)
         if self._trace:
             self.print_trace("", "", c.name() + " ended", s0=s0)
+        c.remove_animation_children()
         c.status._value = data
         c._scheduled_time = inf
         c._process = None
@@ -6134,7 +6165,7 @@ class Environment(object):
                     if Pythonista:
                         import sound
 
-                        class Play(object):
+                        class Play:
                             def __init__(self, s, repeat=-1):
                                 self.player = sound.Player(s)
                                 self.player.number_of_loops = repeat
@@ -6149,7 +6180,7 @@ class Environment(object):
 
                     self._audio.start = float(startstr)
 
-                    self._audio.t0 = self.t
+                    self._audio.t0 = self._t
 
                     self._audio.filename = audio_filename
 
@@ -6221,7 +6252,9 @@ class Environment(object):
                             self._video_height_real = img.size[1]
                     else:
                         self._video_height_real = self._video_height
-                    if not self._blind_animation:
+                    if self._blind_animation:
+                        can_animate(try_only=True)
+                    else:
                         can_animate(try_only=False)
 
                     video_path = Path(video)
@@ -6231,6 +6264,7 @@ class Environment(object):
                     if extension == ".gif" and not ("*" in video_path.stem):
                         self._video_out = "gif"
                         self._images = []
+
                     elif extension == ".png" and not ("*" in video_path.stem):
                         self._video_out = "png"
                         self._images = []
@@ -6265,7 +6299,7 @@ class Environment(object):
                         self.frame_number = 0
                         self.audio_segments = []
                         if self._audio is not None:
-                            self._audio.start += self.t - self._audio.t0
+                            self._audio.start += self._t - self._audio.t0
                             self._audio.t0 = self.frame_number / self._fps
                             self.audio_segments.append(self._audio)
                             if Pythonista:
@@ -6280,8 +6314,9 @@ class Environment(object):
             if g.animation_env is not None:
                 g.animation_env._animate = self._animate
                 if not Pythonista:
-                    g.animation_env.root.destroy()
-                    g.animation_env.root = None
+                    if g.animation_env.root is not None:  # for blind animation to work properly
+                        g.animation_env.root.destroy()
+                        g.animation_env.root = None
                 g.animation_env = None
 
             if self._blind_animation:
@@ -6298,7 +6333,7 @@ class Environment(object):
                     can_animate(try_only=False)  # install modules
 
                     g.animation_env = self
-                    self.t = self._now  # for the call to set_start_animation
+                    self._t = self._now  # for the call to set_start_animation
                     self.paused = False
                     self.set_start_animation()
 
@@ -6412,10 +6447,10 @@ class Environment(object):
         elif video_mode == "screen":
             image = ImageGrab.grab()
         else:
-            an_objects = sorted(self.an_objects, key=lambda obj: (-obj.layer(self.t), obj.sequence))
+            an_objects = sorted(self.an_objects, key=lambda obj: (-obj.layer(self._t), obj.sequence))
             image = Image.new("RGBA", (self._width, self._height), self.colorspec_to_tuple("bg"))
             for ao in an_objects:
-                ao.make_pil_image(self.t)
+                ao.make_pil_image(self.t())
                 if ao._image_visible and (include_topleft or not ao.getattr("in_topleft", False)):
                     image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image)
         return image.convert(mode)
@@ -7357,7 +7392,15 @@ class Environment(object):
         -------
         the current simulation time : float
         """
-        return self._now - self.env._offset
+        return self._now - self._offset
+
+    def t(self):
+        """
+        Returns
+        -------
+        the current simulation animation time : float
+        """
+        return self._t - self._offset
 
     def reset_now(self, new_now=0):
         """
@@ -7587,27 +7630,27 @@ class Environment(object):
                 self.animation3d_init()
                 self._camera_control()
                 self.start_animation_clocktime = time.time()
-                self.start_animation_time = self.t
+                self.start_animation_time = self._t
 
             tick_start = time.time()
 
             if self._synced or self._video:  # video forces synced
                 if self._video:
-                    self.t = self.video_t
+                    self._t = self.video_t
                 else:
                     if self.paused:
-                        self.t = self.start_animation_time
+                        self._t = self.start_animation_time
                     else:
-                        self.t = self.start_animation_time + ((time.time() - self.start_animation_clocktime) * self._speed)
+                        self._t = self.start_animation_time + ((time.time() - self.start_animation_clocktime) * self._speed)
 
-                while self.peek() < self.t:
+                while self.peek() < self._t:
                     self.step()
                     if not (self.running and self._animate):
                         if self.root is not None:
                             self.root.quit()
                         return
                     if self.paused:
-                        self.t = self.start_animation_time = self._now
+                        self._t = self.start_animation_time = self._now
                         break
 
             else:
@@ -7616,7 +7659,7 @@ class Environment(object):
 
                     if not self._current_component._suppress_pause_at_step:
                         self._step_pressed = False
-                    self.t = self._now
+                    self._t = self._now
 
             if not (self.running and self._animate):
                 if self.root is not None:
@@ -7626,16 +7669,18 @@ class Environment(object):
             if not self.paused:
                 self.frametimes.append(time.time())
 
-            self.animation_pre_tick(self.t)
-            self.animation_pre_tick_sys(self.t)
+            t = self.t()
 
-            an_objects = sorted(self.an_objects, key=lambda obj: (-obj.layer(self.t), obj.sequence))
+            self.animation_pre_tick(t)
+            self.animation_pre_tick_sys(t)
+
+            an_objects = sorted(self.an_objects, key=lambda obj: (-obj.layer(self._t), obj.sequence))
 
             canvas_objects_iter = iter(g.canvas_objects[:])
             co = next(canvas_objects_iter, None)
             overflow_image = None
             for ao in an_objects:
-                ao.make_pil_image(self.t)
+                ao.make_pil_image(t)
                 if ao._image_visible:
                     if co is None:
                         if len(g.canvas_objects) >= self._maximum_number_of_bitmaps:
@@ -7680,18 +7725,17 @@ class Environment(object):
                     g.canvas.itemconfig(g.canvas_object_overflow_image, image=im)
 
             if self._animate3d:
-                t = self.t
                 self._exclude_from_animation = "*"  # makes that both video and non video over2d animation objects are shown
-                an_objects3d = sorted(self.an_objects3d, key=lambda obj: (obj.layer(t), obj.sequence))
+                an_objects3d = sorted(self.an_objects3d, key=lambda obj: (obj.layer(self._t), obj.sequence))
                 for an in an_objects3d:
                     if an.keep(t):
-                        if an.visible(self.t):
+                        if an.visible(t):
                             an.draw(t)
                     else:
                         an.remove()
                 self._exclude_from_animation = "only in video"
 
-            self.animation_post_tick(self.t)
+            self.animation_post_tick(t)
 
             while co is not None:
                 g.canvas.delete(co)
@@ -7964,8 +8008,9 @@ class Environment(object):
         self.running = False
         self.stopped = True
         if not Pythonista:
-            self.root.destroy()
-            self.root = None
+            if self.root is not None:  # for blind animation to work properly
+                self.root.destroy()
+                self.root = None
         self.quit()
 
     def quit(self):
@@ -7993,7 +8038,7 @@ class Environment(object):
         self._step_pressed = True
         self.step()
         self.paused = True
-        self.t = self._now
+        self._t = self._now
         self.set_start_animation()
 
     def an_menu_go(self):
@@ -8022,7 +8067,7 @@ class Environment(object):
         if self._show_time:
             if s != "":
                 s += " "
-            s += "t=" + self.time_to_str(t - self.env._offset).lstrip()
+            s += "t=" + self.time_to_str(t).lstrip()
         return s
 
     def tracetext(self, t):
@@ -8042,10 +8087,10 @@ class Environment(object):
 
     def set_start_animation(self):
         self.frametimes = collections.deque(maxlen=30)
-        self.start_animation_time = self.t
+        self.start_animation_time = self._t
         self.start_animation_clocktime = time.time()
         if self._audio:
-            start_time = self.t - self._audio.t0 + self._audio.start
+            start_time = self._t - self._audio.t0 + self._audio.start
             if Pythonista:
                 if self._animate and self._synced and (not self._video):
                     if self.paused:
@@ -8219,6 +8264,34 @@ class Environment(object):
         vt1 = self.colorspec_to_tuple(v1)
         return tuple(int(c) for c in interpolate(t, t0, t1, vt0, vt1))
 
+    def color_interp(self, x, xp, fp):
+        """
+        linear interpolation of a color 
+
+        Parameters
+        ----------
+        x : float
+            target x-value
+
+        xp : list of float, tuples or lists
+            values on the x-axis
+
+        fp : list of colorspecs
+            values on the y-axis |n|
+            should be same length as xp
+
+        Returns
+        -------
+        interpolated color value : tuple
+
+        Notes
+        -----
+        If x < xp[0], fp[0] will be returned |n|
+        If x > xp[-1], fp[-1] will be returned |n|
+        """
+        fp_resolved = [self.colorspec_to_tuple(el) for el in fp]
+        return tuple(map(int, interp(x, xp, fp_resolved)))
+
     def colorspec_to_hex(self, colorspec, withalpha=True):
         v = self.colorspec_to_tuple(colorspec)
         if withalpha:
@@ -8232,7 +8305,7 @@ class Environment(object):
 
     def colorspec_to_gl_color_alpha(self, colorspec):
         color_tuple = self.colorspec_to_tuple(colorspec)
-        return (color_tuple[0] / 255, color_tuple[1] / 255, color_tuple[2] / 255), color_tuple[3]
+        return ((color_tuple[0] / 255, color_tuple[1] / 255, color_tuple[2] / 255), color_tuple[3])
 
     def pythonistacolor(self, colorspec):
         c = self.colorspec_to_tuple(colorspec)
@@ -8960,8 +9033,15 @@ class Animate2dBase(DynamicClass):
         self.type = type
         env = locals_["env"]
         arg = locals_["arg"]
+        parent = locals_["parent"]
+        if attached_to is None and parent is not None:
+            if not isinstance(parent, Component):
+                raise ValueError(repr(parent) + " is not a component")
+            parent._animation_children.add(self)
+
         screen_coordinates = locals_["screen_coordinates"]
         over3d = locals_["over3d"]
+
 
         self.env = g.default_env if env is None else env
         self.sequence = self.env.serialize()
@@ -9026,7 +9106,7 @@ class Animate2dBase(DynamicClass):
             self.env.an_objects.discard(self)
             self.canvas_object = None  # safety! even set for non tkinter
 
-    def is_removed():
+    def is_removed(self):
 
         if self.over3d:
             return self not in self.env.an_over3d_objects
@@ -9044,6 +9124,12 @@ class Animate2dBase(DynamicClass):
                 visible = False
 
             if visible:
+                if self.type == "text":  # checked so early as to avoid evaluation of x, y, angle, ...
+                    text = self.text(t)
+                    if (text is None) or (text.strip() == ""):
+                        self._image_visible = False
+                        return
+
                 self._image_ident_prev = self._image_ident
 
                 self._image_x_prev = self._image_x
@@ -9333,10 +9419,7 @@ class Animate2dBase(DynamicClass):
                     self._image_y = qy + ey - imrheight / 2
 
                 elif self.type == "text":
-                    text = self.text(t)
-                    if (text is None) or (text.strip() == ""):
-                        self._image_visible = False
-                        return
+                    # text contains self.text()
                     textcolor = self.env.colorspec_to_tuple(self.textcolor(t))
                     fontsize = self.fontsize(t)
                     angle = self.angle(t)
@@ -10334,7 +10417,7 @@ class Animate:
         """
         self.animation_object.remove()
 
-    def is_removed():
+    def is_removed(self):
         return self.animation_object.is_removed()
 
     def x(self, t=None):
@@ -10847,7 +10930,7 @@ class Animate:
                             pixels[x, y] = (255, 255, 255, 0)
 
 
-class AnimateEntry(object):
+class AnimateEntry:
     """
     defines a button
 
@@ -10950,7 +11033,7 @@ class AnimateEntry(object):
             self.installed = False
 
 
-class AnimateButton(object):
+class AnimateButton:
     """
     defines a button
 
@@ -11083,7 +11166,7 @@ class AnimateButton(object):
             self.installed = False
 
 
-class AnimateSlider(object):
+class AnimateSlider:
     """
     defines a slider
 
@@ -11308,6 +11391,10 @@ class AnimateQueue(DynamicClass):
         if "n", waiting line runs northeards (i.e. from bottom to top) |n|
         if "e", waiting line runs eastwards (i.e. from left to right) (default) |n|
         if "s", waiting line runs southwards (i.e. from top to bottom)
+:
+
+    trajectory : Trajectory
+        trajectory to be followed. Overrides any given directory
 
     reverse : bool
         if False (default), display in normal order. If True, reversed.
@@ -11386,6 +11473,7 @@ class AnimateQueue(DynamicClass):
         x=50,
         y=50,
         direction="w",
+        trajectory=None,
         max_length=None,
         xy_anchor="sw",
         reverse=False,
@@ -11431,7 +11519,7 @@ class AnimateQueue(DynamicClass):
         self.visible = visible
         self.keep = keep
         self.over3d = _default_over3d if over3d is None else over3d
-
+        self.trajectory = trajectory
         self.register_dynamic_attributes(
             "xy_anchor x y id max_length direction reverse titleoffsetx titleoffsety titlefont titlefontsize titlecolor title layer visible keep"
         )
@@ -11460,9 +11548,17 @@ class AnimateQueue(DynamicClass):
         self.current_aos = {}
         xy_anchor = self.xy_anchor(t)
         max_length = self.max_length(t)
-        x = self.x(t)
-        y = self.y(t)
-        direction = self.direction(t)
+        direction = self.direction(t).lower()
+        if self.trajectory is None:
+            x = self.x(t)
+            y = self.y(t)
+        else:
+            direction = "t"
+            x = 0
+            y = 0
+
+            trajectory = self.trajectory
+
         reverse = self.reverse(t)
         self.visible_t = self.visible(t)
         titleoffsetx = self.titleoffsetx(t)
@@ -11470,6 +11566,7 @@ class AnimateQueue(DynamicClass):
 
         x += self._queue.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True, over3d=self.over3d)
         y += self._queue.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True, over3d=self.over3d)
+
         if direction == "e":
             self.x_t = x + (-25 if titleoffsetx is None else titleoffsetx)
             self.y_t = y + (25 if titleoffsetx is None else titleoffsety)
@@ -11488,6 +11585,11 @@ class AnimateQueue(DynamicClass):
         elif direction == "s":
             self.x_t = x + (-25 if titleoffsetx is None else titleoffsetx)
             self.y_t = y + (25 if titleoffsety is None else titleoffsety)
+            self.text_anchor_t = "sw"
+            self.angle_t = 0
+        elif direction == "t":
+            self.x_t = trajectory.x(t=x, _t0=0) + (-25 if titleoffsetx is None else titleoffsetx)
+            self.y_t = trajectory.y(t=x, _t0=0) + (25 if titleoffsety is None else titleoffsety)
             self.text_anchor_t = "sw"
             self.angle_t = 0
         n = 0
@@ -11509,20 +11611,32 @@ class AnimateQueue(DynamicClass):
             dimy = _call(animation_objects[1], t, c)
             for ao in animation_objects[2:]:
                 if isinstance(ao, AnimateClassic):
-                    ao.x0 = x
-                    ao.y0 = y
+                    if direction == "t":
+                        ao.x0 = trajectory.x(t=x, _t0=0)
+                        ao.y0 = trajectory.y(t=x, _t0=0)
+                    else:
+                        ao.x0 = x
+                        ao.y0 = y
                 else:
-                    ao.x = x
-                    ao.y = y
+                    if direction == "t":
+                        ao.x = trajectory.x(t=x, _t0=0)
+                        ao.y = trajectory.y(t=x, _t0=0)
+                        ao.angle = trajectory.angle(t=x, _t0=0)
+                    else:
+                        ao.x = x
+                        ao.y = y
 
-            if direction.lower() == "w":
+            if direction == "w":
                 x -= dimx
-            if direction.lower() == "s":
+            if direction == "s":
                 y -= dimy
-            if direction.lower() == "e":
+            if direction == "e":
                 x += dimx
-            if direction.lower() == "n":
+            if direction == "n":
                 y += dimy
+            if direction == "t":
+                x += dimx
+
             n += 1
 
         for animation_objects in prev_aos.values():
@@ -11532,7 +11646,7 @@ class AnimateQueue(DynamicClass):
     def show(self):
         """
         show (unremove)
-        
+
         It is possible to use this method if already shown
         """
         self.ao_title.show()
@@ -11546,7 +11660,7 @@ class AnimateQueue(DynamicClass):
             for ao in animation_objects[2:]:
                 ao.remove()
 
-    def is_removed():
+    def is_removed(self):
         return self not in self.env.sys_objects
 
 
@@ -11714,7 +11828,7 @@ class Animate3dQueue(DynamicClass):
     def show(self):
         """
         show (unremove)
-        
+
         It is possible to use this method if already shown
         """
         self.env.sys_objects.add(self)
@@ -11725,7 +11839,7 @@ class Animate3dQueue(DynamicClass):
                 ao.remove()
         self.env.sys_objects.discard(self)
 
-    def is_removed():
+    def is_removed(self):
         return self not in self.env.sys_objects
 
 
@@ -11824,7 +11938,7 @@ class AnimateCombined:
         for item in self.animation_objects:
             item.show()
 
-    def is_removed():
+    def is_removed(self):
         return all(item.is_removed() for item in self.animation_objects)
 
     def __repr__(self):
@@ -11941,9 +12055,9 @@ class AnimateText(Animate2dBase):
         offsetx=None,
         offsety=None,
         arg=None,
-        parent=None,
         visible=None,
         keep=None,
+        parent=None,
         env=None,
         screen_coordinates=False,
         over3d=None,
@@ -12135,6 +12249,7 @@ class AnimateRectangle(Animate2dBase):
                 text_offsety=0,
                 visible=True,
                 keep=True,
+                parent=None,
             ),
             attach_text=True,
         )
@@ -13002,6 +13117,7 @@ class AnimateImage(Animate2dBase):
         arg=None,
         screen_coordinates=False,
         over3d=None,
+        parent=None,
     ):
 
         super().__init__(
@@ -13034,7 +13150,7 @@ class AnimateImage(Animate2dBase):
         )
 
 
-class Component(object):
+class Component:
     """Component object
 
     A salabim component is used as component (primarily for queueing)
@@ -13228,18 +13344,6 @@ class Component(object):
             self.status._value = scheduled
             self._reschedule(scheduled_time, priority, urgent, "activate", cap_now, extra=extra)
         self.setup(**kwargs)
-
-    def __del__(self):
-        self.remove_animation_children()
-
-    def remove_animation_children(self):
-        """
-        removes all animation objects which has this as a parent
-        """
-        if hasattr(self, "_animation_children"):  # prevent problems with not fully initialized components
-            for ao in self._animation_children:
-                ao.remove()
-            del self._animation_children
 
     def animation_objects(self, id):
         """
@@ -14647,6 +14751,20 @@ class Component(object):
         else:
             return self._process.__name__
 
+    def remove_animation_children(self):
+        """
+        removes animation children
+
+        Note
+        ----
+        Normally, the animation_children are removed automatically upon termination of a component (when it terminates)
+        """
+        print("****remove_a_c", self._animation_children)
+        for ao in self._animation_children:
+            ao.remove()
+        self._animation_children = set()
+
+
     def suppress_trace(self, value=None):
         """
         Parameters
@@ -15626,8 +15744,8 @@ class ComponentGenerator(Component):
 class _BlindVideoMaker(Component):
     def process(self):
         while True:
-            self.env.t = self.env._now
-            self.env.animation_pre_tick_sys(self.env.t)  # required to update sys objects, like AnimateQueue
+            self.env._t = self.env._now
+            self.env.animation_pre_tick_sys(self.env.t())  # required to update sys objects, like AnimateQueue
 
             self.env._save_frame()
             yield self.hold(self.env._speed / self.env._fps)
@@ -17846,7 +17964,7 @@ class Distribution(_Distribution):
         return self._mean
 
 
-class State(object):
+class State:
     """
     State
 
@@ -18276,7 +18394,7 @@ class State(object):
         return self._waiters
 
 
-class Resource(object):
+class Resource:
     """
     Resource
 
@@ -18794,7 +18912,7 @@ class _PeriodComponent(Component):
             yield self.hold(duration)
 
 
-class PeriodMonitor(object):
+class PeriodMonitor:
     """
     defines a number of period monitors for a given monitor.
 
@@ -18876,7 +18994,7 @@ class PeriodMonitor(object):
             self.perperiod = [Monitor(name=period_monitor_name, monitor=False, env=self.env) for period_monitor_name in period_monitor_names]
 
 
-class AudioClip(object):
+class AudioClip:
     @staticmethod
     def send(command):
         buffer = ctypes.c_buffer(255)
@@ -19318,7 +19436,109 @@ def interpolate(t, t0, t1, v0, v1):
         return _i(p, v0, v1)
 
 
-def interp(x, x_arr, y_arr):
+def searchsorted(a, v, side="left"):
+    """
+    search sorted
+
+    Parameters
+    ----------
+    a : iterable
+        iterable to be searched in, must be non descending
+
+    v : float
+        value to be searched for
+
+    side : string
+        If ‘left’ (default) the index of the first suitable location found is given.
+        If ‘right’, return the last such index.
+        If there is no suitable index, return either 0 or N (where N is the length of a).    
+
+    Returns
+    -------
+    Index where v should be inserted to maintain order : int
+
+    Note
+    ----
+    If numpy is installed, uses numpy.searchstarted
+    """
+
+    if has_numpy():
+        return numpy.searchsorted(a, v, side)
+
+    if side == "left":
+        return bisect.bisect_left(a, v)
+    if side == "right":
+        return bisect.bisect_right(a, v)
+    raise ValueError(f"{repr(side)} is an invalid value for the keyword 'side'")
+
+
+def arange(start, stop, step=1):
+    """
+    arange (like numpy)
+
+    Parameters
+    ----------
+    start : float
+        start value
+
+    stop: : float
+        stop value
+
+    step : float
+        default: 1
+
+    Returns
+    -------
+    Iterable
+
+    Note
+    ----
+    If numpy is installed, uses numpy.arange
+    """
+    if has_numpy():
+        return numpy.arange(start, stop, step)
+
+    result = []
+    value = start
+    while True:
+        if (step > 0 and value >= stop) or (step < 0 and value <= stop):
+            return result
+        result.append(value)
+        value += step
+
+
+def linspace(start, stop, num, endpoint=True):
+    """
+    like numpy.linspace, but returns a list
+
+    Parameters
+    ----------
+    start : float
+        start of the space
+
+    stop : float
+        stop of the space
+
+    num : int
+        number of points in the space
+
+    endpoint : bool
+        if True (default), stop is last point in the space |n|
+        if False, space ends before stop
+    """
+    if num == 0:
+        return []
+    if num == 1:
+        return [start]
+    if endpoint:
+        step = (stop - start) / (num - 1)
+    else:
+        step = (stop - start) / num
+
+    return [start + step * i for i in range(num)]
+
+
+def interp(x, xp, fp, left=None, right=None):
     """
     linear interpolatation
 
@@ -19327,45 +19547,45 @@ def interp(x, x_arr, y_arr):
     x : float
         target x-value
 
-    x_arr : list of float
+    xp : list of float, tuples or lists
         values on the x-axis
 
-    y_arr : list of float
+    fp : list of float, tuples of lists
         values on the y-axis |n|
-        should be same length as x_arr
+        should be same length as  p
 
     Returns
     -------
-    interpolated value : float
+    interpolated value : float, tuple or list
 
     Notes
     -----
-    If x < x_arr[0], y_arr[0] will be returned |n|
-    If x > x_arr[-1], y_arr[-1] will be returned |n|
+    If x < xp[0], fp[0] will be returned |n|
+    If x > xp[-1], fp[-1] will be returned |n|
 
-    This function is similar to the numpy interp function. In fact,
-    if numpy is installed this function will use numpy.interp.
+    This function is similar to the numpy interp function.
     """
-    if len(x_arr) != len(y_arr):
-        raise ValueError("lengths of x_arr and y_arr are not the same")
-    if len(x_arr) == 0:
-        raise ValueError("length of x_arr and y_arr must be >0")
+    if len(xp) != len(fp):
+        raise ValueError("xp and yp are not the same length")
+    if len(xp) == 0:
+        raise ValueError("list of sample points is empty")
 
-    if has_numpy:
-        return numpy.interp(x, x_arr, y_arr)
-    xiprev = None
-    for xi, yi in zip(x_arr, y_arr):
-        if xi >= x:
-            break
-        xiprev = xi
-        yiprev = yi
-    else:
-        return yi
+    if x < xp[0]:
+        return fp[0] if left is None else left
+    if x > xp[-1]:
+        return fp[-1] if right is None else right
+    if len(xp) == 1:
+        return fp[0]
 
-    if xiprev is None:
-        return yi
+    i = bisect.bisect_right(xp, x)
 
-    return yiprev + (yi - yiprev) * (x - xiprev) / (xi - xiprev)
+    if i >= len(xp):
+        return fp[-1]
+
+    if isinstance(fp[0], (tuple, list)):
+        return type(fp[0])(el_i_min_1 + (el_i - el_i_min_1) * (x - xp[i - 1]) / (xp[i] - xp[i - 1]) for el_i_min_1, el_i in zip(fp[i - 1], fp[i]))
+
+    return fp[i - 1] + (fp[i] - fp[i - 1]) * (x - xp[i - 1]) / (xp[i] - xp[i - 1])
 
 
 def _set_name(name, _nameserialize, object):
@@ -19722,7 +19942,7 @@ class _AnimateExtro(Animate3dBase):
     def draw(self, t):
         if self.env.an_objects_over3d:
             for ao in sorted(self.env.an_objects_over3d, key=lambda obj: (-obj.layer(t), obj.sequence)):
-                ao.make_pil_image(t)
+                ao.make_pil_image(t - self.env._offset)
 
                 if ao._image_visible:
                     ao.x1 = ao._image_x
@@ -19767,7 +19987,7 @@ class _AnimateExtro(Animate3dBase):
                 gl.glDrawPixels(w, h, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, imdata)
 
             else:
-                for ao in sorted(self.env.an_objects_over3d, key=lambda obj: (-obj.layer(self.env.t), obj.sequence)):
+                for ao in sorted(self.env.an_objects_over3d, key=lambda obj: (-obj.layer(self.env._t), obj.sequence)):
                     if ao._image_visible:
                         imdata = ao._image.tobytes("raw", "RGBA", 0, -1)
                         w = ao._image.size[0]
@@ -21674,6 +21894,10 @@ def reset():
     except Exception:
         pass
 
+    try:
+        g.animation_env.root.destroy()
+    except Exception:
+        pass
     g.default_env = None
     g.animation_env = None
     g.animation_scene = None
@@ -21687,10 +21911,9 @@ reset()
 if __name__ == "__main__":
     try:
         import salabim_exp
-    except Exception:
+    except Exception as e:
         print("salabim_exp.py not found or ?")
-        raise
-        quit()
+        raise e
 
     try:
         salabim_exp.__dict__["exp"]
