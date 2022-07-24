@@ -17,7 +17,34 @@ Pythonista = platform.system() == "Darwin"
 
 
 def exp():
-    exp177()
+    exp179()
+    
+def exp179():
+    class X(sim.Component):
+        def process(self):
+            yield self.hold(5)
+
+    env=sim.Environment()
+    x=X()
+    sim.AnimateRectangle((100,100,200,50), text=lambda t: f"{t:5.1f}",parent=x)
+    env.animate(True)
+    env.run(1000)
+    print("end")
+
+
+
+def exp178():
+    env = sim.Environment()
+    m1 = sim.Monitor('m1')
+    m2 = sim.Monitor('m2',level=True)
+    for t in range(5):
+        print(env.now(), m1.start, m2.start, m2.tx()[0][0])
+        env.run(10)
+#        m1.reset()
+#        m2.reset()
+        env.reset_now()
+        
+        
 
 def exp177():
     class Machine(sim.Component):
@@ -415,9 +442,17 @@ def exp166():
 
 
 def exp165():
+    class X(sim.Component):
+        def process(self):
+            yield self.hold(10)
+
     sim.can_animate3d()
 
     env = sim.Environment(trace=False)
+
+    x=X()
+
+
     #    env.animation3d_init()
     do_animate = True
     do_animate3d = True
@@ -450,7 +485,7 @@ def exp165():
     env.show_camera_position()
     #    env.camera_control()
 
-    sim.Animate3dSphere(x=60, y=60, z=60, radius=10, number_of_slices=32)
+    sim.Animate3dSphere(x=60, y=60, z=60, radius=10, number_of_slices=32, parent=x)
 
     sim.Animate3dRectangle(x0=10, y0=10, x1=40, y1=40, z=-20, color="yellow")
     sim.Animate3dLine(x0=0, y0=0, z0=0, x1=50, y1=50, z1=50, color="purple")
@@ -530,6 +565,7 @@ view(field_of_view_y=39.3412)  # t=19.4049
         offset=-3,
         enabled=True,
     )
+
 
     try:
         env.run(sim.inf)
