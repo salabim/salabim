@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \    | ___|
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |   |___ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _  ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_)|____/
+#               _         _      _               ____   ____       ___       __
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \     / /_  
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |   | '_ \ 
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _ | (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_) \___/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "22.0.5"
+__version__ = "22.0.6"
 import heapq
 import random
 import time
@@ -2784,7 +2784,8 @@ class Monitor:
 
     def _xweight(self, ex0=False, force_numeric=True):
         if self._level:
-            thishash = hash((self, len(self._x), max(self.env._t, self.env._now)))
+            t_extra = self.env._t if self.env._animate else self.env._now
+            thishash = hash((self, len(self._x), t_extra))
         else:
             thishash = hash((self, len(self._x)))
         if Monitor.cached_xweight[(ex0, force_numeric)][0] == thishash:
@@ -2805,7 +2806,7 @@ class Monitor:
                     weightall.append(t - lastt)
                 lastt = t
 
-            weightall.append(self.env._t - lastt)
+            weightall.append(t_extra - lastt)
 
             weight = array.array("d")
             if typecode:
@@ -3255,7 +3256,7 @@ class AnimateMonitor(DynamicClass):
             linewidth=lambda t: self.borderlinewidth(t),
             linecolor=lambda t: self.bordercolor(t),
             screen_coordinates=self.screen_coordinates,
-            layer=lambda: self.layer_t,
+            layer=lambda: self.layer_t + 0.2, # to make it appear vehind label lines and plot line/points
             over3d=self.over3d,
             visible=lambda: self.visible_t,
         )
@@ -3434,7 +3435,7 @@ class AnimateMonitor(DynamicClass):
                 ao_label_line.angle = self.angle_t
                 ao_label_line.linewidth = self.label_linewidth(t)
                 ao_label_line.linecolor = self.label_linecolor(t)
-                ao_label_line.layer = self.layer_t
+                ao_label_line.layer = self.layer_t + 0.1 # to make it appear behind the plot line/points
                 ao_label_line.over3d = self.over3d
                 ao_label_line.visible = self.visible_t
 
@@ -3531,7 +3532,6 @@ if Pythonista:
                         env.step()
                         if not env._current_component._suppress_pause_at_step:
                             env._step_pressed = False
-                        env._t = env._now
                 if not env.paused:
                     env.frametimes.append(time.time())
                 touchvalues = self.touches.values()
@@ -5755,7 +5755,6 @@ class Environment:
                     t = inf
             c._on_event_list = False
             self.env._now = t
-            self.env._t = t
 
             self._current_component = c
 
@@ -7400,7 +7399,7 @@ class Environment:
         -------
         the current simulation animation time : float
         """
-        return self._t - self._offset
+        return (self._t if self._animate else self._now) - self._offset
 
     def reset_now(self, new_now=0):
         """
@@ -9041,7 +9040,6 @@ class Animate2dBase(DynamicClass):
 
         screen_coordinates = locals_["screen_coordinates"]
         over3d = locals_["over3d"]
-
 
         self.env = g.default_env if env is None else env
         self.sequence = self.env.serialize()
@@ -14759,11 +14757,9 @@ class Component:
         ----
         Normally, the animation_children are removed automatically upon termination of a component (when it terminates)
         """
-        print("****remove_a_c", self._animation_children)
         for ao in self._animation_children:
             ao.remove()
         self._animation_children = set()
-
 
     def suppress_trace(self, value=None):
         """

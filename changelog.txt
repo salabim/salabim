@@ -1,5 +1,20 @@
 salabim changelog
 
+version 22.0.6  2022-07-28
+==========================
+Bugfix (0)
+----------
+In the just released version 22.0.5, a serious bug made that animations did
+not run correctly.
+Fixed.
+
+Bugfix (1)
+----------
+In AnimateMonitor / Monitor.animate(), the fillcolor rectangle was not correctly
+positioned behind the label lines, which were in turn not positioned behind
+the plot line/points.
+Fixed.
+
 version 22.0.5  2022-07-24  
 ==========================
 Improved functionality (0)

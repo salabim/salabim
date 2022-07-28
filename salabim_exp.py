@@ -17,7 +17,48 @@ Pythonista = platform.system() == "Darwin"
 
 
 def exp():
-    exp179()
+    exp181()
+
+
+def exp181():
+    env = sim.Environment()
+
+    class X(sim.Component):
+        def process(self):
+            m.tally(1)
+            yield self.hold(1)
+            m.tally(2)
+
+
+
+    env.animate(True)
+    m = sim.Monitor("m", level=True)
+    X()
+    sim.AnimateText(x=10, y=100, text=lambda:f"mean={m.mean():6.3f}")
+
+    env.run(10)
+    print(m.mean())
+
+def exp180():
+    env = sim.Environment(trace=True)
+    
+    class X(sim.Component):
+        def process(self):
+            yield self.hold(5)
+            print('xx')
+            yield 1
+            print('yy')
+            yield self.hold(1)
+            print('+++')
+        
+    class Y(sim.Component):
+        def process(self):
+            yield self.passivate()
+            
+    x = X()
+    y = Y()
+    env.run()
+        
     
 def exp179():
     class X(sim.Component):
