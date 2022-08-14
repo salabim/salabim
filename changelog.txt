@@ -1,5 +1,40 @@
 salabim changelog
 
+version 22.0.7
+==========================
+New functionality
+-----------------
+The method Environment.background3d_color can be used to set or query the
+background color of a 3D window. Note that this can be changed at any time
+and will be immediately in effect.
+Related to this is a new parameter background3d_color of Envuironment.animation_parameters,
+which has the same functionality.
+
+Renamed methods (0)
+-------------------
+For consistency reasons, the following methods are renamed
+
+salabim <= 22.0.6                            salabim >= 22.0.7
+------------------------------------------   -------------------------------------------
+Environment.user_to_screencoordinates_x      Environment.user_to_screen_coordinates_x
+Environment.user_to_screencoordinates_y      Environment.user_to_screen_coordinates_y
+Environment.user_to_screencoordinates_size   Environment.user_to_screen_coordinates_size
+Environment.screen_to_usercoordinates_x      Environment.screen_to_user_coordinates_x
+Environment.screen_to_usercoordinates_y      Environment.screen_to_user_coordinates_y
+Environment.screen_to_usercoordinates_size   Environment.screen_to_user_coordinates_size
+------------------------------------------   -------------------------------------------
+
+Bugfix (0)
+----------
+When a 3D animation was closed, the 3D window did not disappear.
+Fixed.
+
+Bugfix (1)
+----------
+When initializing Resource with a non zero inititial_claimed_quantity,
+the Resource.available_quantity monitor got the wrong initial tally.
+Fixed.
+ 
 version 22.0.6  2022-07-28
 ==========================
 Bugfix (0)

@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___       __
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \     / /_  
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |   | '_ \ 
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _ | (_) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_) \___/
+#               _         _      _               ____   ____       ___      _____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \    |___  |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |      / /
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _   / /
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_) /_/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "22.0.6"
+__version__ = "22.0.7"
 import heapq
 import random
 import time
@@ -3256,7 +3256,7 @@ class AnimateMonitor(DynamicClass):
             linewidth=lambda t: self.borderlinewidth(t),
             linecolor=lambda t: self.bordercolor(t),
             screen_coordinates=self.screen_coordinates,
-            layer=lambda: self.layer_t + 0.2, # to make it appear vehind label lines and plot line/points
+            layer=lambda: self.layer_t + 0.2,  # to make it appear vehind label lines and plot line/points
             over3d=self.over3d,
             visible=lambda: self.visible_t,
         )
@@ -3435,7 +3435,7 @@ class AnimateMonitor(DynamicClass):
                 ao_label_line.angle = self.angle_t
                 ao_label_line.linewidth = self.label_linewidth(t)
                 ao_label_line.linecolor = self.label_linecolor(t)
-                ao_label_line.layer = self.layer_t + 0.1 # to make it appear behind the plot line/points
+                ao_label_line.layer = self.layer_t + 0.1  # to make it appear behind the plot line/points
                 ao_label_line.over3d = self.over3d
                 ao_label_line.visible = self.visible_t
 
@@ -5230,8 +5230,8 @@ class Environment:
         self._speed = 1
         self._animate = False
         self._animate3d = False
-        self.view = _AnimateIntro()
-        _AnimateExtro()
+        self.view = _AnimateIntro(env=self)
+        _AnimateExtro(env=self)
         self._gl_initialized = False
         self._camera_auto_print = False
         self.obj_filenames = {}
@@ -5279,6 +5279,7 @@ class Environment:
         self._video_width = "auto"
         self._video_height = "auto"
         self._video_mode = "2d"
+        self._background3d_color = "black"
         self._title = "salabim"
         self._show_menu_buttons = True
         self._x0 = 0
@@ -5359,7 +5360,6 @@ class Environment:
 
         self.window3d = glut.glutCreateWindow("salabim3d")
 
-        gl.glClearColor(0.0, 0.0, 0.0, 0.0)
         gl.glClearDepth(1.0)
         gl.glDepthFunc(gl.GL_LESS)
         gl.glEnable(gl.GL_DEPTH_TEST)
@@ -5827,6 +5827,7 @@ class Environment:
         x1=None,
         background_color=None,
         foreground_color=None,
+        background3d_color=None,
         fps=None,
         modelname=None,
         use_toplevel=None,
@@ -5936,6 +5937,10 @@ class Environment:
             in order to get a good contrast with the background color. |n|
             if omitted and background_color is also omitted, no change. At init of the
             environment, this will be set to black.
+
+        background3d_color : colorspec
+            color of the 3d background |n|
+            if omitted, no change. At init of the environment, this will be set to black.
 
         fps : float
             number of frames per second
@@ -6124,6 +6129,9 @@ class Environment:
                 raise ValueError(foreground_color + "not allowed for foreground_color")
             self._foreground_color = foreground_color
 
+        if background3d_color is not None:
+            self._background3d_color = background3d_color
+
         if modelname is not None:
             self._modelname = modelname
 
@@ -6192,6 +6200,10 @@ class Environment:
             if animate3d == "?":
                 animate3d = can_animate3d(try_only=True)
             self._animate3d = animate3d
+            if not animate3d:
+                glut.glutDestroyWindow(self.window3d)
+                glut.glutMainLoopEvent()
+                self._gl_initialized = False
 
         if animate is not None:
             if animate == "?":
@@ -6651,7 +6663,7 @@ class Environment:
         """
         return self._scale
 
-    def user_to_screencoordinates_x(self, userx):
+    def user_to_screen_coordinates_x(self, userx):
         """
         converts a user x coordinate to a screen x coordinate
 
@@ -6666,7 +6678,7 @@ class Environment:
         """
         return (userx - self._x0) * self._scale
 
-    def user_to_screencoordinates_y(self, usery):
+    def user_to_screen_coordinates_y(self, usery):
         """
         converts a user x coordinate to a screen x coordinate
 
@@ -6681,7 +6693,7 @@ class Environment:
         """
         return (usery - self._y0) * self._scale
 
-    def user_to_screencoordinates_size(self, usersize):
+    def user_to_screen_coordinates_size(self, usersize):
         """
         converts a user size to a value to be used with screen coordinates
 
@@ -6696,7 +6708,7 @@ class Environment:
         """
         return usersize * self._scale
 
-    def screen_to_usercoordinates_x(self, screenx):
+    def screen_to_user_coordinates_x(self, screenx):
         """
         converts a screen x coordinate to a user x coordinate
 
@@ -6711,7 +6723,7 @@ class Environment:
         """
         return self._x0 + screenx / self._scale
 
-    def screen_to_usercoordinates_y(self, screeny):
+    def screen_to_user_coordinates_y(self, screeny):
         """
         converts a screen x coordinate to a user x coordinate
 
@@ -6726,7 +6738,7 @@ class Environment:
         """
         return self._y0 + screeny / self._scale
 
-    def screen_to_usercoordinates_size(self, screensize):
+    def screen_to_user_coordinates_size(self, screensize):
         """
         converts a screen size to a value to be used with user coordinates
 
@@ -6991,6 +7003,24 @@ class Environment:
         if value is not None:
             self.animation_parameters(background_color=value, animate=None)
         return self._background_color
+
+    def background3d_color(self, value=None):
+        """
+        background3d_color of the animation
+
+        Parameters
+        ----------
+        value : colorspec
+            new background_color |n|
+            if not specified, no change
+
+        Returns
+        -------
+        background3d_color of animation : colorspec
+        """
+        if value is not None:
+            self.animation_parameters(background3d_color=value)
+        return self._background3d_color
 
     def foreground_color(self, value=None):
         """
@@ -18484,8 +18514,9 @@ class Resource:
             "Claimed quantity of " + self.name(), level=True, initial_tally=initial_claimed_quantity, monitor=monitor, type="float", env=self.env
         )
         self.available_quantity = _SystemMonitor(
-            "Available quantity of " + self.name(), level=True, initial_tally=capacity, monitor=monitor, type="float", env=self.env
+            "Available quantity of " + self.name(), level=True, initial_tally=capacity - initial_claimed_quantity, monitor=monitor, type="float", env=self.env
         )
+
         self.occupancy = _SystemMonitor("Occupancy of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="float", env=self.env)
         if self.env._trace:
             self.env.print_trace("", "", self.name() + " create", "capacity=" + str(self._capacity) + (" anonymous" if self._anonymous else ""))
@@ -19863,6 +19894,10 @@ def resize_with_pad(im, target_width, target_height):
 
 
 class _AnimateIntro(Animate3dBase):
+    def __init__(self, env):
+        self.env = env
+        super().__init__()
+
     def setup(self):
         self.layer = -math.inf
         self.field_of_view_y = 45
@@ -19913,6 +19948,9 @@ class _AnimateIntro(Animate3dBase):
         if self.lights_pname(t) is None:
             self.lights_pname = gl.GL_POSITION  # in principal only at first call
 
+        background_color = list(self.env.colorspec_to_gl_color(self.env._background3d_color)) + [0.0]
+        gl.glClearColor(*background_color)
+
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
 
         gl.glMatrixMode(gl.GL_PROJECTION)
@@ -19932,6 +19970,10 @@ class _AnimateIntro(Animate3dBase):
 
 
 class _AnimateExtro(Animate3dBase):
+    def __init__(self, env):
+        self.env = env
+        super().__init__()
+
     def setup(self):
         self.layer = math.inf
 

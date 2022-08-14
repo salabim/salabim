@@ -15,9 +15,8 @@ import datetime
 
 Pythonista = platform.system() == "Darwin"
 
-
 def exp():
-    exp181()
+    exp165()
 
 
 def exp181():
@@ -489,8 +488,9 @@ def exp165():
 
     sim.can_animate3d()
 
-    env = sim.Environment(trace=False)
 
+    env = sim.Environment(trace=False)
+    env.background3d_color("orange")
     x=X()
 
 
@@ -609,6 +609,13 @@ view(field_of_view_y=39.3412)  # t=19.4049
 
 
     try:
+        env.run(4)
+        env.animate3d(False)
+        env.background3d_color("blue")
+
+        env.run(4)
+        env.animate3d(True)
+
         env.run(sim.inf)
     except sim.SimulationStopped:
         pass
