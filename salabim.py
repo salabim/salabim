@@ -14307,10 +14307,10 @@ class Component:
 
     def honor_any(self):
         for r in self._requests:
-            if r.honor_only_first and r._requesters[0] != self:
+            if r._honor_only_first and r._requesters[0] != self:
                 continue
             self_prio = self.priority(r._requesters)
-            if r.honor_only_highest_priority and self_prio != r._requesters._head.successor.priority:
+            if r._honor_only_highest_priority and self_prio != r._requesters._head.successor.priority:
                 continue
 
             if self._requests[r] > 0:
