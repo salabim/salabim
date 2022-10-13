@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \    |___  |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |      / /
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _   / /
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_) /_/
+#               _         _      _               ____   ____       ___       ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \     ( _ )
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |    / _ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _ | (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_) \___/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "22.0.7"
+__version__ = "22.0.8"
 import heapq
 import random
 import time
@@ -627,6 +627,7 @@ class Monitor:
         self.env = self_env
         m.isgenerated = True
         m._name = self.name() + ".frozen" if name is None else name
+        m.env._animate=False
         m.env._now = self.env._now
         m.env._offset = self.env._offset
         m.env._t = self.env._t
@@ -2734,7 +2735,8 @@ class Monitor:
         t = array.array("d")
         if add_now:
             addx = [x[-1]]
-            addt = [self.env._t]
+            t_extra = self.env._t if self.env._animate else self.env._now
+            addt = [t_extra]
         else:
             addx = []
             addt = []
@@ -2805,7 +2807,6 @@ class Monitor:
                 if lastt is not None:
                     weightall.append(t - lastt)
                 lastt = t
-
             weightall.append(t_extra - lastt)
 
             weight = array.array("d")
@@ -3581,7 +3582,7 @@ if Pythonista:
                         scene.pop_matrix()
                     elif uio.type == "slider":
                         scene.push_matrix()
-                        scene.tint(env.pythonistacolor(uio.labelcolor))
+                        scene.tint(env.pythonistacolor(uio.foreground_color))
                         v = uio.vmin
                         x = ux + uio.xdelta / 2
                         y = uy
@@ -3598,7 +3599,7 @@ if Pythonista:
                                 xsel = touch.location[0] - ux
                                 vsel = round(-0.5 + xsel / uio.xdelta) * uio.resolution
                                 thisv = vsel
-                        scene.stroke(env.pythonistacolor(uio.linecolor))
+                        scene.stroke(env.pythonistacolor(uio.foreground_color))
                         v = uio.vmin
                         xfirst = -1
                         while v <= uio.vmax:
@@ -3613,9 +3614,10 @@ if Pythonista:
                             x += uio.xdelta
 
                         scene.push_matrix()
+                        scene.stroke(env.pythonistacolor(uio.foreground_color))
                         scene.translate(xfirst, uy + uio.height + 2)
-                        if uio.label:
-                            scene.text(uio.label, uio.font, uio.fontsize, alignment=9)
+                        if uio._label:
+                            scene.text(uio._label, uio.font, uio.fontsize, alignment=9)
                         scene.pop_matrix()
                         scene.translate(ux + uio.width, uy + uio.height + 2)
                         scene.text(str(thisv) + " ", uio.font, uio.fontsize, alignment=7)
@@ -5078,6 +5080,967 @@ class Animate3dBase(DynamicClass):
         return self in self.env.an_objects3d
 
 
+class _Movement:  # used by trajectories
+    def __init__(self, l, vmax=None, v0=None, v1=None, acc=None, dec=None):
+        if vmax is None:
+            vmax = 1
+        if v0 is None:
+            v0 = vmax
+        if v1 is None:
+            v1 = vmax
+        if acc is None:
+            acc = math.inf
+        if dec is None:
+            dec = math.inf
+
+        acc2inv = 1 / (2 * acc)
+        dec2inv = 1 / (2 * dec)
+        s_v0_vmax = (vmax ** 2 - v0 ** 2) * acc2inv
+        s_vmax_v1 = (vmax ** 2 - v1 ** 2) * dec2inv
+
+        if s_v0_vmax + s_vmax_v1 > l:
+            vmax = math.sqrt((l + (v0 ** 2 * acc2inv) + (v1 ** 2 * dec2inv)) / (acc2inv + dec2inv))
+
+        self.l_v0_vmax = (vmax ** 2 - v0 ** 2) * acc2inv
+        self.l_vmax_v1 = (vmax ** 2 - v1 ** 2) * dec2inv
+
+        self.l_vmax = l - self.l_v0_vmax - self.l_vmax_v1
+        if self.l_v0_vmax < 0 or self.l_vmax_v1 < 0:
+            raise ValueError("not feasible")
+        self.t_v0_vmax = (vmax - v0) / acc
+        self.t_vmax = self.l_vmax / vmax
+        self.t_vmax_v1 = (vmax - v1) / dec
+        self.t = self.t_v0_vmax + self.t_vmax + self.t_vmax_v1
+        self.v0 = v0
+        self.vmax = vmax
+        self.acc = acc
+        self.dec = dec
+
+    def l_at_t(self, t):
+        if t < 0:
+            return 0
+        if self.acc == math.inf and self.dec == math.inf:
+            return self.vmax * t
+        if t < self.t_v0_vmax:
+            return (self.v0 * t) + self.acc * t ** 2 / 2
+        t -= self.t_v0_vmax
+        if t < self.t_vmax:
+            return self.l_v0_vmax + t * self.vmax
+        t -= self.t_vmax
+        if self.dec == math.inf:
+            return self.l_v0_vmax + self.l_vmax + (self.vmax * t)
+        return self.l_v0_vmax + self.l_vmax + (self.vmax * t) - self.dec * t ** 2 / 2
+
+
+class _Trajectory:  # uised by trajectories
+    def in_trajectory(self, t):
+        return self._t0 <= t <= self._t1
+
+    def t0(self):
+        return self._t0
+
+    def t1(self):
+        return self._t1
+
+    def duration(self):
+        return self._duration
+
+    def rendered_polygon(self, time_step=1):
+        result = []
+        for t in arange(self.t0(), self.t1(), time_step):
+            result.extend([self.x(t), self.y(t)])
+        result.extend([self.x(self.t1()), self.y(self.t1())])
+        return result
+
+    def __add__(self, other):
+        if other == 0:
+            return self
+        if not isinstance(other, _Trajectory):
+            return NotImplemented
+        return TrajectoryMerged([self, other])
+
+    __radd__ = __add__
+
+
+class TrajectoryMerged(_Trajectory):
+    @functools.lru_cache(maxsize=1)
+    def index(self, t):
+        if t <= self._t0s[0]:
+            return 0
+        if t >= self._t0s[-1]:
+            return len(self._t0s) - 1
+        i = searchsorted(self._t0s, t, "left") - 1
+        return i
+
+    def __init__(self, trajectories):
+        """
+        merge trajectories
+
+        Parameters
+        ----------
+        trajectories : iterable (list, tuple, ...)
+            list trajectories to be merged
+
+        Returns
+        -------
+        merged trajectory : Trajectory
+
+        Notes
+        -----
+        It is arguably easier just to add or sum trajectories, like |n|
+
+            trajectory = trajectory1 + trajectory2 + trajectory3 or |n|
+            trajectory = sum((trajectory, trajectory2, trajectory3))        
+        """
+        self._trajectories = trajectories
+        self._duration = sum(trajectory._duration for trajectory in self._trajectories)
+        self._t0 = 0
+        self._t1 = self._t0 + self._duration
+        self._length = sum(trajectory._length for trajectory in self._trajectories)
+        cum_length = 0
+        _t0 = self._t0
+        self.cum_lengths = []
+        self._t0s = []
+        for trajectory in self._trajectories:
+            self.cum_lengths.append(cum_length)
+            self._t0s.append(_t0)
+            cum_length += trajectory._length
+            _t0 += trajectory._duration
+        self.cum_lengths.append(cum_length)
+        self._length = cum_length
+
+    def __init__(self, trajectories):
+        self._trajectories = trajectories
+        self._duration = sum(trajectory._duration for trajectory in self._trajectories)
+        self._t0 = trajectories[0]._t0
+        self._t1 = self._t0 + self._duration
+        self._length = sum(trajectory._length for trajectory in self._trajectories)
+        cum_length = 0
+        _t0 = self._t0
+        self.cum_lengths = []
+        self._t0s = []
+        for trajectory in self._trajectories:
+            self.cum_lengths.append(cum_length)
+            self._t0s.append(_t0)
+            cum_length += trajectory._length
+            _t0 += trajectory._duration
+        self.cum_lengths.append(cum_length)
+        self._length = cum_length
+
+    def __repr__(self):
+        return f"TrajectoryMerged(t0={self._t0}, trajectories={self._trajectories}, t0s={self._t0s})"
+
+    def x(self, t, _t0=None):
+        """
+        value of x
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate x
+
+        Returns
+        -------
+        evaluated x : float
+        """
+        i = self.index(t)
+        trajectory = self._trajectories[i]
+        t0 = self._t0s[i]
+        return trajectory.x(t=t, _t0=t0)
+
+    def y(self, t, _t0=None):
+        """
+        value of y
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate y
+
+        Returns
+        -------
+        evaluated y : float
+        """
+        i = self.index(t)
+        trajectory = self._trajectories[i]
+        t0 = self._t0s[i]
+        return trajectory.y(t=t, _t0=t0)
+
+    def angle(self, t, _t0=None):
+        """
+        value of angle (in degrees)
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate angle
+
+        Returns
+        -------
+        evaluated angle (in degrees) : float
+        """
+        i = self.index(t)
+        trajectory = self._trajectories[i]
+        t0 = self._t0s[i]
+        return trajectory.angle(t=t, _t0=t0)
+
+    def in_trajectory(self, t):
+        """
+        is t in trajectory?
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate
+
+        Returns
+        -------
+        is t in trajectory? : bool
+        """
+        return super().in_trajectory(t)
+
+    def t0(self):
+        """
+        start time of trajectory
+
+        Returns
+        -------
+        start time of trajectory : float
+        """
+        return super().t0()
+
+    def t1(self):
+        """
+        end time of trajectory
+
+        Returns
+        -------
+        end time of trajectory : float
+        """
+        return super().t1()
+
+    def duration(self):
+        """
+        duration of trajectory
+
+        Returns
+        -------
+        duration of trajectory (t1 - t0): float
+        """
+        return super().duration()
+
+    def length(self, t=None, _t0=None):
+        """
+        length of traversed trajectory at time t or total length
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate length. If omitted, total length will be returned            
+
+        Returns
+        -------
+        length : float
+            length of traversed trajectory at time t or |n|
+            total length if t omitted
+        """
+        i = self.index(t)
+        trajectory = self._trajectories[i]
+        t0 = self._t0s[i]
+        return trajectory.length(t=t, _t0=t0) + self.cum_lengths[i]
+
+    def rendered_polygon(self, time_step=1):
+        """
+        rendered polygon
+
+        Parameters
+        ----------
+        time_step : float
+            defines at which point in time the trajectory has to be rendered |n|
+            default : 1
+
+        Returns
+        -------
+        polygon : list of x, y
+            rendered from t0 to t1 with time_step |n|
+            can be used directly in sim.AnimatePoints() or AnimatePolygon()
+        """
+        return super().rendered_polygon(time_step)
+
+
+class TrajectoryStandstill(_Trajectory):
+    def __init__(self, xy, duration, orientation=0, t0=None, env=None):
+        """
+        Standstill trajectory, to be used in Animatexxx through x, y and angle methods
+
+        Parameters
+        ----------
+        xy : tuple or list of 2 floats
+            initial (and final) position. should be like x, y
+
+        orientation : float or callable
+            orientation (angle) in degrees |n|
+            a one parameter callable is also accepted (and will be called with 0) |n|
+            default: 0
+
+        t0 : float
+            time the trajectory should start |n|
+            default: env.now() |n|
+            if not the first in a merged trajectory or AnimateQueue, ignored
+
+        env : Environment
+            environment where the trajectory is defined |n|
+            if omitted, default_env will be used
+        """
+        env = g.default_env if env is None else env
+        self._t0 = env.now() if t0 is None else t0
+        self._x, self._y = xy
+        self._duration = duration
+        self._length = 0
+        self._t1 = self._t0 + duration
+        if callable(orientation):
+            self._angle = orientation(0)
+        else:
+            self._angle = orientation
+
+    def x(self, t, _t0=None):
+        """
+        value of x
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate x
+
+        Returns
+        -------
+        evaluated x : float
+        """
+        return self._x
+
+    def y(self, t, _t0=None):
+        """
+        value of y
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate y
+
+        Returns
+        -------
+        evaluated y : float
+        """
+        return self._y
+
+    def angle(self, t, _t0=None):
+        """
+        value of angle (in degrees)
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate angle
+
+        Returns
+        -------
+        evaluated angle (in degrees) : float
+        """
+        return self._angle
+
+    def in_trajectory(self, t):
+        """
+        is t in trajectory?
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate
+
+        Returns
+        -------
+        is t in trajectory? : bool
+        """
+        return super().in_trajectory(t)
+
+    def t0(self):
+        """
+        start time of trajectory
+
+        Returns
+        -------
+        start time of trajectory : float
+        """
+        return super().t0()
+
+    def t1(self):
+        """
+        end time of trajectory
+
+        Returns
+        -------
+        end time of trajectory : float
+        """
+        return super().t1()
+
+    def duration(self):
+        """
+        duration of trajectory
+
+        Returns
+        -------
+        duration of trajectory (t1 - t0): float
+        """
+        return super().duration()
+
+    def length(self, t=None, _t0=None):
+        """
+        length of traversed trajectory at time t or total length
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate length.           
+
+        Returns
+        -------
+        length : float
+            always 0 |n|
+        """
+        return 0
+
+    def rendered_polygon(self, time_step=1):
+        """
+        rendered polygon
+
+        Parameters
+        ----------
+        time_step : float
+            defines at which point in time the trajectory has to be rendered |n|
+            default : 1
+
+        Returns
+        -------
+        polygon : list of x, y
+            rendered from t0 to t1 with time_step |n|
+            can be used directly in sim.AnimatePoints() or AnimatePolygon()
+        """
+        return super().rendered_polygon(time_step)
+
+
+class TrajectoryPolygon(_Trajectory):
+    def __init__(self, polygon, t0=None, vmax=None, v0=None, v1=None, acc=None, dec=None, orientation=None, spline=None, res=50, env=None):
+        """
+        Polygon trajectory, to be used in Animatexxx through x, y and angle methods
+
+        Parameters
+        ----------
+        polygon : iterable of floats
+            should be like x0, y0, x1, y1, ...
+
+        t0 : float
+            time the trajectory should start |n|
+            default: env.now() |n|
+            if not the first in a merged trajectory or AnimateQueue, ignored
+
+        vmax : float
+            maximum speed, i.e. position units per time unit |n|
+            default: 1
+
+        v0 : float
+            velocity at start |n|
+            default: vmax
+
+        v1 : float
+            velocity at end |n|
+            default: vmax
+
+        acc : float
+            acceleration rate (position units / time units ** 2) |n|
+            default: inf (i.e. no acceleration)
+
+        dec : float
+            deceleration rate (position units / time units ** 2) |n|
+            default: inf (i.e. no deceleration)
+
+        orientation : float
+            default: gives angle in the direction of the movement when calling angle(t) |n|
+            if a one parameter callable, the angle in the direction of the movement will be callled |n|
+            if a float, this orientation will always be returned as angle(t) 
+
+        spline : None or string
+            if None (default), polygon is used as such |n|
+            if 'bezier' (or any string starting with 'b' or 'B', Bézier splining is used |n|
+            if 'catmull_rom' (or any string starting with 'c' or 'C', Catmull-Rom splining is used
+
+        res : int
+            resolution of spline (ignored when no splining is applied)
+
+        env : Environment
+            environment where the trajectory is defined |n|
+            if omitted, default_env will be used
+
+        Notes
+        -----
+        bezier and catmull_rom splines require numpy to be installed.
+        """
+
+        def catmull_rom_polygon(polygon, res):
+            def evaluate(x, v0, v1, v2, v3):
+                c1 = 1.0 * v1
+                c2 = -0.5 * v0 + 0.5 * v2
+                c3 = 1.0 * v0 + -2.5 * v1 + 2.0 * v2 - 0.5 * v3
+                c4 = -0.5 * v0 + 1.5 * v1 + -1.5 * v2 + 0.5 * v3
+                return ((c4 * x + c3) * x + c2) * x + c1
+
+            if not has_numpy():
+                raise ImportError("catmull_rom trajectory requires numpy")
+
+            p_x = []
+            p_y = []
+            for x, y in zip(polygon[::2], polygon[1::2]):
+                p_x.append(x)
+                p_y.append(y)
+
+            _x = numpy.empty(res * (len(p_x) - 1) + 1)
+            _y = numpy.empty(res * (len(p_x) - 1) + 1)
+
+            _x[-1] = p_x[-1]
+            _y[-1] = p_y[-1]
+
+            for i in range(len(p_x) - 1):
+                _x[i * res : (i + 1) * res] = numpy.linspace(p_x[i], p_x[i + 1], res, endpoint=False)
+                numpy.linspace(polygon[i * 2], polygon[i * 2 + 2], res, endpoint=False)
+                _y[i * res : (i + 1) * res] = numpy.array(
+                    [
+                        evaluate(
+                            x,
+                            p_y[0] - (p_y[1] - p_y[0]) if i == 0 else p_y[i - 1],
+                            p_y[i],
+                            p_y[i + 1],
+                            p_y[i + 1] + (p_y[i + 1] - p_y[i]) if i == len(p_x) - 2 else p_y[i + 2],
+                        )
+                        for x in numpy.linspace(0.0, 1.0, res, endpoint=False)
+                    ]
+                )
+            polygon = []
+            for xy in zip(_x, _y):
+                polygon.extend(xy)
+            return polygon
+
+        def bezier_polygon(polygon, res):
+            # based on https://github.com/torresjrjr/Bezier.py
+
+            def bezier_curve(t_values, points):
+                def two_points(t, P1, P2):
+                    return (1 - t) * P1 + t * P2
+
+                def do_points(t, points):
+                    newpoints = []
+                    for i1 in range(0, len(points) - 1):
+                        newpoints += [two_points(t, points[i1], points[i1 + 1])]
+                    return newpoints
+
+                def do_point(t, points):
+                    newpoints = points
+                    while len(newpoints) > 1:
+                        newpoints = do_points(t, newpoints)
+                    return newpoints[0]
+
+                curve = numpy.array([[0.0] * len(points[0])])
+                for t in t_values:
+                    curve = numpy.append(curve, [do_point(t, points)], axis=0)
+                curve = numpy.delete(curve, 0, 0)
+                return curve
+
+            if not has_numpy():
+                raise ImportError("bezier trajectory requires numpy")
+            points = []
+            for x, y in zip(polygon[::2], polygon[1::2]):
+                points.append([x, y])
+            points = numpy.array(points)
+            t_points = numpy.linspace(0, 1, res)
+
+            polygon = []
+            curve = bezier_curve(t_points, points)
+            for xy in curve:
+                polygon.extend(xy)
+            return polygon
+
+        if spline is not None:
+            if isinstance(spline, str) and spline.lower().startswith("c"):
+                polygon = catmull_rom_polygon(polygon, res=res)
+            elif isinstance(spline, str) and spline.lower().startswith("b"):
+                polygon = bezier_polygon(polygon, res=res)
+            else:
+                raise ValueError(f"spline {spline} not recognized")
+
+        env = g.default_env if env is None else env
+        self._t0 = env.now() if t0 is None else t0
+
+        cum_length = 0
+        self.cum_length = []
+        self._x = []
+        self._y = []
+        self._angle = []
+        for x, y, next_x, next_y in zip(polygon[::2], polygon[1::2], polygon[2::2], polygon[3::2]):
+            dx = next_x - x
+            dy = next_y - y
+            if orientation is None:
+                self._angle.append(math.degrees(math.atan2(dy, dx)))
+            else:
+                if callable(orientation):
+                    self._angle.append(orientation(math.degrees(math.atan2(dy, dx))))
+                else:
+                    self._angle.append(orientation)
+            self._x.append(x)
+            self._y.append(y)
+            self.cum_length.append(cum_length)
+            segment_length = math.sqrt(dx * dx + dy * dy)
+            cum_length += segment_length
+        self._x.append(next_x)
+        self._y.append(next_y)
+        self._angle.append(self._angle[-1])
+        self.cum_length.append(cum_length)
+
+        self._length = self.cum_length[-1]
+        self.movement = _Movement(l=self._length, v0=v0, v1=v1, vmax=vmax, acc=acc, dec=dec)
+        self._duration = self.movement.t
+        self._t1 = self._t0 + self._duration
+
+    def __repr__(self):
+        return f"TrajectoryPolygon(t0={self._t0})"
+
+    @functools.lru_cache(maxsize=1)
+    def indexes(self, t, _t0=None):
+        t = t - (self._t0 if _t0 is None else _t0)
+
+        length = self.movement.l_at_t(t)
+
+        if length <= self.cum_length[0]:
+            return length, 0, 0
+        if length >= self.cum_length[-1]:
+            return length, len(self.cum_length) - 1, len(self.cum_length) - 1
+
+        i = searchsorted(self.cum_length, length) - 1
+        return length, i, i + 1
+
+    def x(self, t, _t0=None):
+        """
+        value of x
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate x
+
+        Returns
+        -------
+        evaluated x : float
+        """
+        length, i, j = self.indexes(t, _t0=_t0)
+        return interp(length, [self.cum_length[i], self.cum_length[j]], [self._x[i], self._x[j]])
+
+    def y(self, t, _t0=None):
+        """
+        value of y
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate y
+
+        Returns
+        -------
+        evaluated y : float
+        """
+        length, i, j = self.indexes(t, _t0=_t0)
+        return interp(length, [self.cum_length[i], self.cum_length[j]], [self._y[i], self._y[j]])
+
+    def angle(self, t, _t0=None):
+        """
+        value of angle (in degrees)
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate angle
+
+        Returns
+        -------
+        evaluated angle (in degrees) : float
+        """
+        length, i, j = self.indexes(t, _t0=_t0)
+        return self._angle[i]
+
+    def in_trajectory(self, t):
+        """
+        is t in trajectory?
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate
+
+        Returns
+        -------
+        is t in trajectory? : bool
+        """
+        return super().in_trajectory(t)
+
+    def t0(self):
+        """
+        start time of trajectory
+
+        Returns
+        -------
+        start time of trajectory : float
+        """
+        return super().t0()
+
+    def t1(self):
+        """
+        end time of trajectory
+
+        Returns
+        -------
+        end time of trajectory : float
+        """
+        return super().t1()
+
+    def duration(self):
+        """
+        duration of trajectory
+
+        Returns
+        -------
+        duration of trajectory (t1 - t0): float
+        """
+        return super().duration()
+
+    def length(self, t=None, _t0=None):
+        """
+        length of traversed trajectory at time t or total length
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate lenght. If omitted, total length will be returned
+
+        Returns
+        -------
+        length : float
+            length of traversed trajectory at time t or |n|
+            total length if t omitted
+        """
+        length, i, j = self.indexes(t, _t0=_t0)
+        return self.cum_length[i] + length
+
+    def rendered_polygon(self, time_step=1):
+        """
+        rendered polygon
+
+        Parameters
+        ----------
+        time_step : float
+            defines at which point in time the trajectory has to be rendered |n|
+            default : 1
+
+        Returns
+        -------
+        polygon : list of x, y
+            rendered from t0 to t1 with time_step |n|
+            can be used directly in sim.AnimatePoints() or AnimatePolygon()
+        """
+        return super().rendered_polygon(time_step)
+
+
+class TrajectoryCircle(_Trajectory):
+    def __init__(
+        self, radius, x_center=0, y_center=0, angle0=0, angle1=360, t0=None, vmax=None, v0=None, v1=None, acc=None, dec=None, orientation=None, env=None
+    ):
+        """
+        Circle (arc) trajectory, to be used in Animatexxx through x, y and angle methods
+
+        Parameters
+        ----------        
+        radius : float
+            radius of the circle or arc
+
+        x_center : float
+            x-coordinate of the circle
+
+        y_center : float
+            y-coordinate of the circle            
+
+        angle0 : float
+            start angle in degrees |n|
+            default: 0
+
+        angle1 : float
+            end angle in degrees |n|
+            default: 360
+
+        t0 : float
+            time the trajectory should start |n|
+            default: env.now() |n|
+            if not the first in a merged trajectory or AnimateQueue, ignored
+
+        vmax : float
+            maximum speed, i.e. position units per time unit |n|
+            default: 1
+
+        v0 : float
+            velocity at start |n|
+            default: vmax
+
+        v1 : float
+            velocity at end |n|
+            default: vmax
+
+        acc : float
+            acceleration rate (position units / time units ** 2) |n|
+            default: inf (i.e. no acceleration)
+
+        dec : float
+            deceleration rate (position units / time units ** 2) |n|
+            default: inf (i.e. no deceleration)
+
+        orientation : float
+            default: gives angle in the direction of the movement when calling angle(t) |n|
+            if a one parameter callable, the angle in the direction of the movement will be callled |n|
+            if a float, this orientation will always be returned as angle(t) 
+
+        env : Environment
+            environment where the trajectory is defined |n|
+            if omitted, default_env will be used
+        """
+        env = g.default_env if env is None else env
+        self._t0 = env.now() if t0 is None else t0
+        self.radius = radius
+        self.angle0 = angle0
+        self.angle1 = angle1
+        self.x_center = x_center
+        self.y_center = y_center
+        self._length = abs(math.radians(self.angle1 - self.angle0)) * self.radius
+        self.movement = _Movement(l=self._length, v0=v0, v1=v1, vmax=vmax, acc=acc, dec=dec)
+        self._duration = self.movement.t
+        self._t1 = self._t0 + self._duration
+        self.orientation = orientation
+
+    def __repr__(self):
+        return f"TrajectoryCircle(t0={self._t0})"
+
+    def x(self, t, _t0=None):
+        length = self.length(t, _t0=_t0)
+        return self.x_center + self.radius * math.cos(math.radians(interp(length, (0, self._length), (self.angle0, self.angle1))))
+
+    def y(self, t, _t0=None):
+        length = self.length(t, _t0=_t0)
+        return self.y_center + self.radius * math.sin(math.radians(interp(length, (0, self._length), (self.angle0, self.angle1))))
+
+    def angle(self, t, _t0=None):
+        length = self.length(t, _t0=_t0)
+        if self.angle0 < self.angle1:
+            result = interp(length, (0, self._length), (self.angle0, self.angle1)) + 90
+        else:
+            result = interp(length, (0, self._length), (self.angle0, self.angle1)) - 90
+
+        if self.orientation is None:
+            return result
+
+        if callable(self.orientation):
+            return self.orientation(result)
+        return self.orientation
+
+    def in_trajectory(self, t):
+        """
+        is t in trajectory?
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate
+
+        Returns
+        -------
+        is t in trajectory? : bool
+        """
+        return super().in_trajectory(t)
+
+    def t0(self):
+        """
+        start time of trajectory
+
+        Returns
+        -------
+        start time of trajectory : float
+        """
+        return super().t0()
+
+    def t1(self):
+        """
+        end time of trajectory
+
+        Returns
+        -------
+        end time of trajectory : float
+        """
+        return super().t1()
+
+    def duration(self):
+        """
+        duration of trajectory
+
+        Returns
+        -------
+        duration of trajectory (t1 - t0): float
+        """
+        return super().duration()
+
+    @functools.lru_cache(maxsize=1)
+    def length(self, t=None, _t0=None):
+        """
+        length of traversed trajectory at time t or total length
+
+        Parameters
+        ----------
+        t : float
+            time at which to evaluate lenght. If omitted, total length will be returned
+
+        Returns
+        -------
+        length : float
+            length of traversed trajectory at time t or |n|
+            total length if t omitted
+        """
+        t0 = self._t0 if _t0 is None else _t0
+        t1 = t0 + self._duration
+        if t < t0:
+            t = t0
+        elif t > t1:
+            t = t1
+        return self.movement.l_at_t(t - t0)
+
+    def rendered_polygon(self, time_step=1):
+        """
+        rendered polygon
+
+        Parameters
+        ----------
+        time_step : float
+            defines at which point in time the trajectory has to be rendered |n|
+            default : 1
+
+        Returns
+        -------
+        polygon : list of x, y
+            rendered from t0 to t1 with time_step |n|
+            can be used directly in sim.AnimatePoints() or AnimatePolygon()
+        """
+        return super().rendered_polygon(time_step)
+
+
 class Environment:
     """
     environment object
@@ -5968,7 +6931,7 @@ class Environment:
 
         show_menu_buttons : bool
             if True, show the menu buttons (default)  |n|
-            if False, do show the menu buttons
+            if False, do not show the menu buttons
 
         maximum_number_of_bitmaps : int
             maximum number of tkinter bitmaps (default 4000)
@@ -11225,20 +12188,20 @@ class AnimateSlider:
     height : float
         height of slider in screen coordinates (default 20)
 
-    linewidth : float
-        width of contour in screen coordinate (default 0 = no contour)
+    foreground_color : colorspec
+        color of the foreground (default "fg")
 
-    linecolor : colorspec
-        color of contour (default foreground_color)
+    background_color : colorspec
+        color of the backgroundground (default "bg")
 
-    labelcolor : colorspec
-        color of the label (default foreground_color)
+    trough_color : colorspec
+        color of the trough (default "lightgrey")
+
+    show_value : boolean
+        if True (default), show values; if False don't show values
 
     label : str
         label if the slider (default null string) |n|
-        if label is an argumentless function, this function
-        will be used to display as label, otherwise the
-        label plus the current value of the slider will be shown
 
     font : str
          font of the text (default Helvetica)
@@ -11272,7 +12235,6 @@ class AnimateSlider:
 
     def __init__(
         self,
-        layer=0,
         x=0,
         y=0,
         width=100,
@@ -11281,14 +12243,19 @@ class AnimateSlider:
         vmax=10,
         v=None,
         resolution=1,
-        linecolor="fg",
-        labelcolor="fg",
+        background_color="bg",
+        foreground_color="fg",
+        trough_color="lightgray",
+        show_value=True,
         label="",
         font="",
         fontsize=12,
         action=None,
         xy_anchor="sw",
         env=None,
+        linecolor=None,  # only for backward compatibility
+        labelcolor=None,  # only for backward compatibility
+        layer=None,  # only for backward compatibility
     ):
 
         self.env = g.default_env if env is None else env
@@ -11311,11 +12278,13 @@ class AnimateSlider:
         self.y = y - fontsize
         self.width = width
         self.height = height
-        self.linecolor = self.env.colorspec_to_tuple(linecolor)
-        self.labelcolor = self.env.colorspec_to_tuple(labelcolor)
+        self.background_color = background_color
+        self.foreground_color = foreground_color
+        self.trough_color = trough_color
+        self.show_value = show_value
         self.font = font
         self.fontsize = fontsize
-        self.label = label
+        self._label = label
         self.action = action
         self.installed = False
         self.xy_anchor = xy_anchor
@@ -11351,12 +12320,19 @@ class AnimateSlider:
                 self._v = value
 
         if Pythonista:
-            return self._v
+            return repr(self._v)
         else:
             if self.env._animate:
                 return self.slider.get()
             else:
                 return self._v
+
+    def label(self, text=None):
+        if text is not None:
+            self._label = text
+            if hasattr(self, "slider"):
+                self.slider.config(label=self._label)
+        return self._label
 
     def install(self):
         if not Pythonista:
@@ -11367,7 +12343,6 @@ class AnimateSlider:
                 from_=self.vmin,
                 to=self.vmax,
                 orient=tkinter.HORIZONTAL,
-                label=self.label,
                 resolution=self.resolution,
                 command=self.action,
                 length=self.width,
@@ -11376,9 +12351,12 @@ class AnimateSlider:
             self.slider.window = g.canvas.create_window(x, self.env._height - y, anchor=tkinter.NW, window=self.slider)
             self.slider.config(
                 font=(self.font, int(self.fontsize * 0.8)),
-                foreground=self.env.colorspec_to_hex("fg", False),
-                background=self.env.colorspec_to_hex("bg", False),
-                highlightbackground=self.env.colorspec_to_hex("bg", False),
+                foreground=self.env.colorspec_to_hex(self.env.colorspec_to_tuple(self.foreground_color), False),
+                background=self.env.colorspec_to_hex(self.env.colorspec_to_tuple(self.background_color), False),
+                highlightbackground=self.env.colorspec_to_hex(self.env.colorspec_to_tuple(self.background_color), False),
+                troughcolor=self.env.colorspec_to_hex(self.env.colorspec_to_tuple(self.trough_color), False),
+                showvalue=self.show_value,
+                label=self._label,
             )
 
         self.installed = True
@@ -11457,9 +12435,6 @@ class AnimateQueue(DynamicClass):
     titleoffsety : float
         y-offset of the title relative to the start of the queue |n|
         default: -25 if direction is s, -25 otherwise
-
-    layer : int
-        layer (default 0)
 
     id : any
         the animation works by calling the animation_objects method of each component, optionally
@@ -11885,10 +12860,11 @@ class AnimateCombined:
 
     Notes
     -----
-    When an attribute of an AnimateCombined is assigned, it will propagate to all members, provided it is already an attribute. |n|
-    When an attribute of an AnimateCombined is queried, the value of that attribute in any of animation_objects will be returned. 
-    In case of multiple values, a ValueError will be raised. Likewise, when this attribute does not exist in the 
-    animation_objects list. |n|
+    When an attribute of an AnimateCombined is assigned, it will propagate to all members,
+    provided it has already that attribute. |n|
+    When an attribute of an AnimateCombined is queried, the value of the attribute
+    of the first animation_object of the list that has such an attribute will be returned. |n|
+    If the attribute does not exist in any animation_object of the list, an AttributeError will be raised. |n|
     |n|
     It is possible to use animation_objects with ::
 
@@ -11897,10 +12873,7 @@ class AnimateCombined:
     """
 
     def __init__(self, animation_objects, **kwargs):
-        self.animation_objects = set()
-
-        for item in animation_objects:
-            self.add(item)
+        self.animation_objects = animation_objects
 
         self.update(**kwargs)
 
@@ -11929,17 +12902,11 @@ class AnimateCombined:
     def __getattr__(self, key):
         for item in self.animation_objects:
             if hasattr(item, key):
-                this_attr = item.getattribute_spec(key)
-                if "result" in locals():
-                    if this_attr != result:
-                        raise ValueError(f"multiple values for {key} found")
-                else:
-                    result = this_attr
-        if "result" in locals():
-            return result
-        raise ValueError(f"no value found for {key}")
+                return getattr(item, key)
 
-    def add(self, item):
+        raise AttributeError(f"None of the AnimateCombined animation objects has an attribute {key!r}")
+
+    def append(self, item):
         """
         Add Animate2dBase, Animate3dBase or AnimateCombined object
 
@@ -11950,7 +12917,7 @@ class AnimateCombined:
         """
         if not isinstance(item, (AnimateCombined, Animate2dBase, Animate3dBase)):
             return NotImplemented
-        self.animation_objects.add(item)
+        self.animation_objects.append(item)
 
     def remove(self):
         """
@@ -14307,10 +15274,10 @@ class Component:
 
     def honor_any(self):
         for r in self._requests:
-            if r.honor_only_first and r._requesters[0] != self:
+            if r._honor_only_first and r._requesters[0] != self:
                 continue
             self_prio = self.priority(r._requesters)
-            if r.honor_only_highest_priority and self_prio != r._requesters._head.successor.priority:
+            if r._honor_only_highest_priority and self_prio != r._requesters._head.successor.priority:
                 continue
 
             if self._requests[r] > 0:
@@ -19359,6 +20326,14 @@ def spec_to_image(spec):
             if spec == "":
                 im = Image.new("RGBA", (1, 1), (0, 0, 0, 0))  # (0, 0) raises an error on some platforms
             else:
+                if Path(spec).suffix.lower() == ".heic":
+                    if Pythonista:
+                        raise ImportError(".heic files not supported under Pythonista.")
+                    try:
+                        from pillow_heif import register_heif_opener
+                    except ImportError:
+                        raise ImportError("pillow_heif is required for reading .heic files. Install with pip install pillow_heif")
+                    register_heif_opener()
                 im = Image.open(spec)
                 im = im.convert("RGBA")
             spec_to_image_cache[spec] = im

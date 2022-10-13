@@ -16,7 +16,50 @@ import datetime
 Pythonista = platform.system() == "Darwin"
 
 def exp():
-    exp165()
+    exp184()
+
+def exp184():
+    class X(sim.Component):
+        def process(self):
+            for i in range(4):
+                mon.tally(i)
+                yield self.hold(1)
+
+    env = sim.Environment()
+    mon=sim.Monitor("mon", level=True)
+    X()
+    env.run()
+    print(env._now)
+    print(mon.xt())
+
+def exp183():
+    import salabim as sim
+    import datetime
+
+    def action(v):
+        v_as_datetime = datetime.datetime(2022,1,1) + datetime.timedelta(days=int(v))
+        an0.label(f"{v_as_datetime:%Y-%m-%d}")
+
+    env = sim.Environment()    
+    an0 = sim.AnimateSlider(x=100, y=100, action=action, width=500, height=30, v=30, vmin=0, vmax=365, resolution=1, fontsize=12,show_value=False)
+
+    an1=sim.AnimateSlider(x=100, y=200, width=500, height=30, vmin=0, vmax=365, resolution=1, fontsize=12,show_value=True,foreground_color="red", label="label")
+    an2=sim.AnimateSlider(x=100, y=300, width=500, height=30, vmin=0, vmax=365, resolution=1, fontsize=12,show_value=True,background_color="red", foreground_color="white", trough_color="blue", label="label")
+
+    env.animate(True)
+
+
+    env.run(sim.inf)
+
+
+    
+def exp182():
+    env = sim.Environment()    
+    an0 = sim.AnimateLine(spec=(1,2,3,4),x=8)
+    an1 = sim.AnimateCircle(radius=5)
+    an2 = sim.AnimateText('ab',x=9)
+    an = sim.AnimateCombined((an0, an1, an2))
+    print(an.x(env.now()))
 
 
 def exp181():

@@ -1,6 +1,123 @@
 salabim changelog
 
-version 22.0.7
+version 22.0.8  2022-10-13
+==========================
+New functionality (0)
+-----------------------
+Salabim has a new feature: trajectories.
+These can be used as:
+- a trajectory an animated object should follow in time,
+  including getting the required duration
+- placing components of a queue along a trajectory
+
+A trajectory can consist of a number of subtrajectories,
+where each can be a polygon (optionally splined) or a circle (segment)
+
+The position on the trajectory in relation to the time is
+optionally described a uniform acceleration/deceleration
+with a given initial speed, final speed as well a maximum speed.
+
+The various classes and their methods are in the reference section
+of the documentation.
+A manual update covering this subject is in the works.
+
+See also sample models "Demo trajectory.py".
+
+New functionality (1)
+-----------------------
+AnimateQueue and Queue.animate can now place the animation objects on a given
+trajectory, by specifying
+    direction="t", trajectory=...
+The trajectory x, y and angle method are called with the cumulated 'length' of the
+animation objects dimx parameter (dimy is ignored).
+
+See also sample models "Demo trajectory animate queue.py"
+
+New functionality (2)
+---------------------
+AnimateImage now supports .heic (Apple's propriety High Efficiency Image File Format) files.
+In order to read these files, pillow-heif has to be installed, e.g. with
+    pip install pillow-heif
+This functionality is not available under Pythonista.
+
+Changed functionality (0)
+-------------------------
+The AnimateSlider parameters are changed considerably as the previous version
+was not consistent and missed useful functionality.
+
+New parameters are:
+    foreground_color : colorspec
+        color of the foreground (default "fg")
+
+    background_color : colorspec
+        color of the backgroundground (default "bg")
+
+    trough_color : colorspec
+        color of the trough (default "lightgrey")
+
+    show_value : boolean
+        if True (default), show values; if False don't show values (thus only showing the label)
+
+The following parameters were available, but actually not used at all:
+    linecolor
+    labelcolor
+    layer
+They will remain accepted for compatibility reasons.
+
+Added the method AnimateSlider.label:
+    Parameters
+    ----------
+    text : str
+        new label
+        if omitted, no change
+
+    Returns
+    -------
+    Current label : str
+
+With the new label method, it's easy to make dynamic labels, like:
+
+    import salabim as sim
+    import datetime
+
+    def action(v):
+        v_as_datetime = datetime.datetime(2022, 1, 1) + datetime.timedelta(days=int(v))
+        an0.label(f"{v_as_datetime:%Y-%m-%d}")
+
+    env = sim.Environment()
+    an0 = sim.AnimateSlider(x=100, y=100, action=action, width=500, height=30, v=30, vmin=0, vmax=365, resolution=1, fontsize=12, show_value=False)
+    env.animate(True)
+    env.run(sim.inf)
+
+See also sample model "Demo slider.py"
+
+Note that the Pythonista implementation does not use all given parameters.
+
+Changed functionality (1)
+-------------------------
+In order to let AnimateCombined dynamic attributes work the same way as ordinary
+Animatexxx objects, getting an attribute for an AnimateCombined object now returns
+that attribute of the first animation object that has such an attribute, rather
+than the 'shared' value.
+If an attribute can't be found at all, now an AttributeError is raised, rather than
+a ValueError.
+
+As the animation_objects in AnimateCombined are now a list, rather than a set,
+AnimateCombined.add is replaced by AnimateCombined.append.
+    
+Bugfix (0)
+----------
+Fixed a bug in resource requesting (thanks to Cameron Powell)
+
+Bugfix (1)
+----------
+Bug in Monitor.xt() re adding now (introduced in version 22.0.6) fixed. 
+
+Documentation bugfix (0)
+------------------------
+A minor mistake in the docstring of animation_paramters re show_menu_buttons corrected,
+
+version 22.0.7  2022-08-14
 ==========================
 New functionality
 -----------------
