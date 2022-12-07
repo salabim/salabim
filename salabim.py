@@ -10218,7 +10218,7 @@ class Animate2dBase(DynamicClass):
 
                         elif self.type == "polygon":
                             p = list(polygon)
-                            if p[0:1] != p[-2:-1]:
+                            if p[0:2] != p[-3:-1]:
                                 p.append(p[0])  # close the polygon
                                 p.append(p[1])
 
