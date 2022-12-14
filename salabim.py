@@ -3927,6 +3927,13 @@ class Queue:
         else:
             return self.number_of_arrivals / duration
 
+    def available_capacity(self):
+        """
+        returns the number of available spaces in the queue,
+        or inf if no capacity limit is configured
+        """
+        return self.capacity() - len(self)
+        
     def departure_rate(self, reset=False):
         """
         returns the departure rate |n|
