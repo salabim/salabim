@@ -8,7 +8,7 @@ The labels parameter of AnimateMonitor may now be also a dict, where
 the keys indicate where to put the label (via vertical_map), and the
 values are the texts to be shown there.
 It is still possible to use an iterable, in which case the text to
-be shown are is the string representation of the label itself.
+be shown the string representation of the label itself.
 
 Added functionality (1) [thanks to a suggestion by @tcdejong]
 -----------------------
@@ -26,8 +26,8 @@ Also introduced is a new method of Queue: set_capacity:
 
 Added test (0)
 --------------
-If blind_animation = True, the test for existence of PIL was not done, so
-an less obvious error message was issued if PIL was not present. Fixed.
+If blind_animation == True, the test for the existence of PIL was not done, so
+a less obvious error message was issued if PIL was not present. Fixed.
 
 Bug fix (0)
 -----------
@@ -46,6 +46,17 @@ Bug in 3D blind animation. Fixed.
 Documentation fix (0)
 ---------------------
 TrajectoryMerged was not documented. Fixed.
+
+Usage recommendation (0)
+------------------------
+Hugo Hughes reports that it is possible to run 3D animated model on a headless server.
+This can be done with a module that creates a virtual screen "pyvirtualdisplay", like
+    from pyvirtualdisplay import Display
+    virtual_display = Display(visible=0, size=(1920, 1080))
+    virtual_display.start()
+
+(Both the tkinter and OpenGL windows are properly emulated).
+Is blind_animation still required?
 
 version 22.0.8  2022-10-13
 ==========================
