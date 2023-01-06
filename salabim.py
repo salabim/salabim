@@ -1,13 +1,14 @@
-#               _         _      _               ____   ____       ___       ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ \     / _ \     ( _ )
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  __) |   | | | |    / _ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  / __/  _ | |_| | _ | (_) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||_____|(_) \___/ (_) \___/
+#               _         _      _               ____   _____      ___       ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /     / _ \     / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \    | | | |   | | | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | |_| |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_) \___/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "22.0.8"
+__version__ = "23.0.0"
+
 import heapq
 import random
 import time
@@ -627,7 +628,7 @@ class Monitor:
         self.env = self_env
         m.isgenerated = True
         m._name = self.name() + ".frozen" if name is None else name
-        m.env._animate=False
+        m.env._animate = False
         m.env._now = self.env._now
         m.env._offset = self.env._offset
         m.env._t = self.env._t
@@ -2095,7 +2096,7 @@ class Monitor:
 
         done = False
         for i in range(10):
-            exp = 10 ** i
+            exp = 10**i
             for bin_width in (exp, exp * 2, exp * 5):
                 lowerbound = math.floor(xmin / bin_width) * bin_width
                 number_of_bins = int(math.ceil((xmax - lowerbound) / bin_width))
@@ -2541,7 +2542,7 @@ class Monitor:
             font of the labels (default null string)
 
         label_fontsize : int
-            size of the font of the labels (default 15)    
+            size of the font of the labels (default 15)
 
         label_anchor : str
             specifies where the label coordinates (as returned by map_value) are relative to |n|
@@ -2580,7 +2581,7 @@ class Monitor:
             objects. |n|
             if True, screen_coordinates will be used instead.
 
-        over3d : bool  
+        over3d : bool
             if True, this object will be rendered to the OpenGL window |n|
             if False (default), the normal 2D plane will be used.
 
@@ -2850,7 +2851,7 @@ class _CapacityMonitor(Monitor):
 
     @value.setter
     def value(self, value):
-        self.resource.set_capacity(value)
+        self.parent.set_capacity(value)
 
 
 class _ModeMonitor(Monitor):
@@ -3070,8 +3071,10 @@ class AnimateMonitor(DynamicClass):
         when y-values are non numeric, it is advised to provide an approriate map function, like: |n|
         vertical_map = "unknown red green blue yellow".split().index
 
-    labels : iterable
-        labels to be shown on the vertical axis (default: empty tuple) |n|
+    labels : iterable or dict
+        if an iterable, these are the values of the labels to be shown |n|
+        if a dict, the keys are the values of the labels, the keys are the texts to be shown |n|
+        labels will be shown on the vertical axis (default: empty tuple) |n|
         the placement of the labels is controlled by the vertical_map method
 
     label_color : colorspec
@@ -3081,7 +3084,7 @@ class AnimateMonitor(DynamicClass):
         font of the labels (default null string)
 
     label_fontsize : int
-        size of the font of the labels (default 15)    
+        size of the font of the labels (default 15)
 
     label_anchor : str
         specifies where the label coordinates (as returned by map_value) are relative to |n|
@@ -3114,7 +3117,7 @@ class AnimateMonitor(DynamicClass):
         if given, the animation object will be removed
         automatically when the parent component is no longer accessible
 
-    over3d : bool  
+    over3d : bool
         if True, this object will be rendered to the OpenGL window |n|
         if False (default), the normal 2D plane will be used.
 
@@ -3392,11 +3395,18 @@ class AnimateMonitor(DynamicClass):
         labels = []
         label_ys = []
 
-        for label in self.labels(t):
+        _labels = self.labels(t)
+
+        for value in _labels:
+            if isinstance(_labels, dict):
+                text = _labels[value]
+            else:
+                text = value
+
             try:
-                label_y = self.vertical_map(label) * self.vertical_scale_t + self.vertical_offset_t
+                label_y = self.vertical_map(value) * self.vertical_scale_t + self.vertical_offset_t
                 if 0 <= label_y <= self.height_t:
-                    labels.append(label)
+                    labels.append(text)
                     label_ys.append(label_y)
             except (ValueError, TypeError):
                 pass
@@ -3640,8 +3650,11 @@ class Qmember:
         pass
 
     def insert_in_front_of(self, m2, c, q, priority):
-        if q._length >= q.capacity._tally:
+        available_quantity = q.capacity._tally - q._length-1 
+        if available_quantity < 0:
             raise QueueFullError(q.name() + " has reached capacity " + str(q.capacity._tally))
+        q.available_quantity.tally(available_quantity)
+
         m1 = m2.predecessor
         m1.successor = self
         m2.predecessor = self
@@ -3682,7 +3695,7 @@ class Queue:
         it is defined in (lowercased)
 
     capacity : float
-        mximum number of components the queue can contain. |n|
+        maximum number of components the queue can contain. |n|
         if exceeded, a QueueFullError will be raised |n|
         default: inf
 
@@ -3719,7 +3732,10 @@ class Queue:
         self.departure_rate(reset=True)
         self.length = _SystemMonitor("Length of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="uint32", env=self.env)
         self.length_of_stay = Monitor("Length of stay in " + self.name(), monitor=monitor, type="float", env=self.env)
-        self.capacity = Monitor("Capacity of ", level=True, initial_tally=capacity, monitor=monitor, type="float", env=env)
+        self.capacity = _CapacityMonitor("Capacity of " + self.name(), level=True, initial_tally=capacity, monitor=monitor, type="float", env=env)
+        self.capacity.parent=self
+        self.available_quantity = _SystemMonitor("Available quantity of "+self.name(), level=True, initial_tally=capacity, monitor=monitor, type="float", env=env)
+
         if fill is not None:
             savetrace = self.env._trace
             self.env._trace = False
@@ -4109,6 +4125,17 @@ class Queue:
             if m not in exclude:
                 result.append(m.print_histogram(as_str=True))
         return return_or_print(result, as_str, file)
+
+    def set_capacity(self, cap):
+        """
+        Parameters
+        ----------
+        cap : float or int
+            capacity of the queue |n|
+        """
+        self.capacity.tally(cap)
+        self.available_quantity.tally(cap - self._length)
+
 
     def name(self, value=None):
         """
@@ -5095,14 +5122,14 @@ class _Movement:  # used by trajectories
 
         acc2inv = 1 / (2 * acc)
         dec2inv = 1 / (2 * dec)
-        s_v0_vmax = (vmax ** 2 - v0 ** 2) * acc2inv
-        s_vmax_v1 = (vmax ** 2 - v1 ** 2) * dec2inv
+        s_v0_vmax = (vmax**2 - v0**2) * acc2inv
+        s_vmax_v1 = (vmax**2 - v1**2) * dec2inv
 
         if s_v0_vmax + s_vmax_v1 > l:
-            vmax = math.sqrt((l + (v0 ** 2 * acc2inv) + (v1 ** 2 * dec2inv)) / (acc2inv + dec2inv))
+            vmax = math.sqrt((l + (v0**2 * acc2inv) + (v1**2 * dec2inv)) / (acc2inv + dec2inv))
 
-        self.l_v0_vmax = (vmax ** 2 - v0 ** 2) * acc2inv
-        self.l_vmax_v1 = (vmax ** 2 - v1 ** 2) * dec2inv
+        self.l_v0_vmax = (vmax**2 - v0**2) * acc2inv
+        self.l_vmax_v1 = (vmax**2 - v1**2) * dec2inv
 
         self.l_vmax = l - self.l_v0_vmax - self.l_vmax_v1
         if self.l_v0_vmax < 0 or self.l_vmax_v1 < 0:
@@ -5122,17 +5149,17 @@ class _Movement:  # used by trajectories
         if self.acc == math.inf and self.dec == math.inf:
             return self.vmax * t
         if t < self.t_v0_vmax:
-            return (self.v0 * t) + self.acc * t ** 2 / 2
+            return (self.v0 * t) + self.acc * t**2 / 2
         t -= self.t_v0_vmax
         if t < self.t_vmax:
             return self.l_v0_vmax + t * self.vmax
         t -= self.t_vmax
         if self.dec == math.inf:
             return self.l_v0_vmax + self.l_vmax + (self.vmax * t)
-        return self.l_v0_vmax + self.l_vmax + (self.vmax * t) - self.dec * t ** 2 / 2
+        return self.l_v0_vmax + self.l_vmax + (self.vmax * t) - self.dec * t**2 / 2
 
 
-class _Trajectory:  # uised by trajectories
+class _Trajectory:  # used by trajectories
     def in_trajectory(self, t):
         return self._t0 <= t <= self._t1
 
@@ -5163,6 +5190,26 @@ class _Trajectory:  # uised by trajectories
 
 
 class TrajectoryMerged(_Trajectory):
+    """
+    merge trajectories
+
+    Parameters
+    ----------
+    trajectories : iterable (list, tuple, ...)
+        list trajectories to be merged
+
+    Returns
+    -------
+    merged trajectory : Trajectory
+
+    Notes
+    -----
+    It is arguably easier just to add or sum trajectories, like |n|
+
+        trajectory = trajectory1 + trajectory2 + trajectory3 or |n|
+        trajectory = sum((trajectory, trajectory2, trajectory3))
+    """
+
     @functools.lru_cache(maxsize=1)
     def index(self, t):
         if t <= self._t0s[0]:
@@ -5173,25 +5220,6 @@ class TrajectoryMerged(_Trajectory):
         return i
 
     def __init__(self, trajectories):
-        """
-        merge trajectories
-
-        Parameters
-        ----------
-        trajectories : iterable (list, tuple, ...)
-            list trajectories to be merged
-
-        Returns
-        -------
-        merged trajectory : Trajectory
-
-        Notes
-        -----
-        It is arguably easier just to add or sum trajectories, like |n|
-
-            trajectory = trajectory1 + trajectory2 + trajectory3 or |n|
-            trajectory = sum((trajectory, trajectory2, trajectory3))        
-        """
         self._trajectories = trajectories
         self._duration = sum(trajectory._duration for trajectory in self._trajectories)
         self._t0 = 0
@@ -5336,7 +5364,7 @@ class TrajectoryMerged(_Trajectory):
         Parameters
         ----------
         t : float
-            time at which to evaluate length. If omitted, total length will be returned            
+            time at which to evaluate length. If omitted, total length will be returned
 
         Returns
         -------
@@ -5369,29 +5397,30 @@ class TrajectoryMerged(_Trajectory):
 
 
 class TrajectoryStandstill(_Trajectory):
+    """
+    Standstill trajectory, to be used in Animatexxx through x, y and angle methods
+
+    Parameters
+    ----------
+    xy : tuple or list of 2 floats
+        initial (and final) position. should be like x, y
+
+    orientation : float or callable
+        orientation (angle) in degrees |n|
+        a one parameter callable is also accepted (and will be called with 0) |n|
+        default: 0
+
+    t0 : float
+        time the trajectory should start |n|
+        default: env.now() |n|
+        if not the first in a merged trajectory or AnimateQueue, ignored
+
+    env : Environment
+        environment where the trajectory is defined |n|
+        if omitted, default_env will be used
+    """
+
     def __init__(self, xy, duration, orientation=0, t0=None, env=None):
-        """
-        Standstill trajectory, to be used in Animatexxx through x, y and angle methods
-
-        Parameters
-        ----------
-        xy : tuple or list of 2 floats
-            initial (and final) position. should be like x, y
-
-        orientation : float or callable
-            orientation (angle) in degrees |n|
-            a one parameter callable is also accepted (and will be called with 0) |n|
-            default: 0
-
-        t0 : float
-            time the trajectory should start |n|
-            default: env.now() |n|
-            if not the first in a merged trajectory or AnimateQueue, ignored
-
-        env : Environment
-            environment where the trajectory is defined |n|
-            if omitted, default_env will be used
-        """
         env = g.default_env if env is None else env
         self._t0 = env.now() if t0 is None else t0
         self._x, self._y = xy
@@ -5500,7 +5529,7 @@ class TrajectoryStandstill(_Trajectory):
         Parameters
         ----------
         t : float
-            time at which to evaluate length.           
+            time at which to evaluate length.
 
         Returns
         -------
@@ -5529,62 +5558,62 @@ class TrajectoryStandstill(_Trajectory):
 
 
 class TrajectoryPolygon(_Trajectory):
+    """
+    Polygon trajectory, to be used in Animatexxx through x, y and angle methods
+
+    Parameters
+    ----------
+    polygon : iterable of floats
+        should be like x0, y0, x1, y1, ...
+
+    t0 : float
+        time the trajectory should start |n|
+        default: env.now() |n|
+        if not the first in a merged trajectory or AnimateQueue, ignored
+
+    vmax : float
+        maximum speed, i.e. position units per time unit |n|
+        default: 1
+
+    v0 : float
+        velocity at start |n|
+        default: vmax
+
+    v1 : float
+        velocity at end |n|
+        default: vmax
+
+    acc : float
+        acceleration rate (position units / time units ** 2) |n|
+        default: inf (i.e. no acceleration)
+
+    dec : float
+        deceleration rate (position units / time units ** 2) |n|
+        default: inf (i.e. no deceleration)
+
+    orientation : float
+        default: gives angle in the direction of the movement when calling angle(t) |n|
+        if a one parameter callable, the angle in the direction of the movement will be callled |n|
+        if a float, this orientation will always be returned as angle(t)
+
+    spline : None or string
+        if None (default), polygon is used as such |n|
+        if 'bezier' (or any string starting with 'b' or 'B', Bézier splining is used |n|
+        if 'catmull_rom' (or any string starting with 'c' or 'C', Catmull-Rom splining is used
+
+    res : int
+        resolution of spline (ignored when no splining is applied)
+
+    env : Environment
+        environment where the trajectory is defined |n|
+        if omitted, default_env will be used
+
+    Notes
+    -----
+    bezier and catmull_rom splines require numpy to be installed.
+    """
+
     def __init__(self, polygon, t0=None, vmax=None, v0=None, v1=None, acc=None, dec=None, orientation=None, spline=None, res=50, env=None):
-        """
-        Polygon trajectory, to be used in Animatexxx through x, y and angle methods
-
-        Parameters
-        ----------
-        polygon : iterable of floats
-            should be like x0, y0, x1, y1, ...
-
-        t0 : float
-            time the trajectory should start |n|
-            default: env.now() |n|
-            if not the first in a merged trajectory or AnimateQueue, ignored
-
-        vmax : float
-            maximum speed, i.e. position units per time unit |n|
-            default: 1
-
-        v0 : float
-            velocity at start |n|
-            default: vmax
-
-        v1 : float
-            velocity at end |n|
-            default: vmax
-
-        acc : float
-            acceleration rate (position units / time units ** 2) |n|
-            default: inf (i.e. no acceleration)
-
-        dec : float
-            deceleration rate (position units / time units ** 2) |n|
-            default: inf (i.e. no deceleration)
-
-        orientation : float
-            default: gives angle in the direction of the movement when calling angle(t) |n|
-            if a one parameter callable, the angle in the direction of the movement will be callled |n|
-            if a float, this orientation will always be returned as angle(t) 
-
-        spline : None or string
-            if None (default), polygon is used as such |n|
-            if 'bezier' (or any string starting with 'b' or 'B', Bézier splining is used |n|
-            if 'catmull_rom' (or any string starting with 'c' or 'C', Catmull-Rom splining is used
-
-        res : int
-            resolution of spline (ignored when no splining is applied)
-
-        env : Environment
-            environment where the trajectory is defined |n|
-            if omitted, default_env will be used
-
-        Notes
-        -----
-        bezier and catmull_rom splines require numpy to be installed.
-        """
-
         def catmull_rom_polygon(polygon, res):
             def evaluate(x, v0, v1, v2, v3):
                 c1 = 1.0 * v1
@@ -5856,65 +5885,66 @@ class TrajectoryPolygon(_Trajectory):
 
 
 class TrajectoryCircle(_Trajectory):
+    """
+    Circle (arc) trajectory, to be used in Animatexxx through x, y and angle methods
+
+    Parameters
+    ----------
+    radius : float
+        radius of the circle or arc
+
+    x_center : float
+        x-coordinate of the circle
+
+    y_center : float
+        y-coordinate of the circle
+
+    angle0 : float
+        start angle in degrees |n|
+        default: 0
+
+    angle1 : float
+        end angle in degrees |n|
+        default: 360
+
+    t0 : float
+        time the trajectory should start |n|
+        default: env.now() |n|
+        if not the first in a merged trajectory or AnimateQueue, ignored
+
+    vmax : float
+        maximum speed, i.e. position units per time unit |n|
+        default: 1
+
+    v0 : float
+        velocity at start |n|
+        default: vmax
+
+    v1 : float
+        velocity at end |n|
+        default: vmax
+
+    acc : float
+        acceleration rate (position units / time units ** 2) |n|
+        default: inf (i.e. no acceleration)
+
+    dec : float
+        deceleration rate (position units / time units ** 2) |n|
+        default: inf (i.e. no deceleration)
+
+    orientation : float
+        default: gives angle in the direction of the movement when calling angle(t) |n|
+        if a one parameter callable, the angle in the direction of the movement will be callled |n|
+        if a float, this orientation will always be returned as angle(t)
+
+    env : Environment
+        environment where the trajectory is defined |n|
+        if omitted, default_env will be used
+    """
+
     def __init__(
         self, radius, x_center=0, y_center=0, angle0=0, angle1=360, t0=None, vmax=None, v0=None, v1=None, acc=None, dec=None, orientation=None, env=None
     ):
-        """
-        Circle (arc) trajectory, to be used in Animatexxx through x, y and angle methods
-
-        Parameters
-        ----------        
-        radius : float
-            radius of the circle or arc
-
-        x_center : float
-            x-coordinate of the circle
-
-        y_center : float
-            y-coordinate of the circle            
-
-        angle0 : float
-            start angle in degrees |n|
-            default: 0
-
-        angle1 : float
-            end angle in degrees |n|
-            default: 360
-
-        t0 : float
-            time the trajectory should start |n|
-            default: env.now() |n|
-            if not the first in a merged trajectory or AnimateQueue, ignored
-
-        vmax : float
-            maximum speed, i.e. position units per time unit |n|
-            default: 1
-
-        v0 : float
-            velocity at start |n|
-            default: vmax
-
-        v1 : float
-            velocity at end |n|
-            default: vmax
-
-        acc : float
-            acceleration rate (position units / time units ** 2) |n|
-            default: inf (i.e. no acceleration)
-
-        dec : float
-            deceleration rate (position units / time units ** 2) |n|
-            default: inf (i.e. no deceleration)
-
-        orientation : float
-            default: gives angle in the direction of the movement when calling angle(t) |n|
-            if a one parameter callable, the angle in the direction of the movement will be callled |n|
-            if a float, this orientation will always be returned as angle(t) 
-
-        env : Environment
-            environment where the trajectory is defined |n|
-            if omitted, default_env will be used
-        """
         env = g.default_env if env is None else env
         self._t0 = env.now() if t0 is None else t0
         self.radius = radius
@@ -6132,7 +6162,7 @@ class Environment:
         do_reset=None,
         blind_animation=False,
         *args,
-        **kwargs
+        **kwargs,
     ):
         if name is None:
             if isdefault_env:
@@ -6375,7 +6405,7 @@ class Environment:
             lag time (for smooth camera movements) (default: 1))
 
         offset : float
-            the duration (can be negative) given is added to the times given in spec. Default: 0 
+            the duration (can be negative) given is added to the times given in spec. Default: 0
 
         enabled : bool
             if True (default), move camera according to spec/lag |n|
@@ -6613,7 +6643,7 @@ class Environment:
         ----------
         over3d : bool
             if False (default), present on 2D screen |n|
-            if True, present on 3D overlay 
+            if True, present on 3D overlay
         """
         if over3d is None:
             over3d = default_over3d()
@@ -7226,10 +7256,7 @@ class Environment:
                             self._video_height_real = img.size[1]
                     else:
                         self._video_height_real = self._video_height
-                    if self._blind_animation:
-                        can_animate(try_only=True)
-                    else:
-                        can_animate(try_only=False)
+                    can_animate(try_only=False)
 
                     video_path = Path(video)
                     extension = video_path.suffix.lower()
@@ -9258,7 +9285,7 @@ class Environment:
 
     def color_interp(self, x, xp, fp):
         """
-        linear interpolation of a color 
+        linear interpolation of a color
 
         Parameters
         ----------
@@ -10218,7 +10245,7 @@ class Animate2dBase(DynamicClass):
 
                         elif self.type == "polygon":
                             p = list(polygon)
-                            if p[0:1] != p[-2:-1]:
+                            if p[0:2] != p[-3:-1]:
                                 p.append(p[0])  # close the polygon
                                 p.append(p[1])
 
@@ -10859,7 +10886,7 @@ class Animate:
     width1 : float
        width of the image to be displayed at time t1 (default: width0) |n|
 
-    over3d : bool  
+    over3d : bool
         if True, this object will be rendered to the OpenGL window |n|
         if False (default), the normal 2D plane will be used.
 
@@ -12378,96 +12405,96 @@ class AnimateSlider:
 
 class AnimateQueue(DynamicClass):
     """
-    Animates the component in a queue.
+        Animates the component in a queue.
 
-    Parameters
-    ----------
-    queue : Queue
+        Parameters
+        ----------
+        queue : Queue
 
-    x : float
-        x-position of the first component in the queue |n|
-        default: 50
+        x : float
+            x-position of the first component in the queue |n|
+            default: 50
 
-    y : float
-        y-position of the first component in the queue |n|
-        default: 50
+        y : float
+            y-position of the first component in the queue |n|
+            default: 50
 
-    direction : str
-        if "w", waiting line runs westwards (i.e. from right to left) |n|
-        if "n", waiting line runs northeards (i.e. from bottom to top) |n|
-        if "e", waiting line runs eastwards (i.e. from left to right) (default) |n|
-        if "s", waiting line runs southwards (i.e. from top to bottom)
-:
+        direction : str
+            if "w", waiting line runs westwards (i.e. from right to left) |n|
+            if "n", waiting line runs northeards (i.e. from bottom to top) |n|
+            if "e", waiting line runs eastwards (i.e. from left to right) (default) |n|
+            if "s", waiting line runs southwards (i.e. from top to bottom)
+    :
 
-    trajectory : Trajectory
-        trajectory to be followed. Overrides any given directory
+        trajectory : Trajectory
+            trajectory to be followed. Overrides any given directory
 
-    reverse : bool
-        if False (default), display in normal order. If True, reversed.
+        reverse : bool
+            if False (default), display in normal order. If True, reversed.
 
-    max_length : int
-        maximum number of components to be displayed
+        max_length : int
+            maximum number of components to be displayed
 
-    xy_anchor : str
-        specifies where x and y are relative to |n|
-        possible values are (default: sw): |n|
-        ``nw    n    ne`` |n|
-        ``w     c     e`` |n|
-        ``sw    s    se``
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
 
-    titlecolor : colorspec
-        color of the title (default foreground color)
+        titlecolor : colorspec
+            color of the title (default foreground color)
 
-    titlefont : font
-        font of the title (default null string)
+        titlefont : font
+            font of the title (default null string)
 
-    titlefontsize : int
-        size of the font of the title (default 15)
+        titlefontsize : int
+            size of the font of the title (default 15)
 
-    title : str
-        title to be shown above queue |n|
-        default: name of the queue
+        title : str
+            title to be shown above queue |n|
+            default: name of the queue
 
-    titleoffsetx : float
-        x-offset of the title relative to the start of the queue |n|
-        default: 25 if direction is w, -25 otherwise
+        titleoffsetx : float
+            x-offset of the title relative to the start of the queue |n|
+            default: 25 if direction is w, -25 otherwise
 
-    titleoffsety : float
-        y-offset of the title relative to the start of the queue |n|
-        default: -25 if direction is s, -25 otherwise
+        titleoffsety : float
+            y-offset of the title relative to the start of the queue |n|
+            default: -25 if direction is s, -25 otherwise
 
-    id : any
-        the animation works by calling the animation_objects method of each component, optionally
-        with id. By default, this is self, but can be overriden, particularly with the queue
+        id : any
+            the animation works by calling the animation_objects method of each component, optionally
+            with id. By default, this is self, but can be overriden, particularly with the queue
 
-    arg : any
-        this is used when a parameter is a function with two parameters, as the first argument or
-        if a parameter is a method as the instance |n|
-        default: self (instance itself)
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
 
-    visible : bool
-        if False, nothing will be shown |n|
-        (default True)
+        visible : bool
+            if False, nothing will be shown |n|
+            (default True)
 
-    keep : bool
-        if False, animation object will be taken from the animation objects. With show(), the animation can be reshown.
-        (default True)
+        keep : bool
+            if False, animation object will be taken from the animation objects. With show(), the animation can be reshown.
+            (default True)
 
-    parent : Component
-        component where this animation object belongs to (default None) |n|
-        if given, the animation object will be removed
-        automatically when the parent component is no longer accessible
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
 
-    Note
-    ----
-    All measures are in screen coordinates |n|
+        Note
+        ----
+        All measures are in screen coordinates |n|
 
-    All parameters, apart from queue, id, arg and parent can be specified as: |n|
-    - a scalar, like 10 |n|
-    - a function with zero arguments, like lambda: title |n|
-    - a function with one argument, being the time t, like lambda t: t + 10 |n|
-    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
-    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+        All parameters, apart from queue, id, arg and parent can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: title |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
     """
 
     def __init__(
@@ -12572,7 +12599,7 @@ class AnimateQueue(DynamicClass):
 
         if direction == "e":
             self.x_t = x + (-25 if titleoffsetx is None else titleoffsetx)
-            self.y_t = y + (25 if titleoffsetx is None else titleoffsety)
+            self.y_t = y + (25 if titleoffsety is None else titleoffsety)
             self.text_anchor_t = "sw"
             self.angle_t = 0
         elif direction == "w":
@@ -12856,7 +12883,7 @@ class AnimateCombined:
         iterable of Animate2dBase, Animate3dBase or AnimateCombined objects
 
     **kwargs : dict
-        attributes to be set for objects in animation_objects  
+        attributes to be set for objects in animation_objects
 
     Notes
     -----
@@ -12884,7 +12911,7 @@ class AnimateCombined:
         Parameters
         ----------
         **kwargs : dict
-            attributes to be set  
+            attributes to be set
         """
 
         for k, v in kwargs.items():
@@ -12912,7 +12939,7 @@ class AnimateCombined:
 
         Parameters
         ----------
-        item : Animate2dBase, Animate3dBase or AnimateCombined 
+        item : Animate2dBase, Animate3dBase or AnimateCombined
             to be added
         """
         if not isinstance(item, (AnimateCombined, Animate2dBase, Animate3dBase)):
@@ -13017,9 +13044,9 @@ class AnimateText(Animate2dBase):
         objects. |n|
         if True, screen_coordinates will be used instead.
 
-    over3d : bool  
+    over3d : bool
         if True, this object will be rendered to the OpenGL window |n|
-        if False (default), the normal 2D plane will be used.        
+        if False (default), the normal 2D plane will be used.
 
     Note
     ----
@@ -13350,7 +13377,7 @@ class AnimatePolygon(Animate2dBase):
         objects. |n|
         if True, screen_coordinates will be used instead.
 
-    over3d : bool  
+    over3d : bool
         if True, this object will be rendered to the OpenGL window |n|
         if False (default), the normal 2D plane will be used.
 
@@ -13523,9 +13550,9 @@ class AnimateLine(Animate2dBase):
         objects. |n|
         if True, screen_coordinates will be used instead.
 
-    over3d : bool  
+    over3d : bool
         if True, this object will be rendered to the OpenGL window |n|
-        if False (default), the normal 2D plane will be used.        
+        if False (default), the normal 2D plane will be used.
 
     Note
     ----
@@ -13697,7 +13724,7 @@ class AnimatePoints(Animate2dBase):
         objects. |n|
         if True, screen_coordinates will be used instead.
 
-    over3d : bool  
+    over3d : bool
         if True, this object will be rendered to the OpenGL window |n|
         if False (default), the normal 2D plane will be used.
 
@@ -13886,7 +13913,7 @@ class AnimateCircle(Animate2dBase):
         objects. |n|
         if True, screen_coordinates will be used instead.
 
-    over3d : bool  
+    over3d : bool
         if True, this object will be rendered to the OpenGL window |n|
         if False (default), the normal 2D plane will be used.
 
@@ -14069,7 +14096,7 @@ class AnimateImage(Animate2dBase):
         objects. |n|
         if True, screen_coordinates will be used instead.
 
-    over3d : bool  
+    over3d : bool
         if True, this object will be rendered to the OpenGL window |n|
         if False (default), the normal 2D plane will be used.
 
@@ -14220,7 +14247,7 @@ class Component:
 
     cap_now : bool
         indicator whether times (at, delay) in the past are allowed. If, so now() will be used.
-        default: sys.default_cap_now(), usualy False        
+        default: sys.default_cap_now(), usualy False
 
     env : Environment
         environment where the component is defined |n|
@@ -14243,7 +14270,7 @@ class Component:
         mode="",
         cap_now=None,
         env=None,
-        **kwargs
+        **kwargs,
     ):
         if env is None:
             self.env = g.default_env
@@ -15027,7 +15054,7 @@ class Component:
         priority : float
             priority of the fail event|n|
             default: 0 |n|
-            if a component has the same time on the event list, this component is sorted accoring to
+            if a component has the same time on the event list, this component is sorted according to
             the priority.
 
         urgent : bool
@@ -15068,7 +15095,7 @@ class Component:
 
         cap_now : bool
             indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
-            default: sys.default_cap_now(), usualy False            
+            default: sys.default_cap_now(), usualy False
 
         Note
         ----
@@ -16123,6 +16150,7 @@ class Component:
         length_of_stay = self.env._now - mx.enter_time
         q.length_of_stay.tally(length_of_stay)
         q.length.tally(q._length)
+        q.available_quantity.tally(q.capacity._tally-q._length)
         q.number_of_departures += 1
         return self
 
@@ -16490,7 +16518,7 @@ class ComponentGenerator(Component):
     disturbance : callable (usually a distribution)
         for each component to be generated, the disturbance call (sampling) is added
         to the actual generation time. |n|
-        disturbance may only be used together with iat. The force_at parameter is not 
+        disturbance may only be used together with iat. The force_at parameter is not
         allowed in that case.
 
     suppress_trace : bool
@@ -16536,7 +16564,7 @@ class ComponentGenerator(Component):
         disturbance=None,
         #        cap_now=None,
         env=None,
-        **kwargs
+        **kwargs,
     ):
         if generator_name is None:
             if inspect.isclass(component_class) and issubclass(component_class, Component):
@@ -16739,6 +16767,20 @@ class _BlindVideoMaker(Component):
         while True:
             self.env._t = self.env._now
             self.env.animation_pre_tick_sys(self.env.t())  # required to update sys objects, like AnimateQueue
+            if self.env._animate3d:
+                if not self.env._gl_initialized:
+                    self.env.animation3d_init()
+
+                self.env._exclude_from_animation = "*"  # makes that both video and non video over2d animation objects are shown
+
+                an_objects3d = sorted(self.env.an_objects3d, key=lambda obj: (obj.layer(self.env._t), obj.sequence))
+                for an in an_objects3d:
+                    if an.keep(self.env._t):
+                        if an.visible(self.env._t):
+                            an.draw(self.env._t)
+                    else:
+                        an.remove()
+                self.env._exclude_from_animation = "only in video"
 
             self.env._save_frame()
             yield self.hold(self.env._speed / self.env._fps)
@@ -19416,6 +19458,10 @@ class Resource:
         if the resource is actually just a level. |n|
         if False, claims belong to a component.
 
+    prememptive : bool
+        if True, components with a lower priority will be bumped out of the claimers queue if possible
+        if False (default), no bumping
+
     honor_only_first : bool
         if True, only the first component of requesters will be honoured (default: False)
 
@@ -19445,7 +19491,7 @@ class Resource:
         monitor=True,
         env=None,
         *args,
-        **kwargs
+        **kwargs,
     ):
         if env is None:
             self.env = g.default_env
@@ -19476,7 +19522,7 @@ class Resource:
         self._trying = False
 
         self.capacity = _CapacityMonitor("Capacity of " + self.name(), level=True, initial_tally=capacity, monitor=monitor, type="float", env=self.env)
-        self.capacity.resource = self
+        self.capacity.parent = self
         self.claimed_quantity = _SystemMonitor(
             "Claimed quantity of " + self.name(), level=True, initial_tally=initial_claimed_quantity, monitor=monitor, type="float", env=self.env
         )
@@ -20139,7 +20185,7 @@ class _APNG:
         def parse_chunks(b):
             i = 8
             while i < len(b):
-                data_len, = struct.unpack("!I", b[i : i + 4])
+                (data_len,) = struct.unpack("!I", b[i : i + 4])
                 type_ = b[i + 4 : i + 8].decode("latin-1")
                 yield _APNG.Chunk(type_, b[i : i + data_len + 12])
                 i += data_len + 12
@@ -20453,7 +20499,7 @@ def searchsorted(a, v, side="left"):
     side : string
         If ‘left’ (default) the index of the first suitable location found is given.
         If ‘right’, return the last such index.
-        If there is no suitable index, return either 0 or N (where N is the length of a).    
+        If there is no suitable index, return either 0 or N (where N is the length of a).
 
     Returns
     -------
@@ -21123,7 +21169,7 @@ class Animate3dObj(Animate3dBase):
         layer=0,
         parent=None,
         env=None,
-        **kwargs
+        **kwargs,
     ):
 
         super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
@@ -21461,7 +21507,7 @@ class Animate3dBox(Animate3dBase):
     x_len : float
         length of the box in x direction (deffult 1)
 
-    y_len : float 
+    y_len : float
         length of the box in y direction (default 1)
 
     z_len : float
@@ -21559,7 +21605,7 @@ class Animate3dBox(Animate3dBase):
         layer=0,
         parent=None,
         env=None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
 
@@ -21705,7 +21751,7 @@ class Animate3dBar(Animate3dBase):
         layer=0,
         parent=None,
         env=None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
 
@@ -21847,7 +21893,7 @@ class Animate3dCylinder(Animate3dBase):
         layer=0,
         parent=None,
         env=None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
         self.x0 = x0
@@ -21959,7 +22005,7 @@ class Animate3dSphere(Animate3dBase):
         layer=0,
         parent=None,
         env=None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
 
@@ -22045,8 +22091,8 @@ def draw_bar3d(
     dy = y1 - y0
     dz = z1 - z0
 
-    length = math.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
-    y_angle = -math.degrees(math.atan2(dz, math.sqrt(dx ** 2 + dy ** 2)))
+    length = math.sqrt(dx**2 + dy**2 + dz**2)
+    y_angle = -math.degrees(math.atan2(dz, math.sqrt(dx**2 + dy**2)))
     z_angle = math.degrees(math.atan2(dy, dx))
     bar_width_2 = bar_width if bar_width_2 is None else bar_width_2
 
@@ -22105,8 +22151,8 @@ def draw_cylinder3d(x0=0, y0=0, z0=0, x1=1, y1=1, z1=1, gl_color=(1, 1, 1), radi
     dy = y1 - y0
     dz = z1 - z0
 
-    length = math.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
-    y_angle = -math.degrees(math.atan2(dz, math.sqrt(dx ** 2 + dy ** 2)))
+    length = math.sqrt(dx**2 + dy**2 + dz**2)
+    y_angle = -math.degrees(math.atan2(dz, math.sqrt(dx**2 + dy**2)))
     z_angle = math.degrees(math.atan2(dy, dx))
     x_angle = rotation_angle
     gl.glPushMatrix()
@@ -22130,7 +22176,7 @@ def draw_cylinder3d(x0=0, y0=0, z0=0, x1=1, y1=1, z1=1, gl_color=(1, 1, 1), radi
     two_d_vertices.append(two_d_vertices[0])
 
     if show_lids:
-        """ draw front lid """
+        """draw front lid"""
         gl.glBegin(gl.GL_TRIANGLE_FAN)
         gl.glNormal3f(-1, 0, 0)
         for two_d_vertex in two_d_vertices:
@@ -22818,7 +22864,7 @@ def over3d(val=True):
     Use as ::
 
         with over3d():
-            an = AnimateText('test')       
+            an = AnimateText('test')
     """
     save_default_over3d = default_over3d()
     default_over3d(val)
@@ -22864,7 +22910,7 @@ def cap_now(val=True):
     Use as ::
 
         with cap_now():
-            an = AnimateText('test')       
+            an = AnimateText('test')
     """
     save_default_cap_now = default_cap_now()
     default_cap_now(val)
