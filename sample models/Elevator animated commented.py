@@ -82,7 +82,7 @@ def do_animation():  # Animation initialisation is done in this function
         )  # Text indicating the floor number
 
         sim.AnimateQueue(queue=floor.visitors, x=xwait - xvisitor_dim, y=floor.y, direction="w")
-,        # The queue at each floor of people waiting for the elevator, build westward
+        # The queue at each floor of people waiting for the elevator, build westward
 
     for car in cars:  # Components needed to display the cars
         x = xcar[car]  # A dictionary containing the x-coordinates of the cars
