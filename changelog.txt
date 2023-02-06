@@ -1,5 +1,47 @@
 salabim changelog
 
+version 23.0.1  2023-02-06
+==========================
+Annotation (0)
+--------------
+Salabim has now type hints on all API classes, methods and functions. 
+This might help users when using IDEs and other tooling.
+
+Warning (0)
+-----------
+As this change involved quite a lot of modifications (and some bug fixes),
+it is possible that errors were introduced.
+Please report any bugs as soon as possible. 
+
+Changed functionality / bug fix (0)
+-----------------------------------
+Due to an error in the sampling of a Poisson distribution, large means
+(around 750 and up), always returned 2.
+Now, if this happens, salabim falls back to another algorithm,
+that works for any mean. But, this is slower than the 'base'
+algorithm.
+
+Salabim now offers the possibility to use the numpy Poisson sampling 
+functionality, which is indeed much faster. For reproducibility 
+reasons, this feature is disabled by default.
+In order to enable numpy Poisson distribution sampling, specify
+prefer_numpy = True when defining the Poisson distribution, like
+    d = sim.Poisson(mean=1000, prefer_numpy=True)
+If numpy is not installed, salabim uses the 'normal' algorithm.
+
+Bug fix (0)
+-----------
+AnimateSlider could not be removed properly. Fixed.
+
+Bug fix (1)
+-----------
+A bug in AnimateSlider sometimes caused an error in getting the current value (v). Fixed.
+
+Bug fix (2)
+-----------
+The way caching xweight was built, sometimes resulted in -although statistically correct-
+unexpected results for monitor. The fix applied is also more performant.
+
 version 23.0.0  2023-01-06
 ==========================
 Added functionality (0)

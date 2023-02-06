@@ -12,11 +12,218 @@ import platform
 from ycecream import yc
 import numpy as np
 import datetime
+import pickle
 
 Pythonista = platform.system() == "Darwin"
 
 def exp():
-    exp184()
+
+    exp194()
+    
+def exp194():
+    class X(sim.Component):
+        def process(self):
+            self.enter(q)
+            print(self == q[0], q.head()==self,  q.index(self))
+            yield self.hold(100)
+            
+    env = sim.Environment()
+    q=sim.Queue('q')
+    X()
+    X()
+    X()
+    env.run(10)
+    
+
+
+def exp193():
+
+    env=sim.Environment()
+    m = sim.Monitor("m", level=True)
+    m1 = sim.Monitor("m", level=True)
+
+    for i in range(10):
+        m.tally(i)
+        env.run(1)
+        m.tally(5+i)
+        env.run(1)  
+    print(m._xweight())
+    m.reset()
+    print(m._xweight())
+    m.tally(1)
+    print(m._xweight())
+    print(m._xweight())
+#    print(m1._xweight())
+
+    env.run(1)
+    print(m._xweight())
+    print(m._xweight())
+    pickle.dump(m.freeze(), open("a.pickle", "wb"))
+
+def exp192():
+    class X(sim.Component):
+        def process(self):
+            yield self.wait(s, fail_at=5)
+    
+    env = sim.Environment(trace=True)
+    x = X()
+    s=sim.State('s')
+    
+    env.run(1)
+    print(x.scheduled_time())
+
+    
+    
+def exp191():
+    class Suppy(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(1)
+                q = sim.Uniform(0,100)()
+                r.release(-q) # yield self.get((r, q))
+                
+                
+    class Demand(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(1)
+                q = sim.Uniform(0,300)()
+                yield self.put((r, q))
+                
+    env = sim.Environment(trace=False)
+    env.animate(True)
+    r=sim.Resource('r', capacity=sim.inf, initial_claimed_quantity=500, anonymous=True)
+    r.claimed_quantity.animate(x=10,y=10,width=1000,height=100,vertical_scale=0.1, horizontal_scale=10)
+    Suppy()
+    Demand()
+    env.run(20)
+    print(r.claimed_quantity.minimum())
+
+def exp190():
+    class X(sim.Component):
+        def process(self):
+            yield self.hold(1)
+            q.set_capacity(10)
+            print(q.capacity.xt())
+            print(q.available_quantity.xt())
+            self.enter(q)
+            yield self.hold(1)
+            print(q.capacity.xt())
+            print(q.available_quantity.xt())
+            print(q.length.xt())
+#            self.leave(q)
+            print(q.capacity.xt())
+            print(q.available_quantity.xt())
+            print(q.length.xt())
+            q.set_capacity(100)
+            print(q.capacity.xt())
+            print(q.available_quantity.xt())
+            print(q.length.xt())
+            print(q.available_quantity())
+
+
+
+
+    env = sim.Environment(trace=True)
+
+    q = sim.Queue('q')
+    X()
+    env.run()
+    q = sim.Queue("q", capacity=10)
+    q.set_capacity(20)
+    print(q.capacity(), q.available_quantity())
+
+    
+
+def exp189():
+    env = sim.Environment(blind_animation=True)
+    env.animate(True)
+    env.animate3d(True)
+    env.position((500,500))
+    env.video_mode("3d")
+    env.show_time(True)
+    env.video("1.mp4")
+    sim.AnimateText("Test", x=512, y=768/2,fontsize=150, text_anchor="c")
+    sim.Animate3dLine(z1=100)
+    env.run(1)
+    env.video_close()
+    print("done")
+
+def exp188():
+    env = sim.Environment()
+
+    mycounter=sim.Monitor('mycounter',level=True)
+    mystate=sim.State('mystate')
+    print(mycounter())
+    print(mystate())
+
+def exp187():
+    env = sim.Environment(blind_animation=True)
+    env.x1(50)
+    env.width(1024)
+    pixel = env.x1() / env.width()
+    env.animate(True)
+    sim.AnimateLine((0,0,40,40),linewidth=2*pixel)
+    sim.AnimateRectangle((0,0,6,0.15), x=10, y=10, linecolor='', fillcolor='red')
+    sim.AnimateRectangle((0,0,6,0.5), x=10, y=15, linecolor='', fillcolor='blue')    
+    env.run(1024)
+    
+def exp186():
+    
+    env = sim.Environment()
+    
+    dooropen=sim.State('dooropen')
+    
+    
+    sim.AnimateMonitor(dooropen.value,x=100,y=200,width=600,height=200,
+                       labels=(False,True),
+#                       labels={False: 'Door Closed', True: 'Door Open'},
+                       linecolor='red',
+                       linewidth=3,
+                       vertical_scale=200,
+                       horizontal_scale=60,
+                       title='door value')
+                       
+    
+    env.animate(True)
+    sim.AnimateCircle(radius=200, x= 400,y=400, arc_angle0=45, arc_angle1=0, fillcolor='', linecolor='blue',draw_arc=True)
+    sim.AnimateCircle(radius=200, x= 400,y=400, arc_angle0=45, arc_angle1=90, fillcolor='', linecolor='red')    
+    while True:
+        state = sim.Pdf((True, False),1)()
+        dooropen.set(state)
+        print(dooropen())
+        env.run(1)
+                       
+        
+
+
+def exp185():
+    import collections
+
+    class Car(sim.Component):
+        def leave(self, q=None):
+            if q is not None:
+                q.exits.append(collections.namedtuple("exits", "name enter_time leave_time color")(self.name(), self.enter_time(q), self.env.now(), self.color))
+            super().leave(q)
+
+        def process(self):
+            self.color = sim.Pdf("red blue green".split(),1)()
+            yield self.hold(sim.Uniform(10,20))
+            self.enter(env.cars_waiting)
+            yield self.hold(sim.Uniform(1,2))
+            self.leave(env.cars_waiting)
+            
+    env = sim.Environment()
+    env.cars_waiting = sim.Queue("cars_waiting")
+    env.cars_waiting.exits = []
+    r = sim.Resource("r", capacity=1E30)
+    r.mode = sim.Monitor("r.mode")
+      
+    for _ in range(5):
+        Car()
+    env.trace(True)
+    env.run()
+    print(env.cars_waiting.exits)
 
 def exp184():
     class X(sim.Component):
@@ -27,10 +234,12 @@ def exp184():
 
     env = sim.Environment()
     mon=sim.Monitor("mon", level=True)
-    X()
+    x=X()
     env.run()
     print(env._now)
     print(mon.xt())
+    print(x.status.xt(force_numeric=False))
+    
 
 def exp183():
     import salabim as sim
@@ -1876,7 +2085,9 @@ def test113():
     env = sim.Environment(trace=True)
     Getter()
     Putter()
-    r0 = sim.Resource("r0", 10, anonymous=True)
+    r0 = sim.Resource("r0", capacity=sim.inf, anonymous=True, initial_claimed_quantity=10)
+    self.on_hand_qty = sim.Resource(name=material, capacity=sim.inf, initial_claimed_quantity=initial_stock, anonymous=True)
+
     env.run(100)
 
 
