@@ -17,8 +17,61 @@ import pickle
 Pythonista = platform.system() == "Darwin"
 
 def exp():
+    exp198()
 
-    exp194()
+def exp198():
+    env1 = sim.Environment(name="env1")
+    env = sim.Environment(name="env")
+    x=env1.Component("name")
+    print(env.Component.__doc__)
+
+    print(x.env)
+    raise env.QueueFullError()
+
+def exp197():
+    class X(sim.Component):
+        def process(self):
+            yield self.from_store(env.store, fail_at=1)
+            if self.failed():
+                print("Failed")
+            yield self.hold(1)
+  
+#            yield self.hold(1)    
+
+    class Y(sim.Component):
+        def process(self):
+            yield self.hold(0.9)
+            yield self.to_store(env.store, sim.Component(),fail_at=100)
+
+    env = sim.Environment(trace=True)
+
+    env.store = env.Store(capacity=0)
+    with env.suppress_trace():
+        X()
+        Y()
+
+    env.run(0)
+
+def exp196():
+    env = sim.Environment(trace=True)
+    for text in ["nw", "n", "ne", "c"]:
+        env.AnimateLine((100,100,200,200),text=text,text_anchor=text)
+    env.animate(True)
+    env.run(env.inf)
+    
+
+    
+def exp195():
+    class Car(sim.Component):
+        ...
+        
+    env = sim.Environment(trace=True)
+    sim.ComponentGenerator(Car, number=5, iat=1, name='ford.')
+    env.run()
+    
+
+
+
     
 def exp194():
     class X(sim.Component):
@@ -704,8 +757,8 @@ def exp166():
     env = sim.Environment()
     X()
 
-    env.animate(True)
     env.animate3d(True)
+    env.animate(True)
     env.position3d((1025, 0))
 
     env.view(x_eye=-529.7288, y_eye=-550.3268, z_eye=393.4118, x_center=50.0000, y_center=50.0000, z_center=0.0000, field_of_view_y=10.0000)  # t=9.9491
@@ -754,6 +807,9 @@ def exp165():
     env.x1(380)
     env.y0(0)
 
+    env.animate(do_animate)
+    env.animate3d(do_animate)
+
     env.width3d(950)
     env.height3d(768)
     env.position3d((0, 100))
@@ -762,8 +818,6 @@ def exp165():
     env.height(768)
     env.position((960, 100))
 
-    env.animate(do_animate)
-    env.animate3d(do_animate)
     env.show_fps(True)
     sim.Animate3dGrid(x_range=range(0, 101, 10), y_range=range(0, 101, 10))
 
