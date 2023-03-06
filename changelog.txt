@@ -1,5 +1,165 @@
 salabim changelog
 
+version 23.1.0  2023-03-06
+==========================
+New functionality (0)
+---------------------
+This version contains a completely new concept that can make modelling
+simpler, particularly for job shops, flow, etc.: stores 
+
+A store is essentially a queue (sometimes with limited capacity) that can
+hold components.
+
+And we can then request components from the store. If there's a component
+in the store, it is returned. But if it is not the requesting component
+goes into the requesting state, until something is available in the store.
+
+The same holds for processes putting components in the store: if it
+is full, the component that wants to add something to the store goes into
+the requesting state. Here we have an unlimited waiting room, though.
+
+Here's the well-known 3 clerk bank sample model with a store:
+
+    # Bank, 3 clerks (store).py
+    import salabim as sim
+
+
+    class CustomerGenerator(sim.Component):
+        def process(self):
+            while True:
+                yield self.to_store(waiting_room, Customer())
+                yield self.hold(sim.Uniform(5, 15).sample())
+
+
+    class Clerk(sim.Component):
+        def process(self):
+            while True:
+                yield self.from_store(waiting_room)
+                customer = self.from_store_item()
+                yield self.hold(30)
+
+
+    class Customer(sim.Component):
+        ...
+
+
+    env = sim.Environment(trace=False)
+    CustomerGenerator()
+    for _ in range(3):
+        Clerk()
+    waiting_room = sim.Store("waiting_room")
+
+
+    env.run(till=50000)
+
+    waiting_room.contents().print_statistics()
+    waiting_room.contents().print_info()
+
+It is possible to specify several stores to get an item from. And likewise,
+several stores to put an item.
+It is also possible to filter components so to make the requester only get
+a certain type of item.
+
+The manual contains a new section on stores, with several examples. See also the
+chapter on Modelling.
+
+New functionality (1)
+---------------------
+From now on every class or function that used to be prefixed with sim.
+can also be prefixed with env.
+
+So, for instance:
+    q = env.Queue("q")
+or
+    store = env.Store("store")
+or
+    env.run(env.inf)
+
+The only place where that is not allowed is for subclassing,
+particularly sim.Component. So you still need to say
+    class Car(sim.Component):
+        ...
+
+Note that explicit setting of env is still possible:
+    env.Queue("q", env=env0)
+is equivalent to
+    sim.Queue("q", env=env0)
+
+Implicit setting of env is handled like
+    env0.Queue("q")
+is equivalent to
+    sim.Queue("q", env=env0)
+
+Support functions, like arange can now also be prefixed with env.
+So env.arange(0, 10, 0.5) and sim.arange(0, 10, 0.5) are equivalent. 
+
+Also prefixable with env are env.inf and env.nan and the exceptions.
+
+New functionality (2)
+---------------------
+Introduced a context manager Environment.suppress_trace that can
+be used to temporarily disable trace. After the context manager block,
+the trace status returns to the value before. Usage:
+    with env.suppress_trace():
+        car = sim.Component()
+This will never print the trace output for component creation.
+
+Changed functionality (0)
+-------------------------
+In TrajectoryPolygon, the spline may now also be "" (the null string),
+denoting no splining.
+
+Added functionality (0)
+-----------------------
+In the various print_histogram() print_histograms() a new parameter is
+introduced: graph_scale, which represents the number of characters to
+show 100% in the graphical representation of % and cum%.
+This is particularly useful for (this) documentation.
+
+So, ``m.print_histogram()`` might print:
+
+...
+           <=      duration     %  cum%
+        0            22.216  22.2  22.2 *****************|
+        1            32.485  32.5  54.7 *************************                  |
+        2            26.441  26.4  81.1 *********************                                           |
+        3            18.858  18.9 100   ***************                                                                 |
+          inf         0       0   100                                                                                   |
+
+, whereas ``m.print_histogram(graph_scale=30)`` will result in:
+
+...
+           <=      duration     %  cum%
+        0            22.216  22.2  22.2 ******|
+        1            32.485  32.5  54.7 *********       |
+        2            26.441  26.4  81.1 *******                 |
+        3            18.858  18.9 100   *****                         |
+          inf         0       0   100                                 |
+          
+Bug fix (0)
+-----------
+Trajectories did not always work correctly. Fixed.
+
+Bug fix (1)
+-----------
+If a queue is animated the title should be the name of the queue by default.
+In a recent update, the default was set to the null string, though.
+Fixed.
+
+Bug fix (2)
+-----------
+When saving an animated gif, the duration of the video was not always correct.
+Particularly at 30 fps (the default), the duration was actually 90% shorter,
+because frame durations are always a multiple of 10 ms.
+That means that a 30 fps animated gif will be now actually recorded at 33.33 fps
+and have the proper duration.
+Fixed.
+
+Documentation (0)
+-----------------
+The changelog is now part of both the online and pdf documentation.
+The pdf version is now kept up-to-date (synced with the online docs).
+
 version 23.0.1  2023-02-06
 ==========================
 Annotation (0)
@@ -408,7 +568,7 @@ Animation functionality (0)
 ---------------------------
 All animation primitives *) now have a show() method that can be used
 to show an animation objects that had been removed. 
-It is possible to use show for animation objects that are already shown
+It is possible to use show for animation objects that are already shown.
 
 All animation primitives *) now have a remove() method that can be used
 take an animation object off the animation objects set.
@@ -632,7 +792,7 @@ This can be very useful for animations where the location changes at certain poi
 Added functionality (4)
 -----------------------
 Salabim can now optionally show times and durations as dates/timedeltas. 
-Therefore, sim.Environment() had a new parameter datetime0.
+Therefore, sim.Environment() has a new parameter datetime0.
 If datetime0 is set to True, the base date will be 1 January 1970. Alternatively, a
 datetime.datatime date can be given.
 Note that if no time unit is specified, and datetime0 is given, the time unit will

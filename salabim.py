@@ -1,14 +1,13 @@
-#               _         _      _               ____   _____      ___      _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /     / _ \    / |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \    | | | |   | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_|
+#               _         _      _               ____   _____     _      ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    / |    / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \    | |   | | | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | | _ | |_| |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|_|(_) \___/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
-# from __future__ import annotations
 
-__version__ = "23.0.1"
+__version__ = "23.1.0"
 
 import heapq
 import random
@@ -43,19 +42,7 @@ import datetime
 
 from pathlib import Path
 
-from typing import (
-    Any,
-    Union,
-    Iterable,
-    Tuple,
-    List,
-    Callable,
-    TextIO,
-    Dict,
-    Set,
-    Type,
-    Hashable,
-)
+from typing import Any, Union, Iterable, Tuple, List, Callable, TextIO, Dict, Set, Type, Hashable, Optional
 
 
 ColorType = Union[str, Iterable[float]]
@@ -72,9 +59,9 @@ class g:
 
 if Pythonista:
     try:
-        import scene
-        import ui
-        import objc_util
+        import scene # type: ignore
+        import ui # type: ignore
+        import objc_util # type: ignore
     except ModuleNotFoundError:
         Pythonista = False  # for non Pythonista implementation on iOS
 
@@ -316,13 +303,12 @@ class Monitor:
         initial_tally: Any = None,
         type: str = None,
         weight_legend: str = None,
-        fill: Union[Iterable] = None,
+        fill: Iterable = None,
         stats_only: bool = False,
         env: "Environment" = None,
         *args,
         **kwargs,
     ):
-
         if env is None:
             self.env = g.default_env
         else:
@@ -332,11 +318,7 @@ class Monitor:
         else:
             self._name = name
         self._level = level
-        self._weight_legend = (
-            ("duration" if self._level else "weight")
-            if weight_legend is None
-            else weight_legend
-        )
+        self._weight_legend = ("duration" if self._level else "weight") if weight_legend is None else weight_legend
         if self._level:
             if weight_legend is None:
                 self.weight_legend = "duration"
@@ -418,12 +400,7 @@ class Monitor:
             function = inspect.getframeinfo(frame).function
             if function == "__init__":
                 function = frame.f_locals["self"].__class__.__name__
-            raise NotImplementedError(
-                function
-                + " not available for "
-                + self.name()
-                + " because it is stats_only"
-            )
+            raise NotImplementedError(function + " not available for " + self.name() + " because it is stats_only")
 
     def stats_only(self) -> bool:
         return self._stats_only
@@ -456,30 +433,16 @@ class Monitor:
         self._block_stats_only()
         name = kwargs.pop("name", None)
         if kwargs:
-            raise TypeError(
-                "merge() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'"
-            )
+            raise TypeError("merge() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
         for m in monitors:
             m._block_stats_only()
             if not isinstance(m, Monitor):
-                raise TypeError(
-                    "not possible to merge monitor with "
-                    + object_to_str(m, True)
-                    + " type"
-                )
+                raise TypeError("not possible to merge monitor with " + object_to_str(m, True) + " type")
             if self._level != m._level:
-                raise TypeError(
-                    "not possible to mix level monitor with non level monitor"
-                )
+                raise TypeError("not possible to mix level monitor with non level monitor")
             if self.xtype != m.xtype:
-                raise TypeError(
-                    "not possible to mix type '"
-                    + self.xtype
-                    + "' with type '"
-                    + m.xtype
-                    + "'"
-                )
+                raise TypeError("not possible to mix type '" + self.xtype + "' with type '" + m.xtype + "'")
             if self.env != m.env:
                 raise TypeError("not possible to mix environments")
         if name is None:
@@ -489,9 +452,7 @@ class Monitor:
             else:
                 name = self.name() + ".merged"
 
-        new = _SystemMonitor(
-            name=name, type=self.xtype, level=self._level, env=self.env
-        )
+        new = _SystemMonitor(name=name, type=self.xtype, level=self._level, env=self.env)
 
         merge = [self] + list(monitors)
 
@@ -503,12 +464,7 @@ class Monitor:
 
             curx = [new.off] * len(merge)
             new._t = array.array("d")
-            for t, index, x in heapq.merge(
-                *[
-                    zip(merge[index]._t, itertools.repeat(index), merge[index]._x)
-                    for index in range(len(merge))
-                ]
-            ):
+            for t, index, x in heapq.merge(*[zip(merge[index]._t, itertools.repeat(index), merge[index]._x) for index in range(len(merge))]):
                 if new.xtypecode:
                     curx[index] = x
                 else:
@@ -537,9 +493,7 @@ class Monitor:
                         merge[index]._t,
                         itertools.repeat(index),
                         merge[index]._x,
-                        merge[index]._weight
-                        if merge[index]._weight
-                        else (1,) * len(merge[index]._x),
+                        merge[index]._weight if merge[index]._weight else (1,) * len(merge[index]._x),
                     )
                     for index in range(len(merge))
                 ]
@@ -567,9 +521,7 @@ class Monitor:
         if factor <= 0:
             raise TypeError(f"factor {factor} <= 0")
 
-        new = _SystemMonitor(
-            name=name, type=self.xtype, level=self._level, env=self.env
-        )
+        new = _SystemMonitor(name=name, type=self.xtype, level=self._level, env=self.env)
         new._x = []
         new._t = []
         for x in self._x:
@@ -583,9 +535,7 @@ class Monitor:
         new.isgenerated = True
         return new
 
-    def x_map(
-        self, func: Callable, monitors: List["Monitor"] = [], name: str = None
-    ) -> "Monitor":
+    def x_map(self, func: Callable, monitors: List["Monitor"] = [], name: str = None) -> "Monitor":
         """
         maps a function to the x-values of the given monitors (static method)
 
@@ -754,9 +704,7 @@ class Monitor:
         self._block_stats_only()
         if name is None:
             name = self.name() + ".sliced"
-        new = _SystemMonitor(
-            level=self._level, type=self.xtype, name=name, env=self.env
-        )
+        new = _SystemMonitor(level=self._level, type=self.xtype, name=name, env=self.env)
         actions = []
         if modulo is None:
             if start is None:
@@ -771,9 +719,7 @@ class Monitor:
                 stop += self.env._offset
                 stop_action = "b"  # non inclusive
 
-            stop = min(
-                stop, self.env._now - self.env._offset
-            )  # not self.now() in order to support frozen monitors
+            stop = min(stop, self.env._now - self.env._offset)  # not self.now() in order to support frozen monitors
             actions.append((start, "a", 0, 0))
             actions.append((stop, stop_action, 0, 0))
         else:
@@ -805,15 +751,13 @@ class Monitor:
             new._x.append(curx)
 
         enabled = False
-        for (t, type, x, weight) in heapq.merge(
+        for t, type, x, weight in heapq.merge(
             actions,
             zip(
                 self._t,
                 itertools.repeat("c"),
                 self._x,
-                self._weight
-                if (self._weight and not self._level)
-                else (1,) * len(self._x),
+                self._weight if (self._weight and not self._level) else (1,) * len(self._x),
             ),
         ):
             if new._level:
@@ -945,9 +889,7 @@ class Monitor:
         if t == self.env._now:
             return self._tally  # even if monitor is off, the current value is valid
         if self._stats_only:
-            raise NotImplementedError(
-                "__call__(t) not supported for stats_only monitors"
-            )
+            raise NotImplementedError("__call__(t) not supported for stats_only monitors")
         if t < self._t[0]:
             return self.off
         i = bisect.bisect_left(list(zip(self._t, itertools.count())), (t, float("inf")))
@@ -1095,9 +1037,7 @@ class Monitor:
                     self._x.append(self.off)
                 self._t.append(self.env._now)
             else:
-                self._weight = (
-                    False  # weights are only stored if there is a non 1 weight
-                )
+                self._weight = False  # weights are only stored if there is a non 1 weight
         self.cached_xweight.clear()  # invalidate cache
 
         self.monitor(monitor)
@@ -1127,12 +1067,9 @@ class Monitor:
 
                 self._monitor = value
         else:
-
             if value is not None:
                 if value and self.isgenerated:
-                    raise TypeError(
-                        "sliced, merged or frozen monitors cannot be turned on"
-                    )
+                    raise TypeError("sliced, merged or frozen monitors cannot be turned on")
                 self._monitor = value
                 if self._level:
                     if self._monitor:
@@ -1167,9 +1104,7 @@ class Monitor:
         if self._stats_only:
             if self._level:
                 if weight != 1:
-                    raise ValueError(
-                        "level monitor supports only weight=1, not: " + str(weight)
-                    )
+                    raise ValueError("level monitor supports only weight=1, not: " + str(weight))
                 if self._monitor:
                     weight = self.env._now - self._ttally_monitored
                     value_num = self._tally
@@ -1195,12 +1130,8 @@ class Monitor:
                     # algorithm based on https://fanf2.user.srcf.net/hermes/doc/antiforgery/stats.pdf
                     self.sumw[ex0] += weight
                     mun1 = self.mun[ex0]
-                    self.mun[ex0] = mun1 + (weight / self.sumw[ex0]) * (
-                        value_num - mun1
-                    )
-                    self.sn[ex0] = self.sn[ex0] + weight * (value_num - mun1) * (
-                        value_num - self.mun[ex0]
-                    )
+                    self.mun[ex0] = mun1 + (weight / self.sumw[ex0]) * (value_num - mun1)
+                    self.sn[ex0] = self.sn[ex0] + weight * (value_num - mun1) * (value_num - self.mun[ex0])
                     self._minimum[ex0] = min(self._minimum[ex0], value_num)
                     self._maximum[ex0] = max(self._maximum[ex0], value_num)
                 if weight != 1:
@@ -1211,9 +1142,7 @@ class Monitor:
             if self._level:
                 if weight != 1:
                     if self._level:
-                        raise ValueError(
-                            "level monitor supports only weight=1, not: " + str(weight)
-                        )
+                        raise ValueError("level monitor supports only weight=1, not: " + str(weight))
                 if value == self.off:
                     raise ValueError("not allowed to tally " + str(self.off) + " (off)")
                 self._tally = value
@@ -1462,9 +1391,7 @@ class Monitor:
         """
         self._block_stats_only()
         self.env._check_time_unit_na()
-        return self.multiply(
-            _time_unit_lookup(time_unit) / self.env._time_unit, name=name
-        )
+        return self.multiply(_time_unit_lookup(time_unit) / self.env._time_unit, name=name)
 
     def multiply(self, scale: float = 1, name: str = None) -> "Monitor":
         """
@@ -1494,18 +1421,14 @@ class Monitor:
         if self.xtype == "float":
             if name is None:
                 name = self.name()
-            new = _SystemMonitor(
-                name=name, monitor=False, type="float", level=False, env=self.env
-            )
+            new = _SystemMonitor(name=name, monitor=False, type="float", level=False, env=self.env)
             new.isgenerated = True
             new._x = [x * scale for x in self._x]
             new._t = [t for t in self._t]
             return new
 
         else:
-            raise ValueError(
-                "type", self.xtype, " monitors can't be multiplied (only float)"
-            )
+            raise ValueError("type", self.xtype, " monitors can't be multiplied (only float)")
 
     def name(self, value: str = None) -> str:
         """
@@ -1631,10 +1554,7 @@ class Monitor:
             sumweight = sum(weight)
             if sumweight:
                 wmean = self.mean(ex0=ex0)
-                wvar = (
-                    sum((vweight * (vx - wmean) ** 2) for vx, vweight in zip(x, weight))
-                    / sumweight
-                )
+                wvar = sum((vweight * (vx - wmean) ** 2) for vx, vweight in zip(x, weight)) / sumweight
                 return math.sqrt(wvar)
             else:
                 return nan
@@ -1724,9 +1644,7 @@ class Monitor:
         """
         return self.percentile(50, ex0=ex0, interpolation=interpolation)
 
-    def percentile(
-        self, q: float, ex0: bool = False, interpolation: str = "linear"
-    ) -> float:
+    def percentile(self, q: float, ex0: bool = False, interpolation: str = "linear") -> float:
         """
         q-th percentile of tallied values
 
@@ -1765,11 +1683,7 @@ class Monitor:
         """
         self._block_stats_only()
 
-        if interpolation not in (
-            ("linear", "lower", "higher", "midpoint")
-            if self._weight
-            else ("linear", "lower", "higher", "midpoint", "nearest")
-        ):
+        if interpolation not in (("linear", "lower", "higher", "midpoint") if self._weight else ("linear", "lower", "higher", "midpoint", "nearest")):
             raise ValueError("incorrect interpolation method " + str(interpolation))
 
         q = max(0, min(q, 100))
@@ -1818,9 +1732,7 @@ class Monitor:
                     break
 
             if interpolation == "linear":
-                return interpolate(
-                    q, weight_cum[k], weight_cum[k + 1], x_sorted[k], x_sorted[k + 1]
-                )
+                return interpolate(q, weight_cum[k], weight_cum[k + 1], x_sorted[k], x_sorted[k + 1])
             if interpolation == "lower":
                 return x_sorted[k]
             if interpolation == "higher":
@@ -1833,9 +1745,7 @@ class Monitor:
                 else:
                     return x_sorted[k + 1]
 
-    def bin_number_of_entries(
-        self, lowerbound: float, upperbound: float, ex0: bool = False
-    ) -> int:
+    def bin_number_of_entries(self, lowerbound: float, upperbound: float, ex0: bool = False) -> int:
         """
         count of the number of tallied values in range (lowerbound,upperbound]
 
@@ -1916,13 +1826,7 @@ class Monitor:
 
     def sys_bin_weight(self, lowerbound, upperbound):
         x, weight = self._xweight()
-        return sum(
-            (
-                vweight
-                for vx, vweight in zip(x, weight)
-                if (vx > lowerbound) and (vx <= upperbound)
-            )
-        )
+        return sum((vweight for vx, vweight in zip(x, weight) if (vx > lowerbound) and (vx <= upperbound)))
 
     def value_number_of_entries(self, value: Any) -> int:
         """
@@ -2184,19 +2088,11 @@ class Monitor:
         indent = pad("", ll)
 
         if show_header:
-            result.append(
-                indent
-                + f"Statistics of {self.name()} at {fn(self.env._now - self.env._offset, 13, 3)}"
-            )
+            result.append(indent + f"Statistics of {self.name()} at {fn(self.env._now - self.env._offset, 13, 3)}")
 
         if show_legend:
-            result.append(
-                indent + "                        all    excl.zero         zero"
-            )
-            result.append(
-                pad("-" * (ll - 1) + " ", ll)
-                + "-------------- ------------ ------------ ------------"
-            )
+            result.append(indent + "                        all    excl.zero         zero")
+            result.append(pad("-" * (ll - 1) + " ", ll) + "-------------- ------------ ------------ ------------")
 
         if self.sys_weight() == 0:
             result.append(pad(self.name(), ll) + "no data")
@@ -2210,30 +2106,16 @@ class Monitor:
                 f"{pad(self.name(), ll)}{pad('entries', 14)}{fn(self.number_of_entries(), 13, 3)}{fn(self.number_of_entries(ex0=True), 13, 3)}{fn(self.number_of_entries_zero(), 13, 3)}"
             )
 
-        result.append(
-            f"{indent}mean          {fn(self.mean(), 13, 3)}{fn(self.mean(ex0=True), 13, 3)}"
-        )
+        result.append(f"{indent}mean          {fn(self.mean(), 13, 3)}{fn(self.mean(ex0=True), 13, 3)}")
 
-        result.append(
-            f"{indent}std.deviation {fn(self.std(), 13, 3)}{fn(self.std(ex0=True), 13, 3)}"
-        )
+        result.append(f"{indent}std.deviation {fn(self.std(), 13, 3)}{fn(self.std(ex0=True), 13, 3)}")
         result.append("")
-        result.append(
-            f"{indent}minimum       {fn(self.minimum(), 13, 3)}{fn(self.minimum(ex0=True), 13, 3)}"
-        )
+        result.append(f"{indent}minimum       {fn(self.minimum(), 13, 3)}{fn(self.minimum(ex0=True), 13, 3)}")
         if not self._stats_only:
-            result.append(
-                f"{indent}median        {fn(self.percentile(50), 13, 3)}{fn(self.percentile(50, ex0=True), 13, 3)}"
-            )
-            result.append(
-                f"{indent}90% percentile{fn(self.percentile(90), 13, 3)}{fn(self.percentile(90, ex0=True), 13, 3)}"
-            )
-            result.append(
-                f"{indent}95% percentile{fn(self.percentile(95), 13, 3)}{fn(self.percentile(95, ex0=True), 13, 3)}"
-            )
-        result.append(
-            f"{indent}maximum       {fn(self.maximum(), 13, 3)}{fn(self.maximum(ex0=True), 13, 3)}"
-        )
+            result.append(f"{indent}median        {fn(self.percentile(50), 13, 3)}{fn(self.percentile(50, ex0=True), 13, 3)}")
+            result.append(f"{indent}90% percentile{fn(self.percentile(90), 13, 3)}{fn(self.percentile(90, ex0=True), 13, 3)}")
+            result.append(f"{indent}95% percentile{fn(self.percentile(95), 13, 3)}{fn(self.percentile(95, ex0=True), 13, 3)}")
+        result.append(f"{indent}maximum       {fn(self.maximum(), 13, 3)}{fn(self.maximum(ex0=True), 13, 3)}")
         return return_or_print(result, as_str, file)
 
     def histogram_autoscale(self, ex0: bool = False) -> Tuple[float, float, int]:
@@ -2277,6 +2159,7 @@ class Monitor:
         ex0: bool = False,
         as_str: bool = False,
         file: TextIO = None,
+        graph_scale: float = None,
     ) -> str:
         """
         print monitor statistics and histogram
@@ -2312,6 +2195,9 @@ class Monitor:
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
+        graph_scale : float
+            Scale in the graphical representation of the % and cum% (default=80)
+
         Returns
         -------
         histogram (if as_str is True) : str
@@ -2322,9 +2208,7 @@ class Monitor:
         with a maximum of 30 classes. |n|
         Exactly same functionality as Monitor.print_histogram()
         """
-        return self.print_histogram(
-            number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str, file=file
-        )
+        return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str, file=file, graph_scale=graph_scale)
 
     def print_histogram(
         self,
@@ -2335,6 +2219,7 @@ class Monitor:
         ex0: bool = False,
         as_str: bool = False,
         file: TextIO = None,
+        graph_scale: float = None,
         sort_on_weight: bool = False,
         sort_on_duration: bool = False,
         sort_on_value: bool = False,
@@ -2365,7 +2250,6 @@ class Monitor:
         ex0 : bool
             if False (default), include zeroes. if True, exclude zeroes
 
-
         as_str: bool
             if False (default), print the histogram
             if True, return a string containing the histogram
@@ -2373,6 +2257,9 @@ class Monitor:
         file: file
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
+
+        graph_scale : float
+            Scale in the graphical representation of the % and cum% (default=80)
 
         sort_on_weight : bool
             if True, sort the values on weight first (largest first), then on the values itself|n|
@@ -2383,16 +2270,6 @@ class Monitor:
             if True, sort the values on duration first (largest first), then on the values itself|n|
             if False, sort the values on the values itself |n|
             False is the default for level monitors. Not permitted for non level monitors.
-
-        sort_on_weight : bool
-            if True, sort the values on weight first (largest first), then on the values itself|n|
-            if False (default), sort the values on the values itself |n|
-            Not permitted for level monitors.
-
-        sort_on_duration : bool
-            if True, sort the values on duration first (largest first), then on the values itself|n|
-            if False (default), sort the values on the values itself |n|
-            Not permitted for non level monitors.
 
         sort_on_value : bool
             if True, sort on the values. |n|
@@ -2410,13 +2287,9 @@ class Monitor:
         """
 
         if self._level and sort_on_weight:
-            raise ValueError(
-                "level monitors can't be sorted on weight. Use sort_on_duration instead"
-            )
+            raise ValueError("level monitors can't be sorted on weight. Use sort_on_duration instead")
         if not self._level and sort_on_duration:
-            raise ValueError(
-                "non level monitors can't be sorted on duration. Use sort_on_weight instead"
-            )
+            raise ValueError("non level monitors can't be sorted on duration. Use sort_on_weight instead")
         if sort_on_value and sort_on_weight:
             raise ValueError("sort_on_value can't be combined with sorted_on_value")
         if sort_on_value and sort_on_weight:
@@ -2424,6 +2297,9 @@ class Monitor:
 
         result = []
         result.append("Histogram of " + self.name() + ("[ex0]" if ex0 else ""))
+
+        if graph_scale is None:
+            graph_scale = 80
 
         if self._stats_only:
             weight_total = self.sumw[bool(ex0)]
@@ -2445,21 +2321,15 @@ class Monitor:
             if values or values_is_iterable:
                 nentries = len(x)
                 if self._weight:
-                    result.append(
-                        f"{pad(self.weight_legend, 13)}{fn(weight_total, 13, 3)}"
-                    )
+                    result.append(f"{pad(self.weight_legend, 13)}{fn(weight_total, 13, 3)}")
                 if not self._level:
                     result.append(f"{pad('entries', 13)}{fn(nentries, 13, 3)}")
                 result.append("")
                 if self._level:
-                    result.append(
-                        f"value                {rpad(self.weight_legend, 13)}     %"
-                    )
+                    result.append(f"value                {rpad(self.weight_legend, 13)}     %")
                 else:
                     if self._weight:
-                        result.append(
-                            f"value                {rpad(self.weight_legend, 13)}     % entries     %"
-                        )
+                        result.append(f"value                {rpad(self.weight_legend, 13)}     % entries     %")
                     else:
                         result.append("value               entries     %")
 
@@ -2480,9 +2350,7 @@ class Monitor:
                             )
                             if v in values
                         ]
-                        values_not_in_monitor = [
-                            v for v in values if v not in values_label
-                        ]
+                        values_not_in_monitor = [v for v in values if v not in values_label]
                         values_label.extend(sorted(values_not_in_monitor))
                     else:
                         values_label = values
@@ -2499,9 +2367,7 @@ class Monitor:
                     if v in rest_values:
                         rest_values.remove(v)
 
-                if (
-                    rest_values
-                ):  # not possible via set subtraction as values may be not hashable
+                if rest_values:  # not possible via set subtraction as values may be not hashable
                     values_condition.append(rest_values)
                     values_label.append("<rest>")
 
@@ -2511,25 +2377,17 @@ class Monitor:
                     else:
                         if self._weight:
                             count = self.value_weight(value_condition)
-                            count_entries = self.value_number_of_entries(
-                                value_condition
-                            )
+                            count_entries = self.value_number_of_entries(value_condition)
                         else:
                             count = self.value_number_of_entries(value_condition)
 
                     perc = count / weight_total
-                    scale = 80
-                    n = int(perc * scale)
+
+                    n = int(perc * graph_scale)
                     s = "*" * n
 
                     if self._level:
-                        result.append(
-                            pad(str(value_label), 20)
-                            + fn(count, 14, 3)
-                            + fn(perc * 100, 6, 1)
-                            + " "
-                            + s
-                        )
+                        result.append(pad(str(value_label), 20) + fn(count, 14, 3) + fn(perc * 100, 6, 1) + " " + s)
                     else:
                         if self._weight:
                             result.append(
@@ -2540,13 +2398,7 @@ class Monitor:
                                 + fn(count_entries * 100 / nentries, 6, 1)
                             )
                         else:
-                            result.append(
-                                pad(str(value_label), 20)
-                                + rpad(str(count), 7)
-                                + fn(perc * 100, 6, 1)
-                                + " "
-                                + s
-                            )
+                            result.append(pad(str(value_label), 20) + rpad(str(count), 7) + fn(perc * 100, 6, 1) + " " + s)
             else:
                 auto_scale = True
                 if bin_width is None:
@@ -2575,11 +2427,7 @@ class Monitor:
                 if not self._stats_only and number_of_bins >= 0:
                     result.append("")
                     if self._weight:
-                        result.append(
-                            "           <= "
-                            + rpad(self.weight_legend, 13)
-                            + "     %  cum%"
-                        )
+                        result.append("           <= " + rpad(self.weight_legend, 13) + "     %  cum%")
                     else:
                         result.append("           <=       entries     %  cum%")
 
@@ -2603,15 +2451,12 @@ class Monitor:
                             s = ""
                         else:
                             cumperc += perc
-                            scale = 80
-                            n = int(perc * scale)
-                            ncum = int(cumperc * scale) + 1
-                            s = ("*" * n) + (" " * (scale - n))
+                            n = int(perc * graph_scale)
+                            ncum = int(cumperc * graph_scale) + 1
+                            s = ("*" * n) + (" " * (graph_scale - n))
                             s = s[: ncum - 1] + "|" + s[ncum + 1 :]
 
-                        result.append(
-                            f"{fn(ub, 13, 3)} {fn(count, 13, 3)}{fn(perc * 100, 6, 1)}{fn(cumperc * 100, 6, 1)} {s}"
-                        )
+                        result.append(f"{fn(ub, 13, 3)} {fn(count, 13, 3)}{fn(perc * 100, 6, 1)}{fn(cumperc * 100, 6, 1)} {s}")
         result.append("")
         return return_or_print(result, as_str=as_str, file=file)
 
@@ -2653,14 +2498,10 @@ class Monitor:
 
         if self._level:
             if sort_on_weight:
-                raise ValueError(
-                    "level monitors can't be sorted on weight. Use sort_on_duration instead"
-                )
+                raise ValueError("level monitors can't be sorted on weight. Use sort_on_duration instead")
         else:
             if sort_on_duration:
-                raise ValueError(
-                    "non level monitors can't be sorted on duration. Use sort_on_weight instead"
-                )
+                raise ValueError("non level monitors can't be sorted on duration. Use sort_on_weight instead")
 
         def key(x):
             if sort_on_weight:
@@ -2836,9 +2677,7 @@ class Monitor:
         """
         return AnimateMonitor(monitor=self, *args, **kwargs)
 
-    def x(
-        self, ex0: bool = False, force_numeric: bool = True
-    ) -> Union[List, array.array]:
+    def x(self, ex0: bool = False, force_numeric: bool = True) -> Union[List, array.array]:
         """
         array/list of tallied values
 
@@ -2865,9 +2704,7 @@ class Monitor:
             raise TypeError("x not available for level monitors")
         return self._xweight(ex0=ex0, force_numeric=force_numeric)[0]
 
-    def xweight(
-        self, ex0: bool = False, force_numeric: bool = True
-    ) -> Union[List, array.array]:
+    def xweight(self, ex0: bool = False, force_numeric: bool = True) -> Union[List, array.array]:
         """
         array/list of tallied values
 
@@ -3034,13 +2871,7 @@ class Monitor:
         """
         self._block_stats_only()
 
-        return tuple(
-            reversed(
-                self.xt(
-                    ex0=ex0, exoff=exoff, force_numeric=force_numeric, add_now=add_now
-                )
-            )
-        )
+        return tuple(reversed(self.xt(ex0=ex0, exoff=exoff, force_numeric=force_numeric, add_now=add_now)))
 
     def _xweight(self, ex0=False, force_numeric=True):
         t_extra = self.env._t if self.env._animate else self.env._now
@@ -3078,7 +2909,6 @@ class Monitor:
                         weight.append(vweight)
             xweight = (xx, weight)
         else:
-
             if ex0:
                 x0 = [vx for vx in x if vx != 0]
                 if typecode:
@@ -3090,11 +2920,7 @@ class Monitor:
                         x0,
                         array.array(
                             "d",
-                            [
-                                vweight
-                                for vx, vweight in zip(x, self._weight)
-                                if vx != 0
-                            ],
+                            [vweight for vx, vweight in zip(x, self._weight) if vx != 0],
                         ),
                     )
                 else:
@@ -3135,9 +2961,7 @@ class _StatusMonitor(Monitor):
         return self._tally
 
     @_value.setter
-    def _value(
-        self, value: Any
-    ) -> None:  # as we don't want user to set (tally) the status
+    def _value(self, value: Any) -> None:  # as we don't want user to set (tally) the status
         self.tally(value)
 
 
@@ -3412,7 +3236,7 @@ class AnimateMonitor(DynamicClass):
         nowcolor: Union[ColorType, Callable] = "red",
         titlefont: Union[str, Callable] = "",
         titlefontsize: Union[float, Callable] = 15,
-        title: [Union[str, Callable]] = None,
+        title: Union[str, Callable] = None,
         x: Union[float, Callable] = 0,
         y: Union[float, Callable] = 0,
         offsetx: Union[float, Callable] = 0,
@@ -3456,12 +3280,8 @@ class AnimateMonitor(DynamicClass):
         if over3d is None:
             over3d = default_over3d()
 
-        offsetx += monitor.env.xy_anchor_to_x(
-            xy_anchor, screen_coordinates=True, over3d=over3d
-        )
-        offsety += monitor.env.xy_anchor_to_y(
-            xy_anchor, screen_coordinates=True, over3d=over3d
-        )
+        offsetx += monitor.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True, over3d=over3d)
+        offsety += monitor.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True, over3d=over3d)
 
         self.linecolor = linecolor
         self.linewidth = linewidth
@@ -3527,8 +3347,7 @@ class AnimateMonitor(DynamicClass):
             linewidth=lambda t: self.borderlinewidth(t),
             linecolor=lambda t: self.bordercolor(t),
             screen_coordinates=self.screen_coordinates,
-            layer=lambda: self.layer_t
-            + 0.2,  # to make it appear vehind label lines and plot line/points
+            layer=lambda: self.layer_t + 0.2,  # to make it appear vehind label lines and plot line/points
             over3d=self.over3d,
             visible=lambda: self.visible_t,
         )
@@ -3539,9 +3358,7 @@ class AnimateMonitor(DynamicClass):
             x=lambda: self.x_t,
             y=lambda: self.y_t,
             offsetx=lambda: self.offsetx_t,
-            offsety=lambda t: self.offsety_t
-            + self.height_t
-            + self.titlefontsize(t) * 0.15,
+            offsety=lambda t: self.offsety_t + self.height_t + self.titlefontsize(t) * 0.15,
             angle=lambda: self.angle_t,
             text_anchor="sw",
             fontsize=lambda t: self.titlefontsize(t),
@@ -3612,7 +3429,6 @@ class AnimateMonitor(DynamicClass):
         )
 
     def line(self, t):
-
         result = []
         if len(self._monitor._x) != 0:
             value = self._monitor._x[-1]
@@ -3677,19 +3493,14 @@ class AnimateMonitor(DynamicClass):
                 text = value
 
             try:
-                label_y = (
-                    self.vertical_map(value) * self.vertical_scale_t
-                    + self.vertical_offset_t
-                )
+                label_y = self.vertical_map(value) * self.vertical_scale_t + self.vertical_offset_t
                 if 0 <= label_y <= self.height_t:
                     labels.append(text)
                     label_ys.append(label_y)
             except (ValueError, TypeError):
                 pass
 
-        for (label, label_y, ao_label_text, ao_label_line) in itertools.zip_longest(
-            labels, label_ys, self.ao_label_texts[:], self.ao_label_lines[:]
-        ):
+        for label, label_y, ao_label_text, ao_label_line in itertools.zip_longest(labels, label_ys, self.ao_label_texts[:], self.ao_label_lines[:]):
             if label is None:
                 ao_label_text = self.ao_label_texts.pop()
                 ao_label_line = self.ao_label_lines.pop()
@@ -3697,12 +3508,8 @@ class AnimateMonitor(DynamicClass):
                 ao_label_line.remove()
             else:
                 if ao_label_text is None:
-                    ao_label_text = AnimateText(
-                        screen_coordinates=self.screen_coordinates
-                    )
-                    ao_label_line = AnimateLine(
-                        screen_coordinates=self.screen_coordinates
-                    )
+                    ao_label_text = AnimateText(screen_coordinates=self.screen_coordinates)
+                    ao_label_line = AnimateLine(screen_coordinates=self.screen_coordinates)
                     self.ao_label_texts.append(ao_label_text)
                     self.ao_label_lines.append(ao_label_line)
 
@@ -3728,9 +3535,7 @@ class AnimateMonitor(DynamicClass):
                 ao_label_line.angle = self.angle_t
                 ao_label_line.linewidth = self.label_linewidth(t)
                 ao_label_line.linecolor = self.label_linecolor(t)
-                ao_label_line.layer = (
-                    self.layer_t + 0.1
-                )  # to make it appear behind the plot line/points
+                ao_label_line.layer = self.layer_t + 0.1  # to make it appear behind the plot line/points
                 ao_label_line.over3d = self.over3d
                 ao_label_line.visible = self.visible_t
 
@@ -3787,27 +3592,16 @@ if Pythonista:
             env = g.animation_env
             if env is not None:
                 for uio in env.ui_objects:
-                    ux = uio.x + env.xy_anchor_to_x(
-                        uio.xy_anchor, screen_coordinates=True, retina_scale=True
-                    )
-                    uy = uio.y + env.xy_anchor_to_y(
-                        uio.xy_anchor, screen_coordinates=True, retina_scale=True
-                    )
+                    ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True, retina_scale=True)
+                    uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True, retina_scale=True)
                     if uio.type == "button":
-                        if touch.location in scene.Rect(
-                            ux - 2, uy - 2, uio.width + 2, uio.height + 2
-                        ):
+                        if touch.location in scene.Rect(ux - 2, uy - 2, uio.width + 2, uio.height + 2):
                             uio.action()
                             break  # new buttons might have been installed
                     if uio.type == "slider":
-                        if touch.location in scene.Rect(
-                            ux - 2, uy - 2, uio.width + 4, uio.height + 4
-                        ):
+                        if touch.location in scene.Rect(ux - 2, uy - 2, uio.width + 4, uio.height + 4):
                             xsel = touch.location[0] - ux
-                            uio._v = (
-                                uio.vmin
-                                + round(-0.5 + xsel / uio.xdelta) * uio.resolution
-                            )
+                            uio._v = uio.vmin + round(-0.5 + xsel / uio.xdelta) * uio.resolution
                             uio._v = max(min(uio._v, uio.vmax), uio.vmin)
                             if uio.action is not None:
                                 uio.action(str(uio._v))
@@ -3826,10 +3620,7 @@ if Pythonista:
                         if env.paused:
                             env._t = env.start_animation_time
                         else:
-                            env._t = env.start_animation_time + (
-                                (time.time() - env.start_animation_clocktime)
-                                * env._speed
-                            )
+                            env._t = env.start_animation_time + ((time.time() - env.start_animation_clocktime) * env._speed)
                     while (env.peek() < env._t) and env.running and env._animate:
                         env.step()
                         if env.paused:
@@ -3865,22 +3656,16 @@ if Pythonista:
                     scene.unload_image(ims)
                 if env._video and (not env.paused):
                     env._save_frame()
-                    env.video_t += env._speed / env._fps
+                    env.video_t += env._speed / env._real_fps
 
                 for uio in env.ui_objects:
                     if not uio.installed:
                         uio.install()
-                    ux = uio.x + env.xy_anchor_to_x(
-                        uio.xy_anchor, screen_coordinates=True, retina_scale=True
-                    )
-                    uy = uio.y + env.xy_anchor_to_y(
-                        uio.xy_anchor, screen_coordinates=True, retina_scale=True
-                    )
+                    ux = uio.x + env.xy_anchor_to_x(uio.xy_anchor, screen_coordinates=True, retina_scale=True)
+                    uy = uio.y + env.xy_anchor_to_y(uio.xy_anchor, screen_coordinates=True, retina_scale=True)
 
                     if uio.type == "entry":
-                        raise NotImplementedError(
-                            "AnimateEntry not supported on Pythonista"
-                        )
+                        raise NotImplementedError("AnimateEntry not supported on Pythonista")
                     if uio.type == "button":
                         linewidth = uio.linewidth
                         scene.push_matrix()
@@ -3909,9 +3694,7 @@ if Pythonista:
                             v += uio.resolution
                         thisv = uio._v
                         for touch in touchvalues:
-                            if touch.location in scene.Rect(
-                                ux, uy, uio.width, uio.height
-                            ):
+                            if touch.location in scene.Rect(ux, uy, uio.width, uio.height):
                                 xsel = touch.location[0] - ux
                                 vsel = round(-0.5 + xsel / uio.xdelta) * uio.resolution
                                 thisv = vsel
@@ -3936,9 +3719,7 @@ if Pythonista:
                             scene.text(uio._label, uio.font, uio.fontsize, alignment=9)
                         scene.pop_matrix()
                         scene.translate(ux + uio.width, uy + uio.height + 2)
-                        scene.text(
-                            str(thisv) + " ", uio.font, uio.fontsize, alignment=7
-                        )
+                        scene.text(str(thisv) + " ", uio.font, uio.fontsize, alignment=7)
                         scene.tint(1, 1, 1, 1)
                         # required for proper loading of images later
                         scene.pop_matrix()
@@ -3960,9 +3741,7 @@ class Qmember:
     def insert_in_front_of(self, m2, c, q, priority):
         available_quantity = q.capacity._tally - q._length - 1
         if available_quantity < 0:
-            raise QueueFullError(
-                q.name() + " has reached capacity " + str(q.capacity._tally)
-            )
+            raise QueueFullError(q.name() + " has reached capacity " + str(q.capacity._tally))
         q.available_quantity.tally(available_quantity)
 
         m1 = m2.predecessor
@@ -4082,11 +3861,9 @@ class Queue:
         )
 
         if fill is not None:
-            savetrace = self.env._trace
-            self.env._trace = False
-            for c in fill:
-                c.enter(self)
-            self.env._trace = savetrace
+            with self.env.suppress_trace():
+                for c in fill:
+                    c.enter(self)
         if self.env._trace:
             self.env.print_trace("", "", self.name() + " create")
         self.setup(*args, **kwargs)
@@ -4436,26 +4213,14 @@ class Queue:
         statistics (if as_str is True) : str
         """
         result = []
-        result.append(
-            f"Statistics of {self.name()} at {fn(self.env._now - self.env._offset, 13, 3)}"
-        )
-        result.append(
-            self.length.print_statistics(
-                show_header=False, show_legend=True, do_indent=True, as_str=True
-            )
-        )
+        result.append(f"Statistics of {self.name()} at {fn(self.env._now - self.env._offset, 13, 3)}")
+        result.append(self.length.print_statistics(show_header=False, show_legend=True, do_indent=True, as_str=True))
 
         result.append("")
-        result.append(
-            self.length_of_stay.print_statistics(
-                show_header=False, show_legend=False, do_indent=True, as_str=True
-            )
-        )
+        result.append(self.length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True, as_str=True))
         return return_or_print(result, as_str, file)
 
-    def print_histograms(
-        self, exclude: Any = None, as_str: bool = False, file: bool = None
-    ) -> Any:
+    def print_histograms(self, exclude: Iterable = [], as_str: bool = False, file: bool = None, graph_scale: float = None) -> Any:
         """
         prints the histograms of the length and length_of_stay monitor of the queue
 
@@ -4473,6 +4238,9 @@ class Queue:
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
+        graph_scale : float
+            Scale in the graphical representation of the % and cum% (default=80)
+
         Returns
         -------
         histograms (if as_str is True) : str
@@ -4480,7 +4248,7 @@ class Queue:
         result = []
         for m in (self.length, self.length_of_stay):
             if m not in exclude:
-                result.append(m.print_histogram(as_str=True))
+                result.append(m.print_histogram(as_str=True, graph_scale=graph_scale))
         return return_or_print(result, as_str, file)
 
     def set_capacity(self, cap: float) -> None:
@@ -4617,9 +4385,7 @@ class Queue:
         component.enter_at_head(self)
         return self
 
-    def add_in_front_of(
-        self, component: "Component", poscomponent: "Component"
-    ) -> "Queue":
+    def add_in_front_of(self, component: "Component", poscomponent: "Component") -> "Queue":
         """
         adds a component to a queue, just in front of a component
 
@@ -5022,7 +4788,6 @@ class Queue:
         """
         mx = self._head.successor
         while mx != self._tail:
-
             if mx.component.name() == txt:
                 return mx.component
             mx = mx.successor
@@ -5077,25 +4842,20 @@ class Queue:
         ----
         The components in source added to the queue will get the priority of the tail of self.
         """
-        savetrace = self.env._trace
         count = 0
-        self.env._trace = False
-        for c in source:
-            if c not in self:
-                c.enter(self)
-                count += 1
-        self.env._trace = savetrace
+        with self.env.suppress_trace():
+            self.env._trace = False
+            for c in source:
+                if c not in self:
+                    c.enter(self)
+                    count += 1
         if self.env._trace:
             self.env.print_trace(
                 "",
                 "",
                 self.name()
                 + " extend from "
-                + (
-                    source.name()
-                    if isinstance(source, Queue)
-                    else "instance of " + str(type(source))
-                )
+                + (source.name() if isinstance(source, Queue) else "instance of " + str(type(source)))
                 + " ("
                 + str(count)
                 + " components)",
@@ -5104,10 +4864,7 @@ class Queue:
             if isinstance(source, Queue):
                 source.clear()
             else:
-                raise TypeError(
-                    "clear_source cannot be applied to instances of type"
-                    + str(type(source))
-                )
+                raise TypeError("clear_source cannot be applied to instances of type" + str(type(source)))
 
     def as_set(self):
         return {c for c in self}
@@ -5144,30 +4901,26 @@ class Queue:
         in that order. |n|
         Alternatively, the more pythonic | operator is also supported, e.g. q1 | q2
         """
-        save_trace = self.env._trace
-        self.env._trace = False
-        if name is None:
-            name = self.name() + " | " + q.name()
-        q1 = type(self)(name=name, monitor=monitor, env=self.env)
-        self_set = self.as_set()
+        with self.env.suppress_trace():
+            if name is None:
+                name = self.name() + " | " + q.name()
+            q1 = type(self)(name=name, monitor=monitor, env=self.env)
+            self_set = self.as_set()
 
-        mx = self._head.successor
-        while mx != self._tail:
-            Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
-            mx = mx.successor
-
-        mx = q._head.successor
-        while mx != q._tail:
-            if mx.component not in self_set:
+            mx = self._head.successor
+            while mx != self._tail:
                 Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
-            mx = mx.successor
+                mx = mx.successor
 
-        self.env._trace = save_trace
+            mx = q._head.successor
+            while mx != q._tail:
+                if mx.component not in self_set:
+                    Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
+                mx = mx.successor
+
         return q1
 
-    def intersection(
-        self, q: "Queue", name: str = None, monitor: bool = False
-    ) -> "Queue":
+    def intersection(self, q: "Queue", name: str = None, monitor: bool = False) -> "Queue":
         """
         returns the intersect of two queues
 
@@ -5196,23 +4949,19 @@ class Queue:
         in the same order as in self. |n|
         Alternatively, the more pythonic & operator is also supported, e.g. q1 & q2
         """
-        save_trace = self.env._trace
-        self.env._trace = False
-        if name is None:
-            name = self.name() + " & " + q.name()
-        q1 = type(self)(name=name, monitor=monitor, env=self.env)
-        q_set = q.as_set()
-        mx = self._head.successor
-        while mx != self._tail:
-            if mx.component in q_set:
-                Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
-            mx = mx.successor
-        self.env._trace = save_trace
+        with self.env.suppress_trace():
+            if name is None:
+                name = self.name() + " & " + q.name()
+            q1 = type(self)(name=name, monitor=monitor, env=self.env)
+            q_set = q.as_set()
+            mx = self._head.successor
+            while mx != self._tail:
+                if mx.component in q_set:
+                    Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
+                mx = mx.successor
         return q1
 
-    def difference(
-        self, q: "Queue", name: str = None, monitor: bool = False
-    ) -> "Queue":
+    def difference(self, q: "Queue", name: str = None, monitor: bool = False) -> "Queue":
         """
         returns the difference of two queues
 
@@ -5241,21 +4990,17 @@ class Queue:
         """
         if name is None:
             name = self.name() + " - " + q.name()
-        save_trace = self.env._trace
-        self.env._trace = False
-        q1 = type(self)(name=name, monitor=monitor, env=self.env)
-        q_set = q.as_set()
-        mx = self._head.successor
-        while mx != self._tail:
-            if mx.component not in q_set:
-                Qmember().insert_in_front_of(q1._tail, mx.component, q1, mx.priority)
-            mx = mx.successor
-        self.env._trace = save_trace
+        with self.env.suppress_trace():
+            q1 = type(self)(name=name, monitor=monitor, env=self.env)
+            q_set = q.as_set()
+            mx = self._head.successor
+            while mx != self._tail:
+                if mx.component not in q_set:
+                    Qmember().insert_in_front_of(q1._tail, mx.component, q1, mx.priority)
+                mx = mx.successor
         return q1
 
-    def symmetric_difference(
-        self, q: "Queue", name: str = None, monitor: bool = False
-    ) -> "Queue":
+    def symmetric_difference(self, q: "Queue", name: str = None, monitor: bool = False) -> "Queue":
         """
         returns the symmetric difference of two queues
 
@@ -5284,23 +5029,21 @@ class Queue:
         """
         if name is None:
             name = self.name() + " ^ " + q.name()
-        save_trace = self.env._trace
-        self.env._trace = False
-        q1 = type(self)(name=name, monitor=monitor, env=self.env)
+        with self.env.suppress_trace():
+            q1 = type(self)(name=name, monitor=monitor, env=self.env)
 
-        intersection_set = self.as_set() & q.as_set()
-        mx = self._head.successor
-        while mx != self._tail:
-            if mx.component not in intersection_set:
-                Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
-            mx = mx.successor
-        mx = q._head.successor
-        while mx != q._tail:
-            if mx.component not in intersection_set:
-                Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
-            mx = mx.successor
+            intersection_set = self.as_set() & q.as_set()
+            mx = self._head.successor
+            while mx != self._tail:
+                if mx.component not in intersection_set:
+                    Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
+                mx = mx.successor
+            mx = q._head.successor
+            while mx != q._tail:
+                if mx.component not in intersection_set:
+                    Qmember().insert_in_front_of(q1._tail, mx.component, q1, 0)
+                mx = mx.successor
 
-        self.env._trace = save_trace
         return q1
 
     def copy(
@@ -5335,18 +5078,16 @@ class Queue:
         The priority will be copied from original queue.
         Also, the order will be maintained.
         """
-        save_trace = self.env._trace
-        self.env._trace = False
-        if name is None:
-            name = "copy of " + self.name()
-        q1 = type(self)(name=name, monitor=monitor, env=self.env)
-        if copy_capacity:
-            q1.capacity._tally = self.capacity._tally
-        mx = self._head.successor
-        while mx != self._tail:
-            Qmember().insert_in_front_of(q1._tail, mx.component, q1, mx.priority)
-            mx = mx.successor
-        self.env._trace = save_trace
+        with self.env.suppress_trace():
+            if name is None:
+                name = "copy of " + self.name()
+            q1 = type(self)(name=name, monitor=monitor, env=self.env)
+            if copy_capacity:
+                q1.capacity._tally = self.capacity._tally
+            mx = self._head.successor
+            while mx != self._tail:
+                Qmember().insert_in_front_of(q1._tail, mx.component, q1, mx.priority)
+                mx = mx.successor
         return q1
 
     def move(self, name: str = None, monitor: bool = False, copy_capacity=False):
@@ -5386,16 +5127,394 @@ class Queue:
 
         removes all components from a queue
         """
-        savetrace = self.env._trace
-        self.env._trace = False
-        mx = self._head.successor
-        while mx != self._tail:
-            c = mx.component
-            mx = mx.successor
-            c.leave(self)
-        self.env._trace = savetrace
+        with self.env.suppress_trace():
+            mx = self._head.successor
+            while mx != self._tail:
+                c = mx.component
+                mx = mx.successor
+                c.leave(self)
         if self.env._trace:
             self.env.print_trace("", "", self.name() + " clear")
+
+
+class Store:
+    def __init__(
+        self,
+        name: str = None,
+        capacity: int = inf,
+        env: "Environment" = None,
+        *args,
+        **kwargs,
+    ):
+        if env is None:
+            self.env = g.default_env
+        else:
+            self.env = env
+        _set_name(name, self.env._nameserializeStore, self)
+        self._capacity = capacity
+        with self.env.suppress_trace():
+            self._contents = Queue(f"{self.name()}.contents", env=env)
+            self._to_store_requesters = Queue(f"{name}.to_store_requesters", env=env)
+            self._to_store_requesters._isinternal = True
+            self._from_store_requesters = Queue(f"{name}.from_store_requesters", env=env)
+            self._from_store_requesters._isinternal = True
+        if self.env._trace:
+            self.env.print_trace("", "", self.name() + " create", f"capacity={self._capacity}")
+        self.setup(*args, **kwargs)
+
+    def setup(self):
+        """
+        called immediately after initialization of a store.
+
+        by default this is a dummy method, but it can be overridden.
+
+        only keyword arguments are passed
+        """
+        pass
+
+    def all_monitors(self) -> Tuple["Monitor"]:
+        """
+        returns all mononitors belonging to the store
+
+        Returns
+        -------
+        all monitors : tuple of monitors
+        """
+        return (
+            self.contents().length,
+            self.contents().length_of_stay,
+        )
+
+    def reset_monitors(self, monitor: bool = None, stats_only: bool = None) -> None:
+        """
+        resets the store monitors
+
+        Parameters
+        ----------
+        monitor : bool
+            if True, monitoring will be on. |n|
+            if False, monitoring is disabled |n|
+            if omitted, no change of monitoring state
+
+        stats_only : bool
+            if True, only statistics will be collected (using less memory, but also less functionality) |n|
+            if False, full functionality |n|
+            if omittted, no change of stats_only
+        """
+
+        self.contents().reset_monitors(monitor=monitor, stats_only=stats_only)
+
+    def print_statistics(self, as_str: bool = False, file: TextIO = None) -> str:
+        """
+        prints a summary of statistics of a store
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the statistics
+            if True, return a string containing the statistics
+
+        file: file
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
+        Returns
+        -------
+        statistics (if as_str is True) : str
+        """
+        result = []
+        result.append(f"Statistics of {self.name()} at {(self.env._now - self.env._offset):13.3f}")
+        show_legend = True
+        for q in [self.contents()]:
+            result.append(
+                q.length.print_statistics(
+                    show_header=False,
+                    show_legend=show_legend,
+                    do_indent=True,
+                    as_str=True,
+                )
+            )
+            show_legend = False
+            result.append("")
+            result.append(
+                q.length_of_stay.print_statistics(
+                    show_header=False,
+                    show_legend=show_legend,
+                    do_indent=True,
+                    as_str=True,
+                )
+            )
+            result.append("")
+        return return_or_print(result, as_str, file)
+
+    def print_histograms(self, as_str: bool = False, file: TextIO = None, graph_scale: float = None) -> str:
+        """
+        prints histograms of the contents queue as well
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the histograms
+            if True, return a string containing the histograms
+
+        file: file
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
+        graph_scale : float
+            Scale in the graphical representation of the % and cum% (default=80)
+
+        Returns
+        -------
+        histograms (if as_str is True) : str
+        """
+        result = []
+        for q in [self.contents()]:
+            result.append(q.print_histograms(as_str=True, graph_scale=graph_scale))
+        return return_or_print(result, as_str, file)
+
+    def monitor(self, value: bool) -> None:
+        """
+        enables/disables the store monitors
+
+        Parameters
+        ----------
+        value : bool
+            if True, monitoring is enabled |n|
+            if False, monitoring is disabled |n|
+        """
+        self.contents().monitor(value)
+
+    def register(self, registry: List) -> "Store":
+        """
+        registers the store in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of (to be) registered objects
+
+        Returns
+        -------
+        store (self) : Store
+
+        Note
+        ----
+        Use Store.deregister if store does no longer need to be registered.
+        """
+        if not isinstance(registry, list):
+            raise TypeError("registry not list")
+        if self in registry:
+            raise ValueError(self.name() + " already in registry")
+        registry.append(self)
+        return self
+
+    def deregister(self, registry: List) -> "Store":
+        """
+        deregisters the store in the registry
+
+        Parameters
+        ----------
+        store : list
+            list of registered components
+
+        Returns
+        -------
+        store (self) : Store
+        """
+        if not isinstance(registry, list):
+            raise TypeError("registry not list")
+        if self not in registry:
+            raise ValueError(self.name() + " not in registry")
+        registry.remove(self)
+        return self
+
+    def __repr__(self):
+        return object_to_str(self) + " (" + self.name() + ")"
+
+    def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
+        """
+        prints info about the store
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        file: file
+            if None(default), all output is directed to stdout |n|
+            otherwise, the output is directed to the file
+
+        Returns
+        -------
+        info (if as_str is True) : str
+        """
+        result = []
+        result.append(object_to_str(self) + " " + hex(id(self)))
+        result.append("  name=" + self.name())
+        result.append("  capacity=" + str(self._capacity))
+        if self._contents:
+            result.append("  contents:")
+            mx = self._contents._head.successor
+            while mx != self._contents._tail:
+                c = mx.component
+                mx = mx.successor
+                result.append("    " + pad(c.name(), 20))
+        else:
+            result.append("  no components in contents")
+        return return_or_print(result, as_str, file)
+
+    def capacity(self, cap: float = None) -> float:
+        """
+        Parameters
+        ----------
+        cap : float or int
+            capacity of the store |n|
+            this may lead to from_store claimers being honoured
+            if omitted, no change
+
+        Returns
+        -------
+        capacity : float
+        """
+        if cap is not None:
+            self._capacity = cap
+            self._try_from_store()
+        return self._capacity
+
+    def contents(self) -> "Queue":
+        """
+        get contents queue
+
+        Returns
+        -------
+        contents queue : Queue
+        """
+        return self._contents
+
+    def from_store_requesters(self) -> "Queue":
+        """
+        get the queue holding all from_store requesting components
+
+        Returns
+        -------
+        queue holding all from_store requesting components : Queue
+        """
+        return self._from_store_requesters
+
+    def remove_item(self, item: "Component"):
+        """
+        Removes an item (component) from a store
+
+        Parameters
+        ----------
+        item : Component
+            component to remove from store
+
+        Note
+        ----
+        A ValueError is raised if the item is not in this store
+        """
+        if item in self._contents:
+            item.leave(self._contents)
+            self._try_to_store()
+        else:
+            raise ValueError(f"{item._name} does not belong to {self._name}")
+
+    def rescan(self):
+        """
+        Rescan for any components to be allowed in or out.
+        """
+        self._try_from_store()
+        self._try_to_store()
+
+    def _try_from_store(self):
+        any_change = False
+        for c in self._from_store_requesters:
+            if self._contents:
+                for item in self._contents:
+                    if c._from_store_filter(item):
+                        any_change = True
+                        for store in c._from_stores:
+                            c.leave(store._from_store_requesters)
+                        with self.env.suppress_trace():
+                            item = self._contents.pop(0)
+                        c._from_stores = []
+                        c._from_store_item = item
+                        c._from_store_store = self
+                        c._remove()
+                        c.status._value = scheduled
+                        c._reschedule(c.env._now, 0, False, f"from_store ({self.name()}) honor with {item.name()}", False, s0=c.env.last_s0)
+                        break
+            else:
+                break
+        if any_change:
+            self._try_to_store()
+
+    def _try_to_store(self):
+        any_change = False
+        for c in self._to_store_requesters:
+            if len(self._contents) < self._capacity:
+                any_change = True
+                for store in c._to_stores:
+                    c.leave(store._to_store_requesters)
+                with self.env.suppress_trace():
+                    c._to_store_item.enter_sorted(self._contents, c._to_store_priority)
+                c._to_stores = []
+                c._remove()
+                c.status._value = scheduled
+                c._reschedule(c.env._now, 0, False, f"to_store ({self.name()}) honor ", False, s0=c.env.last_s0)
+                c._to_store_item = None
+                c._to_store_store = self
+            else:
+                break
+        if any_change:
+            self._try_from_store()
+
+    def name(self, value: str = None) -> str:
+        """
+        Parameters
+        ----------
+        value : str
+            new name of the store
+            if omitted, no change
+
+        Returns
+        -------
+        Name of the store : str
+
+        Note
+        ----
+        base_name and sequence_number are not affected if the name is changed |n|
+        All derived named are updated as well.
+        """
+        if value is not None:
+            self._name = value
+            self._contents.name(f"{value}.contents")
+            self._to_store_requesters.name(f"{value}.to_store_requesters")
+            self._from_store_requesters.name(f"{value}.from_store_requesters")
+        return self._name
+
+    def base_name(self) -> str:
+        """
+        Returns
+        -------
+        base name of the store (the name used at initialization): str
+        """
+        return self._base_name
+
+    def sequence_number(self) -> int:
+        """
+        Returns
+        -------
+        sequence_number of the store : int
+            (the sequence number at initialization) |n|
+            normally this will be the integer value of a serialized name,
+            but also non serialized names (without a dot or a comma at the end)
+            will be numbered)
+        """
+        return self._sequence_number
 
 
 class Animate3dBase(DynamicClass):
@@ -5519,9 +5638,7 @@ class _Movement:  # used by trajectories
         s_vmax_v1 = (vmax**2 - v1**2) * dec2inv
 
         if s_v0_vmax + s_vmax_v1 > l:
-            vmax = math.sqrt(
-                (l + (v0**2 * acc2inv) + (v1**2 * dec2inv)) / (acc2inv + dec2inv)
-            )
+            vmax = math.sqrt((l + (v0**2 * acc2inv) + (v1**2 * dec2inv)) / (acc2inv + dec2inv))
 
         self.l_v0_vmax = (vmax**2 - v0**2) * acc2inv
         self.l_vmax_v1 = (vmax**2 - v1**2) * dec2inv
@@ -5541,6 +5658,8 @@ class _Movement:  # used by trajectories
     def l_at_t(self, t):
         if t < 0:
             return 0
+        if t > self.t:
+            t = self.t
         if self.acc == math.inf and self.dec == math.inf:
             return self.vmax * t
         if t < self.t_v0_vmax:
@@ -5808,7 +5927,8 @@ class TrajectoryStandstill(_Trajectory):
         env: "Environment" = None,
     ):
         env = g.default_env if env is None else env
-        self._t0 = env.now() if t0 is None else t0
+        self._t0 = 0 if env is None else (env.now() if t0 is None else t0)
+
         self._x, self._y = xy
         self._duration = duration
         self._length = 0
@@ -5983,7 +6103,7 @@ class TrajectoryPolygon(_Trajectory):
         if a float, this orientation will always be returned as angle(t)
 
     spline : None or string
-        if None (default), polygon is used as such |n|
+        if None (default) or '', polygon is used as such |n|
         if 'bezier' (or any string starting with 'b' or 'B', Bézier splining is used |n|
         if 'catmull_rom' (or any string starting with 'c' or 'C', Catmull-Rom splining is used
 
@@ -6037,9 +6157,7 @@ class TrajectoryPolygon(_Trajectory):
             _y[-1] = p_y[-1]
 
             for i in range(len(p_x) - 1):
-                _x[i * res : (i + 1) * res] = numpy.linspace(
-                    p_x[i], p_x[i + 1], res, endpoint=False
-                )
+                _x[i * res : (i + 1) * res] = numpy.linspace(p_x[i], p_x[i + 1], res, endpoint=False)
                 numpy.linspace(polygon[i * 2], polygon[i * 2 + 2], res, endpoint=False)
                 _y[i * res : (i + 1) * res] = numpy.array(
                     [
@@ -6048,9 +6166,7 @@ class TrajectoryPolygon(_Trajectory):
                             p_y[0] - (p_y[1] - p_y[0]) if i == 0 else p_y[i - 1],
                             p_y[i],
                             p_y[i + 1],
-                            p_y[i + 1] + (p_y[i + 1] - p_y[i])
-                            if i == len(p_x) - 2
-                            else p_y[i + 2],
+                            p_y[i + 1] + (p_y[i + 1] - p_y[i]) if i == len(p_x) - 2 else p_y[i + 2],
                         )
                         for x in numpy.linspace(0.0, 1.0, res, endpoint=False)
                     ]
@@ -6104,20 +6220,18 @@ class TrajectoryPolygon(_Trajectory):
                 polygon = catmull_rom_polygon(polygon, res=res)
             elif isinstance(spline, str) and spline.lower().startswith("b"):
                 polygon = bezier_polygon(polygon, res=res)
-            else:
+            elif isinstance(spline, str) and not spline.strip() == "":
                 raise ValueError(f"spline {spline} not recognized")
 
         env = g.default_env if env is None else env
-        self._t0 = env.now() if t0 is None else t0
+        self._t0 = 0 if env is None else (env.now() if t0 is None else t0)
 
         cum_length = 0.0
         self.cum_length = []
         self._x = []
         self._y = []
         self._angle = []
-        for x, y, next_x, next_y in zip(
-            polygon[::2], polygon[1::2], polygon[2::2], polygon[3::2]
-        ):
+        for x, y, next_x, next_y in zip(polygon[::2], polygon[1::2], polygon[2::2], polygon[3::2]):
             dx = next_x - x
             dy = next_y - y
             if orientation is None:
@@ -6138,9 +6252,7 @@ class TrajectoryPolygon(_Trajectory):
         self.cum_length.append(cum_length)
 
         self._length = self.cum_length[-1]
-        self.movement = _Movement(
-            l=self._length, v0=v0, v1=v1, vmax=vmax, acc=acc, dec=dec
-        )
+        self.movement = _Movement(l=self._length, v0=v0, v1=v1, vmax=vmax, acc=acc, dec=dec)
         self._duration = self.movement.t
         self._t1 = self._t0 + self._duration
 
@@ -6149,14 +6261,17 @@ class TrajectoryPolygon(_Trajectory):
 
     @functools.lru_cache(maxsize=1)
     def indexes(self, t, _t0=None):
-        t = t - (self._t0 if _t0 is None else _t0)
+        if t is None:
+            t = self._duration
+        else:
+            t = t - (self._t0 if _t0 is None else _t0)
 
         length = self.movement.l_at_t(t)
 
         if length <= self.cum_length[0]:
             return length, 0, 0
         if length >= self.cum_length[-1]:
-            return length, len(self.cum_length) - 1, len(self.cum_length) - 1
+            return 0, len(self.cum_length) - 1, len(self.cum_length) - 1
 
         i = searchsorted(self.cum_length, length) - 1
         return length, i, i + 1
@@ -6175,9 +6290,7 @@ class TrajectoryPolygon(_Trajectory):
         evaluated x : float
         """
         length, i, j = self.indexes(t, _t0=_t0)
-        return interp(
-            length, [self.cum_length[i], self.cum_length[j]], [self._x[i], self._x[j]]
-        )
+        return interp(length, [self.cum_length[i], self.cum_length[j]], [self._x[i], self._x[j]])
 
     def y(self, t: float, _t0: float = None) -> float:
         """
@@ -6193,9 +6306,7 @@ class TrajectoryPolygon(_Trajectory):
         evaluated y : float
         """
         length, i, j = self.indexes(t, _t0=_t0)
-        return interp(
-            length, [self.cum_length[i], self.cum_length[j]], [self._y[i], self._y[j]]
-        )
+        return interp(length, [self.cum_length[i], self.cum_length[j]], [self._y[i], self._y[j]])
 
     def angle(self, t: float, _t0: float = None) -> float:
         """
@@ -6214,7 +6325,6 @@ class TrajectoryPolygon(_Trajectory):
         return self._angle[i]
 
     def in_trajectory(self, t: float) -> bool:
-
         """
         is t in trajectory?
 
@@ -6260,7 +6370,6 @@ class TrajectoryPolygon(_Trajectory):
         return super().duration()
 
     def length(self, t: float = None, _t0: float = None) -> float:
-
         """
         length of traversed trajectory at time t or total length
 
@@ -6279,7 +6388,6 @@ class TrajectoryPolygon(_Trajectory):
         return self.cum_length[i] + length
 
     def rendered_polygon(self, time_step: float = 1) -> List[Tuple[float, float]]:
-
         """
         rendered polygon
 
@@ -6373,16 +6481,15 @@ class TrajectoryCircle(_Trajectory):
         env: "Environment" = None,
     ):
         env = g.default_env if env is None else env
-        self._t0 = env.now() if t0 is None else t0
+        self._t0 = 0 if env is None else (env.now() if t0 is None else t0)
+
         self.radius = radius
         self.angle0 = angle0
         self.angle1 = angle1
         self.x_center = x_center
         self.y_center = y_center
         self._length = abs(math.radians(self.angle1 - self.angle0)) * self.radius
-        self.movement = _Movement(
-            l=self._length, v0=v0, v1=v1, vmax=vmax, acc=acc, dec=dec
-        )
+        self.movement = _Movement(l=self._length, v0=v0, v1=v1, vmax=vmax, acc=acc, dec=dec)
         self._duration = self.movement.t
         self._t1 = self._t0 + self._duration
         self.orientation = orientation
@@ -6404,9 +6511,7 @@ class TrajectoryCircle(_Trajectory):
         evaluated x : float
         """
         length = self.length(t, _t0=_t0)
-        return self.x_center + self.radius * math.cos(
-            math.radians(interp(length, (0, self._length), (self.angle0, self.angle1)))
-        )
+        return self.x_center + self.radius * math.cos(math.radians(interp(length, (0, self._length), (self.angle0, self.angle1))))
 
     def y(self, t: float, _t0: float = None) -> float:
         """
@@ -6422,9 +6527,7 @@ class TrajectoryCircle(_Trajectory):
         evaluated y : float
         """
         length = self.length(t, _t0=_t0)
-        return self.y_center + self.radius * math.sin(
-            math.radians(interp(length, (0, self._length), (self.angle0, self.angle1)))
-        )
+        return self.y_center + self.radius * math.sin(math.radians(interp(length, (0, self._length), (self.angle0, self.angle1))))
 
     def angle(self, t: float, _t0: float = None) -> float:
         """
@@ -6453,7 +6556,6 @@ class TrajectoryCircle(_Trajectory):
         return self.orientation
 
     def in_trajectory(self, t: float) -> bool:
-
         """
         is t in trajectory?
 
@@ -6500,7 +6602,6 @@ class TrajectoryCircle(_Trajectory):
 
     @functools.lru_cache(maxsize=1)
     def length(self, t: Any = None, _t0: float = None) -> float:
-
         """
         length of traversed trajectory at time t or total length
 
@@ -6524,7 +6625,6 @@ class TrajectoryCircle(_Trajectory):
         return self.movement.l_at_t(t - t0)
 
     def rendered_polygon(self, time_step: float = 1) -> List[Tuple[float, float]]:
-
         """
         rendered polygon
 
@@ -6679,6 +6779,7 @@ class Environment:
         self._nameserializeQueue = {}
         self._nameserializeComponent = {}
         self._nameserializeResource = {}
+        self._nameserializeStore = {}
         self._nameserializeState = {}
         self._seq = 0
         self._event_list = []
@@ -6716,10 +6817,8 @@ class Environment:
         self.last_s0 = ""
         self._blind_animation = blind_animation
         if self._blind_animation:
-            save_trace = self.trace()
-            self.trace(False)
-            self._blind_video_maker = _BlindVideoMaker(process="", suppress_trace=True)
-            self.trace(save_trace)
+            with self.suppress_trace():
+                self._blind_video_maker = _BlindVideoMaker(process="", suppress_trace=True)
         if PyDroid:
             if g.tkinter_loaded == "?":
                 g.tkinter_loaded = "tkinter" in sys.modules
@@ -6813,11 +6912,7 @@ class Environment:
         return
 
     def animation_pre_tick_sys(self, t: float) -> None:
-        for (
-            ao
-        ) in (
-            self.sys_objects.copy()
-        ):  # copy required as ao's may be removed due to keep
+        for ao in self.sys_objects.copy():  # copy required as ao's may be removed due to keep
             ao.update(t)
 
     def animation3d_init(self):
@@ -6867,9 +6962,7 @@ class Environment:
         if key in self._opengl_key_press_special_bind:
             self._opengl_key_press_special_bind[key]()
 
-    def camera_move(
-        self, spec: str = "", lag: float = 1, offset: float = 0, enabled: bool = True
-    ):
+    def camera_move(self, spec: str = "", lag: float = 1, offset: float = 0, enabled: bool = True):
         """
         Moves the camera according to the given spec, which is normally a collection of camera_print
         outputs.
@@ -6900,7 +6993,6 @@ class Environment:
         times = collections.defaultdict(list)
 
         if enabled:
-
             for prop in props:
                 build_values[prop].append(getattr(self.view, prop)(t=offset))
                 build_times[prop].append(offset)
@@ -6963,30 +7055,17 @@ class Environment:
         adjusted_y = self.view.y_eye(t) - self.view.y_center(t)
         cos_rad = math.cos(math.radians(delta_angle))
         sin_rad = math.sin(math.radians(delta_angle))
-        self.view.x_eye = (
-            self.view.x_center(t) + cos_rad * adjusted_x + sin_rad * adjusted_y
-        )
-        self.view.y_eye = (
-            self.view.y_center(t) - sin_rad * adjusted_x + cos_rad * adjusted_y
-        )
+        self.view.x_eye = self.view.x_center(t) + cos_rad * adjusted_x + sin_rad * adjusted_y
+        self.view.y_eye = self.view.y_center(t) - sin_rad * adjusted_x + cos_rad * adjusted_y
 
         if self._camera_auto_print:
             self.camera_print(props="x_eye y_eye")
 
     def camera_zoom(self, event=None, factor_xy=None, factor_z=None):
         t = self.t()
-        self.view.x_eye = (
-            self.view.x_center(t)
-            - (self.view.x_center(t) - self.view.x_eye(t)) * factor_xy
-        )
-        self.view.y_eye = (
-            self.view.y_center(t)
-            - (self.view.y_center(t) - self.view.y_eye(t)) * factor_xy
-        )
-        self.view.z_eye = (
-            self.view.z_center(t)
-            - (self.view.z_center(t) - self.view.z_eye(t)) * factor_z
-        )
+        self.view.x_eye = self.view.x_center(t) - (self.view.x_center(t) - self.view.x_eye(t)) * factor_xy
+        self.view.y_eye = self.view.y_center(t) - (self.view.y_center(t) - self.view.y_eye(t)) * factor_xy
+        self.view.z_eye = self.view.z_center(t) - (self.view.z_center(t) - self.view.z_eye(t)) * factor_z
         if self._camera_auto_print:
             self.camera_print(props="x_eye y_eye z_eye")
 
@@ -7040,12 +7119,8 @@ class Environment:
         adjusted_y = self.view.y_center(t) - self.view.y_eye(t)
         cos_rad = math.cos(math.radians(delta_angle))
         sin_rad = math.sin(math.radians(delta_angle))
-        self.view.x_center = (
-            self.view.x_eye(t) + cos_rad * adjusted_x + sin_rad * adjusted_y
-        )
-        self.view.y_center = (
-            self.view.y_eye(t) - sin_rad * adjusted_x + cos_rad * adjusted_y
-        )
+        self.view.x_center = self.view.x_eye(t) + cos_rad * adjusted_x + sin_rad * adjusted_y
+        self.view.y_center = self.view.y_eye(t) - sin_rad * adjusted_x + cos_rad * adjusted_y
         if self._camera_auto_print:
             self.camera_print(props="x_eye y_eye")
 
@@ -7057,15 +7132,7 @@ class Environment:
         items = []
         for prop in props.split():
             items.append(f"{getattr(self.view,prop)(t):.4f}")
-        print(
-            "view("
-            + (
-                ",".join(
-                    f"{prop}={getattr(self.view,prop)(t):.4f}" for prop in props.split()
-                )
-            )
-            + f")  # t={t:.4f}"
-        )
+        print("view(" + (",".join(f"{prop}={getattr(self.view,prop)(t):.4f}" for prop in props.split())) + f")  # t={t:.4f}")
 
     def _bind(self, tkinter_event, func):
         self.root.bind(tkinter_event, func)
@@ -7118,36 +7185,24 @@ class Environment:
         self._bind("<Left>", functools.partial(self.camera_rotate, delta_angle=-1))
         self._bind("<Right>", functools.partial(self.camera_rotate, delta_angle=+1))
 
-        self._bind(
-            "<Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=0.9)
-        )
+        self._bind("<Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=0.9))
         self._bind(
             "<Down>",
             functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1 / 0.9),
         )
 
         self._bind("z", functools.partial(self.camera_zoom, factor_xy=1, factor_z=0.9))
-        self._bind(
-            "Z", functools.partial(self.camera_zoom, factor_xy=1, factor_z=1 / 0.9)
-        )
+        self._bind("Z", functools.partial(self.camera_zoom, factor_xy=1, factor_z=1 / 0.9))
 
-        self._bind(
-            "<Shift-Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=1)
-        )
+        self._bind("<Shift-Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=1))
         self._bind(
             "<Shift-Down>",
             functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1),
         )
 
-        self._bind(
-            "<Alt-Left>", functools.partial(self.camera_xy_eye, x_dis=-10, y_dis=0)
-        )
-        self._bind(
-            "<Alt-Right>", functools.partial(self.camera_xy_eye, x_dis=10, y_dis=0)
-        )
-        self._bind(
-            "<Alt-Down>", functools.partial(self.camera_xy_eye, x_dis=0, y_dis=-10)
-        )
+        self._bind("<Alt-Left>", functools.partial(self.camera_xy_eye, x_dis=-10, y_dis=0))
+        self._bind("<Alt-Right>", functools.partial(self.camera_xy_eye, x_dis=10, y_dis=0))
+        self._bind("<Alt-Down>", functools.partial(self.camera_xy_eye, x_dis=0, y_dis=-10))
         self._bind("<Alt-Up>", functools.partial(self.camera_xy_eye, x_dis=0, y_dis=10))
 
         self._bind(
@@ -7162,9 +7217,7 @@ class Environment:
             "<Control-Down>",
             functools.partial(self.camera_xy_center, x_dis=0, y_dis=-10),
         )
-        self._bind(
-            "<Control-Up>", functools.partial(self.camera_xy_center, x_dis=0, y_dis=10)
-        )
+        self._bind("<Control-Up>", functools.partial(self.camera_xy_center, x_dis=0, y_dis=10))
 
         self._bind("o", functools.partial(self.camera_field_of_view, factor=0.9))
         self._bind("O", functools.partial(self.camera_field_of_view, factor=1 / 0.9))
@@ -7192,9 +7245,7 @@ class Environment:
         if over3d is None:
             over3d = default_over3d()
         top = self.height3d() - 40 if over3d else self.height() - 90
-        for i, prop in enumerate(
-            "x_eye y_eye z_eye x_center y_center z_center field_of_view_y".split()
-        ):
+        for i, prop in enumerate("x_eye y_eye z_eye x_center y_center z_center field_of_view_y".split()):
             ao = AnimateRectangle(
                 spec=(0, 0, 75, 35),
                 fillcolor="30%gray",
@@ -7296,9 +7347,7 @@ class Environment:
                 c = self._main
                 if self.end_on_empty_eventlist:
                     t = self.env._now
-                    self.print_trace(
-                        "", "", "run ended", "no events left", s0=c.lineno_txt()
-                    )
+                    self.print_trace("", "", "run ended", "no events left", s0=c.lineno_txt())
                 else:
                     t = inf
             c._on_event_list = False
@@ -7345,25 +7394,13 @@ class Environment:
             if self._trace and not self._suppress_trace_linenumbers:
                 gi_code = c._process.gi_code
                 gs = inspect.getsourcelines(gi_code)
-                s0 = (
-                    c.overridden_lineno
-                    or self.filename_lineno_to_str(
-                        gi_code.co_filename, len(gs[0]) + gs[1] - 1
-                    )
-                    + "+"
-                )
+                s0 = c.overridden_lineno or self.filename_lineno_to_str(gi_code.co_filename, len(gs[0]) + gs[1] - 1) + "+"
             else:
                 s0 = None
         else:
             if self._trace and not self._suppress_trace_linenumbers:
                 gs = inspect.getsourcelines(c._process)
-                s0 = (
-                    c.overridden_lineno
-                    or self.filename_lineno_to_str(
-                        c._process.__code__.co_filename, len(gs[0]) + gs[1] - 1
-                    )
-                    + "+"
-                )
+                s0 = c.overridden_lineno or self.filename_lineno_to_str(c._process.__code__.co_filename, len(gs[0]) + gs[1] - 1) + "+"
             else:
                 s0 = None
         for r in list(c._claims):
@@ -7377,7 +7414,7 @@ class Environment:
 
     def _print_event_list(self, s: str) -> None:
         print("eventlist ", s)
-        for (t, priority, sequence, comp) in self._event_list:
+        for t, priority, sequence, comp in self._event_list:
             print("    ", self.time_to_str(t), comp.name(), "priority", priority)
 
     def on_closing(self):
@@ -7420,7 +7457,6 @@ class Environment:
         position3d: Any = None,
         visible: bool = None,
     ):
-
         """
         set animation parameters
 
@@ -7647,9 +7683,7 @@ class Environment:
 
         if video_height is not None:
             if self._video:
-                raise ValueError(
-                    "video_height may not be changed while recording video"
-                )
+                raise ValueError("video_height may not be changed while recording video")
             self._video_height = video_height
 
         if video_mode is not None:
@@ -7669,9 +7703,7 @@ class Environment:
 
         if fps is not None:
             if self._video:
-                raise ValueError(
-                    "video_repeat may not be changed while recording video"
-                )
+                raise ValueError("video_repeat may not be changed while recording video")
             self._fps = fps
 
         if x0 is not None:
@@ -7727,9 +7759,7 @@ class Environment:
                 self.set_start_animation()
 
         if audio is not None:
-            if (self._audio is None and audio != "") or (
-                self.audio is not None and self._audio.filename != audio
-            ):
+            if (self._audio is None and audio != "") or (self.audio is not None and self._audio.filename != audio):
                 if self._audio is not None:
                     if Pythonista:
                         self._audio.player.pause()
@@ -7746,7 +7776,7 @@ class Environment:
                     if not os.path.isfile(audio_filename):
                         raise FileNotFoundError(audio_filename)
                     if Pythonista:
-                        import sound
+                        import sound # type: ignore
 
                         class Play:
                             def __init__(self, s, repeat=-1):
@@ -7767,9 +7797,7 @@ class Environment:
 
                     self._audio.filename = audio_filename
 
-                    if (
-                        self._video_out is not None
-                    ):  # if video ist started here as well, the audio_segment is created later
+                    if self._video_out is not None:  # if video ist started here as well, the audio_segment is created later
                         self._audio.t0 = self.frame_number / self._fps
                         self.audio_segments.append(self._audio)
                     self.set_start_animation()
@@ -7803,16 +7831,12 @@ class Environment:
 
         if video_repeat is not None:
             if self._video:
-                raise ValueError(
-                    "video_repeat may not be changed while recording video"
-                )
+                raise ValueError("video_repeat may not be changed while recording video")
             self._video_repeat = video_repeat
 
         if video_pingpong is not None:
             if self._video:
-                raise ValueError(
-                    "video_pingpong may not be changed while recording video"
-                )
+                raise ValueError("video_pingpong may not be changed while recording video")
             self._video_pingpong = video_pingpong
 
         if video is not None:
@@ -7823,9 +7847,7 @@ class Environment:
 
                 if video:
                     if self._video_mode == "screen" and ImageGrab is None:
-                        raise ValueError(
-                            "video_mode='screen' not supported on this platform (ImageGrab does not exist)"
-                        )
+                        raise ValueError("video_mode='screen' not supported on this platform (ImageGrab does not exist)")
                     if self._video_width == "auto":
                         if self._video_mode == "3d":
                             self._video_width_real = self._width3d
@@ -7852,10 +7874,12 @@ class Environment:
                     video_path = Path(video)
                     extension = video_path.suffix.lower()
                     self._video_name = video
+                    self._real_fps = self._fps  # only overridden for animated gifs
                     video_path.parent.mkdir(parents=True, exist_ok=True)
                     if extension == ".gif" and not ("*" in video_path.stem):
                         self._video_out = "gif"
                         self._images = []
+                        self._real_fps = round(100 / int(100 / self._fps))  # duration is always in 10 ms increments
 
                     elif extension == ".png" and not ("*" in video_path.stem):
                         self._video_out = "png"
@@ -7874,14 +7898,10 @@ class Environment:
                             if "?" in video:
                                 raise ValueError("? found in " + video)
                             self.video_name_format = video.replace("*", "{:06d}")
-                            for file in video_path.parent.glob(
-                                video_path.name.replace("*", "??????")
-                            ):
+                            for file in video_path.parent.glob(video_path.name.replace("*", "??????")):
                                 file.unlink()
                         else:
-                            raise ValueError(
-                                "incorrect video name (should contain a *) " + video
-                            )
+                            raise ValueError("incorrect video name (should contain a *) " + video)
 
                         self._video_out = "snapshots"
 
@@ -7892,16 +7912,12 @@ class Environment:
                         else:
                             codec = "MJPG" if extension.lower() == ".avi" else "mp4v"
                         if PyDroid and extension.lower() != ".avi":
-                            raise ValueError(
-                                "PyDroid can only produce .avi videos, not " + extension
-                            )
+                            raise ValueError("PyDroid can only produce .avi videos, not " + extension)
                         can_video(try_only=False)
                         fourcc = cv2.VideoWriter_fourcc(*codec)
                         if video_path.is_file():
                             video_path.unlink()
-                        self._video_name_temp = tempfile.NamedTemporaryFile(
-                            suffix=extension, delete=False
-                        ).name
+                        self._video_name_temp = tempfile.NamedTemporaryFile(suffix=extension, delete=False).name
                         self._video_out = cv2.VideoWriter(
                             self._video_name_temp,
                             fourcc,
@@ -7926,9 +7942,7 @@ class Environment:
             if g.animation_env is not None:
                 g.animation_env._animate = self._animate
                 if not Pythonista:
-                    if (
-                        g.animation_env.root is not None
-                    ):  # for blind animation to work properly
+                    if g.animation_env.root is not None:  # for blind animation to work properly
                         g.animation_env.root.destroy()
                         g.animation_env.root = None
                 g.animation_env = None
@@ -7936,10 +7950,8 @@ class Environment:
             if self._blind_animation:
                 if self._animate:
                     if self._video != "":
-                        save_trace = self.trace()
-                        self.trace(False)
-                        self._blind_video_maker.activate(process="process")
-                        self.trace(save_trace)
+                        with self.suppress_trace():
+                            self._blind_video_maker.activate(process="process")
                 else:
                     self._blind_video_maker.cancel()
             else:
@@ -7954,9 +7966,7 @@ class Environment:
                     if Pythonista:
                         if g.animation_scene is None:
                             g.animation_scene = AnimationScene(env=self)
-                            scene.run(
-                                g.animation_scene, frame_interval=1, show_fps=False
-                            )
+                            scene.run(g.animation_scene, frame_interval=1, show_fps=False)
 
                     else:
                         if self.use_toplevel:
@@ -7973,22 +7983,12 @@ class Environment:
 
                         self.root.bind("-", lambda self: g.animation_env.an_half())
                         self.root.bind("+", lambda self: g.animation_env.an_double())
-                        self.root.bind(
-                            "<space>", lambda self: g.animation_env.an_menu_go()
-                        )
-                        self.root.bind(
-                            "s", lambda self: g.animation_env.an_single_step()
-                        )
-                        self.root.bind(
-                            "<Control-c>", lambda self: g.animation_env.an_quit()
-                        )
+                        self.root.bind("<space>", lambda self: g.animation_env.an_menu_go())
+                        self.root.bind("s", lambda self: g.animation_env.an_single_step())
+                        self.root.bind("<Control-c>", lambda self: g.animation_env.an_quit())
 
-                        g.canvas = tkinter.Canvas(
-                            self.root, width=self._width, height=self._height
-                        )
-                        g.canvas.configure(
-                            background=self.colorspec_to_hex("bg", False)
-                        )
+                        g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
+                        g.canvas.configure(background=self.colorspec_to_hex("bg", False))
                         g.canvas.pack()
                         g.canvas_objects = []
                         g.canvas_object_overflow_image = None
@@ -8015,23 +8015,21 @@ class Environment:
                     if self._video_pingpong:
                         self._images.extend(self._images[::-1])
                     if Pythonista:
-                        import images2gif
+                        import images2gif # type: ignore
 
                         images2gif.writeGif(
                             self._video_name,
                             self._images,
-                            duration=1 / self._fps,
+                            duration=1 / self._real_fps,
                             repeat=self._video_repeat,
                         )
                     else:
-                        if (
-                            self._video_repeat == 1
-                        ):  # in case of repeat == 1, loop should not be specified (otherwise, it might show twice)
+                        if self._video_repeat == 1:  # in case of repeat == 1, loop should not be specified (otherwise, it might show twice)
                             self._images[0].save(
                                 self._video_name,
                                 save_all=True,
                                 append_images=self._images[1:],
-                                duration=1000 / self._fps,
+                                duration=1000 / self._real_fps,
                                 optimize=False,
                             )
                         else:
@@ -8040,13 +8038,12 @@ class Environment:
                                 save_all=True,
                                 append_images=self._images[1:],
                                 loop=self._video_repeat,
-                                duration=1000 / self._fps,
+                                duration=1000 / self._real_fps,
                                 optimize=False,
                             )
 
                     del self._images
             elif self._video_out == "png":
-
                 if self._video_pingpong:
                     self._images.extend(self._images[::-1])
                 this_apng = _APNG(num_plays=self._video_repeat)
@@ -8090,17 +8087,11 @@ class Environment:
         elif video_mode == "screen":
             image = ImageGrab.grab()
         else:
-            an_objects = sorted(
-                self.an_objects, key=lambda obj: (-obj.layer(self._t), obj.sequence)
-            )
-            image = Image.new(
-                "RGBA", (self._width, self._height), self.colorspec_to_tuple("bg")
-            )
+            an_objects = sorted(self.an_objects, key=lambda obj: (-obj.layer(self._t), obj.sequence))
+            image = Image.new("RGBA", (self._width, self._height), self.colorspec_to_tuple("bg"))
             for ao in an_objects:
                 ao.make_pil_image(self.t())
-                if ao._image_visible and (
-                    include_topleft or not ao.getattr("in_topleft", False)
-                ):
+                if ao._image_visible and (include_topleft or not ao.getattr("in_topleft", False)):
                     image.paste(
                         ao._image,
                         (
@@ -8204,18 +8195,11 @@ class Environment:
                     last_t = audio_segment.t1
 
             if seq > 0:
-                temp_filename = (
-                    tempdir + "\\temp" + os.path.splitext(self._video_name)[1]
-                )
+                temp_filename = tempdir + "\\temp" + os.path.splitext(self._video_name)[1]
                 shutil.copyfile(self._video_name_temp, temp_filename)
 
                 with open(tempdir + "\\temp.txt", "w") as f:
-                    f.write(
-                        "\n".join(
-                            "file '" + tempdir + "\\temp" + str(i) + ".mp3'"
-                            for i in range(seq)
-                        )
-                    )
+                    f.write("\n".join("file '" + tempdir + "\\temp" + str(i) + ".mp3'" for i in range(seq)))
                 if hasattr(self, "debug_ffmpeg"):
                     print("contents of temp.txt file")
                     with open(tempdir + "\\temp.txt", "r") as f:
@@ -8245,9 +8229,7 @@ class Environment:
         try:
             subprocess.call(command, shell=False)
         except FileNotFoundError:
-            raise FileNotFoundError(
-                "ffmpeg could not be loaded (refer to install procedure)."
-            )
+            raise FileNotFoundError("ffmpeg could not be loaded (refer to install procedure).")
 
     def uninstall_uios(self):
         for uio in self.ui_objects:
@@ -9116,9 +9098,7 @@ class Environment:
             )
 
         if self._datetime0:
-            self._datetime0 += datetime.timedelta(
-                seconds=self.to_seconds(self._offset - offset_before)
-            )
+            self._datetime0 += datetime.timedelta(seconds=self.to_seconds(self._offset - offset_before))
             self.print_trace("", "", "", f"(t=0 ==> to {self.time_to_str(0)})")
 
     def trace(self, value: bool = None) -> bool:
@@ -9148,6 +9128,23 @@ class Environment:
             self._trace = value
             self._buffered_trace = False
         return self._trace
+
+    @contextlib.contextmanager
+    def suppress_trace(self):
+        """
+        context manager to the trace temporarily
+
+        Note
+        ----
+        To be used as ::
+
+            with env.suppress_trace():
+                ...
+        """
+        save_trace = self._trace
+        self._trace = False
+        yield
+        self._trace = save_trace
 
     def suppress_trace_linenumbers(self, value: bool = None) -> bool:
         """
@@ -9278,9 +9275,7 @@ class Environment:
 
         self._main.frame = _get_caller_frame()
         self._main.status._value = scheduled
-        self._main._reschedule(
-            scheduled_time, priority, urgent, "run", cap_now, extra=extra
-        )
+        self._main._reschedule(scheduled_time, priority, urgent, "run", cap_now, extra=extra)
 
         self.running = True
         while self.running:
@@ -9338,9 +9333,7 @@ class Environment:
                     if self.paused:
                         self._t = self.start_animation_time
                     else:
-                        self._t = self.start_animation_time + (
-                            (time.time() - self.start_animation_clocktime) * self._speed
-                        )
+                        self._t = self.start_animation_time + ((time.time() - self.start_animation_clocktime) * self._speed)
 
                 while self.peek() < self._t:
                     self.step()
@@ -9373,9 +9366,7 @@ class Environment:
             self.animation_pre_tick(t)
             self.animation_pre_tick_sys(t)
 
-            an_objects = sorted(
-                self.an_objects, key=lambda obj: (-obj.layer(self._t), obj.sequence)
-            )
+            an_objects = sorted(self.an_objects, key=lambda obj: (-obj.layer(self._t), obj.sequence))
 
             canvas_objects_iter = iter(g.canvas_objects[:])
             co = next(canvas_objects_iter, None)
@@ -9386,9 +9377,7 @@ class Environment:
                     if co is None:
                         if len(g.canvas_objects) >= self._maximum_number_of_bitmaps:
                             if overflow_image is None:
-                                overflow_image = Image.new(
-                                    "RGBA", (self._width, self._height), (0, 0, 0, 0)
-                                )
+                                overflow_image = Image.new("RGBA", (self._width, self._height), (0, 0, 0, 0))
                             overflow_image.paste(
                                 ao._image,
                                 (
@@ -9415,9 +9404,7 @@ class Environment:
                                 ao.im = ImageTk.PhotoImage(ao._image)
                                 g.canvas.itemconfig(ao.canvas_object, image=ao.im)
 
-                            if (ao._image_x != ao._image_x_prev) or (
-                                ao._image_y != ao._image_y_prev
-                            ):
+                            if (ao._image_x != ao._image_x_prev) or (ao._image_y != ao._image_y_prev):
                                 g.canvas.coords(
                                     ao.canvas_object,
                                     (ao._image_x, self._height - ao._image_y),
@@ -9443,9 +9430,7 @@ class Environment:
             else:
                 im = ImageTk.PhotoImage(overflow_image)
                 if g.canvas_object_overflow_image is None:
-                    g.canvas_object_overflow_image = g.canvas.create_image(
-                        0, self._height, image=im, anchor=tkinter.SW
-                    )
+                    g.canvas_object_overflow_image = g.canvas.create_image(0, self._height, image=im, anchor=tkinter.SW)
                 else:
                     g.canvas.itemconfig(g.canvas_object_overflow_image, image=im)
 
@@ -9484,7 +9469,7 @@ class Environment:
             if self._video:
                 if not self.paused:
                     self._save_frame()
-                    self.video_t += self._speed / self._fps
+                    self.video_t += self._speed / self._real_fps
                     self.frame_number += 1
             else:
                 if self._synced:
@@ -9520,9 +9505,7 @@ class Environment:
         can_animate(try_only=False)
 
         if video_mode == "screen" and ImageGrab is None:
-            raise ValueError(
-                "video_mode='screen' not supported on this platform (ImageGrab does not exist)"
-            )
+            raise ValueError("video_mode='screen' not supported on this platform (ImageGrab does not exist)")
 
         filename_path = Path(filename)
         extension = filename_path.suffix.lower()
@@ -9533,7 +9516,7 @@ class Environment:
         else:
             raise ValueError("extension " + extension + "  not supported")
         filename_path.parent.mkdir(parents=True, exist_ok=True)
-        self._capture_image(mode, video_mode).save(filename)
+        self._capture_image(mode, video_mode).save(str(filename))
 
     def modelname_width(self):
         if Environment.cached_modelname_width[0] != self._modelname:
@@ -9898,9 +9881,7 @@ class Environment:
 
     def quit(self):
         if g.animation_env is not None:
-            g.animation_env.animation_parameters(
-                animate=False, video=""
-            )  # stop animation
+            g.animation_env.animation_parameters(animate=False, video="")  # stop animation
         if Pythonista:
             if g.animation_scene is not None:
                 g.animation_scene.view.close()
@@ -9944,9 +9925,7 @@ class Environment:
         s = ""
         if self._synced and (not self.paused) and self._show_fps:
             if len(self.frametimes) >= 2:
-                fps = (len(self.frametimes) - 1) / (
-                    self.frametimes[-1] - self.frametimes[0]
-                )
+                fps = (len(self.frametimes) - 1) / (self.frametimes[-1] - self.frametimes[0])
             else:
                 fps = 0
             s += f"fps={fps:.1f}"
@@ -9995,9 +9974,7 @@ class Environment:
                             if start_time < self._audio.duration:
                                 self._audio.play(start=start_time)
 
-    def xy_anchor_to_x(
-        self, xy_anchor, screen_coordinates, over3d=False, retina_scale=False
-    ):
+    def xy_anchor_to_x(self, xy_anchor, screen_coordinates, over3d=False, retina_scale=False):
         scale = self.retina if (retina_scale and self.retina > 1) else 1
         if over3d:
             width = self._width3d
@@ -10023,9 +10000,7 @@ class Environment:
 
         raise ValueError("incorrect xy_anchor", xy_anchor)
 
-    def xy_anchor_to_y(
-        self, xy_anchor, screen_coordinates, over3d=False, retina_scale=False
-    ):
+    def xy_anchor_to_y(self, xy_anchor, screen_coordinates, over3d=False, retina_scale=False):
         scale = self.retina if (retina_scale and self.retina > 1) else 1
         if over3d:
             height = self._height3d
@@ -10726,10 +10701,7 @@ class Environment:
         """
         len_s1 = len(self.time_to_str(0))
         if self._trace:
-            if not (
-                hasattr(self, "_current_component")
-                and self._current_component._suppress_trace
-            ):
+            if not (hasattr(self, "_current_component") and self._current_component._suppress_trace):
                 if s0 is None:
                     if self._suppress_trace_linenumbers:
                         s0 = ""
@@ -10743,16 +10715,7 @@ class Environment:
 
                         s0 = self._frame_to_lineno(_get_caller_frame())
                 self.last_s0 = s0
-                line = (
-                    pad(s0, 7)
-                    + pad(s1, len_s1)
-                    + " "
-                    + pad(s2, 20)
-                    + " "
-                    + pad(s3, max(len(s3), 36))
-                    + " "
-                    + s4.strip()
-                )
+                line = pad(s0, 7) + pad(s1, len_s1) + " " + pad(s2, 20) + " " + pad(s3, max(len(s3), 36)) + " " + s4.strip()
                 if _optional:
                     self._buffered_trace = line
                 else:
@@ -10924,9 +10887,7 @@ class Environment:
                     self._datetime0 = datetime.datetime(1970, 1, 1)
                 else:
                     if not isinstance(datetime0, datetime.datetime):
-                        raise ValueError(
-                            f"datetime0 should be datetime.datetime or True, not {type(datetime0)}"
-                        )
+                        raise ValueError(f"datetime0 should be datetime.datetime or True, not {type(datetime0)}")
                     self._datetime0 = datetime0
                 if self._time_unit is None:
                     self._time_unit = _time_unit_lookup("seconds")
@@ -10954,7 +10915,7 @@ class Environment:
 
         elif Pythonista:
             try:
-                import sound
+                import sound # type: ignore
 
                 sound.stop_all_effects()
                 sound.play_effect("game:Beep", pitch=0.3)
@@ -10963,9 +10924,7 @@ class Environment:
 
 
 class Animate2dBase(DynamicClass):
-    def __init__(
-        self, type, locals_, argument_default, attached_to=None, attach_text=True
-    ):
+    def __init__(self, type, locals_, argument_default, attached_to=None, attach_text=True):
         super().__init__()
         self.type = type
         env = locals_["env"]
@@ -11010,13 +10969,9 @@ class Animate2dBase(DynamicClass):
         self.canvas_object = None
 
         if self.env._animate_debug:
-            self.caller = self.env._frame_to_lineno(
-                _get_caller_frame(), add_filename=True
-            )
+            self.caller = self.env._frame_to_lineno(_get_caller_frame(), add_filename=True)
         else:
-            self.caller = (
-                "?. use env.animate_debug(True) to get the originating Animate location"
-            )
+            self.caller = "?. use env.animate_debug(True) to get the originating Animate location"
 
         if attach_text:
             self.depending_object = Animate2dBase(
@@ -11057,7 +11012,6 @@ class Animate2dBase(DynamicClass):
             self.canvas_object = None  # safety! even set for non tkinter
 
     def is_removed(self):
-
         if self.over3d:
             return self not in self.env.an_over3d_objects
         else:
@@ -11074,9 +11028,7 @@ class Animate2dBase(DynamicClass):
                 visible = False
 
             if visible:
-                if (
-                    self.type == "text"
-                ):  # checked so early as to avoid evaluation of x, y, angle, ...
+                if self.type == "text":  # checked so early as to avoid evaluation of x, y, angle, ...
                     text = self.text(t)
                     if (text is None) or (text.strip() == ""):
                         self._image_visible = False
@@ -11111,7 +11063,6 @@ class Animate2dBase(DynamicClass):
                 angle = self.angle(t)
 
                 if self.type in ("polygon", "rectangle", "line", "circle"):
-
                     if self.screen_coordinates:
                         linewidth = self.linewidth(t)
                     else:
@@ -11303,9 +11254,7 @@ class Animate2dBase(DynamicClass):
                                 ),
                                 (0, 0, 0, 0),
                             )
-                            point_image = Image.new(
-                                "RGBA", (int(linewidth), int(linewidth)), linecolor
-                            )
+                            point_image = Image.new("RGBA", (int(linewidth), int(linewidth)), linecolor)
 
                             for i in range(0, len(r), 2):
                                 rx = rscaled[i]
@@ -11366,12 +11315,8 @@ class Animate2dBase(DynamicClass):
                         self.env._dimx = self.maxpx - self.minpx
                         self.env._dimy = self.maxpy - self.minpy
 
-                    self._image_x = (
-                        qx + self.minrx - linewidth + (offsetx * cosa - offsety * sina)
-                    )
-                    self._image_y = (
-                        qy + self.minry - linewidth + (offsetx * sina + offsety * cosa)
-                    )
+                    self._image_x = qx + self.minrx - linewidth + (offsetx * cosa - offsety * sina)
+                    self._image_y = qy + self.minry - linewidth + (offsetx * sina + offsety * cosa)
 
                 elif self.type == "image":
                     spec = self.image(t)
@@ -11482,14 +11427,8 @@ class Animate2dBase(DynamicClass):
                             "sw": (-0.5, -0.5),
                         }
                         dis = anchor_to_dis[text_anchor.lower()]
-                        offsetx += (
-                            text_offsetx + dis[0] * self.env._dimx - dis[0] * 4
-                        )  # 2 extra at east or west
-                        offsety += (
-                            text_offsety
-                            + dis[1] * self.env._dimy
-                            - (2 if dis[1] > 0 else 0)
-                        )  # 2 extra at north
+                        offsetx += text_offsetx + dis[0] * self.env._dimx - dis[0] * 4  # 2 extra at east or west
+                        offsety += text_offsety + dis[1] * self.env._dimy - (2 if dis[1] > 0 else 0)  # 2 extra at north
                     else:
                         if self.screen_coordinates:
                             qx = x
@@ -11519,9 +11458,7 @@ class Animate2dBase(DynamicClass):
                         else:
                             lines = lines[:max_lines]
 
-                        widths = [
-                            (font.getsize(line)[0] if line else 0) for line in lines
-                        ]
+                        widths = [(font.getsize(line)[0] if line else 0) for line in lines]
                         if widths:
                             totwidth = max(widths)
                         else:
@@ -11598,9 +11535,7 @@ class Animate2dBase(DynamicClass):
                     self._image_x = qx + ex - imrwidth / 2
                     self._image_y = qy + ey - imrheight / 2
                 else:
-                    raise ValueError(
-                        "Internal error: animate type" + self.type + "not recognized."
-                    )
+                    raise ValueError("Internal error: animate type" + self.type + "not recognized.")
                 if self.over3d:
                     width = self.env._width3d
                     height = self.env._height3d
@@ -11620,21 +11555,12 @@ class Animate2dBase(DynamicClass):
             self.env._animate = False
             self.env.running = False
             traceback.print_exc()
-            raise type(e)(
-                str(e)
-                + " [from "
-                + self.type
-                + " animation object created in line "
-                + self.caller
-                + "]"
-            ) from e
+            raise type(e)(str(e) + " [from " + self.type + " animation object created in line " + self.caller + "]") from e
 
 
 class AnimateClassic(Animate2dBase):
     def __init__(self, master, locals_):
-        super().__init__(
-            locals_=locals_, type=master.type, argument_default={}, attach_text=False
-        )
+        super().__init__(locals_=locals_, type=master.type, argument_default={}, attach_text=False)
         self.master = master
 
     def text(self, t):
@@ -12056,7 +11982,6 @@ class Animate:
         over3d: bool = None,
         env: "Environment" = None,
     ):
-
         self.env = g.default_env if env is None else env
         self._image_ident = None  # denotes no image yet
         self._image = None
@@ -12066,9 +11991,7 @@ class Animate:
         self.over3d = _default_over3d if over3d is None else over3d
         self.screen_coordinates = screen_coordinates
 
-        self.type = self.settype(
-            circle0, line0, polygon0, rectangle0, points0, image, text
-        )
+        self.type = self.settype(circle0, line0, polygon0, rectangle0, points0, image, text)
         if self.type == "":
             raise ValueError("no object specified")
         type1 = self.settype(circle1, line1, polygon1, rectangle1, points1, None, None)
@@ -12161,13 +12084,9 @@ class Animate:
 
         self.t1 = inf if t1 is None else t1
         if self.env._animate_debug:
-            self.caller = self.env._frame_to_lineno(
-                _get_caller_frame(), add_filename=True
-            )
+            self.caller = self.env._frame_to_lineno(_get_caller_frame(), add_filename=True)
         else:
-            self.caller = (
-                "?. use env.animate_debug(True) to get the originating Animate location"
-            )
+            self.caller = "?. use env.animate_debug(True) to get the originating Animate location"
         """
         if over3d:
             self.env.an_objects_over3d.append(self)
@@ -12420,9 +12339,7 @@ class Animate:
         self.circle0 = self.circle() if circle0 is None else circle0
         self.line0 = self.line() if line0 is None else de_none(line0)
         self.polygon0 = self.polygon() if polygon0 is None else de_none(polygon0)
-        self.rectangle0 = (
-            self.rectangle() if rectangle0 is None else de_none(rectangle0)
-        )
+        self.rectangle0 = self.rectangle() if rectangle0 is None else de_none(rectangle0)
         self.points0 = self.points() if points0 is None else de_none(points0)
         if as_points is not None:
             self.as_points0 = as_points
@@ -12513,9 +12430,7 @@ class Animate:
         x : float
             default behaviour: linear interpolation between self.x0 and self.x1
         """
-        return interpolate(
-            (self.env._now if t is None else t), self.t0, self.t1, self.x0, self.x1
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.x0, self.x1)
 
     def y(self, t=None):
         """
@@ -12531,9 +12446,7 @@ class Animate:
         y : float
             default behaviour: linear interpolation between self.y0 and self.y1
         """
-        return interpolate(
-            (self.env._now if t is None else t), self.t0, self.t1, self.y0, self.y1
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.y0, self.y1)
 
     def offsetx(self, t=None):
         """
@@ -12854,9 +12767,7 @@ class Animate:
         if width1 is None:
             width1 = spec_to_image_width(self.image0)
 
-        return interpolate(
-            (self.env._now if t is None else t), self.t0, self.t1, width0, width1
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, width0, width1)
 
     def fontsize(self, t=None):
         """
@@ -13182,9 +13093,7 @@ class AnimateEntry:
             relief=tkinter.FLAT,
         )
         self.entry.bind("<Return>", self.on_enter)
-        self.entry_window = g.canvas.create_window(
-            x, self.env._height - y, anchor=tkinter.SW, window=self.entry
-        )
+        self.entry_window = g.canvas.create_window(x, self.env._height - y, anchor=tkinter.SW, window=self.entry)
         self.entry.insert(0, self.value)
         self.installed = True
 
@@ -13293,7 +13202,6 @@ class AnimateButton:
         env: "Environment" = None,
         xy_anchor: str = "sw",
     ):
-
         self.env = g.default_env if env is None else env
         self.type = "button"
         self.t0 = -inf
@@ -13328,15 +13236,9 @@ class AnimateButton:
 
     def install(self):
         if not Pythonista:
-            x = self.x + self.env.xy_anchor_to_x(
-                self.xy_anchor, screen_coordinates=True
-            )
-            y = self.y + self.env.xy_anchor_to_y(
-                self.xy_anchor, screen_coordinates=True
-            )
-            if (
-                Chromebook
-            ):  # the Chromebook settings are not accurate for anything else than the menu buttons
+            x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
+            y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
+            if Chromebook:  # the Chromebook settings are not accurate for anything else than the menu buttons
                 my_font = tkinter.font.Font(size=int(self.fontsize * 0.45))
                 my_width = int(0.6 * self.width / self.fontsize)
                 y = y + 8
@@ -13479,7 +13381,6 @@ class AnimateSlider:
         labelcolor: ColorType = None,  # only for backward compatibility
         layer: float = None,  # only for backward compatibility
     ):
-
         self.env = g.default_env if env is None else env
         n = round((vmax - vmin) / resolution) + 1
         self.vmin = vmin
@@ -13558,12 +13459,8 @@ class AnimateSlider:
 
     def install(self):
         if not Pythonista:
-            x = self.x + self.env.xy_anchor_to_x(
-                self.xy_anchor, screen_coordinates=True
-            )
-            y = self.y + self.env.xy_anchor_to_y(
-                self.xy_anchor, screen_coordinates=True
-            )
+            x = self.x + self.env.xy_anchor_to_x(self.xy_anchor, screen_coordinates=True)
+            y = self.y + self.env.xy_anchor_to_y(self.xy_anchor, screen_coordinates=True)
             self.slider = tkinter.Scale(
                 self.env.root,
                 from_=self.vmin,
@@ -13574,23 +13471,13 @@ class AnimateSlider:
                 length=self.width,
                 width=self.height,
             )
-            self.slider.window = g.canvas.create_window(
-                x, self.env._height - y, anchor=tkinter.NW, window=self.slider
-            )
+            self.slider.window = g.canvas.create_window(x, self.env._height - y, anchor=tkinter.NW, window=self.slider)
             self.slider.config(
                 font=(self.font, int(self.fontsize * 0.8)),
-                foreground=self.env.colorspec_to_hex(
-                    self.env.colorspec_to_tuple(self.foreground_color), False
-                ),
-                background=self.env.colorspec_to_hex(
-                    self.env.colorspec_to_tuple(self.background_color), False
-                ),
-                highlightbackground=self.env.colorspec_to_hex(
-                    self.env.colorspec_to_tuple(self.background_color), False
-                ),
-                troughcolor=self.env.colorspec_to_hex(
-                    self.env.colorspec_to_tuple(self.trough_color), False
-                ),
+                foreground=self.env.colorspec_to_hex(self.env.colorspec_to_tuple(self.foreground_color), False),
+                background=self.env.colorspec_to_hex(self.env.colorspec_to_tuple(self.background_color), False),
+                highlightbackground=self.env.colorspec_to_hex(self.env.colorspec_to_tuple(self.background_color), False),
+                troughcolor=self.env.colorspec_to_hex(self.env.colorspec_to_tuple(self.trough_color), False),
                 showvalue=self.show_value,
                 label=self._label,
             )
@@ -13615,96 +13502,96 @@ class AnimateSlider:
 
 class AnimateQueue(DynamicClass):
     """
-        Animates the component in a queue.
+    Animates the component in a queue.
 
-        Parameters
-        ----------
-        queue : Queue
+    Parameters
+    ----------
+    queue : Queue
+        queue it concerns
 
-        x : float
-            x-position of the first component in the queue |n|
-            default: 50
+    x : float
+        x-position of the first component in the queue |n|
+        default: 50
 
-        y : float
-            y-position of the first component in the queue |n|
-            default: 50
+    y : float
+        y-position of the first component in the queue |n|
+        default: 50
 
-        direction : str
-            if "w", waiting line runs westwards (i.e. from right to left) |n|
-            if "n", waiting line runs northeards (i.e. from bottom to top) |n|
-            if "e", waiting line runs eastwards (i.e. from left to right) (default) |n|
-            if "s", waiting line runs southwards (i.e. from top to bottom)
-    :
+    direction : str
+        if "w", waiting line runs westwards (i.e. from right to left) |n|
+        if "n", waiting line runs northeards (i.e. from bottom to top) |n|
+        if "e", waiting line runs eastwards (i.e. from left to right) (default) |n|
+        if "s", waiting line runs southwards (i.e. from top to bottom)
 
-        trajectory : Trajectory
-            trajectory to be followed. Overrides any given directory
+    trajectory : Trajectory
+        trajectory to be followed. Overrides any given directory
 
-        reverse : bool
-            if False (default), display in normal order. If True, reversed.
+    reverse : bool
+        if False (default), display in normal order. If True, reversed.
 
-        max_length : int
-            maximum number of components to be displayed
+    max_length : int
+        maximum number of components to be displayed
 
-        xy_anchor : str
-            specifies where x and y are relative to |n|
-            possible values are (default: sw): |n|
-            ``nw    n    ne`` |n|
-            ``w     c     e`` |n|
-            ``sw    s    se``
+    xy_anchor : str
+        specifies where x and y are relative to |n|
+        possible values are (default: sw): |n|
+        ``nw    n    ne`` |n|
+        ``w     c     e`` |n|
+        ``sw    s    se``
 
-        titlecolor : colorspec
-            color of the title (default foreground color)
+    titlecolor : colorspec
+        color of the title (default foreground color)
 
-        titlefont : font
-            font of the title (default null string)
+    titlefont : font
+        font of the title (default null string)
 
-        titlefontsize : int
-            size of the font of the title (default 15)
+    titlefontsize : int
+        size of the font of the title (default 15)
 
-        title : str
-            title to be shown above queue |n|
-            default: name of the queue
+    title : str
+        title to be shown above queue |n|
+        default: name of the queue
 
-        titleoffsetx : float
-            x-offset of the title relative to the start of the queue |n|
-            default: 25 if direction is w, -25 otherwise
+    titleoffsetx : float
+        x-offset of the title relative to the start of the queue |n|
+        default: 25 if direction is w, -25 otherwise
 
-        titleoffsety : float
-            y-offset of the title relative to the start of the queue |n|
-            default: -25 if direction is s, -25 otherwise
+    titleoffsety : float
+        y-offset of the title relative to the start of the queue |n|
+        default: -25 if direction is s, -25 otherwise
 
-        id : any
-            the animation works by calling the animation_objects method of each component, optionally
-            with id. By default, this is self, but can be overriden, particularly with the queue
+    id : any
+        the animation works by calling the animation_objects method of each component, optionally
+        with id. By default, this is self, but can be overriden, particularly with the queue
 
-        arg : any
-            this is used when a parameter is a function with two parameters, as the first argument or
-            if a parameter is a method as the instance |n|
-            default: self (instance itself)
+    arg : any
+        this is used when a parameter is a function with two parameters, as the first argument or
+        if a parameter is a method as the instance |n|
+        default: self (instance itself)
 
-        visible : bool
-            if False, nothing will be shown |n|
-            (default True)
+    visible : bool
+        if False, nothing will be shown |n|
+        (default True)
 
-        keep : bool
-            if False, animation object will be taken from the animation objects. With show(), the animation can be reshown.
-            (default True)
+    keep : bool
+        if False, animation object will be taken from the animation objects. With show(), the animation can be reshown.
+        (default True)
 
-        parent : Component
-            component where this animation object belongs to (default None) |n|
-            if given, the animation object will be removed
-            automatically when the parent component is no longer accessible
+    parent : Component
+        component where this animation object belongs to (default None) |n|
+        if given, the animation object will be removed
+        automatically when the parent component is no longer accessible
 
-        Note
-        ----
-        All measures are in screen coordinates |n|
+    Note
+    ----
+    All measures are in screen coordinates |n|
 
-        All parameters, apart from queue, id, arg and parent can be specified as: |n|
-        - a scalar, like 10 |n|
-        - a function with zero arguments, like lambda: title |n|
-        - a function with one argument, being the time t, like lambda t: t + 10 |n|
-        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
-        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+    All parameters, apart from queue, id, arg and parent can be specified as: |n|
+    - a scalar, like 10 |n|
+    - a function with zero arguments, like lambda: title |n|
+    - a function with one argument, being the time t, like lambda t: t + 10 |n|
+    - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+    - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
     """
 
     def __init__(
@@ -13754,7 +13641,7 @@ class AnimateQueue(DynamicClass):
         self.titlefont = titlefont
         self.titlefontsize = titlefontsize
         self.titlecolor = titlecolor
-        self.title = title
+        self.title = queue.name() if title is None else title
         self.layer = layer
         self.visible = visible
         self.keep = keep
@@ -13804,12 +13691,8 @@ class AnimateQueue(DynamicClass):
         titleoffsetx = self.titleoffsetx(t)
         titleoffsety = self.titleoffsety(t)
 
-        x += self._queue.env.xy_anchor_to_x(
-            xy_anchor, screen_coordinates=True, over3d=self.over3d
-        )
-        y += self._queue.env.xy_anchor_to_y(
-            xy_anchor, screen_coordinates=True, over3d=self.over3d
-        )
+        x += self._queue.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True, over3d=self.over3d)
+        y += self._queue.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True, over3d=self.over3d)
 
         if direction == "e":
             self.x_t = x + (-25 if titleoffsetx is None else titleoffsetx)
@@ -13832,12 +13715,8 @@ class AnimateQueue(DynamicClass):
             self.text_anchor_t = "sw"
             self.angle_t = 0
         elif direction == "t":
-            self.x_t = trajectory.x(t=x, _t0=0) + (
-                -25 if titleoffsetx is None else titleoffsetx
-            )
-            self.y_t = trajectory.y(t=x, _t0=0) + (
-                25 if titleoffsety is None else titleoffsety
-            )
+            self.x_t = trajectory.x(t=x, _t0=0) + (-25 if titleoffsetx is None else titleoffsetx)
+            self.y_t = trajectory.y(t=x, _t0=0) + (25 if titleoffsety is None else titleoffsety)
             self.text_anchor_t = "sw"
             self.angle_t = 0
         n = 0
@@ -13850,9 +13729,7 @@ class AnimateQueue(DynamicClass):
                 if nargs == 1:
                     animation_objects = self.current_aos[c] = c.animation_objects()
                 else:
-                    animation_objects = self.current_aos[c] = c.animation_objects(
-                        self.id(t)
-                    )
+                    animation_objects = self.current_aos[c] = c.animation_objects(self.id(t))
             else:
                 animation_objects = self.current_aos[c] = prev_aos[c]
                 del prev_aos[c]
@@ -14019,9 +13896,7 @@ class Animate3dQueue(DynamicClass):
             parent._animation_children.add(self)
         self.env = queue.env
         self.layer = layer
-        self.register_dynamic_attributes(
-            "x y z id max_length direction reverse layer visible keep"
-        )
+        self.register_dynamic_attributes("x y z id max_length direction reverse layer visible keep")
         self.show()
 
     def update(self, t):
@@ -14051,9 +13926,7 @@ class Animate3dQueue(DynamicClass):
                 if nargs == 1:
                     animation_objects = self.current_aos[c] = c.animation3d_objects()
                 else:
-                    animation_objects = self.current_aos[c] = c.animation3d_objects(
-                        self.id(t)
-                    )
+                    animation_objects = self.current_aos[c] = c.animation3d_objects(self.id(t))
             else:
                 animation_objects = self.current_aos[c] = prev_aos[c]
                 del prev_aos[c]
@@ -14170,9 +14043,7 @@ class AnimateCombined:
             if hasattr(item, key):
                 return getattr(item, key)
 
-        raise AttributeError(
-            f"None of the AnimateCombined animation objects has an attribute {key!r}"
-        )
+        raise AttributeError(f"None of the AnimateCombined animation objects has an attribute {key!r}")
 
     def append(self, item):
         """
@@ -14485,7 +14356,6 @@ class AnimateRectangle(Animate2dBase):
         screen_coordinates: bool = False,
         over3d: bool = None,
     ):
-
         super().__init__(
             locals_=locals(),
             type="rectangle",
@@ -14664,7 +14534,6 @@ class AnimatePolygon(Animate2dBase):
         screen_coordinates: bool = False,
         over3d: bool = None,
     ):
-
         super().__init__(
             locals_=locals(),
             type="polygon",
@@ -14912,8 +14781,8 @@ class AnimatePoints(Animate2dBase):
         default: 0
 
     as_points : bool
-         if False (default), the contour lines are drawn |n|
-         if True, only the corner points are shown
+         if False, the contour lines are drawn |n|
+         if True (default), only the corner points are shown
 
     text : str, tuple or list
         the text to be displayed |n|
@@ -15096,7 +14965,6 @@ class AnimateCircle(Animate2dBase):
 
     fillcolor : colorspec
         color of interior (default foreground_color) |n|
-        default transparent
 
     linecolor : colorspec
         color of the contour (default transparent)
@@ -15207,7 +15075,6 @@ class AnimateCircle(Animate2dBase):
         screen_coordinates: bool = False,
         over3d: bool = None,
     ):
-
         super().__init__(
             locals_=locals(),
             type="circle",
@@ -15386,7 +15253,6 @@ class AnimateImage(Animate2dBase):
         screen_coordinates: bool = False,
         over3d: bool = None,
     ):
-
         super().__init__(
             locals_=locals(),
             type="image",
@@ -15418,7 +15284,8 @@ class AnimateImage(Animate2dBase):
 
 
 class Component:
-    """Component object
+    """
+    Component object
 
     A salabim component is used as component (primarily for queueing)
     or as a component with a process |n|
@@ -15499,8 +15366,6 @@ class Component:
         if omitted, default_env will be used
     """
 
-    overridden_lineno = None
-
     def __init__(
         self,
         name: str = None,
@@ -15524,12 +15389,12 @@ class Component:
         _set_name(name, self.env._nameserializeComponent, self)
         self._qmembers = {}
         self._process = None
-        self.status = _StatusMonitor(
-            name=self.name() + ".status", level=True, initial_tally=data, env=self.env
-        )
+        self.status = _StatusMonitor(name=self.name() + ".status", level=True, initial_tally=data, env=self.env)
         self._requests = collections.OrderedDict()
         self._claims = collections.OrderedDict()
         self._waits = []
+        self._from_stores = []
+        self._to_stores = []
         self._on_event_list = False
         self._scheduled_time = inf
         self._failed = False
@@ -15537,9 +15402,7 @@ class Component:
         self._creation_time = self.env._now
         self._suppress_trace = suppress_trace
         self._suppress_pause_at_step = suppress_pause_at_step
-        self.mode = _ModeMonitor(
-            name=self.name() + ".mode", level=True, initial_tally=mode, env=self.env
-        )
+        self.mode = _ModeMonitor(name=self.name() + ".mode", level=True, initial_tally=mode, env=self.env)
         self._mode_time = self.env._now
         self._aos = {}
         self._animation_children = set()
@@ -15570,13 +15433,9 @@ class Component:
                 raise TypeError("priority is not allowed for a data component")
             if self.env._trace:
                 if self._name == "main":
-                    self.env.print_trace(
-                        "", "", self.name() + " create", self._modetxt()
-                    )
+                    self.env.print_trace("", "", self.name() + " create", self._modetxt())
                 else:
-                    self.env.print_trace(
-                        "", "", self.name() + " create data component", self._modetxt()
-                    )
+                    self.env.print_trace("", "", self.name() + " create data component", self._modetxt())
         else:
             self.env.print_trace("", "", self.name() + " create", self._modetxt())
 
@@ -15615,10 +15474,10 @@ class Component:
                     at = at()
                 scheduled_time = at + self.env._offset + delay
             self.status._value = scheduled
-            self._reschedule(
-                scheduled_time, priority, urgent, "activate", cap_now, extra=extra
-            )
+            self._reschedule(scheduled_time, priority, urgent, "activate", cap_now, extra=extra)
         self.setup(**kwargs)
+
+    overridden_lineno = None
 
     def animation_objects(self, id: Any) -> Tuple:
         """
@@ -15807,9 +15666,7 @@ class Component:
                     "    "
                     + pad(q.name(), 20)
                     + " enter_time="
-                    + self.env.time_to_str(
-                        self._qmembers[q].enter_time - self.env._offset
-                    )
+                    + self.env.time_to_str(self._qmembers[q].enter_time - self.env._offset)
                     + " priority="
                     + str(self._qmembers[q].priority)
                 )
@@ -15817,16 +15674,12 @@ class Component:
             result.append("  requesting resource(s):")
 
             for r in sorted(list(self._requests), key=lambda obj: obj.name().lower()):
-                result.append(
-                    "    " + pad(r.name(), 20) + " quantity=" + str(self._requests[r])
-                )
+                result.append("    " + pad(r.name(), 20) + " quantity=" + str(self._requests[r]))
         if len(self._claims) > 0:
             result.append("  claiming resource(s):")
 
             for r in sorted(list(self._claims), key=lambda obj: obj.name().lower()):
-                result.append(
-                    "    " + pad(r.name(), 20) + " quantity=" + str(self._claims[r])
-                )
+                result.append("    " + pad(r.name(), 20) + " quantity=" + str(self._claims[r]))
         if len(self._waits) > 0:
             if self._wait_all:
                 result.append("  waiting for all of state(s):")
@@ -15881,18 +15734,30 @@ class Component:
             self._waits = []
             self._failed = True
 
-    def _reschedule(
-        self, scheduled_time, priority, urgent, caller, cap_now, extra="", s0=None
-    ):
+        if self._from_stores:
+            if self.env._trace:
+                self.env.print_trace("", "", self.name(), "from_store failed")
+            for store in list(self._from_stores):
+                self.leave(store._from_store_requesters)
+            self._from_stores = []
+            self._failed = True
+
+        if self._to_stores:
+            if self.env._trace:
+                self.env.print_trace("", "", self.name(), "to_store failed")
+            for store in list(self._to_stores):
+                self.leave(store._to_store_requesters)
+            self._to_stores = []
+            self._failed = True
+
+    def _reschedule(self, scheduled_time, priority, urgent, caller, cap_now, extra="", s0=None):
         if scheduled_time < self.env._now:
             if cap_now is None:
                 cap_now = _default_cap_now
             if cap_now:
                 scheduled_time = self.env._now
             else:
-                raise ValueError(
-                    f"scheduled time ({scheduled_time:0.3f}) before now ({self.env._now:0.3f})"
-                )
+                raise ValueError(f"scheduled time ({scheduled_time:0.3f}) before now ({self.env._now:0.3f})")
         self._scheduled_time = scheduled_time
         if scheduled_time != inf:
             self._push(scheduled_time, priority, urgent)
@@ -15901,10 +15766,7 @@ class Component:
                 scheduled_time_str = "ends on no events left  "
                 extra = " "
             else:
-                scheduled_time_str = (
-                    "scheduled for "
-                    + self.env.time_to_str(scheduled_time - self.env._offset).strip()
-                )
+                scheduled_time_str = "scheduled for " + self.env.time_to_str(scheduled_time - self.env._offset).strip()
             if (scheduled_time == self.env._now) or (scheduled_time == inf):
                 delta = ""
             else:
@@ -15915,10 +15777,7 @@ class Component:
                 "",
                 self.name() + " " + caller + delta,
                 merge_blanks(
-                    scheduled_time_str
-                    + _prioritytxt(priority)
-                    + _urgenttxt(urgent)
-                    + lineno,
+                    scheduled_time_str + _prioritytxt(priority) + _urgenttxt(urgent) + lineno,
                     self._modetxt(),
                     extra,
                 ),
@@ -16059,9 +15918,7 @@ class Component:
             scheduled_time = at + self.env._offset + delay
 
         self.status._value = scheduled
-        self._reschedule(
-            scheduled_time, priority, urgent, "activate", cap_now, extra=extra
-        )
+        self._reschedule(scheduled_time, priority, urgent, "activate", cap_now, extra=extra)
 
     def hold(
         self,
@@ -16272,10 +16129,7 @@ class Component:
                 self.env.print_trace(
                     "",
                     "",
-                    self.name()
-                    + " resume (interrupted."
-                    + str(self._interrupt_level)
-                    + ")",
+                    self.name() + " resume (interrupted." + str(self._interrupt_level) + ")",
                     merge_blanks(self._modetxt()),
                 )
             else:
@@ -16354,9 +16208,7 @@ class Component:
         self._scheduled_time = inf
         self.set_mode(mode)
         if self.env._trace:
-            self.env.print_trace(
-                "", "", "cancel " + self.name() + " " + self._modetxt()
-            )
+            self.env.print_trace("", "", "cancel " + self.name() + " " + self._modetxt())
         self.status._value = data
 
     def standby(self, mode: str = None) -> None:
@@ -16392,10 +16244,281 @@ class Component:
                 self.env._buffered_trace = False
             else:
                 lineno = self.lineno_txt(add_at=True)
-                self.env.print_trace(
-                    "", "", "standby", merge_blanks(lineno, self._modetxt())
-                )
+                self.env.print_trace("", "", "standby", merge_blanks(lineno, self._modetxt()))
         self.status._value = standby
+
+    def from_store(
+        self,
+        store: Union["Store", Iterable],
+        filter: Callable = lambda c: True,
+        fail_priority: float = 0,
+        urgent: bool = False,
+        fail_at: float = None,
+        fail_delay: float = None,
+        mode: str = None,
+        cap_now: bool = None,
+    ) -> "Component":
+        """
+        get item from store(s)
+
+        Parameters
+        ----------
+        store : store or iterable stores
+            store(s) to get item from
+
+        filter : callable
+            only components that return True when applied to them will be considered |n|
+            should be a function with one parameter(component) and returning a bool |n|
+            default: lambda c: True (i.e. always return True)
+
+        fail_priority : float
+            priority of the fail event|n|
+            default: 0 |n|
+            if a component has the same time on the event list, this component is sorted according to
+            the priority.
+
+        urgent : bool
+            urgency indicator |n|
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority |n|
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority
+
+        fail_at : float or distribution
+            time out |n|
+            if the request is not honored before fail_at,
+            the request will be cancelled and the
+            parameter failed will be set. |n|
+            if not specified, the request will not time out. |n|
+            if distribution, the distribution is sampled
+
+        fail_delay : float or distribution
+            time out |n|
+            if the request is not honored before now+fail_delay,
+            the request will be cancelled and the
+            parameter failed will be set. |n|
+            if not specified, the request will not time out. |n|
+            if distribution, the distribution is sampled
+
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations |n|
+            if nothing specified, the mode will be unchanged. |n|
+            also mode_time will be set to now, if mode is set.
+
+        cap_now : bool
+            indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+
+        Note
+        ----
+        Only allowed for current component
+
+        Always use as
+        use ``item = yield self.from_store(...)``.
+
+        The parameter failed will be reset by a calling request, wait, from_store or to_store
+        """
+        try:
+            self._from_stores = list(store)
+            if len(self._from_stores) == 0:
+                raise ValueError("no stores specified")
+
+        except TypeError:
+            self._from_stores = [store]
+
+
+        if self.status.value != current:
+            self._checkisnotdata()
+            self._checkisnotmain()
+            self._remove()
+            self._check_fail()
+
+        if fail_at is None:
+            if fail_delay is None:
+                scheduled_time = inf
+            else:
+                if fail_delay == inf:
+                    scheduled_time = inf
+                else:
+                    if callable(fail_delay):
+                        fail_delay = fail_delay()
+                    scheduled_time = self.env._now + fail_delay
+        else:
+            if fail_delay is None:
+                if callable(fail_at):
+                    fail_at = fail_at()
+                scheduled_time = fail_at + self.env._offset
+            else:
+                raise ValueError("both fail_at and fail_delay specified")
+
+        self.set_mode(mode)
+
+        self._failed = False
+
+        if self.env._trace:
+            self.env.print_trace("", "", self.name(), f"from_store ({', '.join(store._name for store in self._from_stores)})")
+
+        for store in self._from_stores:
+            self.enter(store._from_store_requesters)
+        self.status._value = requesting
+        self._from_store_item = None
+        self._from_store_filter = filter
+
+        for store in self._from_stores:
+            store._try_from_store()
+            if self._from_store_item:
+                break
+        if not self._from_store_item:
+            self._reschedule(scheduled_time, fail_priority, urgent, "request from_store", cap_now)
+
+    def to_store(
+        self,
+        store: Union["Store", Iterable],
+        item: "Component",
+        priority: float = 0,
+        fail_priority: float = 0,
+        urgent: bool = False,
+        fail_at: float = None,
+        fail_delay: float = None,
+        mode: str = None,
+        cap_now: bool = None,
+    ) -> "Component":
+        """
+        put item to store(s)
+
+        Parameters
+        ----------
+        store : store or iterable stores
+            store(s) to put item to
+
+        item: Component
+            component to put to store
+
+        fail_priority : float
+            priority of the fail event|n|
+            default: 0 |n|
+            if a component has the same time on the event list, this component is sorted according to
+            the priority.
+
+        urgent : bool
+            urgency indicator |n|
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority |n|
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority
+
+        fail_at : float or distribution
+            time out |n|
+            if the request is not honored before fail_at,
+            the request will be cancelled and the
+            parameter failed will be set. |n|
+            if not specified, the request will not time out. |n|
+            if distribution, the distribution is sampled
+
+        fail_delay : float or distribution
+            time out |n|
+            if the request is not honored before now+fail_delay,
+            the request will be cancelled and the
+            parameter failed will be set. |n|
+            if not specified, the request will not time out. |n|
+            if distribution, the distribution is sampled
+
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations |n|
+            if nothing specified, the mode will be unchanged. |n|
+            also mode_time will be set to now, if mode is set.
+
+        cap_now : bool
+            indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+
+        Note
+        ----
+        Only allowed for current component
+
+        Always use as
+        use ``yield self.to_store(...)``.
+
+        The parameter failed will be reset by a calling request, wait, from_store, to_store
+        """
+        try:
+            self._to_stores = list(store)
+            if len(self._to_stores) == 0:
+                raise ValueError("no stores specified")
+
+        except TypeError:
+            self._to_stores = [store]
+
+        if self.status.value != current:
+            self._checkisnotdata()
+            self._checkisnotmain()
+            self._remove()
+            self._check_fail()
+
+        if fail_at is None:
+            if fail_delay is None:
+                scheduled_time = inf
+            else:
+                if fail_delay == inf:
+                    scheduled_time = inf
+                else:
+                    if callable(fail_delay):
+                        fail_delay = fail_delay()
+                    scheduled_time = self.env._now + fail_delay
+        else:
+            if fail_delay is None:
+                if callable(fail_at):
+                    fail_at = fail_at()
+                scheduled_time = fail_at + self.env._offset
+            else:
+                raise ValueError("both fail_at and fail_delay specified")
+
+        self.set_mode(mode)
+
+        self._failed = False
+
+        if self.env._trace:
+            self.env.print_trace("", "", self.name(), f"{item._name} to_store ({', '.join(store._name for store in self._to_stores)})")
+
+        for store in self._to_stores:
+            self.enter(store._to_store_requesters)
+
+        self.status._value = requesting
+        self._to_store_item = item
+        self._to_store_priority = priority
+
+        for store in self._to_stores:
+            store._try_to_store()
+            if not self._to_store_item:
+                break
+
+        if self._to_store_item:
+            self._reschedule(scheduled_time, fail_priority, urgent, "request to_store", cap_now)
+
+    def filter(self, value: callable):
+        """
+        updates the filter used in yield self.from_to
+
+        Parameters
+        ----------
+        value : callable
+            new filter, which should be a function with one parameter(component) and returning a bool
+
+        Note
+        ----
+        After applying the new filter, items (components) may leave or enter the store 
+        """
+        self.filter = value()
+        for store in self._from_stores:
+            store._try_from_store()
+            if self._from_store_item:
+                break
 
     def request(self, *args, **kwargs) -> None:
         """
@@ -16493,12 +16616,7 @@ class Component:
         self.oneof_request = kwargs.pop("oneof", False)
         called_from = kwargs.pop("called_from", "request")
         if kwargs:
-            raise TypeError(
-                called_from
-                + "() got an unexpected keyword argument '"
-                + tuple(kwargs)[0]
-                + "'"
-            )
+            raise TypeError(called_from + "() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
         if self.status.value != current:
             self._checkisnotdata()
@@ -16542,9 +16660,7 @@ class Component:
 
             if r._preemptive:
                 if len(args) > 1:
-                    raise ValueError(
-                        "preemptive resources do not support multiple resource requests"
-                    )
+                    raise ValueError("preemptive resources do not support multiple resource requests")
 
             if called_from == "put":
                 q = -q
@@ -16552,9 +16668,7 @@ class Component:
             if q < 0 and not r._anonymous:
                 raise ValueError("quantity " + str(q) + " <0")
             if r in self._requests:
-                self._requests[
-                    r
-                ] += q  # is same resource is specified several times, just add them up
+                self._requests[r] += q  # is same resource is specified several times, just add them up
             else:
                 self._requests[r] = q
             if called_from == "request":
@@ -16572,16 +16686,13 @@ class Component:
 
             self.enter_sorted(r._requesters, priority)
             if self.env._trace:
-                self.env.print_trace(
-                    "", "", self.name(), req_text + r.name() + addstring
-                )
+                self.env.print_trace("", "", self.name(), req_text + r.name() + addstring)
 
             if r._preemptive:
                 av = r.available_quantity()
                 this_claimers = r.claimers()
                 bump_candidates = []
                 for c in reversed(r.claimers()):
-
                     if av >= q:
                         break
                     if priority >= c.priority(this_claimers):
@@ -16600,9 +16711,7 @@ class Component:
 
         if self._requests:
             self.status._value = requesting
-            self._reschedule(
-                scheduled_time, schedule_priority, urgent, "request", cap_now
-            )
+            self._reschedule(scheduled_time, schedule_priority, urgent, "request", cap_now)
 
     def isbumped(self, resource: "Resource" = None) -> bool:
         """
@@ -16661,10 +16770,7 @@ class Component:
             if r._honor_only_first and r._requesters[0] != self:
                 return []
             self_prio = self.priority(r._requesters)
-            if (
-                r._honor_only_highest_priority
-                and self_prio != r._requesters._head.successor.priority
-            ):
+            if r._honor_only_highest_priority and self_prio != r._requesters._head.successor.priority:
                 return []
             if self._requests[r] > 0:
                 if self._requests[r] > (r._capacity - r._claimed_quantity + 1e-8):
@@ -16679,10 +16785,7 @@ class Component:
             if r._honor_only_first and r._requesters[0] != self:
                 continue
             self_prio = self.priority(r._requesters)
-            if (
-                r._honor_only_highest_priority
-                and self_prio != r._requesters._head.successor.priority
-            ):
+            if r._honor_only_highest_priority and self_prio != r._requesters._head.successor.priority:
                 continue
 
             if self._requests[r] > 0:
@@ -16722,20 +16825,14 @@ class Component:
                             self.enter_sorted(r._claimers, this_prio)
                         prio_trace = " priority=" + str(this_prio)
                     r.claimed_quantity.tally(r._claimed_quantity)
-                    r.occupancy.tally(
-                        0 if r._capacity <= 0 else r._claimed_quantity / r._capacity
-                    )
+                    r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
                     r.available_quantity.tally(r._capacity - r._claimed_quantity)
                     if self.env._trace:
                         self.env.print_trace(
                             "",
                             "",
                             self.name(),
-                            "claim "
-                            + str(r._claimed_quantity)
-                            + " from "
-                            + r.name()
-                            + prio_trace,
+                            "claim " + str(r._claimed_quantity) + " from " + r.name() + prio_trace,
                         )
                 self.leave(r._requesters)
                 if r._requesters._length == 0:
@@ -16783,13 +16880,7 @@ class Component:
                     "",
                     "",
                     self.name(),
-                    "bumped from "
-                    + r.name()
-                    + " by "
-                    + bumped_by.name()
-                    + " (release "
-                    + str(q)
-                    + ")",
+                    "bumped from " + r.name() + " by " + bumped_by.name() + " (release " + str(q) + ")",
                     s0=s0,
                 )
             else:
@@ -16846,9 +16937,7 @@ class Component:
                 else:
                     raise TypeError("incorrect specifier" + arg)
                 if r._anonymous:
-                    raise ValueError(
-                        "not possible to release anonymous resources " + r.name()
-                    )
+                    raise ValueError("not possible to release anonymous resources " + r.name())
                 self._release(r, q)
         else:
             for r in list(self._claims):
@@ -16966,9 +17055,7 @@ class Component:
         cap_now = kwargs.pop("cap_now", None)
 
         if kwargs:
-            raise TypeError(
-                "wait() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'"
-            )
+            raise TypeError("wait() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
         if self.status.value != current:
             self._checkisnotdata()
@@ -17017,7 +17104,7 @@ class Component:
             else:
                 raise TypeError("incorrect specifier", arg)
 
-            for (statex, _, _) in self._waits:
+            for statex, _, _ in self._waits:
                 if statex == state:
                     break
             else:
@@ -17082,9 +17169,7 @@ class Component:
             self._waits = []
             self._remove()
             self.status._value = scheduled
-            self._reschedule(
-                self.env._now, 0, False, "wait honor", False, s0=self.env.last_s0
-            )
+            self._reschedule(self.env._now, 0, False, "wait honor", False, s0=self.env.last_s0)
 
         return honored
 
@@ -17697,9 +17782,7 @@ class Component:
                 return priority
         return None
 
-    def remaining_duration(
-        self, value: float = None, priority: float = 0, urgent: bool = False
-    ) -> float:
+    def remaining_duration(self, value: float = None, priority: float = 0, urgent: bool = False) -> float:
         """
         Parameters
         ----------
@@ -17744,17 +17827,9 @@ class Component:
             if self.status.value in (passive, interrupted):
                 self._remaining_duration = value
             elif self.status.value == current:
-                raise ValueError(
-                    "setting remaining_duration not allowed for current component ("
-                    + self.name()
-                    + ")"
-                )
+                raise ValueError("setting remaining_duration not allowed for current component (" + self.name() + ")")
             elif self.status.value == standby:
-                raise ValueError(
-                    "setting remaining_duration not allowed for standby component ("
-                    + self.name()
-                    + ")"
-                )
+                raise ValueError("setting remaining_duration not allowed for standby component (" + self.name() + ")")
             else:
                 self._remove()
                 self._reschedule(
@@ -17853,12 +17928,7 @@ class Component:
                     plus = " "
             else:
                 gs = inspect.getsourcelines(self._process)
-                s0 = (
-                    self.env.filename_lineno_to_str(
-                        self._process.__code__.co_filename, gs[1]
-                    )
-                    + " "
-                )
+                s0 = self.env.filename_lineno_to_str(self._process.__code__.co_filename, gs[1]) + " "
                 return f"{'@' if add_at else ''}{s0}"
         return f"{'@' if add_at else ''}{self.env._frame_to_lineno(frame)}{plus}"
 
@@ -17876,6 +17946,55 @@ class Component:
         s = self.lineno_txt().strip()
         self.env._suppress_trace_linenumbers = save_suppress_trace_linenumbers
         return s
+
+    def to_store_requesters(self) -> "Queue":
+        """
+        get the queue holding all to_store requesting components
+
+        Returns
+        -------
+        queue holding all to_store requesting components : Queue
+        """
+        return self._to_store_requesters
+
+    def from_store_item(self) -> Optional["Component"]:
+        """
+        return item returned from a yield self.from_store(...) if valid
+
+        Returns
+        -------
+        item returned : Component or None, if not valid
+        """
+        try:
+            return self._from_store_item
+        except AttributeError:
+            return None
+
+    def from_store_store(self) -> Optional["Component"]:
+        """
+        return store where item was returned from a yield self.from_store(...) if valid
+
+        Returns
+        -------
+        item returned : Component or None, if not valid
+        """
+        try:
+            return self._from_store_store
+        except AttributeError:
+            return None
+
+    def to_store_store(self) -> Optional["Component"]:
+        """
+        return store where item was sent to with last yield self.to_store(...) if valid
+
+        Returns
+        -------
+        item returned : Component or None, if not valid
+        """
+        try:
+            return self._to_store_store
+        except AttributeError:
+            return None
 
 
 class ComponentGenerator(Component):
@@ -17973,10 +18092,10 @@ class ComponentGenerator(Component):
         self,
         component_class: Type,
         generator_name: str = None,
-        at: float = None,
-        delay: float = None,
-        till: float = None,
-        duration: float = None,
+        at: Union[float, Callable] = None,
+        delay: Union[float, Callable] = None,
+        till: Union[float, Callable] = None,
+        duration: Union[float, Callable] = None,
         number: Union[int, Callable] = None,
         iat=None,
         force_at: bool = False,
@@ -17988,12 +18107,8 @@ class ComponentGenerator(Component):
         **kwargs,
     ):
         if generator_name is None:
-            if inspect.isclass(component_class) and issubclass(
-                component_class, Component
-            ):
-                generator_name = (
-                    str(component_class).split(".")[-1][:-2] + ".generator."
-                )
+            if inspect.isclass(component_class) and issubclass(component_class, Component):
+                generator_name = str(component_class).split(".")[-1][:-2] + ".generator."
             elif isinstance(component_class, _Distribution):
                 generator_name = str(component_class) + ".generator."
             else:
@@ -18013,9 +18128,7 @@ class ComponentGenerator(Component):
             if iat is None:
                 raise ValueError("disturbance can only be used with an iat")
             if not issubclass(component_class, Component):
-                raise ValueError(
-                    "component_class haas to be a Component subclass if disturbance is specified."
-                )
+                raise ValueError("component_class haas to be a Component subclass if disturbance is specified.")
         if callable(at):
             at = at()
         if callable(delay):
@@ -18053,9 +18166,7 @@ class ComponentGenerator(Component):
         else:
             if self.iat is None:
                 if till == inf or self.number == inf:
-                    raise ValueError(
-                        "iat not specified --> till and number need to be specified"
-                    )
+                    raise ValueError("iat not specified --> till and number need to be specified")
                 if disturbance is not None:
                     raise ValueError("iat not specified --> disturbance not allowed")
 
@@ -18063,19 +18174,14 @@ class ComponentGenerator(Component):
                 if force_at or force_till:
                     if number == 1:
                         if force_at and force_till:
-                            raise ValueError(
-                                "force_at and force_till does not allow number=1"
-                            )
+                            raise ValueError("force_at and force_till does not allow number=1")
                         samples = [at] if force_at else [till]
                     else:
                         v_at = at if force_at else samples[0]
                         v_till = till if force_till else samples[-1]
                         min_sample = samples[0]
                         max_sample = samples[-1]
-                        samples = [
-                            interpolate(sample, min_sample, max_sample, v_at, v_till)
-                            for sample in samples
-                        ]
+                        samples = [interpolate(sample, min_sample, max_sample, v_at, v_till) for sample in samples]
                 self.intervals = [t1 - t0 for t0, t1 in zip([0] + samples, samples)]
                 at = 0  # self.intervals.pop(0)
                 process = "do_spread"
@@ -18191,9 +18297,7 @@ class ComponentGenerator(Component):
         result.append(object_to_str(self) + " " + hex(id(self)))
         result.append("  name=" + self.name())
 
-        result.append(
-            "  class of components=" + str(self.component_class).split(".")[-1][:-2]
-        )
+        result.append("  class of components=" + str(self.component_class).split(".")[-1][:-2])
         result.append("  iat=" + repr(self.iat))
         result.append("  suppress_trace=" + str(self._suppress_trace))
         result.append("  suppress_pause_at_step=" + str(self._suppress_pause_at_step))
@@ -18209,9 +18313,7 @@ class _BlindVideoMaker(Component):
     def process(self):
         while True:
             self.env._t = self.env._now
-            self.env.animation_pre_tick_sys(
-                self.env.t()
-            )  # required to update sys objects, like AnimateQueue
+            self.env.animation_pre_tick_sys(self.env.t())  # required to update sys objects, like AnimateQueue
             if self.env._animate3d:
                 if not self.env._gl_initialized:
                     self.env.animation3d_init()
@@ -18419,9 +18521,7 @@ class _Expression(_Distribution):
             return m0 - m1
 
         if self.op == operator.mul:
-            if isinstance(self.dis0, _Distribution) and isinstance(
-                self.dis1, _Distribution
-            ):
+            if isinstance(self.dis0, _Distribution) and isinstance(self.dis1, _Distribution):
                 return nan
             else:
                 return m0 * m1
@@ -18553,20 +18653,14 @@ class Bounded(_Distribution):
         env: "Environment" = None,
     ):
         self.register_time_unit(time_unit, env)
-        self.lowerbound = (
-            -inf if lowerbound is None else lowerbound * self.time_unit_factor
-        )
-        self.upperbound = (
-            inf if upperbound is None else upperbound * self.time_unit_factor
-        )
+        self.lowerbound = -inf if lowerbound is None else lowerbound * self.time_unit_factor
+        self.upperbound = inf if upperbound is None else upperbound * self.time_unit_factor
 
         if self.lowerbound > self.upperbound:
             raise ValueError("lowerbound > upperbound")
 
         if fail_value is None:
-            self.fail_value = (
-                self.upperbound if self.lowerbound == -inf else self.lowerbound
-            )
+            self.fail_value = self.upperbound if self.lowerbound == -inf else self.lowerbound
         else:
             self.fail_value = fail_value
 
@@ -18585,9 +18679,7 @@ class Bounded(_Distribution):
             except (ValueError, TypeError):
                 return sample  # a value that cannot be converted to a float is sampled is assumed to be correct
 
-            if self.lowerbound_op(samplefloat, self.lowerbound) and self.upperbound_op(
-                samplefloat, self.upperbound
-            ):
+            if self.lowerbound_op(samplefloat, self.lowerbound) and self.upperbound_op(samplefloat, self.upperbound):
                 return sample
 
         return self.fail_value
@@ -18720,11 +18812,7 @@ class Exponential(_Distribution):
         result = []
         result.append("Exponential distribution " + hex(id(self)))
         result.append("  mean=" + str(self._mean) + " " + self.time_unit)
-        result.append(
-            "  rate (lambda)="
-            + str(1 / self._mean)
-            + (" " if self.time_unit == "" else " /" + self.time_unit)
-        )
+        result.append("  rate (lambda)=" + str(1 / self._mean) + (" " if self.time_unit == "" else " /" + self.time_unit))
         result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
@@ -18806,17 +18894,13 @@ class Normal(_Distribution):
                 self._standard_deviation = 0.0
             else:
                 if mean == 0:
-                    raise ValueError(
-                        "coefficient_of_variation not allowed with mean = 0"
-                    )
+                    raise ValueError("coefficient_of_variation not allowed with mean = 0")
                 self._standard_deviation = coefficient_of_variation * mean
         else:
             if coefficient_of_variation is None:
                 self._standard_deviation = standard_deviation
             else:
-                raise TypeError(
-                    "both standard_deviation and coefficient_of_variation specified"
-                )
+                raise TypeError("both standard_deviation and coefficient_of_variation specified")
         if self._standard_deviation < 0:
             raise ValueError("standard_deviation < 0")
         if randomstream is None:
@@ -18849,19 +18933,11 @@ class Normal(_Distribution):
         result = []
         result.append("Normal distribution " + hex(id(self)))
         result.append("  mean=" + str(self._mean) + " " + self.time_unit)
-        result.append(
-            "  standard_deviation="
-            + str(self._standard_deviation)
-            + " "
-            + self.time_unit
-        )
+        result.append("  standard_deviation=" + str(self._standard_deviation) + " " + self.time_unit)
         if self._mean == 0:
             result.append("  coefficient of variation= N/A")
         else:
-            result.append(
-                "  coefficient_of_variation="
-                + str(self._standard_deviation / self._mean)
-            )
+            result.append("  coefficient_of_variation=" + str(self._standard_deviation / self._mean))
         if self._use_gauss:
             result.append("  use_gauss=True")
         result.append("  randomstream=" + hex(id(self.randomstream)))
@@ -18874,15 +18950,9 @@ class Normal(_Distribution):
         Sample of the distribution : float
         """
         if self._use_gauss:
-            return (
-                self.randomstream.gauss(self._mean, self._standard_deviation)
-                * self.time_unit_factor
-            )
+            return self.randomstream.gauss(self._mean, self._standard_deviation) * self.time_unit_factor
         else:
-            return (
-                self.randomstream.normalvariate(self._mean, self._standard_deviation)
-                * self.time_unit_factor
-            )
+            return self.randomstream.normalvariate(self._mean, self._standard_deviation) * self.time_unit_factor
 
     def mean(self) -> float:
         """
@@ -18997,10 +19067,7 @@ class IntUniform(_Distribution):
         -------
         Sample of the distribution: int
         """
-        return (
-            self.randomstream.randint(self._lowerbound, self._upperbound)
-            * self.time_unit_factor
-        )
+        return self.randomstream.randint(self._lowerbound, self._upperbound) * self.time_unit_factor
 
     def mean(self) -> float:
         """
@@ -19098,10 +19165,7 @@ class Uniform(_Distribution):
         -------
         Sample of the distribution: float
         """
-        return (
-            self.randomstream.uniform(self._lowerbound, self._upperbound)
-            * self.time_unit_factor
-        )
+        return self.randomstream.uniform(self._lowerbound, self._upperbound) * self.time_unit_factor
 
     def mean(self) -> float:
         """
@@ -19214,10 +19278,7 @@ class Triangular(_Distribution):
         -------
         Sample of the distribtion : float
         """
-        return (
-            self.randomstream.triangular(self._low, self._high, self._mode)
-            * self.time_unit_factor
-        )
+        return self.randomstream.triangular(self._low, self._high, self._mode) * self.time_unit_factor
 
     def mean(self) -> float:
         """
@@ -19336,9 +19397,7 @@ class Poisson(_Distribution):
     It is not recommended to use mean (lambda) > 100
     """
 
-    def __init__(
-        self, mean: float, randomstream: Any = None, prefer_numpy: bool = False
-    ):
+    def __init__(self, mean: float, randomstream: Any = None, prefer_numpy: bool = False):
         if mean <= 0:
             raise ValueError("mean (lambda) <=0")
 
@@ -19506,10 +19565,7 @@ class Weibull(_Distribution):
         -------
         Sample of the distribution : float
         """
-        return (
-            self.randomstream.weibullvariate(self._scale, self._shape)
-            * self.time_unit_factor
-        )
+        return self.randomstream.weibullvariate(self._scale, self._shape) * self.time_unit_factor
 
     def mean(self) -> float:
         """
@@ -19620,11 +19676,7 @@ class Gamma(_Distribution):
         result.append("Gamma distribution " + hex(id(self)))
         result.append("  shape (k)=" + str(self._shape))
         result.append("  scale (teta)=" + str(self._scale) + " " + self.time_unit)
-        result.append(
-            "  rate (beta)="
-            + str(1 / self._scale)
-            + ("" if self.time_unit == "" else " /" + self.time_unit)
-        )
+        result.append("  rate (beta)=" + str(1 / self._scale) + ("" if self.time_unit == "" else " /" + self.time_unit))
         result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
@@ -19634,10 +19686,7 @@ class Gamma(_Distribution):
         -------
         Sample of the distribution : float
         """
-        return (
-            self.randomstream.gammavariate(self._shape, self._scale)
-            * self.time_unit_factor
-        )
+        return self.randomstream.gammavariate(self._shape, self._scale) * self.time_unit_factor
 
     def mean(self) -> float:
         """
@@ -19832,11 +19881,7 @@ class Erlang(_Distribution):
         result = []
         result.append("Erlang distribution " + hex(id(self)))
         result.append("  shape (k)=" + str(self._shape))
-        result.append(
-            "  rate (lambda)="
-            + str(self._rate)
-            + ("" if self.time_unit == "" else " /" + self.time_unit)
-        )
+        result.append("  rate (lambda)=" + str(self._rate) + ("" if self.time_unit == "" else " /" + self.time_unit))
         result.append("  scale (mu)=" + str(1 / self._rate))
         result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
@@ -19847,10 +19892,7 @@ class Erlang(_Distribution):
         -------
         Sample of the distribution : float
         """
-        return (
-            self.randomstream.gammavariate(self._shape, 1 / self._rate)
-            / self.time_unit_factor
-        )
+        return self.randomstream.gammavariate(self._shape, 1 / self._rate) / self.time_unit_factor
 
     def mean(self) -> float:
         """
@@ -19925,9 +19967,7 @@ class Cdf(_Distribution):
                 raise ValueError(f"x value {x} is smaller than previous value {lastx}")
             cum = spec.pop(0)
             if cum < lastcum:
-                raise ValueError(
-                    f"cumulative value {cum} is smaller than previous value {lastcum}"
-                )
+                raise ValueError(f"cumulative value {cum} is smaller than previous value {lastcum}")
             self._x.append(x)
             self._cum.append(cum)
             lastx = x
@@ -19937,9 +19977,7 @@ class Cdf(_Distribution):
         self._cum = [x / lastcum for x in self._cum]
         self._mean = 0
         for i in range(len(self._cum) - 1):
-            self._mean += ((self._x[i] + self._x[i + 1]) / 2) * (
-                self._cum[i + 1] - self._cum[i]
-            )
+            self._mean += ((self._x[i] + self._x[i + 1]) / 2) * (self._cum[i + 1] - self._cum[i])
 
     def __repr__(self):
         return "Cdf"
@@ -19976,9 +20014,7 @@ class Cdf(_Distribution):
         r = self.randomstream.random()
         for i in range(len(self._cum)):
             if r < self._cum[i]:
-                return interpolate(
-                    r, self._cum[i - 1], self._cum[i], self._x[i - 1], self._x[i]
-                )
+                return interpolate(r, self._cum[i - 1], self._cum[i], self._x[i - 1], self._x[i])
         return self._x[i]
 
     def mean(self) -> float:
@@ -20070,14 +20106,10 @@ class Pdf(_Distribution):
                     raise ValueError("uneven number of parameters specified")
         else:
             xs = list(spec)
-            if hasattr(probabilities, "__iter__") and not isinstance(
-                probabilities, str
-            ):
+            if hasattr(probabilities, "__iter__") and not isinstance(probabilities, str):
                 probabilities = list(probabilities)
                 if len(xs) != len(probabilities):
-                    raise ValueError(
-                        "length of x-values does not match length of probabilities"
-                    )
+                    raise ValueError("length of x-values does not match length of probabilities")
             else:
                 probabilities = len(spec) * [1]
 
@@ -20086,15 +20118,11 @@ class Pdf(_Distribution):
         for x, p in zip(xs, probabilities):
             if time_unit is not None:
                 if isinstance(x, _Distribution):
-                    raise TypeError(
-                        "time_unit can't be combined with distribution value"
-                    )
+                    raise TypeError("time_unit can't be combined with distribution value")
                 try:
                     x = float(x) * self.time_unit_factor
                 except (ValueError, TypeError):
-                    raise TypeError(
-                        "time_unit can't be combined with non numeric value"
-                    )
+                    raise TypeError("time_unit can't be combined with non numeric value")
 
             self._x.append(x)
             sump += p
@@ -20269,22 +20297,16 @@ class CumPdf(_Distribution):
             xs = list(spec)
 
             if len(xs) != len(cumprobabilities):
-                raise ValueError(
-                    "length of x-values does not match length of cumulative probabilities"
-                )
+                raise ValueError("length of x-values does not match length of cumulative probabilities")
 
         for x, p in zip(xs, cumprobabilities):
             if time_unit is not None:
                 if isinstance(x, _Distribution):
-                    raise TypeError(
-                        "time_unit can't be combined with distribution value"
-                    )
+                    raise TypeError("time_unit can't be combined with distribution value")
                 try:
                     x = float(x) * self.time_unit_factor
                 except (ValueError, TypeError):
-                    raise TypeError(
-                        "time_unit can't be combined with non numeric value"
-                    )
+                    raise TypeError("time_unit can't be combined with non numeric value")
             self._x.append(x)
             p = p - sump
             if p < 0:
@@ -20394,9 +20416,7 @@ class External(_Distribution):
         if "scipy" in sys.modules:
             import scipy
 
-            self.dis_is_scipy = isinstance(
-                dis, (scipy.stats.rv_continuous, scipy.stats.rv_discrete)
-            )
+            self.dis_is_scipy = isinstance(dis, (scipy.stats.rv_continuous, scipy.stats.rv_discrete))
         self.dis = dis
         self.time_unit = None
         time_unit = None
@@ -20413,13 +20433,7 @@ class External(_Distribution):
         self.register_time_unit(time_unit, env)
         self.samples = []
         if self.dis_is_scipy:
-            self._mean = self.dis.mean(
-                **{
-                    k: v
-                    for k, v in self.kwargs.items()
-                    if k not in ("size", "random_state")
-                }
-            )
+            self._mean = self.dis.mean(**{k: v for k, v in self.kwargs.items() if k not in ("size", "random_state")})
         else:
             self._mean = nan
 
@@ -20485,9 +20499,7 @@ class External(_Distribution):
             descr.append(kwarg + "=" + repr(self.kwargs[kwarg]))
         if self.time_unit != "":
             descr.append("time_unit=" + repr(self.time_unit))
-        result.append(
-            "External(" + ", ".join(descr) + ") distribution " + hex(id(self))
-        )
+        result.append("External(" + ", ".join(descr) + ") distribution " + hex(id(self)))
         return return_or_print(result, as_str, file)
 
 
@@ -20546,7 +20558,6 @@ class Distribution(_Distribution):
         randomstream: Any = None,
         time_unit: str = None,
     ):
-
         spec_orig = spec
 
         sp = spec.split("(")
@@ -20727,13 +20738,9 @@ class State:
             self.env = env
         _set_name(name, self.env._nameserializeState, self)
         self._value = value
-        savetrace = self.env._trace
-        self.env._trace = False
-        self._waiters = Queue(
-            name="waiters of " + self.name(), monitor=monitor, env=self.env
-        )
-        self._waiters._isinternal = True
-        self.env._trace = savetrace
+        with self.env.suppress_trace():
+            self._waiters = Queue(name="waiters of " + self.name(), monitor=monitor, env=self.env)
+            self._waiters._isinternal = True
         self.value = _SystemMonitor(
             name="Value of " + self.name(),
             level=True,
@@ -20743,9 +20750,7 @@ class State:
             env=self.env,
         )
         if self.env._trace:
-            self.env.print_trace(
-                "", "", self.name() + " create", "value = " + repr(self._value)
-            )
+            self.env.print_trace("", "", self.name() + " create", "value = " + repr(self._value))
         self.setup(*args, **kwargs)
 
     def setup(self) -> None:
@@ -20810,6 +20815,7 @@ class State:
         exclude: Iterable = (),
         as_str: bool = False,
         file: TextIO = None,
+        graph_scale: float = None,
     ) -> str:
         """
         print histograms of the waiters queue and the value monitor
@@ -20828,15 +20834,18 @@ class State:
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
+        graph_scale : float
+            Scale in the graphical representation of the % and cum% (default=80)
+
         Returns
         -------
         histograms (if as_str is True) : str
         """
         result = []
         if self.waiters() not in exclude:
-            result.append(self.waiters().print_histograms(exclude=exclude, as_str=True))
+            result.append(self.waiters().print_histograms(exclude=exclude, as_str=True, graph_scale=graph_scale))
         if self.value not in exclude:
-            result.append(self.value.print_histogram(as_str=True))
+            result.append(self.value.print_histogram(as_str=True, graph_scale=graph_scale))
         return return_or_print(result, as_str, file)
 
     def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
@@ -20936,17 +20945,13 @@ class State:
         This method is identical to set, except the default value is False.
         """
         if self.env._trace:
-            self.env.print_trace(
-                "", "", self.name() + " reset", "value = " + repr(value)
-            )
+            self.env.print_trace("", "", self.name() + " reset", "value = " + repr(value))
         if self._value != value:
             self._value = value
             self.value.tally(value)
             self._trywait()
 
-    def trigger(
-        self, value: Any = True, value_after: Any = None, max: Union[float, int] = inf
-    ):
+    def trigger(self, value: Any = True, value_after: Any = None, max: Union[float, int] = inf):
         """
         triggers the value of the state
 
@@ -20977,13 +20982,7 @@ class State:
                 "",
                 "",
                 self.name() + " trigger",
-                " value = "
-                + str(value)
-                + " --> "
-                + str(value_after)
-                + " allow "
-                + str(max)
-                + " components",
+                " value = " + str(value) + " --> " + str(value_after) + " allow " + str(max) + " components",
             )
         self._value = value
         self.value.tally(value)  # strictly speaking, not required
@@ -21116,26 +21115,12 @@ class State:
         statistics (if as_str is True) : str
         """
         result = []
-        result.append(
-            f"Statistics of {self.name()} at {fn(self.env._now - self.env._offset, 13, 3)}"
-        )
-        result.append(
-            self.waiters().length.print_statistics(
-                show_header=False, show_legend=True, do_indent=True, as_str=True
-            )
-        )
+        result.append(f"Statistics of {self.name()} at {fn(self.env._now - self.env._offset, 13, 3)}")
+        result.append(self.waiters().length.print_statistics(show_header=False, show_legend=True, do_indent=True, as_str=True))
         result.append("")
-        result.append(
-            self.waiters().length_of_stay.print_statistics(
-                show_header=False, show_legend=False, do_indent=True, as_str=True
-            )
-        )
+        result.append(self.waiters().length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True, as_str=True))
         result.append("")
-        result.append(
-            self.value.print_statistics(
-                show_header=False, show_legend=False, do_indent=True, as_str=True
-            )
-        )
+        result.append(self.value.print_statistics(show_header=False, show_legend=False, do_indent=True, as_str=True))
         return return_or_print(result, as_str, file)
 
     def waiters(self) -> Queue:
@@ -21218,27 +21203,20 @@ class Resource:
 
         if initial_claimed_quantity != 0:
             if not anonymous:
-                raise ValueError(
-                    "initial_claimed_quantity != 0 only allowed for anonymous resources"
-                )
+                raise ValueError("initial_claimed_quantity != 0 only allowed for anonymous resources")
 
         self._capacity = capacity
         self._honor_only_first = honor_only_first
         self._honor_only_highest_priority = honor_only_highest_priority
 
         _set_name(name, self.env._nameserializeResource, self)
-        savetrace = self.env._trace
-        self.env._trace = False
-        self._requesters = Queue(
-            name="requesters of " + self.name(), monitor=monitor, env=self.env
-        )
-        self._requesters._isinternal = True
-        self._claimers = Queue(
-            name="claimers of " + self.name(), monitor=monitor, env=self.env
-        )
-        self._claimers._isinternal = True
-        self._claimers._isclaimers = True  # used by Component.isbumped()
-        self.env._trace = savetrace
+        with self.env.suppress_trace():
+            self._requesters = Queue(name="requesters of " + self.name(), monitor=monitor, env=self.env)
+            self._requesters._isinternal = True
+            self._claimers = Queue(name="claimers of " + self.name(), monitor=monitor, env=self.env)
+            self._claimers._isinternal = True
+            self._claimers._isclaimers = True  # used by Component.isbumped()
+
         self._claimed_quantity = initial_claimed_quantity
         self._anonymous = anonymous
         self._preemptive = preemptive
@@ -21284,9 +21262,7 @@ class Resource:
                 "",
                 "",
                 self.name() + " create",
-                "capacity="
-                + str(self._capacity)
-                + (" anonymous" if self._anonymous else ""),
+                "capacity=" + str(self._capacity) + (" anonymous" if self._anonymous else ""),
             )
         self.setup(*args, **kwargs)
 
@@ -21384,9 +21360,7 @@ class Resource:
         statistics (if as_str is True) : str
         """
         result = []
-        result.append(
-            f"Statistics of {self.name()} at {(self.env._now - self.env._offset):13.3f}"
-        )
+        result.append(f"Statistics of {self.name()} at {(self.env._now - self.env._offset):13.3f}")
         show_legend = True
         for q in [self.requesters(), self.claimers()]:
             result.append(
@@ -21426,9 +21400,7 @@ class Resource:
             result.append("")
         return return_or_print(result, as_str, file)
 
-    def print_histograms(
-        self, exclude=(), as_str: bool = False, file: TextIO = None
-    ) -> str:
+    def print_histograms(self, exclude=(), as_str: bool = False, file: TextIO = None, graph_scale: float = None) -> str:
         """
         prints histograms of the requesters and claimers queue as well as
         the capacity, available_quantity and claimed_quantity timstamped monitors of the resource
@@ -21447,6 +21419,9 @@ class Resource:
             if None(default), all output is directed to stdout |n|
             otherwise, the output is directed to the file
 
+        graph_scale : float
+            Scale in the graphical representation of the % and cum% (default=80)
+
         Returns
         -------
         histograms (if as_str is True) : str
@@ -21454,7 +21429,7 @@ class Resource:
         result = []
         for q in (self.requesters(), self.claimers()):
             if q not in exclude:
-                result.append(q.print_histograms(exclude=exclude, as_str=True))
+                result.append(q.print_histograms(exclude=exclude, as_str=True, graph_scale=graph_scale))
         for m in (
             self.capacity,
             self.available_quantity,
@@ -21462,7 +21437,7 @@ class Resource:
             self.occupancy,
         ):
             if m not in exclude:
-                result.append(m.print_histogram(as_str=True))
+                result.append(m.print_histogram(as_str=True, graph_scale=graph_scale))
         return return_or_print(result, as_str, file)
 
     def monitor(self, value: bool) -> None:
@@ -21566,28 +21541,21 @@ class Resource:
             while mx != self._requesters._tail:
                 c = mx.component
                 mx = mx.successor
-                result.append(
-                    "    " + pad(c.name(), 20) + " quantity=" + str(c._requests[self])
-                )
+                result.append("    " + pad(c.name(), 20) + " quantity=" + str(c._requests[self]))
         else:
             result.append("  no requesting components")
 
         result.append("  claimed_quantity=" + str(self._claimed_quantity))
         if self._claimed_quantity >= 0:
             if self._anonymous:
-                result.append(
-                    "  not claimed by any components,"
-                    + " because the resource is anonymous"
-                )
+                result.append("  not claimed by any components," + " because the resource is anonymous")
             else:
                 result.append("  claimed by:")
                 mx = self._claimers._head.successor
                 while mx != self._claimers._tail:
                     c = mx.component
                     mx = mx.successor
-                    result.append(
-                        "    " + pad(c.name(), 20) + " quantity=" + str(c._claims[self])
-                    )
+                    result.append("    " + pad(c.name(), 20) + " quantity=" + str(c._claims[self]))
         return return_or_print(result, as_str, file)
 
     def _tryrequest(self):  # this is Resource._tryrequest
@@ -21599,10 +21567,7 @@ class Resource:
                 while mx != self._requesters._tail:
                     if self._honor_only_first and mx != mx_first:
                         break
-                    if (
-                        self._honor_only_highest_priority
-                        and mx.priority != mx_first_priority
-                    ):
+                    if self._honor_only_highest_priority and mx.priority != mx_first_priority:
                         break
                     c = mx.component
                     mx = mx.successor
@@ -21618,10 +21583,7 @@ class Resource:
             while mx != self._requesters._tail:
                 if self._honor_only_first and mx != mx_first:
                     break
-                if (
-                    self._honor_only_highest_priority
-                    and mx.priority != mx_first_priority
-                ):
+                if self._honor_only_highest_priority and mx.priority != mx_first_priority:
                     break
                 if self._minq > (self._capacity - self._claimed_quantity + 1e-8):
                     break  # inpossible to honor any more requests
@@ -21656,9 +21618,7 @@ class Resource:
             if self._claimed_quantity < 1e-8:
                 self._claimed_quantity = 0
             self.claimed_quantity.tally(self._claimed_quantity)
-            self.occupancy.tally(
-                0 if self._capacity <= 0 else self._claimed_quantity / self._capacity
-            )
+            self.occupancy.tally(0 if self._capacity <= 0 else self._claimed_quantity / self._capacity)
             self.available_quantity.tally(self._capacity - self._claimed_quantity)
             self._tryrequest()
 
@@ -21701,9 +21661,7 @@ class Resource:
         self._capacity = cap
         self.capacity.tally(self._capacity)
         self.available_quantity.tally(self._capacity - self._claimed_quantity)
-        self.occupancy.tally(
-            0 if self._capacity <= 0 else self._claimed_quantity / self._capacity
-        )
+        self.occupancy.tally(0 if self._capacity <= 0 else self._claimed_quantity / self._capacity)
         self._tryrequest()
 
     def name(self, value: str = None) -> str:
@@ -21838,14 +21796,7 @@ class PeriodMonitor:
         if period_monitor_names is None:
             period_monitor_names = []
             for duration in periods:
-                period_monitor_names.append(
-                    parent_monitor.name()
-                    + ".period ["
-                    + str(cum)
-                    + " - "
-                    + str(cum + duration)
-                    + "]"
-                )
+                period_monitor_names.append(parent_monitor.name() + ".period [" + str(cum) + " - " + str(cum + duration) + "]")
                 cum += duration
 
         self.m = parent_monitor
@@ -21859,26 +21810,16 @@ class PeriodMonitor:
 
         self.iperiod = 0
         if self.m._level:
-            self.perperiod = [
-                Monitor(
-                    name=period_monitor_name, level=True, monitor=False, env=self.env
-                )
-                for period_monitor_name in period_monitor_names
-            ]
+            self.perperiod = [Monitor(name=period_monitor_name, level=True, monitor=False, env=self.env) for period_monitor_name in period_monitor_names]
         else:
-            self.perperiod = [
-                Monitor(name=period_monitor_name, monitor=False, env=self.env)
-                for period_monitor_name in period_monitor_names
-            ]
+            self.perperiod = [Monitor(name=period_monitor_name, monitor=False, env=self.env) for period_monitor_name in period_monitor_names]
 
 
 class AudioClip:
     @staticmethod
     def send(command):
         buffer = ctypes.c_buffer(255)
-        errorcode = ctypes.windll.winmm.mciSendStringA(
-            str(command).encode(), buffer, 254, 0
-        )
+        errorcode = ctypes.windll.winmm.mciSendStringA(str(command).encode(), buffer, 254, 0)
         if errorcode:
             return errorcode, AudioClip.get_error(errorcode)
         else:
@@ -21929,9 +21870,7 @@ class AudioClip:
         if self._alias:
             start_ms = (0 if start is None else min(start, self.duration)) * 1000
             end_ms = (self.duration if end is None else min(end, self.duration)) * 1000
-            err, buf = AudioClip.directsend(
-                "play", self._alias, "from", int(start_ms), "to", int(end_ms)
-            )
+            err, buf = AudioClip.directsend("play", self._alias, "from", int(start_ms), "to", int(end_ms))
 
     def isplaying(self):
         return self._mode() == "playing"
@@ -21984,7 +21923,7 @@ def audio_duration(filename: str) -> float:
     Only supported on Windows and Pythonista. On other platform returns 0
     """
     if Pythonista:
-        import sound
+        import sound # type: ignore
 
         return sound.Player(filename).duration
     audioclip = AudioClip(filename)
@@ -22115,15 +22054,9 @@ class _APNG:
         seq = 0
         png, control = self.frames[0]
         out.append(png.hdr)
-        out.append(
-            self.make_chunk(
-                "acTL", struct.pack("!II", len(self.frames), self.num_plays)
-            )
-        )
+        out.append(self.make_chunk("acTL", struct.pack("!II", len(self.frames), self.num_plays)))
         if control:
-            out.append(
-                self.make_chunk("fcTL", struct.pack("!I", seq) + control.to_bytes())
-            )
+            out.append(self.make_chunk("fcTL", struct.pack("!I", seq) + control.to_bytes()))
             seq += 1
         idat_chunks = []
         for type_, data in png.chunks:
@@ -22136,18 +22069,14 @@ class _APNG:
             out.append(data)
         out.extend(idat_chunks)
         for png, control in self.frames[1:]:
-            out.append(
-                self.make_chunk("fcTL", struct.pack("!I", seq) + control.to_bytes())
-            )
+            out.append(self.make_chunk("fcTL", struct.pack("!I", seq) + control.to_bytes()))
             seq += 1
             for type_, data in png.chunks:
                 if type_ in ("IHDR", "IEND") or type_ in CHUNK_BEFORE_IDAT:
                     continue
 
                 if type_ == "IDAT":
-                    out.append(
-                        self.make_chunk("fdAT", struct.pack("!I", seq) + data[8:-4])
-                    )
+                    out.append(self.make_chunk("fdAT", struct.pack("!I", seq) + data[8:-4]))
                     seq += 1
                 else:
                     other_chunks.append(data)
@@ -22262,11 +22191,9 @@ def spec_to_image(spec: ColorType) -> Tuple:
                     if Pythonista:
                         raise ImportError(".heic files not supported under Pythonista.")
                     try:
-                        from pillow_heif import register_heif_opener
+                        from pillow_heif import register_heif_opener # type: ignore
                     except ImportError:
-                        raise ImportError(
-                            "pillow_heif is required for reading .heic files. Install with pip install pillow_heif"
-                        )
+                        raise ImportError("pillow_heif is required for reading .heic files. Install with pip install pillow_heif")
                     register_heif_opener()
                 im = Image.open(spec)
                 im = im.convert("RGBA")
@@ -22283,7 +22210,6 @@ def spec_to_image_width(spec):
 
 
 def _time_unit_lookup(descr):
-
     lookup = {
         "years": 1 / (86400 * 365),
         "weeks": 1 / (86400 * 7),
@@ -22531,10 +22457,7 @@ def interp(
         return fp[-1]
 
     if isinstance(fp[0], (tuple, list)):
-        return type(fp[0])(
-            el_i_min_1 + (el_i - el_i_min_1) * (x - xp[i - 1]) / (xp[i] - xp[i - 1])
-            for el_i_min_1, el_i in zip(fp[i - 1], fp[i])
-        )
+        return type(fp[0])(el_i_min_1 + (el_i - el_i_min_1) * (x - xp[i - 1]) / (xp[i] - xp[i - 1]) for el_i_min_1, el_i in zip(fp[i - 1], fp[i]))
 
     return fp[i - 1] + (fp[i] - fp[i - 1]) * (x - xp[i - 1]) / (xp[i] - xp[i - 1])
 
@@ -22587,18 +22510,13 @@ def fn(x, length, d):
     if x >= 10 ** (length - d - 1):
         return ("{:" + str(length) + "." + str(length - d - 3) + "e}").format(x)
     if x == int(x):
-        return ("{:" + str(length - d - 1) + "d}{:" + str(d + 1) + "s}").format(
-            int(x), ""
-        )
+        return ("{:" + str(length - d - 1) + "d}{:" + str(d + 1) + "s}").format(int(x), "")
     return ("{:" + str(length) + "." + str(d) + "f}").format(x)
 
 
 def _checkrandomstream(randomstream):
     if not isinstance(randomstream, random.Random):
-        raise TypeError(
-            "Type randomstream or random.Random expected, got "
-            + str(type(randomstream))
-        )
+        raise TypeError("Type randomstream or random.Random expected, got " + str(type(randomstream)))
 
 
 def _checkismonitor(monitor):
@@ -22732,9 +22650,7 @@ def _call(c, t, self):
 def de_none(lst):
     if lst is None:
         return None
-    lst = list(
-        lst
-    )  # it is necessary to convert to list, because input maybe a tuple or even a deque
+    lst = list(lst)  # it is necessary to convert to list, because input maybe a tuple or even a deque
     result = lst[:2]
     for item in lst[2:]:
         if item is None:
@@ -22749,11 +22665,7 @@ def statuses() -> Tuple:
     tuple of all statuses a component can be in, in alphabetical order.
     """
 
-    return tuple(
-        "current data interrupted passive requesting scheduled standby waiting".split(
-            " "
-        )
-    )
+    return tuple("current data interrupted passive requesting scheduled standby waiting".split(" "))
 
 
 current = "current"
@@ -22858,12 +22770,8 @@ class _AnimateIntro(Animate3dBase):
         self.lights_param = (-1, -1, 1, 0)
         self.lag = 1
 
-        self.register_dynamic_attributes(
-            "field_of_view_y z_near z_far x_eye y_eye z_eye x_center y_center z_center"
-        )
-        self.register_dynamic_attributes(
-            "model_lights_pname model_lights_param lights_light lights_pname lights_param"
-        )
+        self.register_dynamic_attributes("field_of_view_y z_near z_far x_eye y_eye z_eye x_center y_center z_center")
+        self.register_dynamic_attributes("model_lights_pname model_lights_param lights_light lights_pname lights_param")
 
     def draw(self, t):
         x_eye = self.x_eye(t)
@@ -22888,17 +22796,13 @@ class _AnimateIntro(Animate3dBase):
             z_up = 1
 
         if self.model_lights_pname(t) is None:
-            self.model_lights_pname = (
-                gl.GL_LIGHT_MODEL_AMBIENT
-            )  # in principal only at first call
+            self.model_lights_pname = gl.GL_LIGHT_MODEL_AMBIENT  # in principal only at first call
         if self.lights_light(t) is None:
             self.lights_light = gl.GL_LIGHT0  # in principal only at first call
         if self.lights_pname(t) is None:
             self.lights_pname = gl.GL_POSITION  # in principal only at first call
 
-        background_color = list(
-            self.env.colorspec_to_gl_color(self.env._background3d_color)
-        ) + [0.0]
+        background_color = list(self.env.colorspec_to_gl_color(self.env._background3d_color)) + [0.0]
         gl.glClearColor(*background_color)
 
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
@@ -22908,15 +22812,12 @@ class _AnimateIntro(Animate3dBase):
         gl.glLoadIdentity()
         glu.gluPerspective(
             self.field_of_view_y(t),
-            glut.glutGet(glut.GLUT_WINDOW_WIDTH)
-            / glut.glutGet(glut.GLUT_WINDOW_HEIGHT),
+            glut.glutGet(glut.GLUT_WINDOW_WIDTH) / glut.glutGet(glut.GLUT_WINDOW_HEIGHT),
             self.z_near(t),
             self.z_far(t),
         )
 
-        glu.gluLookAt(
-            x_eye, y_eye, z_eye, x_center, y_center, z_center, x_up, y_up, z_up
-        )
+        glu.gluLookAt(x_eye, y_eye, z_eye, x_center, y_center, z_center, x_up, y_up, z_up)
         gl.glEnable(gl.GL_LIGHTING)
         gl.glLightModelfv(self.model_lights_pname(t), self.model_lights_param(t))
         gl.glLightfv(self.lights_light(t), self.lights_pname(t), self.lights_param(t))
@@ -22973,9 +22874,7 @@ class _AnimateExtro(Animate3dBase):
 
             gl.glOrtho(0, self.env._width3d, 0, self.env._height3d, -1, 1)
             if overlap:
-                overlay_image = Image.new(
-                    "RGBA", (self.env._width3d, self.env._height3d), (0, 0, 0, 0)
-                )
+                overlay_image = Image.new("RGBA", (self.env._width3d, self.env._height3d), (0, 0, 0, 0))
                 for ao in sorted(
                     self.env.an_objects_over3d,
                     key=lambda obj: (-obj.layer(t), obj.sequence),
@@ -22985,9 +22884,7 @@ class _AnimateExtro(Animate3dBase):
                             ao._image,
                             (
                                 int(ao._image_x),
-                                int(
-                                    self.env._height3d - ao._image_y - ao._image.size[1]
-                                ),
+                                int(self.env._height3d - ao._image_y - ao._image.size[1]),
                             ),
                             ao._image,
                         )
@@ -23128,10 +23025,7 @@ class Animate3dObj(Animate3dBase):
         env: "Environment" = None,
         **kwargs,
     ):
-
-        super().__init__(
-            visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs
-        )
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
 
         self.x = x
         self.y = y
@@ -23149,9 +23043,7 @@ class Animate3dObj(Animate3dBase):
         self.filename = filename
         self.show_warnings = show_warnings
 
-        self.register_dynamic_attributes(
-            "x y z x_angle y_angle z_angle x_translate y_translate z_translate x_scale y_scale z_scale filename show_warnings"
-        )
+        self.register_dynamic_attributes("x y z x_angle y_angle z_angle x_translate y_translate z_translate x_scale y_scale z_scale filename show_warnings")
         self.x_offset = 0
         self.y_offset = 0
         self.z_offset = 0
@@ -23180,7 +23072,6 @@ class Animate3dObj(Animate3dBase):
                 logging.basicConfig(level=logging.ERROR)
 
             with open(obj_filename, "r") as obj_file:
-
                 create_materials = False
                 obj_file_path = Path(obj_filename).resolve().parent
                 save_cwd = os.getcwd()
@@ -23194,9 +23085,7 @@ class Animate3dObj(Animate3dBase):
             os.chdir(save_cwd)
             logging.basicConfig(level=save_logging_level)
 
-            self.env.obj_filenames[obj_filename] = pywavefront.Wavefront(
-                obj_filename, create_materials=create_materials
-            )
+            self.env.obj_filenames[obj_filename] = pywavefront.Wavefront(obj_filename, create_materials=create_materials)
 
         obj = self.env.obj_filenames[obj_filename]
 
@@ -23288,9 +23177,7 @@ class Animate3dRectangle(Animate3dBase):
         env: "Environment" = None,
         **kwargs,
     ):
-        super().__init__(
-            visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs
-        )
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
 
         self.x0 = x0
         self.y0 = y0
@@ -23386,9 +23273,7 @@ class Animate3dLine(Animate3dBase):
         env: "Environment" = None,
         **kwargs,
     ):
-        super().__init__(
-            visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs
-        )
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
 
         self.x0 = x0
         self.y0 = y0
@@ -23474,9 +23359,7 @@ class Animate3dGrid(Animate3dBase):
         env: "Environment" = None,
         **kwargs,
     ):
-        super().__init__(
-            visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs
-        )
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
 
         self.x_range = x_range
         self.y_range = y_range
@@ -23669,9 +23552,7 @@ class Animate3dBox(Animate3dBase):
         env: "Environment" = None,
         **kwargs,
     ):
-        super().__init__(
-            visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs
-        )
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
 
         self.x_len = x_len
         self.y_len = y_len
@@ -23686,18 +23567,14 @@ class Animate3dBox(Animate3dBase):
         self.color = color
         self.edge_color = edge_color
         self.shaded = shaded
-        self.register_dynamic_attributes(
-            "x_len y_len z_len x y z z_angle x_ref y_ref z_ref color edge_color shaded"
-        )
+        self.register_dynamic_attributes("x_len y_len z_len x y z z_angle x_ref y_ref z_ref color edge_color shaded")
         self.x_offset = 0
         self.y_offset = 0
         self.z_offset = 0
 
     def draw(self, t):
         gl_color, show = self.env.colorspec_to_gl_color_alpha(self.color(t))
-        gl_edge_color, show_edge = self.env.colorspec_to_gl_color_alpha(
-            self.edge_color(t)
-        )
+        gl_edge_color, show_edge = self.env.colorspec_to_gl_color_alpha(self.edge_color(t))
 
         draw_box3d(
             x_len=self.x_len(t),
@@ -23766,6 +23643,10 @@ class Animate3dBar(Animate3dBase):
     rotation_angle : float
         rotation of the bar in degrees (default 0)
 
+    show_lids : bool
+        if True (default), show the 'lids' |n|
+        if False, it's a hollow bar
+
     visible : bool
         visible |n|
         if False, animation object is not shown, shown otherwise
@@ -23821,9 +23702,7 @@ class Animate3dBar(Animate3dBase):
         env: "Environment" = None,
         **kwargs,
     ):
-        super().__init__(
-            visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs
-        )
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
 
         self.x0 = x0
         self.y0 = y0
@@ -23838,9 +23717,7 @@ class Animate3dBar(Animate3dBase):
         self.shaded = shaded
         self.rotation_angle = rotation_angle
         self.show_lids = show_lids
-        self.register_dynamic_attributes(
-            "x0 y0 z0 x1 y1 z1 color bar_width bar_width_2 edge_color shaded rotation_angle show_lids"
-        )
+        self.register_dynamic_attributes("x0 y0 z0 x1 y1 z1 color bar_width bar_width_2 edge_color shaded rotation_angle show_lids")
         self.x_offset = 0
         self.y_offset = 0
         self.z_offset = 0
@@ -23853,9 +23730,7 @@ class Animate3dBar(Animate3dBase):
         bar_width = self.bar_width(t)
         bar_width_2 = self.bar_width_2(t)
         gl_color, show = self.env.colorspec_to_gl_color_alpha(self.color(t))
-        edge_gl_color, show_edge = self.env.colorspec_to_gl_color_alpha(
-            self.edge_color(t)
-        )
+        edge_gl_color, show_edge = self.env.colorspec_to_gl_color_alpha(self.edge_color(t))
         shaded = self.shaded(t)
         rotation_angle = self.rotation_angle(t)
         show_lids = self.show_lids(t)
@@ -23904,6 +23779,9 @@ class Animate3dCylinder(Animate3dBase):
 
     color : colorspec
         color of the cylinder (default "white")
+
+    radius : float
+        radius of the cylinder (default 1)
 
     number_of_sides : int
         number of sides of the cylinder (default 8) |n|
@@ -23969,9 +23847,7 @@ class Animate3dCylinder(Animate3dBase):
         env: "Environment" = None,
         **kwargs,
     ):
-        super().__init__(
-            visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs
-        )
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
         self.x0 = x0
         self.y0 = y0
         self.z0 = z0
@@ -23983,9 +23859,7 @@ class Animate3dCylinder(Animate3dBase):
         self.number_of_sides = number_of_sides
         self.rotation_angle = rotation_angle
         self.show_lids = show_lids
-        self.register_dynamic_attributes(
-            "x0 y0 z0 x1 y1 z1 color radius number_of_sides rotation_angle show_lids"
-        )
+        self.register_dynamic_attributes("x0 y0 z0 x1 y1 z1 color radius number_of_sides rotation_angle show_lids")
         self.x_offset = 0
         self.y_offset = 0
         self.z_offset = 0
@@ -24085,9 +23959,7 @@ class Animate3dSphere(Animate3dBase):
         env: "Environment" = None,
         **kwargs,
     ):
-        super().__init__(
-            visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs
-        )
+        super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
 
         self.radius = radius
         self.x = x
@@ -24096,9 +23968,7 @@ class Animate3dSphere(Animate3dBase):
         self.color = color
         self.number_of_slices = number_of_slices
         self.number_of_stacks = number_of_stacks
-        self.register_dynamic_attributes(
-            "radius x y z color number_of_slices number_of_stacks"
-        )
+        self.register_dynamic_attributes("radius x y z color number_of_slices number_of_stacks")
         self.x_offset = 0
         self.y_offset = 0
         self.z_offset = 0
@@ -24286,9 +24156,7 @@ def draw_cylinder3d(
 
     """ draw sides """
     gl.glBegin(gl.GL_QUADS)
-    for i, (two_d_vertex0, two_d_vertex1) in enumerate(
-        zip(two_d_vertices, two_d_vertices[1:])
-    ):
+    for i, (two_d_vertex0, two_d_vertex1) in enumerate(zip(two_d_vertices, two_d_vertices[1:])):
         a1 = math.radians((start_angle + (i + 0.5) * step_angle))
         gl.glNormal3f(0, math.cos(a1), math.sin(a1))
         gl.glVertex3f(0, *two_d_vertex0)
@@ -24703,11 +24571,8 @@ def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
                 if Pythonista:
                     result = ImageFont.truetype(filename, size=int(fontsize))
                 else:
-
                     #  refer to https://github.com/python-pillow/Pillow/issues/3730 for explanation (in order to load >= 500 fonts)
-                    result = ImageFont.truetype(
-                        font=io.BytesIO(open(filename, "rb").read()), size=int(fontsize)
-                    )
+                    result = ImageFont.truetype(font=io.BytesIO(open(filename, "rb").read()), size=int(fontsize))
                 break
             except Exception:
                 raise
@@ -24789,9 +24654,7 @@ def centered_rectangle(width: float, height: float) -> Tuple:
     return -width / 2, -height / 2, width / 2, height / 2
 
 
-def regular_polygon(
-    radius: float = 1, number_of_sides: int = 3, initial_angle: float = 0
-) -> List:
+def regular_polygon(radius: float = 1, number_of_sides: int = 3, initial_angle: float = 0) -> List:
     """
     creates a polygon tuple with a regular polygon (within a circle) for use with sim.Animate
 
@@ -24866,25 +24729,21 @@ def can_animate(try_only: bool = True) -> bool:
     except ImportError:
         if try_only:
             return False
-        raise ImportError(
-            "PIL is required for animation. Install with pip install Pillow or see salabim manual"
-        )
+        raise ImportError("PIL is required for animation. Install with pip install Pillow or see salabim manual")
 
     if not Pythonista:
         if PyDroid:
             if not g.tkinter_loaded:
                 if try_only:
                     return False
-                raise ImportError(
-                    "PyDroid animation requires that the main program imports tkinter"
-                )
+                raise ImportError("PyDroid animation requires that the main program imports tkinter")
         try:
             import tkinter
             import tkinter.font
 
         except ImportError:
             try:
-                import Tkinter as tkinter
+                import Tkinter as tkinter # type: ignore
 
             except ImportError:
                 if try_only:
@@ -24921,9 +24780,7 @@ def can_animate3d(try_only: bool = True) -> bool:
             if try_only:
                 return False
             else:
-                raise ImportError(
-                    "OpenGL is required for animation3d. Install with pip install PyOpenGL or see salabim manual"
-                )
+                raise ImportError("OpenGL is required for animation3d. Install with pip install PyOpenGL or see salabim manual")
         return True
     else:
         if try_only:
@@ -24960,13 +24817,9 @@ def can_video(try_only: bool = True) -> bool:
             if try_only:
                 return False
             if platform.python_implementation == "PyPy":
-                raise NotImplementedError(
-                    "video production is not supported under PyPy."
-                )
+                raise NotImplementedError("video production is not supported under PyPy.")
             else:
-                raise ImportError(
-                    "cv2 required for video production. Install with pip install opencv-python"
-                )
+                raise ImportError("cv2 required for video production. Install with pip install opencv-python")
     return True
 
 
@@ -25117,8 +24970,40 @@ def reset() -> None:
     g.tkinter_loaded = "?"
     random_seed()  # always start with seed 1234567
 
+def set_environment_aliases():
+    cwd_parts = Path.cwd().parts
+    if len(cwd_parts) >= 2 and cwd_parts[-2]=='salabim' and cwd_parts[-1]=='manual':
+        return  # do not set when using Sphinx build!
+
+    for name, obj in list(globals().items()):
+        if not name.startswith('_'):
+            if inspect.isclass(obj) and obj.__module__ == Environment.__module__:
+
+                if issubclass(obj,Exception):
+                    exec(f"Environment.{name}={name}")
+                else:
+                    if 'env' in inspect.signature(obj).parameters:
+                        exec(f'''\
+def local_{name}(self, *args, **kwargs):
+    if 'env' in kwargs or self == g.default_env:
+        return {name}(*args, **kwargs)
+    else:
+        kwargs['env']=self
+        return {name}(*args, **kwargs)
+Environment.{name} = local_{name}
+Environment.{name}.__doc__ = {name}.__doc__''')
+                    else:                
+                        exec(f'Environment.{name}={name}')                                           
+                
+            if inspect.isfunction(obj):
+                exec(f'Environment.{name}=staticmethod({name})')
+    Environment.inf = inf
+    Environment.nan = nan   
 
 reset()
+
+set_environment_aliases()
+
 if __name__ == "__main__":
     try:
         import salabim_exp
