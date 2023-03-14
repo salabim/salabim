@@ -17,16 +17,127 @@ import pickle
 Pythonista = platform.system() == "Darwin"
 
 def exp():
-    exp198()
+    exp201()
 
+
+def exp203():
+    class X(sim.Component):
+        def process(self):
+            a=yield self.hold(1)
+            print(a)
+            a=yield self.hold(1)
+            print(a)
+
+    env = sim.Environment()
+
+    X()
+    X()
+    env.run(10)
+
+
+def exp202():
+    class X(sim.Component):
+        ...
+
+    def x(p):
+        X(name=f"{p}.").enter_sortedx(q, p)
+
+    env = sim.Environment()
+    q = env.Queue("q")
+    x(1)
+    x(0)
+    x(0)
+    x(1)
+    x(1)
+    x(0)
+    x(0)
+    x(-1)
+    x(100)
+    q.print_info() 
+
+def exp201():
+    class X(sim.Component):
+        def process(self):
+            yield self.to_store(store0,self)
+            # self.enter(store0.contents())
+            yield self.passivate() 
+
+    class Sink0(sim.Component):
+        def process(self):
+            while True:
+                item = yield self.from_store(store0)
+                print("xx",item,self.from_store_item())
+
+    env = sim.Environment(trace=True)
+    store0 = env.Store("store0", capacity=5)
+#    for i in range(6):
+#        X(at=5)
+    X(at=5)
+    Sink0()
+    env.run(20)
+    print(store0.print_info())
+
+
+
+def exp200():
+    class X(sim.Component):
+        def process(self):
+            yield self.hold(1)
+
+    env = sim.Environment(trace=True) 
+    env.ComponentGenerator(X, even_spread=True, duration=10, number=3)
+    sim.ComponentGenerator(X, even_spread=True, duration=10, number=3)
+
+    env.run()   
+
+def exp199():
+
+    class CustomerGenerator(sim.Component):
+        def process(self):
+            while True:
+                Customer()
+                yield self.hold(sim.Uniform(5, 15).sample())
+
+    class Customer(sim.Component):
+        def process(self):
+            yield self.request(clerks)
+            yield self.hold(1)
+            self.release()  # not really required
+
+
+    env = sim.Environment(trace=False)
+    CustomerGenerator()
+    clerks = sim.Resource("clerks", capacity=0)
+
+    # Changing this initial running time affects the length_of_stay.mean()
+    env.run(1000)
+
+    ...
+    clerks.set_capacity(3)
+    for c in clerks.claimers()[:]: # a copy is required as the queue contents changes in the loop
+        c.leave(clerks.claimers())
+        c.enter(clerks.claimers())
+    for c in clerks.requesters()[:]: # a copy is required as the queue contents changes in the loop
+        c.leave(clerks.requesters())
+        c.enter(clerks.requesters())
+
+    clerks.reset_monitors()
+
+    env.run(10)
+    ...
+    
+    print(clerks.requesters().length_of_stay.xt())
+    print(clerks.requesters().length_of_stay.mean())
+    
 def exp198():
     env1 = sim.Environment(name="env1")
     env = sim.Environment(name="env")
-    x=env1.Component("name")
+    x=env1.Component("comp")
     print(env.Component.__doc__)
 
     print(x.env)
-    raise env.QueueFullError()
+    print(type(sim.Component))
+    print(type(env.Component))
 
 def exp197():
     class X(sim.Component):

@@ -1,13 +1,13 @@
-#               _         _      _               ____   _____     _      ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    / |    / _ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \    | |   | | | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | | _ | |_| |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|_|(_) \___/
+#               _         _      _               ____   _____     _     _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    / |   / |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \    | |   | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | | _ | |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|_|(_)|_|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "23.1.0"
+__version__ = "23.1.1"
 
 import heapq
 import random
@@ -44,6 +44,7 @@ from pathlib import Path
 
 from typing import Any, Union, Iterable, Tuple, List, Callable, TextIO, Dict, Set, Type, Hashable, Optional
 
+dataframe = None  # to please PyLance
 
 ColorType = Union[str, Iterable[float]]
 
@@ -59,9 +60,9 @@ class g:
 
 if Pythonista:
     try:
-        import scene # type: ignore
-        import ui # type: ignore
-        import objc_util # type: ignore
+        import scene  # type: ignore
+        import ui  # type: ignore
+        import objc_util  # type: ignore
     except ModuleNotFoundError:
         Pythonista = False  # for non Pythonista implementation on iOS
 
@@ -2934,6 +2935,145 @@ class Monitor:
         self.cached_xweight[(ex0, force_numeric)] = (t_extra, xweight)
         return xweight
 
+    def as_dataframe(self, include_t: bool = True, use_datetime0=False) -> "dataframe":
+        """
+        makes a pandas dataframe with the x-values and optionally the t-values of the monitors|n|
+        The x column names will be the name of the monitor, suffixed with ".x".
+
+        Parameters
+        ----------
+        include_t: bool
+            if True (default), include the t values in the dataframe |n|
+            if False, do not include t values in the dataframe
+
+        Returns
+        -------
+        dataframe containing x (and t) values : pandas dataframe
+
+        Notes
+        -----
+        Requires pandas to be installed |n|
+        For level monitors, Monitor.as_resamplke_dataframe is likely more useful
+        """
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ImportError("Monitor.as_dataframe requires pandas")
+        if include_t:
+            if use_datetime0:
+                df = pd.DataFrame({"t": [self.env.t_to_datetime(t) for t in self._t]})
+            else:
+                df = pd.DataFrame({"t": self._t})
+        else:
+            df = pd.DataFrame()
+        df[f"{self.name()}.x"] = self._x
+
+        return df
+
+    def as_resampled_dataframe(
+        self,
+        extra_monitors: Iterable = [],
+        delta_t: Union[float, datetime.timedelta] = 1,
+        min_t: Union[float, datetime.datetime] = None,
+        max_t: Union[float, datetime.datetime] = None,
+        use_datetime0=False,
+    ) -> "dataframe":
+        """
+        makes a pandas dataframe with t, and x_values for the monitor(s) |n|
+        the t values will be uniformly distributes between min_t and max_t with a time step of delta_t |n|
+        this is essentially the result of a resampling process. It is guaranteed that the values
+        at the given times are correct. |n|
+        The x column names will be the name of the monitor, suffixed with ".x".
+
+        Parameters
+        ----------
+        extra_monitors : iterable of level monitors
+            monitors to be included in the dataframe |n|
+
+        delta_t : float or datetime.timedelta
+            time step (default: 1) |n|
+            specification as datetime.timedelta only allowed if use_datetime0=True
+
+        min_t : float or datetime.datetime
+            start of the resampled time (default: start time of the monitor) |n|
+            specification as datetime.datetime only allowed if use_datetime0=True
+
+        max_t : float or datetime.datetime
+            end of the resampled time (default: env.now()) |n|
+            specification as datetime.datetime only allowed if use_datetime0=True
+
+        use_datetime0 : bool
+            if False (default), use t-values as such
+            if True, use datetime.datetime as t-values (only allowed datetime0 is set for the environment)
+
+        Returns
+        -------
+        dataframe containing t and x values : pandas dataframe
+
+        Notes
+        -----
+        Requires pandas to be installed
+        """
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ImportError("Monitor.as_dataframe requires pandas")
+        if use_datetime0 and not self.env._datetime0:
+            raise ValueError("use_date_time0=True only allowed of env.datetime0 is set")
+
+        if delta_t is None:
+            delta_t = 1
+        else:
+            if isinstance(delta_t, datetime.timedelta):
+                if not use_datetime0:
+                    raise TypeError("delta_t can't be a datetime.timedelta if use_datetime0=False")
+                delta_t = self.env.timedelta_to_duration(delta_t)
+
+        if min_t is None:
+            min_t = self._t[0]
+        else:
+            if isinstance(min_t, datetime.datetime):
+                if not use_datetime0:
+                    raise TypeError("min_t can't be a datetime.datetime if use_datetime0=False")
+
+                min_t = self.env.datetime_to_t(min_t)
+            min_t += self.env._offset
+
+        if max_t is None:
+            max_t = self.env._now
+        else:
+            if isinstance(max_t, datetime.datetime):
+                if not use_datetime0:
+                    raise TypeError("max_t can't be a datetime.datetime if use_datetime0=False")
+                max_t = self.env.datetime_to_t(max_t)
+            max_t += self.env._offset
+        if use_datetime0:
+            df = pd.DataFrame({"t": [self.env.t_to_datetime(t) for t in self.env.arange(min_t, max_t, delta_t)]})
+        else:
+            df = pd.DataFrame({"t": self.env.arange(min_t, max_t, delta_t)})
+
+        for mon in [self] + extra_monitors:
+            if not mon._level:
+                raise ValueError("not all monitors are level")
+            if mon._t[0] != self._t[0]:
+                raise ValueError("not all monitors have the same start time")
+            if mon.env != self.env:
+                raise ValueError("not all monitors have the environment")
+            x_last = mon.off
+            xt_iter = iter(zip(mon._x, mon._t))
+            x_next, t_next = next(xt_iter)
+            new_x = []
+            for t in self.env.arange(min_t, max_t, delta_t):
+                while t >= t_next:
+                    x_last = x_next
+                    try:
+                        x_next, t_next = next(xt_iter)
+                    except StopIteration:
+                        t_next = inf
+                new_x.append(pd.NA if x_last == self.off else x_last)
+            df[f"{mon.name()}.x"] = new_x
+        return df
+
 
 class _CapacityMonitor(Monitor):
     @property
@@ -3754,14 +3894,31 @@ class Qmember:
         self.queue = q
         self.enter_time = c.env._now
         q._length += 1
-        for iter in q._iter_touched:
-            q._iter_touched[iter] = True
+        if not (isinstance(q, Store) or q._isinternal):  # this is because internal and as store never need touch handling (new in 23.0.1)
+            for iter in q._iter_touched:
+                q._iter_touched[iter] = True
         c._qmembers[q] = self
         if q.env._trace:
             if not q._isinternal:
                 q.env.print_trace("", "", c.name(), "enter " + q.name())
         q.length.tally(q._length)
         q.number_of_arrivals += 1
+        if isinstance(q, Store):
+            store = q
+            for requester in store._from_store_requesters:
+                if requester._from_store_filter(c):
+                    c.leave(store)
+                    for store0 in requester._from_stores:
+                        requester.leave(store0._from_store_requesters)
+                    requester._from_stores = []
+                    requester._from_store_item = c
+                    requester._from_store_store = store
+                    requester._remove()
+                    requester.status._value = scheduled
+                    requester._reschedule(requester.env._now, 0, False, f"from_store ({store.name()}) honor with {c.name()}", False, s0=requester.env.last_s0, return_value=c)
+                    break
+
+
 
 
 class Queue:
@@ -4797,6 +4954,7 @@ class Queue:
         self._iter_sequence += 1
         iter_sequence = self._iter_sequence
         self._iter_touched[iter_sequence] = False
+
         iter_list = []
         mx = self._head.successor
         while mx != self._tail:
@@ -5137,7 +5295,7 @@ class Queue:
             self.env.print_trace("", "", self.name() + " clear")
 
 
-class Store:
+class Store(Queue):
     def __init__(
         self,
         name: str = None,
@@ -5146,252 +5304,30 @@ class Store:
         *args,
         **kwargs,
     ):
-        if env is None:
-            self.env = g.default_env
-        else:
-            self.env = env
-        _set_name(name, self.env._nameserializeStore, self)
-        self._capacity = capacity
+        super().__init__(name=name, capacity=capacity, env=env, *args, **kwargs)
         with self.env.suppress_trace():
-            self._contents = Queue(f"{self.name()}.contents", env=env)
             self._to_store_requesters = Queue(f"{name}.to_store_requesters", env=env)
             self._to_store_requesters._isinternal = True
             self._from_store_requesters = Queue(f"{name}.from_store_requesters", env=env)
             self._from_store_requesters._isinternal = True
-        if self.env._trace:
-            self.env.print_trace("", "", self.name() + " create", f"capacity={self._capacity}")
+
         self.setup(*args, **kwargs)
 
-    def setup(self):
-        """
-        called immediately after initialization of a store.
-
-        by default this is a dummy method, but it can be overridden.
-
-        only keyword arguments are passed
-        """
-        pass
-
-    def all_monitors(self) -> Tuple["Monitor"]:
-        """
-        returns all mononitors belonging to the store
-
-        Returns
-        -------
-        all monitors : tuple of monitors
-        """
-        return (
-            self.contents().length,
-            self.contents().length_of_stay,
-        )
-
-    def reset_monitors(self, monitor: bool = None, stats_only: bool = None) -> None:
-        """
-        resets the store monitors
-
-        Parameters
-        ----------
-        monitor : bool
-            if True, monitoring will be on. |n|
-            if False, monitoring is disabled |n|
-            if omitted, no change of monitoring state
-
-        stats_only : bool
-            if True, only statistics will be collected (using less memory, but also less functionality) |n|
-            if False, full functionality |n|
-            if omittted, no change of stats_only
-        """
-
-        self.contents().reset_monitors(monitor=monitor, stats_only=stats_only)
-
-    def print_statistics(self, as_str: bool = False, file: TextIO = None) -> str:
-        """
-        prints a summary of statistics of a store
-
-        Parameters
-        ----------
-        as_str: bool
-            if False (default), print the statistics
-            if True, return a string containing the statistics
-
-        file: file
-            if None(default), all output is directed to stdout |n|
-            otherwise, the output is directed to the file
-
-        Returns
-        -------
-        statistics (if as_str is True) : str
-        """
-        result = []
-        result.append(f"Statistics of {self.name()} at {(self.env._now - self.env._offset):13.3f}")
-        show_legend = True
-        for q in [self.contents()]:
-            result.append(
-                q.length.print_statistics(
-                    show_header=False,
-                    show_legend=show_legend,
-                    do_indent=True,
-                    as_str=True,
-                )
-            )
-            show_legend = False
-            result.append("")
-            result.append(
-                q.length_of_stay.print_statistics(
-                    show_header=False,
-                    show_legend=show_legend,
-                    do_indent=True,
-                    as_str=True,
-                )
-            )
-            result.append("")
-        return return_or_print(result, as_str, file)
-
-    def print_histograms(self, as_str: bool = False, file: TextIO = None, graph_scale: float = None) -> str:
-        """
-        prints histograms of the contents queue as well
-
-        Parameters
-        ----------
-        as_str: bool
-            if False (default), print the histograms
-            if True, return a string containing the histograms
-
-        file: file
-            if None(default), all output is directed to stdout |n|
-            otherwise, the output is directed to the file
-
-        graph_scale : float
-            Scale in the graphical representation of the % and cum% (default=80)
-
-        Returns
-        -------
-        histograms (if as_str is True) : str
-        """
-        result = []
-        for q in [self.contents()]:
-            result.append(q.print_histograms(as_str=True, graph_scale=graph_scale))
-        return return_or_print(result, as_str, file)
-
-    def monitor(self, value: bool) -> None:
-        """
-        enables/disables the store monitors
-
-        Parameters
-        ----------
-        value : bool
-            if True, monitoring is enabled |n|
-            if False, monitoring is disabled |n|
-        """
-        self.contents().monitor(value)
-
-    def register(self, registry: List) -> "Store":
-        """
-        registers the store in the registry
-
-        Parameters
-        ----------
-        registry : list
-            list of (to be) registered objects
-
-        Returns
-        -------
-        store (self) : Store
-
-        Note
-        ----
-        Use Store.deregister if store does no longer need to be registered.
-        """
-        if not isinstance(registry, list):
-            raise TypeError("registry not list")
-        if self in registry:
-            raise ValueError(self.name() + " already in registry")
-        registry.append(self)
-        return self
-
-    def deregister(self, registry: List) -> "Store":
-        """
-        deregisters the store in the registry
-
-        Parameters
-        ----------
-        store : list
-            list of registered components
-
-        Returns
-        -------
-        store (self) : Store
-        """
-        if not isinstance(registry, list):
-            raise TypeError("registry not list")
-        if self not in registry:
-            raise ValueError(self.name() + " not in registry")
-        registry.remove(self)
-        return self
-
-    def __repr__(self):
-        return object_to_str(self) + " (" + self.name() + ")"
-
-    def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
-        """
-        prints info about the store
-
-        Parameters
-        ----------
-        as_str: bool
-            if False (default), print the info
-            if True, return a string containing the info
-
-        file: file
-            if None(default), all output is directed to stdout |n|
-            otherwise, the output is directed to the file
-
-        Returns
-        -------
-        info (if as_str is True) : str
-        """
-        result = []
-        result.append(object_to_str(self) + " " + hex(id(self)))
-        result.append("  name=" + self.name())
-        result.append("  capacity=" + str(self._capacity))
-        if self._contents:
-            result.append("  contents:")
-            mx = self._contents._head.successor
-            while mx != self._contents._tail:
-                c = mx.component
-                mx = mx.successor
-                result.append("    " + pad(c.name(), 20))
-        else:
-            result.append("  no components in contents")
-        return return_or_print(result, as_str, file)
-
-    def capacity(self, cap: float = None) -> float:
+    def set_capacity(self, cap: float) -> None:
         """
         Parameters
         ----------
         cap : float or int
             capacity of the store |n|
-            this may lead to from_store claimers being honoured
-            if omitted, no change
 
-        Returns
-        -------
-        capacity : float
+        Note
+        ----
+        Might cause (to_store requests to be honoured)
         """
-        if cap is not None:
-            self._capacity = cap
-            self._try_from_store()
-        return self._capacity
-
-    def contents(self) -> "Queue":
-        """
-        get contents queue
-
-        Returns
-        -------
-        contents queue : Queue
-        """
-        return self._contents
+        old_cap = self.capacity()
+        super().set_capacity(cap=cap)
+        if cap >= old_cap:
+            self._rescan_to()
 
     def from_store_requesters(self) -> "Queue":
         """
@@ -5403,64 +5339,36 @@ class Store:
         """
         return self._from_store_requesters
 
-    def remove_item(self, item: "Component"):
-        """
-        Removes an item (component) from a store
-
-        Parameters
-        ----------
-        item : Component
-            component to remove from store
-
-        Note
-        ----
-        A ValueError is raised if the item is not in this store
-        """
-        if item in self._contents:
-            item.leave(self._contents)
-            self._try_to_store()
-        else:
-            raise ValueError(f"{item._name} does not belong to {self._name}")
-
     def rescan(self):
         """
-        Rescan for any components to be allowed in or out.
+        Rescan for any components to be allowed from.
         """
-        self._try_from_store()
-        self._try_to_store()
-
-    def _try_from_store(self):
-        any_change = False
         for c in self._from_store_requesters:
-            if self._contents:
-                for item in self._contents:
-                    if c._from_store_filter(item):
-                        any_change = True
-                        for store in c._from_stores:
-                            c.leave(store._from_store_requesters)
-                        with self.env.suppress_trace():
-                            item = self._contents.pop(0)
-                        c._from_stores = []
-                        c._from_store_item = item
-                        c._from_store_store = self
-                        c._remove()
-                        c.status._value = scheduled
-                        c._reschedule(c.env._now, 0, False, f"from_store ({self.name()}) honor with {item.name()}", False, s0=c.env.last_s0)
-                        break
-            else:
-                break
-        if any_change:
-            self._try_to_store()
+            for item in list(self):
+                if c._from_store_filter(item):
+                    for store in c._from_stores:
+                        c.leave(store._from_store_requesters)
+                    with self.env.suppress_trace():
+                        item = self.pop(0)
+                    c._from_stores = []
+                    c._from_store_item = item
+                    c._from_store_store = self
+                    c._remove()
+                    c.status._value = scheduled
+                    c._reschedule(c.env._now, 0, False, f"from_store ({self.name()}) honor with {item.name()}", False, s0=c.env.last_s0, return_value=item)
 
-    def _try_to_store(self):
-        any_change = False
+        
+
+    def _rescan_to(self):
+        """
+        Rescan for any components to be allowed to.
+        """
         for c in self._to_store_requesters:
-            if len(self._contents) < self._capacity:
-                any_change = True
+            if self.available_quantity() > 0:
                 for store in c._to_stores:
                     c.leave(store._to_store_requesters)
                 with self.env.suppress_trace():
-                    c._to_store_item.enter_sorted(self._contents, c._to_store_priority)
+                    c._to_store_item.enter_sorted(self, c._to_store_priority)
                 c._to_stores = []
                 c._remove()
                 c.status._value = scheduled
@@ -5469,52 +5377,6 @@ class Store:
                 c._to_store_store = self
             else:
                 break
-        if any_change:
-            self._try_from_store()
-
-    def name(self, value: str = None) -> str:
-        """
-        Parameters
-        ----------
-        value : str
-            new name of the store
-            if omitted, no change
-
-        Returns
-        -------
-        Name of the store : str
-
-        Note
-        ----
-        base_name and sequence_number are not affected if the name is changed |n|
-        All derived named are updated as well.
-        """
-        if value is not None:
-            self._name = value
-            self._contents.name(f"{value}.contents")
-            self._to_store_requesters.name(f"{value}.to_store_requesters")
-            self._from_store_requesters.name(f"{value}.from_store_requesters")
-        return self._name
-
-    def base_name(self) -> str:
-        """
-        Returns
-        -------
-        base name of the store (the name used at initialization): str
-        """
-        return self._base_name
-
-    def sequence_number(self) -> int:
-        """
-        Returns
-        -------
-        sequence_number of the store : int
-            (the sequence number at initialization) |n|
-            normally this will be the integer value of a serialized name,
-            but also non serialized names (without a dot or a comma at the end)
-            will be numbered)
-        """
-        return self._sequence_number
 
 
 class Animate3dBase(DynamicClass):
@@ -7342,7 +7204,7 @@ class Environment:
                 self._standbylist = []
 
             if self._event_list:
-                (t, priority, seq, c) = heapq.heappop(self._event_list)
+                (t, priority, seq, c, return_value) = heapq.heappop(self._event_list)
             else:
                 c = self._main
                 if self.end_on_empty_eventlist:
@@ -7378,7 +7240,11 @@ class Environment:
             c._check_fail()
             if c._process_isgenerator:
                 try:
-                    next(c._process)
+                    try:
+                        c._process.send(return_value)
+                    except TypeError:
+                        c._process.send(None)
+
                 except StopIteration:
                     self._terminate(c)
             else:
@@ -7408,14 +7274,17 @@ class Environment:
         if self._trace:
             self.print_trace("", "", c.name() + " ended", s0=s0)
         c.remove_animation_children()
+        c._from_store_item = None  # to avoid memory leak
+        c._to_store_item = None  # to avoid memory leak
+
         c.status._value = data
         c._scheduled_time = inf
         c._process = None
 
-    def _print_event_list(self, s: str) -> None:
+    def _print_event_list(self, s: str="") -> None:
         print("eventlist ", s)
-        for t, priority, sequence, comp in self._event_list:
-            print("    ", self.time_to_str(t), comp.name(), "priority", priority)
+        for t, priority, sequence, comp, return_value in self._event_list:
+            print("    ", self.time_to_str(t), comp.name(), "priority", priority, "return_value",return_value)
 
     def on_closing(self):
         self.an_quit()
@@ -7776,7 +7645,7 @@ class Environment:
                     if not os.path.isfile(audio_filename):
                         raise FileNotFoundError(audio_filename)
                     if Pythonista:
-                        import sound # type: ignore
+                        import sound  # type: ignore
 
                         class Play:
                             def __init__(self, s, repeat=-1):
@@ -8015,7 +7884,7 @@ class Environment:
                     if self._video_pingpong:
                         self._images.extend(self._images[::-1])
                     if Pythonista:
-                        import images2gif # type: ignore
+                        import images2gif  # type: ignore
 
                         images2gif.writeGif(
                             self._video_name,
@@ -10915,7 +10784,7 @@ class Environment:
 
         elif Pythonista:
             try:
-                import sound # type: ignore
+                import sound  # type: ignore
 
                 sound.stop_all_effects()
                 sound.play_effect("game:Beep", pitch=0.3)
@@ -15689,14 +15558,14 @@ class Component:
                 result.append("    " + pad(s.name(), 20) + " value=" + str(value))
         return return_or_print(result, as_str, file)
 
-    def _push(self, t, priority, urgent):
+    def _push(self, t, priority, urgent,return_value=None):
         self.env._seq += 1
         if urgent:
             seq = -self.env._seq
         else:
             seq = self.env._seq
         self._on_event_list = True
-        heapq.heappush(self.env._event_list, (t, priority, seq, self))
+        heapq.heappush(self.env._event_list, (t, priority, seq, self,return_value))
 
     def _remove(self):
         if self._on_event_list:
@@ -15750,7 +15619,7 @@ class Component:
             self._to_stores = []
             self._failed = True
 
-    def _reschedule(self, scheduled_time, priority, urgent, caller, cap_now, extra="", s0=None):
+    def _reschedule(self, scheduled_time, priority, urgent, caller, cap_now, extra="", s0=None, return_value=None):
         if scheduled_time < self.env._now:
             if cap_now is None:
                 cap_now = _default_cap_now
@@ -15760,7 +15629,7 @@ class Component:
                 raise ValueError(f"scheduled time ({scheduled_time:0.3f}) before now ({self.env._now:0.3f})")
         self._scheduled_time = scheduled_time
         if scheduled_time != inf:
-            self._push(scheduled_time, priority, urgent)
+            self._push(scheduled_time, priority, urgent, return_value)
         if self.env._trace:
             if extra == "*":
                 scheduled_time_str = "ends on no events left  "
@@ -16321,14 +16190,14 @@ class Component:
 
         The parameter failed will be reset by a calling request, wait, from_store or to_store
         """
-        try:
-            self._from_stores = list(store)
-            if len(self._from_stores) == 0:
+        if isinstance(store, Store):
+            from_stores = [store]
+        else:
+            from_stores = list(store)
+            if len(set(from_stores)) != len(from_stores):
+                raise ValueError("one or more stores specified more than once")
+            if len(from_stores) == 0:
                 raise ValueError("no stores specified")
-
-        except TypeError:
-            self._from_stores = [store]
-
 
         if self.status.value != current:
             self._checkisnotdata()
@@ -16359,20 +16228,25 @@ class Component:
         self._failed = False
 
         if self.env._trace:
-            self.env.print_trace("", "", self.name(), f"from_store ({', '.join(store._name for store in self._from_stores)})")
-
-        for store in self._from_stores:
+            self.env.print_trace("", "", self.name(), f"from_store ({', '.join(store._name for store in from_stores)})")
+        for store in from_stores:
+            for c in store:
+                if filter(c):
+                    c = store.pop()
+                    self._from_store_item = c
+                    self._from_store_store = store
+                    self._remove()
+                    self.status._value = scheduled
+                    self._reschedule(self.env._now, 0, False, f"from_store ({self.name()}) honor with {c.name()}", False, s0=self.env.last_s0, return_value=c)
+                    return
+        self._from_stores = from_stores
+        for store in from_stores:
             self.enter(store._from_store_requesters)
         self.status._value = requesting
         self._from_store_item = None
         self._from_store_filter = filter
 
-        for store in self._from_stores:
-            store._try_from_store()
-            if self._from_store_item:
-                break
-        if not self._from_store_item:
-            self._reschedule(scheduled_time, fail_priority, urgent, "request from_store", cap_now)
+        self._reschedule(scheduled_time, fail_priority, urgent, "request from_store", cap_now)
 
     def to_store(
         self,
@@ -16447,13 +16321,14 @@ class Component:
 
         The parameter failed will be reset by a calling request, wait, from_store, to_store
         """
-        try:
-            self._to_stores = list(store)
-            if len(self._to_stores) == 0:
+        if isinstance(store, Store):
+            to_stores = [store]
+        else:
+            to_stores = list(store)
+            if len(set(to_stores)) != len(to_stores):
+                raise ValueError("one or more stores specified more than once")
+            if len(to_stores) == 0:
                 raise ValueError("no stores specified")
-
-        except TypeError:
-            self._to_stores = [store]
 
         if self.status.value != current:
             self._checkisnotdata()
@@ -16485,18 +16360,25 @@ class Component:
 
         if self.env._trace:
             self.env.print_trace("", "", self.name(), f"{item._name} to_store ({', '.join(store._name for store in self._to_stores)})")
+        q = store
+        for store in to_stores:
+            available_quantity = q.capacity._tally - q._length
+            if available_quantity > 0:
+                item.enter_sorted(q, priority)
+                self._to_store_item = None
+                self._to_store_store = store
+                self._remove()
+                self.status._value = scheduled
+                self._reschedule(self.env._now, 0, False, f"to_store ({self.name()}) honor with {item.name()}", False, s0=self.env.last_s0)
+                return
 
-        for store in self._to_stores:
+        for store in to_stores:
             self.enter(store._to_store_requesters)
 
         self.status._value = requesting
         self._to_store_item = item
         self._to_store_priority = priority
-
-        for store in self._to_stores:
-            store._try_to_store()
-            if not self._to_store_item:
-                break
+        self._to_stores = to_stores
 
         if self._to_store_item:
             self._reschedule(scheduled_time, fail_priority, urgent, "request to_store", cap_now)
@@ -16512,13 +16394,11 @@ class Component:
 
         Note
         ----
-        After applying the new filter, items (components) may leave or enter the store 
+        After applying the new filter, items (components) may leave or enter the store
         """
-        self.filter = value()
+        self._from_store_filter = value
         for store in self._from_stores:
-            store._try_from_store()
-            if self._from_store_item:
-                break
+            store.rescan()
 
     def request(self, *args, **kwargs) -> None:
         """
@@ -17613,13 +17493,16 @@ class Component:
         ----
         The component is placed just before the first component with a priority > given priority
         """
-
         self._checknotinqueue(q)
-        m2 = q._head.successor
-        while (m2 != q._tail) and (m2.priority <= priority):
-            m2 = m2.successor
+        if q._length >=1 and priority < q._head.successor.priority: # direct enter component that's smaller than the rest
+            m2 = q._head.successor
+        else:          
+            m2 = q._tail
+            while (m2.predecessor != q._head) and (m2.predecessor.priority > priority):
+                m2 = m2.predecessor
         Qmember().insert_in_front_of(m2, self, q, priority)
         return self
+
 
     def leave(self, q: "Queue" = None) -> "Component":
         """
@@ -17657,6 +17540,23 @@ class Component:
         q.length.tally(q._length)
         q.available_quantity.tally(q.capacity._tally - q._length)
         q.number_of_departures += 1
+
+        if isinstance(q, Store):
+            store = q
+            available_quantity = q.capacity._tally - q._length
+            if available_quantity > 0:
+                if store._to_store_requesters:
+                    requester = store._to_store_requesters[0]
+                    for requester0 in store._to_store_requesters:
+                        requester0.leave(store._to_store_requesters)
+                    with self.env.suppress_trace():
+                        requester._to_store_item.enter_sorted(q, requester._to_store_priority)
+                    requester._to_stores = []
+                    requester._remove()
+                    requester.status._value = scheduled
+                    requester._reschedule(requester.env._now, 0, False, f"to_store ({self.name()}) honor ", False, s0=requester.env.last_s0)
+                    requester._to_store_item = None
+                    requester._to_store_store = self
         return self
 
     def priority(self, q: "Queue", priority: float = None) -> float:
@@ -17777,7 +17677,7 @@ class Component:
         ----
         The method has to traverse the event list, so performance may be an issue.
         """
-        for t, priority, seq, component in self.env._event_list:
+        for t, priority, seq, component, return_value in self.env._event_list:
             if component is self:
                 return priority
         return None
@@ -18078,6 +17978,11 @@ class ComponentGenerator(Component):
         If False (default), the component generator will be paused when stepping |n|
         Can be queried or set later with the suppress_pause_at_step method.
 
+    equidistant : bool
+        spread the arrival moments evenly over the defined duration |n|
+        in this case, iat may not be specified and number=1 is not allowed. |n|
+        force_at and force_till are ignored.
+
     env : Environment
         environment where the component is defined |n|
         if omitted, default_env will be used
@@ -18103,6 +18008,7 @@ class ComponentGenerator(Component):
         suppress_trace: bool = False,
         suppress_pause_at_step: bool = False,
         disturbance: Callable = None,
+        equidistant: bool = False,
         env: "Environment" = None,
         **kwargs,
     ):
@@ -18125,10 +18031,10 @@ class ComponentGenerator(Component):
         self.force_at = force_at
 
         if disturbance:  # falsy values are interpreted as no disturbance
-            if iat is None:
+            if iat is None and not equidistant:
                 raise ValueError("disturbance can only be used with an iat")
             if not issubclass(component_class, Component):
-                raise ValueError("component_class haas to be a Component subclass if disturbance is specified.")
+                raise ValueError("component_class has to be a Component subclass if disturbance is specified.")
         if callable(at):
             at = at()
         if callable(delay):
@@ -18164,7 +18070,7 @@ class ComponentGenerator(Component):
             at = None
             process = ""
         else:
-            if self.iat is None:
+            if self.iat is None and not equidistant:
                 if till == inf or self.number == inf:
                     raise ValueError("iat not specified --> till and number need to be specified")
                 if disturbance is not None:
@@ -18186,6 +18092,22 @@ class ComponentGenerator(Component):
                 at = 0  # self.intervals.pop(0)
                 process = "do_spread"
             else:
+                if equidistant:
+                    force_till = False  # just to prevent errors further on
+                    force_at = True  # just to prevent errors further on
+                    duration = self.till - at
+                    if duration < 0:
+                        raise ValueError("at > till not allowed for equidistant")
+                    if duration == inf:
+                        raise ValueError("infinite duration not allowed for equidistant")
+                    if self.number == 1:
+                        raise ValueError("number=1 not allowed for equidistant")
+                    if self.iat is not None:
+                        raise ValueError("iat not allowed for equidistant")
+
+                    self.iat = duration / (self.number - 1)
+                    self.till = inf  # let numbers do the end
+
                 if force_till:
                     raise ValueError("force_till is not allowed for iat generators")
                 if not force_at:
@@ -21923,7 +21845,7 @@ def audio_duration(filename: str) -> float:
     Only supported on Windows and Pythonista. On other platform returns 0
     """
     if Pythonista:
-        import sound # type: ignore
+        import sound  # type: ignore
 
         return sound.Player(filename).duration
     audioclip = AudioClip(filename)
@@ -22191,7 +22113,7 @@ def spec_to_image(spec: ColorType) -> Tuple:
                     if Pythonista:
                         raise ImportError(".heic files not supported under Pythonista.")
                     try:
-                        from pillow_heif import register_heif_opener # type: ignore
+                        from pillow_heif import register_heif_opener  # type: ignore
                     except ImportError:
                         raise ImportError("pillow_heif is required for reading .heic files. Install with pip install pillow_heif")
                     register_heif_opener()
@@ -22614,7 +22536,7 @@ def _get_caller_frame():
     filename0 = inspect.getframeinfo(stack[0][0]).filename
     for i in range(len(inspect.stack())):
         frame = stack[i][0]
-        if filename0 != inspect.getframeinfo(frame).filename:
+        if not inspect.getframeinfo(frame).filename in (filename0, "<string>"):
             break
     return frame
 
@@ -24743,7 +24665,7 @@ def can_animate(try_only: bool = True) -> bool:
 
         except ImportError:
             try:
-                import Tkinter as tkinter # type: ignore
+                import Tkinter as tkinter  # type: ignore
 
             except ImportError:
                 if try_only:
@@ -24970,20 +24892,22 @@ def reset() -> None:
     g.tkinter_loaded = "?"
     random_seed()  # always start with seed 1234567
 
+
 def set_environment_aliases():
     cwd_parts = Path.cwd().parts
-    if len(cwd_parts) >= 2 and cwd_parts[-2]=='salabim' and cwd_parts[-1]=='manual':
+    if len(cwd_parts) >= 2 and cwd_parts[-2] == "salabim" and cwd_parts[-1] == "manual":
         return  # do not set when using Sphinx build!
 
     for name, obj in list(globals().items()):
-        if not name.startswith('_'):
+        if not name.startswith("_"):
             if inspect.isclass(obj) and obj.__module__ == Environment.__module__:
 
-                if issubclass(obj,Exception):
+                if issubclass(obj, Exception):
                     exec(f"Environment.{name}={name}")
                 else:
-                    if 'env' in inspect.signature(obj).parameters:
-                        exec(f'''\
+                    if "env" in inspect.signature(obj).parameters:
+                        exec(
+                            f"""\
 def local_{name}(self, *args, **kwargs):
     if 'env' in kwargs or self == g.default_env:
         return {name}(*args, **kwargs)
@@ -24991,14 +24915,16 @@ def local_{name}(self, *args, **kwargs):
         kwargs['env']=self
         return {name}(*args, **kwargs)
 Environment.{name} = local_{name}
-Environment.{name}.__doc__ = {name}.__doc__''')
-                    else:                
-                        exec(f'Environment.{name}={name}')                                           
-                
+Environment.{name}.__doc__ = {name}.__doc__"""
+                        )
+                    else:
+                        exec(f"Environment.{name}={name}")
+
             if inspect.isfunction(obj):
-                exec(f'Environment.{name}=staticmethod({name})')
+                exec(f"Environment.{name}=staticmethod({name})")
     Environment.inf = inf
-    Environment.nan = nan   
+    Environment.nan = nan
+
 
 reset()
 

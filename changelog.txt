@@ -1,5 +1,112 @@
 salabim changelog
 
+version 23.1.1  2023-03-14
+==========================
+New functionality (0)
+---------------------
+The t- and x-values of a monitor (level or non level) can now be saved as
+a pandas dataframe, which can be useful for further data analysis.
+
+All you have to do is:
+    df = mon.as_dataframe()
+
+When dealing with level monitors, this might not be very useful as 
+most analyses assume a uniform (equidistant) t-scale.
+Therefore, salabim also offers the possibility to resample the
+monitor into a dataframe, like
+    df = mon.as_resampled_dataframe(delta_t=1)
+Like this, the monitor will be resampled with a frequency of 1 time unit.
+The lower delta_t, the more accurately the dataframe follows the real values,
+albeit at the cost of a larger dataframe.
+
+It is possible to resample multiple monitors into one pandas dataframe.
+
+See the documentation (Monitor and Reference chapter) for details.
+
+Changed functionality (0)
+-------------------------
+Considerable change in the implementation and API of stores.
+
+From now a store doesn't have a contents queue: It *is* a queue!
+This has a lot of advantages. For instance, all normal queue operations
+are now also available for stores.
+
+And you can now enter components or take them out, possibly honouring
+any pending from_store or to_store.
+
+Note that if the capacity of the store is not inf, the store becomes a
+limited capacity queue. That implies that when a component tries to enter
+the queue when it is already at its capacity, a ``sim.QueueFullError`` will be raised.
+
+Changing the filter function will now automatically rescan for from_store
+honors.
+Changing the capacity of a store (with set_capacity will now automatically
+rescan for to_store honors), if required.
+
+It is still possible to rescan a store with Store.rescan().
+
+The manual has been updated to reflect the changes.
+
+Changed functionality (1)
+-------------------------
+The Component.from_store method now supports a very handy way to get the
+item (component).
+Instead of
+    yield self.from_store(store)
+    item = self.from_store_item()
+you can now say
+    item = yield self.from_store(store)
+
+Note that you have to do an assignment! So, something like
+    yield self.from_store(store).activate()
+or
+    print(yield self.from_store(store).name())
+is not possible (it is actually a syntax error)
+
+Even with the item = yield self.from_store(store) syntax, you can
+query the item with self.from_store_item()
+
+And it is still allowed to use just
+    yield self.from_store(store)
+
+The manual has been updated accordingly.
+
+New functionality (0)
+---------------------
+ComponentGenerator has a new parameter: equidistant.
+If equidistant is True, the components will not be randomly distributed over the
+given duration, but evenly spread. For instance:
+    env.ComponentGenerator(X, at=100, till=200, number=3, equidistant=True)
+, will generate instances of X at t=100, t=150 and t=200.
+
+If equidistant is True, iat may not be specified.
+
+Optimization (0)
+----------------
+The method Component.enter_sorted and Queue.add_sorted now search backwards instead of forward,
+which is more efficient in case all components have the same priority, which is not uncommon.
+
+Note (0)
+--------
+Version 23.1.0 introduced the possibility to use env. instead of sim. in almost all cases.
+As mentioned you can't use this construction when defining an inherited class, like
+    class Car(env.Component)
+This is simply not accepted.
+
+But there is one case, which is not detected and does not work as expected:
+
+    class Car(sim.Component)
+        def __init__(self, *args, **kwargs):
+            ...
+            env.Component.__init__(self,*args, **kwargs) # instead of sim.Component.__init__(self, *args, **kwargs)
+            
+The recommended way is:
+
+    class Car(sim.Component)
+        def __init__(self, *args, **kwargs):
+            ...
+            super().__init__(*args, **kwargs) # instead of sim.Component.__init__(self, *args, **kwargs)
+
 version 23.1.0  2023-03-06
 ==========================
 New functionality (0)
