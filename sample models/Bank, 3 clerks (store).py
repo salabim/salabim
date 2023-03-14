@@ -5,8 +5,8 @@ import salabim as sim
 class CustomerGenerator(sim.Component):
     def process(self):
         while True:
-            yield self.to_store(waiting_room, Customer())
-            yield self.hold(sim.Uniform(5, 15).sample())
+            Customer().enter(waiting_room)
+            yield self.hold(sim.Uniform(5, 15))
 
 
 class Clerk(sim.Component):
@@ -29,5 +29,5 @@ waiting_room = sim.Store("waiting_room")
 
 env.run(till=50000)
 
-waiting_room.contents().print_statistics()
-waiting_room.contents().print_info()
+waiting_room.print_statistics()
+waiting_room.print_info()

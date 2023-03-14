@@ -8,7 +8,7 @@ import salabim as sim
 env = sim.Environment(trace=False)
 env.animate(True)
 env.modelname("Demo animation classes")
-env.background_color("20%gray")
+env.background_color("90%gray")
 
 sim.AnimatePolygon(spec=(100, 100, 300, 100, 200, 190), text="This is\na polygon")
 sim.AnimateLine(spec=(100, 200, 300, 300), text="This is a line")

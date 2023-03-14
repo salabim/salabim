@@ -221,6 +221,6 @@ for side in (left, right):
 lock = Lock(name="lock")
 lock.side = left
 lock.sideq = left
-
+env.show_fps(True)
 do_animation()
 env.run()

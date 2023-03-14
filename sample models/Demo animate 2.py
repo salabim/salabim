@@ -6,7 +6,7 @@ class AnimateWaitSquare(sim.Animate):
     def __init__(self, i):
         self.i = i
         sim.Animate.__init__(
-            self, rectangle0=(-10, -10, 10, 10), x0=300 - 30 * i, y0=100, fillcolor0="red", linewidth0=0
+            self, rectangle0=(-12, -10, 12, 10), x0=300 - 30 * i, y0=100, fillcolor0="red", linewidth0=0
         )
 
     def visible(self, t):
@@ -28,7 +28,7 @@ class AnimateWaitText(sim.Animate):
 
 
 def do_animation():
-    env.animation_parameters()
+    env.animate(True)
     for i in range(10):
         AnimateWaitSquare(i)
         AnimateWaitText(i)

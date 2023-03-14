@@ -14,6 +14,7 @@ class Customer(sim.Component):
         if len(waitingline) >= 5:
             env.number_balked += 1
             env.print_trace("", "", "balked")
+            print(env.now(), "balked",self.name())            
             yield self.cancel()
         self.enter(waitingline)
         for clerk in clerks:
@@ -47,12 +48,8 @@ env.number_reneged = 0
 clerks = [Clerk() for _ in range(3)]
 
 waitingline = sim.Queue("waitingline")
-waitingline.length.monitor(False)
-env.run(duration=1500)  # first do a prerun of 1500 time units without collecting data
-waitingline.length.monitor(True)
-env.run(duration=1500)  # now do the actual data collection for 1500 time units
+env.run(duration=300000)
 waitingline.length.print_histogram(30, 0, 1)
-print()
 waitingline.length_of_stay.print_histogram(30, 0, 10)
 print("number reneged", env.number_reneged)
 print("number balked", env.number_balked)

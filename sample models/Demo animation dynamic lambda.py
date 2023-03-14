@@ -2,12 +2,10 @@ import salabim as sim
 
 """
 In this model cars arrive randomly and want to be washed by two washers
-
 The animation shows the queue of waiting card (the requesters of washers) on the left.
 for each car, the waiting time is shown as a bar.
 On the right are the cars being washed (the claimers of washers), with their total washing time
 as an outline and the time spent there.
-
 The animation rectangle object wait_anim of each car, has a dynamic y coordinate and a dynamic size,
 which are both implemented as lambda functions that get the car and the time t as parameters.
 Note that the fillcolor of wait_animmis changed from red into yellow just by an attribute assignment.
