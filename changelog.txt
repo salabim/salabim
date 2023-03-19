@@ -23,10 +23,10 @@ Improved type hint handling (0)
 The recently introduced functionality to use env. prefix where sim. prefix
 was required (like env.Component instead of sim.Component) did not show the
 type hints in IDEs. 
-From this version on type hints and the docstring will show these correctly.
+From this version type hints and the docstring will show these correctly.
 
 The consequence of this change is an increase in the size of the source code,
-but that shouldn't cause any problem.
+but that shouldn't cause any problems.
 
 Alternative way to initialize a simulation (0)
 ----------------------------------------------
@@ -43,8 +43,8 @@ sim.Environment. So ::
 
 is now valid code.
 
-Note that the env parameter in several class definition has not been changed, though. 
-This might not cause too much problems as env= is hardly ever used in practice
+Note that the env parameter in several class definitions has not been changed, though. 
+This might not cause too many problems as env= is hardly ever used in practice
 (as far as I know).
 
 Bug fix (0)
