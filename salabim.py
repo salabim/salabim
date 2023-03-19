@@ -1,13 +1,13 @@
-#               _         _      _               ____   _____     _     _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    / |   / |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \    | |   | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | | _ | |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|_|(_)|_|
+#               _         _      _               ____   _____     _     ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    / |   |___ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \    | |     __) |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | | _  / __/
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|_|(_)|_____|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "23.1.1"
+__version__ = "23.1.2"
 
 import heapq
 import random
@@ -3915,10 +3915,10 @@ class Qmember:
                     requester._from_store_store = store
                     requester._remove()
                     requester.status._value = scheduled
-                    requester._reschedule(requester.env._now, 0, False, f"from_store ({store.name()}) honor with {c.name()}", False, s0=requester.env.last_s0, return_value=c)
+                    requester._reschedule(
+                        requester.env._now, 0, False, f"from_store ({store.name()}) honor with {c.name()}", False, s0=requester.env.last_s0, return_value=c
+                    )
                     break
-
-
 
 
 class Queue:
@@ -5357,8 +5357,6 @@ class Store(Queue):
                     c.status._value = scheduled
                     c._reschedule(c.env._now, 0, False, f"from_store ({self.name()}) honor with {item.name()}", False, s0=c.env.last_s0, return_value=item)
 
-        
-
     def _rescan_to(self):
         """
         Rescan for any components to be allowed to.
@@ -5732,7 +5730,10 @@ class TrajectoryMerged(_Trajectory):
             length of traversed trajectory at time t or |n|
             total length if t omitted
         """
-        i = self.index(t)
+        if t is None:
+            i = len(self._trajectories) - 1
+        else:
+            i = self.index(t)
         trajectory = self._trajectories[i]
         t0 = self._t0s[i]
         return trajectory.length(t=t, _t0=t0) + self.cum_lengths[i]
@@ -6579,9 +6580,6 @@ class Environment:
     random_seed="*".
     """
 
-    _nameserialize = {}
-    cached_modelname_width = [None, None]
-
     def __init__(
         self,
         trace: bool = False,
@@ -6731,6 +6729,4184 @@ class Environment:
         self.an_clocktext()
 
         self.setup(*args, **kwargs)
+
+    # ENVIRONMENT ANNOTATION START
+    class g:
+        ...
+
+    class QueueFullError(Exception):
+        pass
+
+    class SimulationStopped(Exception):
+        pass
+
+    class ItemFile:
+        ...
+
+    class Monitor:
+        """
+        Monitor object
+
+        Parameters
+        ----------
+        name : str
+            name of the monitor |n|
+            if the name ends with a period (.),
+            auto serializing will be applied |n|
+            if the name end with a comma,
+            auto serializing starting at 1 will be applied |n|
+            if omitted, the name will be derived from the class
+            it is defined in (lowercased)
+
+        monitor : bool
+            if True (default), monitoring will be on. |n|
+            if False, monitoring is disabled |n|
+            it is possible to control monitoring later,
+            with the monitor method
+
+        level : bool
+            if False (default), individual values are tallied, optionally with weight |n|
+            if True, the tallied vslues are interpreted as levels
+
+        initial_tally : any, preferably int, float or translatable into int or float
+            initial value for the a level monitor |n|
+            it is important to set the value correctly.
+            default: 0 |n|
+            not available for non level monitors
+
+        type : str
+            specifies how tallied values are to be stored
+                - "any" (default) stores values in a list. This allows
+                   non numeric values. In calculations the values are
+                   forced to a numeric value (0 if not possible)
+                - "bool" (True, False) Actually integer >= 0 <= 255 1 byte
+                - "int8" integer >= -128 <= 127 1 byte
+                - "uint8" integer >= 0 <= 255 1 byte
+                - "int16" integer >= -32768 <= 32767 2 bytes
+                - "uint16" integer >= 0 <= 65535 2 bytes
+                - "int32" integer >= -2147483648<= 2147483647 4 bytes
+                - "uint32" integer >= 0 <= 4294967295 4 bytes
+                - "int64" integer >= -9223372036854775808 <= 9223372036854775807 8 bytes
+                - "uint64" integer >= 0 <= 18446744073709551615 8 bytes
+                - "float" float 8 bytes
+
+        weight_legend : str
+            used in print_statistics and print_histogram to indicate the dimension of weight or duration (for
+            level monitors, e.g. minutes. Default: weight for non level monitors, duration for level monitors.
+
+        stats_only : bool
+            if True, only statistics will be collected (using less memory, but also less functionality) |n|
+            if False (default), full functionality |n|
+
+        fill : list or tuple
+            can be used to fill the tallied values (all at time now). |n|
+            fill is only available for non level and not stats_only monitors. |n|
+
+        env : Environment
+            environment where the monitor is defined |n|
+            if omitted, default_env will be used
+        """
+
+        def __init__(
+            self,
+            name: str = None,
+            monitor: bool = True,
+            level: bool = False,
+            initial_tally: Any = None,
+            type: str = None,
+            weight_legend: str = None,
+            fill: Iterable = None,
+            stats_only: bool = False,
+            env: "Environment" = None,
+            *args,
+            **kwargs,
+        ):
+            ...
+
+    class DynamicClass:
+        def __init__(self):
+            ...
+
+    class AnimateMonitor(DynamicClass):
+        """
+        animates a monitor in a panel
+
+        Parameters
+        ----------
+        monitor : Monitor
+            monitor to be animated
+
+        linecolor : colorspec
+            color of the line or points (default foreground color)
+
+        linewidth : int
+            width of the line or points (default 1 for level, 3 for non level monitors)
+
+        fillcolor : colorspec
+            color of the panel (default transparent)
+
+        bordercolor : colorspec
+            color of the border (default foreground color)
+
+        borderlinewidth : int
+            width of the line around the panel (default 1)
+
+        nowcolor : colorspec
+            color of the line indicating now (default red)
+
+        titlecolor : colorspec
+            color of the title (default foreground color)
+
+        titlefont : font
+            font of the title (default null string)
+
+        titlefontsize : int
+            size of the font of the title (default 15)
+
+        title : str
+            title to be shown above panel |n|
+            default: name of the monitor
+
+        x : int
+            x-coordinate of panel, relative to xy_anchor, default 0
+
+        y : int
+            y-coordinate of panel, relative to xy_anchor. default 0
+
+        offsetx : float
+            offsets the x-coordinate of the panel (default 0)
+
+        offsety : float
+            offsets the y-coordinate of the panel (default 0)
+
+        angle : float
+            rotation angle in degrees, default 0
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        vertical_offset : float
+            the vertical position of x within the panel is
+             vertical_offset + x * vertical_scale (default 0)
+
+        vertical_scale : float
+            the vertical position of x within the panel is
+            vertical_offset + x * vertical_scale (default 5)
+
+        horizontal_scale : float
+            the relative horizontal position of time t within the panel is on
+            t * horizontal_scale, possibly shifted (default 1)|n|
+
+        width : int
+            width of the panel (default 200)
+
+        height : int
+            height of the panel (default 75)
+
+        vertical_map : function
+            when a y-value has to be plotted it will be translated by this function |n|
+            default: float |n|
+            when the function results in a TypeError or ValueError, the value 0 is assumed |n|
+            when y-values are non numeric, it is advised to provide an approriate map function, like: |n|
+            vertical_map = "unknown red green blue yellow".split().index
+
+        labels : iterable or dict
+            if an iterable, these are the values of the labels to be shown |n|
+            if a dict, the keys are the values of the labels, the keys are the texts to be shown |n|
+            labels will be shown on the vertical axis (default: empty tuple) |n|
+            the placement of the labels is controlled by the vertical_map method
+
+        label_color : colorspec
+            color of labels (default: foreground color)
+
+        label_font : font
+            font of the labels (default null string)
+
+        label_fontsize : int
+            size of the font of the labels (default 15)
+
+        label_anchor : str
+            specifies where the label coordinates (as returned by map_value) are relative to |n|
+            possible values are (default: e): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        label_offsetx : float
+            offsets the x-coordinate of the label (default 0)
+
+        label_offsety : float
+            offsets the y-coordinate of the label (default 0)
+
+        label_linewidth : int
+            width of the label line (default 1)
+
+        label_linecolor : colorspec
+            color of the label lines (default foreground color)
+
+        layer : int
+            layer (default 0)
+
+        as_points : bool
+            allows to override the line/point setting, which is by default False for level
+            monitors and True for non level monitors
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        over3d : bool
+            if True, this object will be rendered to the OpenGL window |n|
+            if False (default), the normal 2D plane will be used.
+
+        visible : bool
+            visible |n|
+            if False, animation monitor is not shown, shown otherwise
+            (default True)
+
+        screen_coordinates : bool
+            use screen_coordinates |n|
+            if False,  the scale parameters are use for positioning and scaling
+            objects. |n|
+            if True (default), screen_coordinates will be used.
+
+        Note
+        ----
+        All measures are in screen coordinates |n|
+        """
+
+        def __init__(
+            self,
+            monitor: "Monitor",
+            linecolor: Union[ColorType, Callable] = "fg",
+            linewidth: Union[float, Callable] = None,
+            fillcolor: Union[Callable, ColorType] = "",
+            bordercolor: Union[ColorType, Callable] = "fg",
+            borderlinewidth: Union[float, Callable] = 1,
+            titlecolor: Union[ColorType, Callable] = "fg",
+            nowcolor: Union[ColorType, Callable] = "red",
+            titlefont: Union[str, Callable] = "",
+            titlefontsize: Union[float, Callable] = 15,
+            title: Union[str, Callable] = None,
+            x: Union[float, Callable] = 0,
+            y: Union[float, Callable] = 0,
+            offsetx: Union[float, Callable] = 0,
+            offsety: Union[float, Callable] = 0,
+            angle: Union[float, Callable] = 0,
+            vertical_offset: Union[float, Callable] = 0,
+            parent: "Component" = None,
+            vertical_scale: Union[float, Callable] = 5,
+            horizontal_scale: Union[float, Callable] = 1,
+            width: Union[float, Callable] = 200,
+            height: Union[float, Callable] = 75,
+            xy_anchor: Union[str, Callable] = "sw",
+            vertical_map: Callable = float,
+            labels: Union[Iterable, Dict] = (),
+            label_color: Union[ColorType, Callable] = "fg",
+            label_font: Union[str, Callable] = "",
+            label_fontsize: Union[float, Callable] = 15,
+            label_anchor: Union[str, Callable] = "e",
+            label_offsetx: Union[float, Callable] = 0,
+            label_offsety: Union[float, Callable] = 0,
+            label_linewidth: Union[float, Callable] = 1,
+            label_linecolor: ColorType = "fg",
+            as_points: bool = None,
+            over3d: bool = None,
+            layer: Union[float, Callable] = 0,
+            visible: Union[bool, Callable] = True,
+            keep: Union[bool, Callable] = True,
+            screen_coordinates: bool = True,
+            arg: Any = None,
+        ):
+            ...
+
+    class Qmember:
+        def __init__(self):
+            ...
+
+    class Queue:
+        """
+        Queue object
+
+        Parameters
+        ----------
+        fill : iterable, usually Queue, list or tuple
+            fill the queue with the components in fill |n|
+            if omitted, the queue will be empty at initialization
+
+        name : str
+            name of the queue |n|
+            if the name ends with a period (.),
+            auto serializing will be applied |n|
+            if the name end with a comma,
+            auto serializing starting at 1 will be applied |n|
+            if omitted, the name will be derived from the class
+            it is defined in (lowercased)
+
+        capacity : float
+            maximum number of components the queue can contain. |n|
+            if exceeded, a QueueFullError will be raised |n|
+            default: inf
+
+        monitor : bool
+            if True (default) , both length and length_of_stay are monitored |n|
+            if False, monitoring is disabled.
+
+        env : Environment
+            environment where the queue is defined |n|
+            if omitted, default_env will be used
+        """
+
+        def __init__(
+            self,
+            name: str = None,
+            monitor: Any = True,
+            fill: Iterable = None,
+            capacity: float = inf,
+            env: "Environment" = None,
+            *args,
+            **kwargs,
+        ) -> None:
+            ...
+
+    class Store(Queue):
+        def __init__(
+            self,
+            name: str = None,
+            capacity: int = inf,
+            env: "Environment" = None,
+            *args,
+            **kwargs,
+        ):
+            ...
+
+    class Animate3dBase(DynamicClass):
+        """
+        Base class for a 3D animation object |n|
+        When a class inherits from this base class, it will be added to the animation objects list to be shown
+
+        Parameters
+        ----------
+        visible : bool
+            visible |n|
+            if False, animation object is not shown, shown otherwise
+            (default True)
+
+        layer : int
+             layer value |n|
+             lower layer values are displayed later in the frame (default 0)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+        """
+
+        def __init__(
+            self,
+            visible: bool = True,
+            keep: bool = True,
+            arg: Any = None,
+            layer: float = 0,
+            parent: "Component" = None,
+            env: "Environment" = None,
+            **kwargs,
+        ) -> None:
+            ...
+
+    class _Trajectory:  # used by trajectories
+        ...
+
+    class TrajectoryMerged(_Trajectory):
+        """
+        merge trajectories
+
+        Parameters
+        ----------
+        trajectories : iterable (list, tuple, ...)
+            list trajectories to be merged
+
+        Returns
+        -------
+        merged trajectory : Trajectory
+
+        Notes
+        -----
+        It is arguably easier just to add or sum trajectories, like |n|
+
+            trajectory = trajectory1 + trajectory2 + trajectory3 or |n|
+            trajectory = sum((trajectory, trajectory2, trajectory3))
+        """
+
+        def __init__(self, trajectories) -> None:
+            ...
+
+    class TrajectoryStandstill(_Trajectory):
+        """
+        Standstill trajectory, to be used in Animatexxx through x, y and angle methods
+
+        Parameters
+        ----------
+        xy : tuple or list of 2 floats
+            initial (and final) position. should be like x, y
+
+        orientation : float or callable
+            orientation (angle) in degrees |n|
+            a one parameter callable is also accepted (and will be called with 0) |n|
+            default: 0
+
+        t0 : float
+            time the trajectory should start |n|
+            default: env.now() |n|
+            if not the first in a merged trajectory or AnimateQueue, ignored
+
+        env : Environment
+            environment where the trajectory is defined |n|
+            if omitted, default_env will be used
+        """
+
+        def __init__(
+            self,
+            xy: Iterable,
+            duration: float,
+            orientation: Union[Callable, float] = 0,
+            t0: float = None,
+            env: "Environment" = None,
+        ):
+            ...
+
+    class TrajectoryPolygon(_Trajectory):
+        """
+        Polygon trajectory, to be used in Animatexxx through x, y and angle methods
+
+        Parameters
+        ----------
+        polygon : iterable of floats
+            should be like x0, y0, x1, y1, ...
+
+        t0 : float
+            time the trajectory should start |n|
+            default: env.now() |n|
+            if not the first in a merged trajectory or AnimateQueue, ignored
+
+        vmax : float
+            maximum speed, i.e. position units per time unit |n|
+            default: 1
+
+        v0 : float
+            velocity at start |n|
+            default: vmax
+
+        v1 : float
+            velocity at end |n|
+            default: vmax
+
+        acc : float
+            acceleration rate (position units / time units ** 2) |n|
+            default: inf (i.e. no acceleration)
+
+        dec : float
+            deceleration rate (position units / time units ** 2) |n|
+            default: inf (i.e. no deceleration)
+
+        orientation : float
+            default: gives angle in the direction of the movement when calling angle(t) |n|
+            if a one parameter callable, the angle in the direction of the movement will be callled |n|
+            if a float, this orientation will always be returned as angle(t)
+
+        spline : None or string
+            if None (default) or '', polygon is used as such |n|
+            if 'bezier' (or any string starting with 'b' or 'B', Bézier splining is used |n|
+            if 'catmull_rom' (or any string starting with 'c' or 'C', Catmull-Rom splining is used
+
+        res : int
+            resolution of spline (ignored when no splining is applied)
+
+        env : Environment
+            environment where the trajectory is defined |n|
+            if omitted, default_env will be used
+
+        Notes
+        -----
+        bezier and catmull_rom splines require numpy to be installed.
+        """
+
+        def __init__(
+            self,
+            polygon: Iterable,
+            t0: float = None,
+            vmax: float = None,
+            v0: float = None,
+            v1: float = None,
+            acc: float = None,
+            dec: float = None,
+            orientation: Union[Callable, float] = None,
+            spline: str = None,
+            res: float = 50,
+            env: "Environment" = None,
+        ) -> None:
+            ...
+
+    class TrajectoryCircle(_Trajectory):
+        """
+        Circle (arc) trajectory, to be used in Animatexxx through x, y and angle methods
+
+        Parameters
+        ----------
+        radius : float
+            radius of the circle or arc
+
+        x_center : float
+            x-coordinate of the circle
+
+        y_center : float
+            y-coordinate of the circle
+
+        angle0 : float
+            start angle in degrees |n|
+            default: 0
+
+        angle1 : float
+            end angle in degrees |n|
+            default: 360
+
+        t0 : float
+            time the trajectory should start |n|
+            default: env.now() |n|
+            if not the first in a merged trajectory or AnimateQueue, ignored
+
+        vmax : float
+            maximum speed, i.e. position units per time unit |n|
+            default: 1
+
+        v0 : float
+            velocity at start |n|
+            default: vmax
+
+        v1 : float
+            velocity at end |n|
+            default: vmax
+
+        acc : float
+            acceleration rate (position units / time units ** 2) |n|
+            default: inf (i.e. no acceleration)
+
+        dec : float
+            deceleration rate (position units / time units ** 2) |n|
+            default: inf (i.e. no deceleration)
+
+        orientation : float
+            default: gives angle in the direction of the movement when calling angle(t) |n|
+            if a one parameter callable, the angle in the direction of the movement will be callled |n|
+            if a float, this orientation will always be returned as angle(t)
+
+        env : Environment
+            environment where the trajectory is defined |n|
+            if omitted, default_env will be used
+        """
+
+        def __init__(
+            self,
+            radius: float,
+            x_center: float = 0,
+            y_center: float = 0,
+            angle0: float = 0,
+            angle1: float = 360,
+            t0: float = None,
+            vmax: float = None,
+            v0: float = None,
+            v1: float = None,
+            acc: float = None,
+            dec: float = None,
+            orientation: Union[Callable, float] = None,
+            env: "Environment" = None,
+        ):
+            ...
+
+    class Environment:
+        """
+        environment object
+
+        Parameters
+        ----------
+        trace : bool or file handle
+            defines whether to trace or not |n|
+            if this a file handle (open for write), the trace output will be sent to this file. |n|
+            if omitted, False
+
+        random_seed : hashable object, usually int
+            the seed for random, equivalent to random.seed() |n|
+            if "*", a purely random value (based on the current time) will be used
+            (not reproducable) |n|
+            if the null string, no action on random is taken |n|
+            if None (the default), 1234567 will be used.
+
+        time_unit : str
+            Supported time_units: |n|
+            "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds", "n/a" |n|
+            default: "n/a"
+
+        datetime0: bool or datetime.datetime
+            display time and durations as datetime.datetime/datetime.timedelta |n|
+            if falsy (default), disabled |n|
+            if True, the t=0 will correspond to 1 January 1970 |n|
+            if no time_unit is specified, but datetime0 is not falsy, time_unit will be set to seconds
+
+        name : str
+            name of the environment |n|
+            if the name ends with a period (.),
+            auto serializing will be applied |n|
+            if the name end with a comma,
+            auto serializing starting at 1 will be applied |n|
+            if omitted, the name will be derived from the class (lowercased)
+            or "default environment" if isdefault_env is True.
+
+        print_trace_header : bool
+            if True (default) print a (two line) header line as a legend |n|
+            if False, do not print a header |n|
+            note that the header is only printed if trace=True
+
+        isdefault_env : bool
+            if True (default), this environment becomes the default environment |n|
+            if False, this environment will not be the default environment |n|
+            if omitted, this environment becomes the default environment |n|
+
+        set_numpy_random_seed : bool
+            if True (default), numpy.random.seed() will be called with the given seed. |n|
+            This is particularly useful when using External distributions. |n|
+            If numpy is not installed, this parameter is ignored |n|
+            if False, numpy.random.seed is not called.
+
+        do_reset : bool
+            if True, reset the simulation environment |n|
+            if False, do not reset the simulation environment |n|
+            if None (default), reset the simulation environment when run under Pythonista, otherwise no reset
+
+        blind_animation : bool
+            if False (default), animation will be performed as expected |n|
+            if True, animations will run silently. This is useful to make videos when tkinter is not installed (installable).
+            This is particularly useful when running a simulation on a server.
+            Note that this will show a slight performance increase, when creating videos.
+
+        Note
+        ----
+        The trace may be switched on/off later with trace |n|
+        The seed may be later set with random_seed() |n|
+        Initially, the random stream will be seeded with the value 1234567.
+        If required to be purely, not reproducable, values, use
+        random_seed="*".
+        """
+
+        def __init__(
+            self,
+            trace: bool = False,
+            random_seed: Hashable = None,
+            set_numpy_random_seed: bool = True,
+            time_unit: str = "n/a",
+            datetime0: Union[bool, datetime.datetime] = False,
+            name: str = None,
+            print_trace_header: bool = True,
+            isdefault_env: bool = True,
+            retina: bool = False,
+            do_reset: bool = None,
+            blind_animation: bool = False,
+            *args,
+            **kwargs,
+        ):
+            ...
+
+    class Animate2dBase(DynamicClass):
+        def __init__(self, type, locals_, argument_default, attached_to=None, attach_text=True):
+            ...
+
+    class AnimateClassic(Animate2dBase):
+        def __init__(self, master, locals_):
+            ...
+
+    class Animate:
+        ...
+
+    class AnimateEntry:
+        """
+        defines a button
+
+        Parameters
+        ----------
+        x : int
+            x-coordinate of centre of the button in screen coordinates (default 0)
+
+        y : int
+            y-coordinate of centre of the button in screen coordinates (default 0)
+
+        number_of_chars : int
+            number of characters displayed in the entry field (default 20)
+
+        fillcolor : colorspec
+            color of the entry background (default foreground_color)
+
+        color : colorspec
+            color of the text (default background_color)
+
+        value : str
+            initial value of the text of the entry (default null string) |n|
+
+        action :  function
+            action to take when the Enter-key is pressed |n|
+            the function should have no arguments |n|
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        All measures are in screen coordinates |n|
+        This class is not available under Pythonista.
+        """
+
+        def __init__(
+            self,
+            x: float = 0,
+            y: float = 0,
+            number_of_chars: int = 20,
+            value: str = "",
+            fillcolor: ColorType = "fg",
+            color: ColorType = "bg",
+            action: Callable = None,
+            env: "Environment" = None,
+            xy_anchor: str = "sw",
+        ):
+            ...
+
+    class AnimateButton:
+        """
+        defines a button
+
+        Parameters
+        ----------
+        x : int
+            x-coordinate of centre of the button in screen coordinates (default 0)
+
+        y : int
+            y-coordinate of centre of the button in screen coordinates (default 0)
+
+        width : int
+            width of button in screen coordinates (default 80)
+
+        height : int
+            height of button in screen coordinates (default 30)
+
+        linewidth : int
+            width of contour in screen coordinates (default 0=no contour)
+
+        fillcolor : colorspec
+            color of the interior (foreground_color)
+
+        linecolor : colorspec
+            color of contour (default foreground_color)
+
+        color : colorspec
+            color of the text (default background_color)
+
+        text : str or function
+            text of the button (default null string) |n|
+            if text is an argumentless function, this will be called each time;
+            the button is shown/updated
+
+        font : str
+            font of the text (default Helvetica)
+
+        fontsize : int
+            fontsize of the text (default 15)
+
+        action :  function
+            action to take when button is pressed |n|
+            executed when the button is pressed (default None)
+            the function should have no arguments |n|
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        All measures are in screen coordinates |n|
+        On Pythonista, this functionality is emulated by salabim
+        On other platforms, the tkinter functionality is used.
+        """
+
+        def __init__(
+            self,
+            x: float = 0,
+            y: float = 0,
+            width: int = 80,
+            fillcolor: ColorType = "fg",
+            color: ColorType = "bg",
+            text: str = "",
+            font: str = "",
+            fontsize: int = 15,
+            action: Callable = None,
+            env: "Environment" = None,
+            xy_anchor: str = "sw",
+        ):
+            ...
+
+    class AnimateSlider:
+        """
+        defines a slider
+
+        Parameters
+        ----------
+        x : int
+            x-coordinate of centre of the slider in screen coordinates (default 0)
+
+        y : int
+            y-coordinate of centre of the slider in screen coordinates (default 0)
+
+        vmin : float
+            minimum value of the slider (default 0)
+
+        vmax : float
+            maximum value of the slider (default 0)
+
+        v : float
+            initial value of the slider (default 0) |n|
+            should be between vmin and vmax
+
+        resolution : float
+            step size of value (default 1)
+
+        width : float
+            width of slider in screen coordinates (default 100)
+
+        height : float
+            height of slider in screen coordinates (default 20)
+
+        foreground_color : colorspec
+            color of the foreground (default "fg")
+
+        background_color : colorspec
+            color of the backgroundground (default "bg")
+
+        trough_color : colorspec
+            color of the trough (default "lightgrey")
+
+        show_value : boolean
+            if True (default), show values; if False don't show values
+
+        label : str
+            label if the slider (default null string) |n|
+
+        font : str
+             font of the text (default Helvetica)
+
+        fontsize : int
+             fontsize of the text (default 12)
+
+        action : function
+             function executed when the slider value is changed (default None) |n|
+             the function should have one argument, being the new value |n|
+             if None (default), no action
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        The current value of the slider is the v attibute of the slider. |n|
+        All measures are in screen coordinates |n|
+        On Pythonista, this functionality is emulated by salabim
+        On other platforms, the tkinter functionality is used.
+        """
+
+        def __init__(
+            self,
+            x: float = 0,
+            y: float = 0,
+            width: int = 100,
+            height: int = 20,
+            vmin: float = 0,
+            vmax: float = 10,
+            v: float = None,
+            resolution: float = 1,
+            background_color: ColorType = "bg",
+            foreground_color: ColorType = "fg",
+            trough_color: ColorType = "lightgray",
+            show_value: bool = True,
+            label: str = "",
+            font: str = "",
+            fontsize: str = 12,
+            action: Callable = None,
+            xy_anchor: str = "sw",
+            env: "Environment" = None,
+            linecolor: ColorType = None,  # only for backward compatibility
+            labelcolor: ColorType = None,  # only for backward compatibility
+            layer: float = None,  # only for backward compatibility
+        ):
+            ...
+
+    class AnimateQueue(DynamicClass):
+        """
+        Animates the component in a queue.
+
+        Parameters
+        ----------
+        queue : Queue
+            queue it concerns
+
+        x : float
+            x-position of the first component in the queue |n|
+            default: 50
+
+        y : float
+            y-position of the first component in the queue |n|
+            default: 50
+
+        direction : str
+            if "w", waiting line runs westwards (i.e. from right to left) |n|
+            if "n", waiting line runs northeards (i.e. from bottom to top) |n|
+            if "e", waiting line runs eastwards (i.e. from left to right) (default) |n|
+            if "s", waiting line runs southwards (i.e. from top to bottom)
+
+        trajectory : Trajectory
+            trajectory to be followed. Overrides any given directory
+
+        reverse : bool
+            if False (default), display in normal order. If True, reversed.
+
+        max_length : int
+            maximum number of components to be displayed
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        titlecolor : colorspec
+            color of the title (default foreground color)
+
+        titlefont : font
+            font of the title (default null string)
+
+        titlefontsize : int
+            size of the font of the title (default 15)
+
+        title : str
+            title to be shown above queue |n|
+            default: name of the queue
+
+        titleoffsetx : float
+            x-offset of the title relative to the start of the queue |n|
+            default: 25 if direction is w, -25 otherwise
+
+        titleoffsety : float
+            y-offset of the title relative to the start of the queue |n|
+            default: -25 if direction is s, -25 otherwise
+
+        id : any
+            the animation works by calling the animation_objects method of each component, optionally
+            with id. By default, this is self, but can be overriden, particularly with the queue
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        visible : bool
+            if False, nothing will be shown |n|
+            (default True)
+
+        keep : bool
+            if False, animation object will be taken from the animation objects. With show(), the animation can be reshown.
+            (default True)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        Note
+        ----
+        All measures are in screen coordinates |n|
+
+        All parameters, apart from queue, id, arg and parent can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: title |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+        """
+
+        def __init__(
+            self,
+            queue,
+            x=50,
+            y=50,
+            direction="w",
+            trajectory=None,
+            max_length=None,
+            xy_anchor="sw",
+            reverse=False,
+            title=None,
+            titlecolor="fg",
+            titlefontsize=15,
+            titlefont="",
+            titleoffsetx=None,
+            titleoffsety=None,
+            layer=0,
+            id=None,
+            arg=None,
+            parent=None,
+            over3d=None,
+            keep=True,
+            visible=True,
+        ):
+            ...
+
+    class Animate3dQueue(DynamicClass):
+        """
+        Animates the component in a queue.
+
+        Parameters
+        ----------
+        queue : Queue
+
+        x : float
+            x-position of the first component in the queue |n|
+            default: 0
+
+        y : float
+            y-position of the first component in the queue |n|
+            default: 0
+
+        z : float
+            z-position of the first component in the queue |n|
+            default: 0
+
+        direction : str
+            if "x+", waiting line runs in positive x direction (default) |n|
+            if "x-", waiting line runs in negative x direction |n|
+            if "y+", waiting line runs in positive y direction |n|
+            if "y-", waiting line runs in negative y direction |n|
+            if "z+", waiting line runs in positive z direction |n|
+            if "z-", waiting line runs in negative z direction |n|
+
+        reverse : bool
+            if False (default), display in normal order. If True, reversed.
+
+        max_length : int
+            maximum number of components to be displayed
+
+        layer : int
+            layer (default 0)
+
+        id : any
+            the animation works by calling the animation_objects method of each component, optionally
+            with id. By default, this is self, but can be overriden, particularly with the queue
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        visible : bool
+            if False, nothing will be shown |n|
+            (default True)
+
+        keep : bool
+            if False, animation object will be taken from the animation objects. With show(), the animation can be reshown.
+            (default True)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        Note
+        ----
+        All parameters, apart from queue, id, arg and parent can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: title |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+        """
+
+        def __init__(
+            self,
+            queue: "Queue",
+            x: Union[float, Callable] = 0,
+            y: Union[float, Callable] = 0,
+            z: Union[float, Callable] = 0,
+            direction: Union[str, Callable] = "x+",
+            max_length: Union[int, Callable] = None,
+            reverse: Union[bool, Callable] = False,
+            layer: Union[int, Callable] = 0,
+            id: Union[Any, Callable] = None,
+            arg: Any = None,
+            parent: "Component" = None,
+            visible: Union[bool, Callable] = True,
+            keep: Union[bool, Callable] = True,
+        ):
+            ...
+
+    class AnimateCombined:
+        ...
+
+    class AnimateText(Animate2dBase):
+        """
+        Displays a text
+
+        Parameters
+        ----------
+        text : str, tuple or list
+            the text to be displayed |n|
+            if text is str, the text may contain linefeeds, which are shown as individual lines
+            if text is tuple or list, each item is displayed on a separate line
+
+        x : float
+            position of anchor point (default 0)
+
+        y : float
+            position of anchor point (default 0)
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw) : |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se`` |n|
+            If null string, the given coordimates are used untranslated
+
+        offsetx : float
+            offsets the x-coordinate of the rectangle (default 0)
+
+        offsety : float
+            offsets the y-coordinate of the rectangle (default 0)
+
+        angle : float
+            angle of the text (in degrees) |n|
+            default: 0
+
+        max_lines : int
+            the maximum of lines of text to be displayed |n|
+            if positive, it refers to the first max_lines lines |n|
+            if negative, it refers to the last -max_lines lines |n|
+            if zero (default), all lines will be displayed
+
+        font : str or list/tuple
+            font to be used for texts |n|
+            Either a string or a list/tuple of fontnames.
+            If not found, uses calibri or arial
+
+        text_anchor : str
+            anchor position of text|n|
+            specifies where to texts relative to the rectangle
+            point |n|
+            possible values are (default: c): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        textcolor : colorspec
+            color of the text (default foreground_color)
+
+        fontsize : float
+            fontsize of text (default 15)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        screen_coordinates : bool
+            use screen_coordinates |n|
+            normally, the scale parameters are use for positioning and scaling
+            objects. |n|
+            if True, screen_coordinates will be used instead.
+
+        over3d : bool
+            if True, this object will be rendered to the OpenGL window |n|
+            if False (default), the normal 2D plane will be used.
+
+        Note
+        ----
+        All measures are in screen coordinates |n|
+
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: title |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+
+        """
+
+        def __init__(
+            self,
+            text: Union[str, Iterable[str], Callable] = None,
+            x: Union[float, Callable] = None,
+            y: Union[float, Callable] = None,
+            font: Union[str, Callable] = None,
+            fontsize: Union[float, Callable] = None,
+            textcolor: Union[ColorType, Callable] = None,
+            text_anchor: Union[str, Callable] = None,
+            angle: Union[float, Callable] = None,
+            xy_anchor: Union[str, Callable] = None,
+            layer: Union[float, Callable] = None,
+            max_lines: Union[int, Callable] = None,
+            offsetx: Union[float, Callable] = None,
+            offsety: Union[float, Callable] = None,
+            arg: Any = None,
+            visible: Union[bool, Callable] = None,
+            keep: Union[bool, Callable] = None,
+            parent: "Component" = None,
+            env: "Environment" = None,
+            screen_coordinates: bool = False,
+            over3d: bool = None,
+        ):
+            ...
+
+    class AnimateRectangle(Animate2dBase):
+        """
+        Displays a rectangle, optionally with a text
+
+        Parameters
+        ----------
+        spec : four item tuple or list
+            should specify xlowerleft, ylowerleft, xupperright, yupperright
+
+        x : float
+            position of anchor point (default 0)
+
+        y : float
+            position of anchor point (default 0)
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw) : |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se`` |n|
+            If null string, the given coordimates are used untranslated
+
+        offsetx : float
+            offsets the x-coordinate of the rectangle (default 0)
+
+        offsety : float
+            offsets the y-coordinate of the rectangle (default 0)
+
+        linewidth : float
+            linewidth of the contour |n|
+            default 1
+
+        fillcolor : colorspec
+            color of interior (default foreground_color) |n|
+            default transparent
+
+        linecolor : colorspec
+            color of the contour (default transparent)
+
+        angle : float
+            angle of the rectangle (in degrees) |n|
+            default: 0
+
+        as_points : bool
+             if False (default), the contour lines are drawn |n|
+             if True, only the corner points are shown
+
+        text : str, tuple or list
+            the text to be displayed |n|
+            if text is str, the text may contain linefeeds, which are shown as individual lines
+
+        max_lines : int
+            the maximum of lines of text to be displayed |n|
+            if positive, it refers to the first max_lines lines |n|
+            if negative, it refers to the last -max_lines lines |n|
+            if zero (default), all lines will be displayed
+
+        font : str or list/tuple
+            font to be used for texts |n|
+            Either a string or a list/tuple of fontnames.
+            If not found, uses calibri or arial
+
+        text_anchor : str
+            anchor position of text|n|
+            specifies where to texts relative to the rectangle
+            point |n|
+            possible values are (default: c): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        textcolor : colorspec
+            color of the text (default foreground_color)
+
+        text_offsetx : float
+            extra x offset to the text_anchor point
+
+        text_offsety : float
+            extra y offset to the text_anchor point
+
+        fontsize : float
+            fontsize of text (default 15)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        Note
+        ----
+        All measures are in screen coordinates |n|
+
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: title |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+        """
+
+        def __init__(
+            self,
+            spec: Union[Iterable, Callable] = None,
+            x: Union[float, Callable] = None,
+            y: Union[float, Callable] = None,
+            fillcolor: Union[ColorType, Callable] = None,
+            linecolor: Union[ColorType, Callable] = None,
+            linewidth: Union[float, Callable] = None,
+            text: Union[str, Callable] = None,
+            fontsize: Union[float, Callable] = None,
+            textcolor: Union[ColorType, Callable] = None,
+            font: Union[str, Callable] = None,
+            angle: Union[float, Callable] = None,
+            xy_anchor: Union[str, Callable] = None,
+            layer: Union[float, Callable] = None,
+            max_lines: Union[int, Callable] = None,
+            offsetx: Union[float, Callable] = None,
+            offsety: Union[float, Callable] = None,
+            as_points: Union[bool, Callable] = None,
+            text_anchor: Union[str, Callable] = None,
+            text_offsetx: Union[float, Callable] = None,
+            text_offsety: Union[float, Callable] = None,
+            arg: Any = None,
+            parent: "Component" = None,
+            visible: Union[bool, Callable] = None,
+            keep: Union[bool, Callable] = None,
+            env: "Environment" = None,
+            screen_coordinates: bool = False,
+            over3d: bool = None,
+        ):
+            ...
+
+    class AnimatePolygon(Animate2dBase):
+        """
+        Displays a polygon, optionally with a text
+
+        Parameters
+        ----------
+        spec : tuple or list
+            should specify x0, y0, x1, y1, ...
+
+        x : float
+            position of anchor point (default 0)
+
+        y : float
+            position of anchor point (default 0)
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw) : |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se`` |n|
+            If null string, the given coordimates are used untranslated
+
+        offsetx : float
+            offsets the x-coordinate of the polygon (default 0)
+
+        offsety : float
+            offsets the y-coordinate of the polygon (default 0)
+
+        linewidth : float
+            linewidth of the contour |n|
+            default 1
+
+        fillcolor : colorspec
+            color of interior (default foreground_color) |n|
+            default transparent
+
+        linecolor : colorspec
+            color of the contour (default transparent)
+
+        angle : float
+            angle of the polygon (in degrees) |n|
+            default: 0
+
+        as_points : bool
+             if False (default), the contour lines are drawn |n|
+             if True, only the corner points are shown
+
+        text : str, tuple or list
+            the text to be displayed |n|
+            if text is str, the text may contain linefeeds, which are shown as individual lines
+
+        max_lines : int
+            the maximum of lines of text to be displayed |n|
+            if positive, it refers to the first max_lines lines |n|
+            if negative, it refers to the last -max_lines lines |n|
+            if zero (default), all lines will be displayed
+
+        font : str or list/tuple
+            font to be used for texts |n|
+            Either a string or a list/tuple of fontnames.
+            If not found, uses calibri or arial
+
+        text_anchor : str
+            anchor position of text|n|
+            specifies where to texts relative to the polygon
+            point |n|
+            possible values are (default: c): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        textcolor : colorspec
+            color of the text (default foreground_color)
+
+        text_offsetx : float
+            extra x offset to the text_anchor point
+
+        text_offsety : float
+            extra y offset to the text_anchor point
+
+        fontsize : float
+            fontsize of text (default 15)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        screen_coordinates : bool
+            use screen_coordinates |n|
+            normally, the scale parameters are use for positioning and scaling
+            objects. |n|
+            if True, screen_coordinates will be used instead.
+
+        over3d : bool
+            if True, this object will be rendered to the OpenGL window |n|
+            if False (default), the normal 2D plane will be used.
+
+        Note
+        ----
+        All measures are in screen coordinates |n|
+
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: title |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+        """
+
+        def __init__(
+            self,
+            spec: Union[Iterable, Callable] = None,
+            x: Union[float, Callable] = None,
+            y: Union[float, Callable] = None,
+            fillcolor: Union[ColorType, Callable] = None,
+            linecolor: Union[ColorType, Callable] = None,
+            linewidth: Union[float, Callable] = None,
+            text: Union[str, Callable] = None,
+            fontsize: Union[float, Callable] = None,
+            textcolor: Union[ColorType, Callable] = None,
+            font: Union[str, Callable] = None,
+            angle: Union[float, Callable] = None,
+            xy_anchor: Union[str, Callable] = None,
+            layer: Union[float, Callable] = None,
+            max_lines: Union[int, Callable] = None,
+            offsetx: Union[float, Callable] = None,
+            offsety: Union[float, Callable] = None,
+            as_points: Union[bool, Callable] = None,
+            text_anchor: Union[str, Callable] = None,
+            text_offsetx: Union[float, Callable] = None,
+            text_offsety: Union[float, Callable] = None,
+            arg: Any = None,
+            parent: "Component" = None,
+            visible: Union[bool, Callable] = None,
+            keep: Union[bool, Callable] = None,
+            env: "Environment" = None,
+            screen_coordinates: bool = False,
+            over3d: bool = None,
+        ):
+            ...
+
+    class AnimateLine(Animate2dBase):
+        """
+        Displays a line, optionally with a text
+
+        Parameters
+        ----------
+        spec : tuple or list
+            should specify x0, y0, x1, y1, ...
+
+        x : float
+            position of anchor point (default 0)
+
+        y : float
+            position of anchor point (default 0)
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw) : |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se`` |n|
+            If null string, the given coordimates are used untranslated
+
+        offsetx : float
+            offsets the x-coordinate of the line (default 0)
+
+        offsety : float
+            offsets the y-coordinate of the line (default 0)
+
+        linewidth : float
+            linewidth of the contour |n|
+            default 1
+
+        linecolor : colorspec
+            color of the contour (default foreground_color)
+
+        angle : float
+            angle of the line (in degrees) |n|
+            default: 0
+
+        as_points : bool
+             if False (default), the contour lines are drawn |n|
+             if True, only the corner points are shown
+
+        text : str, tuple or list
+            the text to be displayed |n|
+            if text is str, the text may contain linefeeds, which are shown as individual lines
+
+        max_lines : int
+            the maximum of lines of text to be displayed |n|
+            if positive, it refers to the first max_lines lines |n|
+            if negative, it refers to the last -max_lines lines |n|
+            if zero (default), all lines will be displayed
+
+        font : str or list/tuple
+            font to be used for texts |n|
+            Either a string or a list/tuple of fontnames.
+            If not found, uses calibri or arial
+
+        text_anchor : str
+            anchor position of text|n|
+            specifies where to texts relative to the polygon
+            point |n|
+            possible values are (default: c): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        textcolor : colorspec
+            color of the text (default foreground_color)
+
+        text_offsetx : float
+            extra x offset to the text_anchor point
+
+        text_offsety : float
+            extra y offset to the text_anchor point
+
+        fontsize : float
+            fontsize of text (default 15)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        screen_coordinates : bool
+            use screen_coordinates |n|
+            normally, the scale parameters are use for positioning and scaling
+            objects. |n|
+            if True, screen_coordinates will be used instead.
+
+        over3d : bool
+            if True, this object will be rendered to the OpenGL window |n|
+            if False (default), the normal 2D plane will be used.
+
+        Note
+        ----
+        All measures are in screen coordinates |n|
+
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: title |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+        """
+
+        def __init__(
+            self,
+            spec: Union[Iterable, Callable] = None,
+            x: Union[float, Callable] = None,
+            y: Union[float, Callable] = None,
+            fillcolor: Union[ColorType, Callable] = None,
+            linecolor: Union[ColorType, Callable] = None,
+            linewidth: Union[float, Callable] = None,
+            text: Union[str, Callable] = None,
+            fontsize: Union[float, Callable] = None,
+            textcolor: Union[ColorType, Callable] = None,
+            font: Union[str, Callable] = None,
+            angle: Union[float, Callable] = None,
+            xy_anchor: Union[str, Callable] = None,
+            layer: Union[float, Callable] = None,
+            max_lines: Union[int, Callable] = None,
+            offsetx: Union[float, Callable] = None,
+            offsety: Union[float, Callable] = None,
+            as_points: Union[bool, Callable] = None,
+            text_anchor: Union[str, Callable] = None,
+            text_offsetx: Union[float, Callable] = None,
+            text_offsety: Union[float, Callable] = None,
+            arg: Any = None,
+            parent: "Component" = None,
+            visible: Union[bool, Callable] = None,
+            keep: Union[bool, Callable] = None,
+            env: "Environment" = None,
+            screen_coordinates: bool = False,
+            over3d: bool = None,
+        ):
+            ...
+
+    class AnimatePoints(Animate2dBase):
+        """
+        Displays a series of points, optionally with a text
+
+        Parameters
+        ----------
+        spec : tuple or list
+            should specify x0, y0, x1, y1, ...
+
+        x : float
+            position of anchor point (default 0)
+
+        y : float
+            position of anchor point (default 0)
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw) : |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se`` |n|
+            If null string, the given coordimates are used untranslated
+
+        offsetx : float
+            offsets the x-coordinate of the points (default 0)
+
+        offsety : float
+            offsets the y-coordinate of the points (default 0)
+
+        linewidth : float
+            width of the points |n|
+            default 1
+
+        linecolor : colorspec
+            color of the points (default foreground_color)
+
+        angle : float
+            angle of the points (in degrees) |n|
+            default: 0
+
+        as_points : bool
+             if False, the contour lines are drawn |n|
+             if True (default), only the corner points are shown
+
+        text : str, tuple or list
+            the text to be displayed |n|
+            if text is str, the text may contain linefeeds, which are shown as individual lines
+
+        max_lines : int
+            the maximum of lines of text to be displayed |n|
+            if positive, it refers to the first max_lines lines |n|
+            if negative, it refers to the last -max_lines lines |n|
+            if zero (default), all lines will be displayed
+
+        font : str or list/tuple
+            font to be used for texts |n|
+            Either a string or a list/tuple of fontnames.
+            If not found, uses calibri or arial
+
+        text_anchor : str
+            anchor position of text|n|
+            specifies where to texts relative to the polygon
+            point |n|
+            possible values are (default: c): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        textcolor : colorspec
+            color of the text (default foreground_color)
+
+        text_offsetx : float
+            extra x offset to the text_anchor point
+
+        text_offsety : float
+            extra y offset to the text_anchor point
+
+        fontsize : float
+            fontsize of text (default 15)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        screen_coordinates : bool
+            use screen_coordinates |n|
+            normally, the scale parameters are use for positioning and scaling
+            objects. |n|
+            if True, screen_coordinates will be used instead.
+
+        over3d : bool
+            if True, this object will be rendered to the OpenGL window |n|
+            if False (default), the normal 2D plane will be used.
+
+        Note
+        ----
+        All measures are in screen coordinates |n|
+
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: title |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+        """
+
+        def __init__(
+            self,
+            spec: Union[Iterable, Callable] = None,
+            x: Union[float, Callable] = None,
+            y: Union[float, Callable] = None,
+            fillcolor: Union[ColorType, Callable] = None,
+            linecolor: Union[ColorType, Callable] = None,
+            linewidth: Union[float, Callable] = None,
+            text: Union[str, Callable] = None,
+            fontsize: Union[float, Callable] = None,
+            textcolor: Union[ColorType, Callable] = None,
+            font: Union[str, Callable] = None,
+            angle: Union[float, Callable] = None,
+            xy_anchor: Union[str, Callable] = None,
+            layer: Union[float, Callable] = None,
+            max_lines: Union[int, Callable] = None,
+            offsetx: Union[float, Callable] = None,
+            offsety: Union[float, Callable] = None,
+            as_points: Union[bool, Callable] = None,
+            text_anchor: Union[str, Callable] = None,
+            text_offsetx: Union[float, Callable] = None,
+            text_offsety: Union[float, Callable] = None,
+            arg: Any = None,
+            parent: "Component" = None,
+            visible: Union[bool, Callable] = None,
+            keep: Union[bool, Callable] = None,
+            env: "Environment" = None,
+            screen_coordinates: bool = False,
+            over3d: bool = None,
+        ):
+            ...
+
+    class AnimateCircle(Animate2dBase):
+        """
+        Displays a (partial) circle or (partial) ellipse , optionally with a text
+
+        Parameters
+        ----------
+        radius : float
+            radius of the circle
+
+        radius1 : float
+            the 'height' of the ellipse. If None (default), a circle will be drawn
+
+        arc_angle0 : float
+            start angle of the circle (default 0)
+
+        arc_angle1 : float
+            end angle of the circle (default 360) |n|
+            when arc_angle1 > arc_angle0 + 360, only 360 degrees will be shown
+
+        draw_arc : bool
+            if False (default), no arcs will be drawn
+            if True, the arcs from and to the center will be drawn
+
+        x : float
+            position of anchor point (default 0)
+
+        y : float
+            position of anchor point (default 0)
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw) : |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se`` |n|
+            If null string, the given coordimates are used untranslated |n|
+            The positions corresponds to a full circle even if arc_angle0 and/or arc_angle1 are specified.
+
+        offsetx : float
+            offsets the x-coordinate of the circle (default 0)
+
+        offsety : float
+            offsets the y-coordinate of the circle (default 0)
+
+        linewidth : float
+            linewidth of the contour |n|
+            default 1
+
+        fillcolor : colorspec
+            color of interior (default foreground_color) |n|
+
+        linecolor : colorspec
+            color of the contour (default transparent)
+
+        angle : float
+            angle of the circle/ellipse and/or text (in degrees) |n|
+            default: 0
+
+        text : str, tuple or list
+            the text to be displayed |n|
+            if text is str, the text may contain linefeeds, which are shown as individual lines
+
+        max_lines : int
+            the maximum of lines of text to be displayed |n|
+            if positive, it refers to the first max_lines lines |n|
+            if negative, it refers to the last -max_lines lines |n|
+            if zero (default), all lines will be displayed
+
+        font : str or list/tuple
+            font to be used for texts |n|
+            Either a string or a list/tuple of fontnames.
+            If not found, uses calibri or arial
+
+        text_anchor : str
+            anchor position of text|n|
+            specifies where to texts relative to the polygon
+            point |n|
+            possible values are (default: c): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        textcolor : colorspec
+            color of the text (default foreground_color)
+
+        text_offsetx : float
+            extra x offset to the text_anchor point
+
+        text_offsety : float
+            extra y offset to the text_anchor point
+
+        fontsize : float
+            fontsize of text (default 15)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        screen_coordinates : bool
+            use screen_coordinates |n|
+            normally, the scale parameters are use for positioning and scaling
+            objects. |n|
+            if True, screen_coordinates will be used instead.
+
+        over3d : bool
+            if True, this object will be rendered to the OpenGL window |n|
+            if False (default), the normal 2D plane will be used.
+
+        Note
+        ----
+        All measures are in screen coordinates |n|
+
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: title |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+        """
+
+        def __init__(
+            self,
+            radius: Union[float, Callable] = None,
+            radius1: Union[float, Callable] = None,
+            arc_angle0: Union[float, Callable] = None,
+            arc_angle1: Union[float, Callable] = None,
+            draw_arc: Union[float, Callable] = None,
+            x: Union[float, Callable] = None,
+            y: Union[float, Callable] = None,
+            fillcolor: Union[ColorType, Callable] = None,
+            linecolor: Union[ColorType, Callable] = None,
+            linewidth: Union[float, Callable] = None,
+            text: Union[str, Callable] = None,
+            fontsize: Union[float, Callable] = None,
+            textcolor: Union[ColorType, Callable] = None,
+            font: Union[str, Callable] = None,
+            angle: Union[float, Callable] = None,
+            xy_anchor: Union[str, Callable] = None,
+            layer: Union[float, Callable] = None,
+            max_lines: Union[int, Callable] = None,
+            offsetx: Union[float, Callable] = None,
+            offsety: Union[float, Callable] = None,
+            as_points: Union[bool, Callable] = None,
+            text_anchor: Union[str, Callable] = None,
+            text_offsetx: Union[float, Callable] = None,
+            text_offsety: Union[float, Callable] = None,
+            arg: Any = None,
+            parent: "Component" = None,
+            visible: Union[bool, Callable] = None,
+            keep: Union[bool, Callable] = None,
+            env: "Environment" = None,
+            screen_coordinates: bool = False,
+            over3d: bool = None,
+        ):
+            ...
+
+    class AnimateImage(Animate2dBase):
+        """
+        Displays an image, optionally with a text
+
+        Parameters
+        ----------
+        image : str, pathlib.Path or PIL Image
+            image to be displayed |n|
+            if used as function or method or in direct assigmnent,
+            the image should be a file containing an image or a PIL image
+
+        x : float
+            position of anchor point (default 0)
+
+        y : float
+            position of anchor point (default 0)
+
+        xy_anchor : str
+            specifies where x and y are relative to |n|
+            possible values are (default: sw) : |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se`` |n|
+            If null string, the given coordimates are used untranslated
+
+        anchor : str
+            specifies where the x and refer to |n|
+            possible values are (default: sw) : |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se`` |n|
+
+        offsetx : float
+            offsets the x-coordinate of the circle (default 0)
+
+        offsety : float
+            offsets the y-coordinate of the circle (default 0)
+
+        angle : float
+            angle of the image (in degrees) (default 0)
+
+        alpha : float
+            alpha of the image (0-255) (default 255)
+
+        width : float
+           width of the image (default: None = no scaling) |n|
+
+        text : str, tuple or list
+            the text to be displayed |n|
+            if text is str, the text may contain linefeeds, which are shown as individual lines
+
+        max_lines : int
+            the maximum of lines of text to be displayed |n|
+            if positive, it refers to the first max_lines lines |n|
+            if negative, it refers to the last -max_lines lines |n|
+            if zero (default), all lines will be displayed
+
+        font : str or list/tuple
+            font to be used for texts |n|
+            Either a string or a list/tuple of fontnames.
+            If not found, uses calibri or arial
+
+        text_anchor : str
+            anchor position of text|n|
+            specifies where to texts relative to the polygon
+            point |n|
+            possible values are (default: c): |n|
+            ``nw    n    ne`` |n|
+            ``w     c     e`` |n|
+            ``sw    s    se``
+
+        textcolor : colorspec
+            color of the text (default foreground_color)
+
+        text_offsetx : float
+            extra x offset to the text_anchor point
+
+        text_offsety : float
+            extra y offset to the text_anchor point
+
+        fontsize : float
+            fontsize of text (default 15)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        screen_coordinates : bool
+            use screen_coordinates |n|
+            normally, the scale parameters are used for positioning and scaling
+            objects. |n|
+            if True, screen_coordinates will be used instead.
+
+        over3d : bool
+            if True, this object will be rendered to the OpenGL window |n|
+            if False (default), the normal 2D plane will be used.
+
+        Note
+        ----
+        All measures are in screen coordinates |n|
+
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: title |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
+        """
+
+        def __init__(
+            self,
+            image: Any = None,
+            x: Union[float, Callable] = None,
+            y: Union[float, Callable] = None,
+            width: Union[float, Callable] = None,
+            text: Union[str, Callable] = None,
+            fontsize: Union[float, Callable] = None,
+            textcolor: Union[ColorType, Callable] = None,
+            font: Union[str, Callable] = None,
+            angle: Union[float, Callable] = None,
+            alpha: Union[float, Callable] = None,
+            xy_anchor: Union[str, Callable] = None,
+            layer: Union[float, Callable] = None,
+            max_lines: Union[int, Callable] = None,
+            offsetx: Union[float, Callable] = None,
+            offsety: Union[float, Callable] = None,
+            text_anchor: Union[str, Callable] = None,
+            text_offsetx: Union[float, Callable] = None,
+            text_offsety: Union[float, Callable] = None,
+            anchor: Union[str, Callable] = None,
+            arg: Any = None,
+            parent: "Component" = None,
+            visible: Union[bool, Callable] = None,
+            keep: Union[bool, Callable] = None,
+            env: "Environment" = None,
+            screen_coordinates: bool = False,
+            over3d: bool = None,
+        ):
+            ...
+
+    class Component:
+        """
+        Component object
+
+        A salabim component is used as component (primarily for queueing)
+        or as a component with a process |n|
+        Usually, a component will be defined as a subclass of Component.
+
+        Parameters
+        ----------
+        name : str
+            name of the component. |n|
+            if the name ends with a period (.),
+            auto serializing will be applied |n|
+            if the name end with a comma,
+            auto serializing starting at 1 will be applied |n|
+            if omitted, the name will be derived from the class
+            it is defined in (lowercased)
+
+        at : float or distribution
+            schedule time |n|
+            if omitted, now is used |n|
+            if distribution, the distribution is sampled
+
+        delay : float or distributiom
+            schedule with a delay |n|
+            if omitted, no delay |n|
+            if distribution, the distribution is sampled
+
+        priority : float
+            priority |n|
+            default: 0 |n|
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+
+        urgent : bool
+            urgency indicator |n|
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority |n|
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority
+
+        process : str
+            name of process to be started. |n|
+            if None (default), it will try to start self.process() |n|
+            if null string, no process will be started even if self.process() exists,
+            i.e. become a data component. |n|
+
+        suppress_trace : bool
+            suppress_trace indicator |n|
+            if True, this component will be excluded from the trace |n|
+            If False (default), the component will be traced |n|
+            Can be queried or set later with the suppress_trace method.
+
+        suppress_pause_at_step : bool
+            suppress_pause_at_step indicator |n|
+            if True, if this component becomes current, do not pause when stepping |n|
+            If False (default), the component will be paused when stepping |n|
+            Can be queried or set later with the suppress_pause_at_step method.
+
+        skip_standby : bool
+            skip_standby indicator |n|
+            if True, after this component became current, do not activate standby components |n|
+            If False (default), after the component became current  activate standby components |n|
+            Can be queried or set later with the skip_standby method.
+
+        mode : str preferred
+            mode |n|
+            will be used in trace and can be used in animations |n|
+            if omitted, the mode will be "". |n|
+            also mode_time will be set to now.
+
+        cap_now : bool
+            indicator whether times (at, delay) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+        """
+
+        def __init__(
+            self,
+            name: str = None,
+            at: Union[float, Callable] = None,
+            delay: Union[float, Callable] = None,
+            priority: float = None,
+            urgent: bool = None,
+            process: str = None,
+            suppress_trace: bool = False,
+            suppress_pause_at_step: bool = False,
+            skip_standby: bool = False,
+            mode: str = "",
+            cap_now: bool = None,
+            env: "Environment" = None,
+            **kwargs,
+        ):
+            ...
+
+    class ComponentGenerator(Component):
+        """
+        Component generator object
+
+        A component generator can be used to genetate components |n|
+        There are two ways of generating components: |n|
+        - according to a given inter arrival time (iat) value or distribution
+        - random spread over a given time interval
+
+        Parameters
+        ----------
+        component_class : callable, usually a subclass of Component or Pdf or Cdf distribution
+            the type of components to be generated |n|
+            in case of a distribution, the Pdf or Cdf should return a callable
+
+        generator_name : str
+            name of the component generator. |n|
+            if the name ends with a period (.),
+            auto serializing will be applied |n|
+            if the name end with a comma,
+            auto serializing starting at 1 will be applied |n|
+            if omitted, the name will be derived from the name of the component_class, padded with '.generator'
+
+        at : float or distribution
+            time where the generator starts time |n|
+            if omitted, now is used |n|
+            if distribution, the distribution is sampled
+
+        delay : float or distribution
+            delay where the generator starts (at = now + delay) |n|
+            if omitted, no delay |n|
+            if distribution, the distribution is sampled
+
+        till : float or distribution
+            time up to which components should be generated |n|
+            if omitted, no end |n|
+            if distribution, the distribution is sampled
+
+        duration : float or distribution
+            duration to which components should be generated (till = now + duration) |n|
+            if omitted, no end |n|
+            if distribution, the distribution is sampled
+
+        number : int or distribution
+            (maximum) number of components to be generated |n|
+            if distribution, the distribution is sampled
+
+        iat : float or distribution
+            inter arrival time (distribution). |n|
+            if None (default), a random spread over the interval (at, till) will be used |n|
+
+        force_at : bool
+            for iat generation: |n|
+                if False (default), the first component will be generated at time = at + sample from the iat |n|
+                if True, the first component will be generated at time = at |n|
+            for random spread generation: |n|
+                if False (default), no force for time = at |n|
+                if True, force the first generation at time = at |n|
+
+        force_till : bool
+            only possible for random spread generation: |n|
+            if False (default), no force for time = till |n|
+            if True, force the last generated component at time = till |n|
+
+        disturbance : callable (usually a distribution)
+            for each component to be generated, the disturbance call (sampling) is added
+            to the actual generation time. |n|
+            disturbance may only be used together with iat. The force_at parameter is not
+            allowed in that case.
+
+        suppress_trace : bool
+            suppress_trace indicator |n|
+            if True, the component generator events will be excluded from the trace |n|
+            If False (default), the component generator will be traced |n|
+            Can be queried or set later with the suppress_trace method.
+
+        suppress_pause_at_step : bool
+            suppress_pause_at_step indicator |n|
+            if True, if this component generator becomes current, do not pause when stepping |n|
+            If False (default), the component generator will be paused when stepping |n|
+            Can be queried or set later with the suppress_pause_at_step method.
+
+        equidistant : bool
+            spread the arrival moments evenly over the defined duration |n|
+            in this case, iat may not be specified and number=1 is not allowed. |n|
+            force_at and force_till are ignored.
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        For iat distributions: if till/duration and number are specified, the generation stops whichever condition
+        comes first.
+        """
+
+        def __init__(
+            self,
+            component_class: Type,
+            generator_name: str = None,
+            at: Union[float, Callable] = None,
+            delay: Union[float, Callable] = None,
+            till: Union[float, Callable] = None,
+            duration: Union[float, Callable] = None,
+            number: Union[int, Callable] = None,
+            iat=None,
+            force_at: bool = False,
+            force_till: bool = False,
+            suppress_trace: bool = False,
+            suppress_pause_at_step: bool = False,
+            disturbance: Callable = None,
+            equidistant: bool = False,
+            env: "Environment" = None,
+            **kwargs,
+        ):
+            ...
+
+    class Random(random.Random):
+        """
+        defines a randomstream, equivalent to random.Random()
+
+        Parameters
+        ----------
+        seed : any hashable
+            default: None
+        """
+
+        def __init__(self, seed: Hashable = None):
+            ...
+
+    class _Distribution:
+        ...
+
+    class Map(_Distribution):
+        """
+        Parameters
+        ----------
+        dis : distribution
+            distribution to be mapped
+
+        function : function
+            function to be applied on each sampled value
+
+        Examples
+        --------
+        d = sim.Map(sim.Normal(10,3), lambda x: x if x > 0 else 0)  # map negative samples to zero
+        d = sim.Map(sim.Uniform(1,7), int)  # die simulator
+        """
+
+        def __init__(self, dis: "_Distribution", function: Callable):
+            ...
+
+    class Bounded(_Distribution):
+        """
+        Parameters
+        ----------
+        dis : distribution
+            distribution to be bounded
+
+        lowerbound : float
+            sample values < lowerbound will be rejected (at most 100 retries) |n|
+            if omitted, no lowerbound check
+
+        upperbound : float
+            sample values > upperbound will be rejected (at most 100 retries) |n|
+            if omitted, no upperbound check
+
+        fail_value : float
+            value to be used if. after number_of_tries retries, sample is still not within bounds |n|
+            default: lowerbound, if specified, otherwise upperbound
+
+        number_of_tries : int
+            number of tries before fail_value is returned |n|
+            default: 100
+
+        include_lowerbound : bool
+            if True (default), the lowerbound may be included.
+            if False, the lowerbound will be excluded.
+
+        include_upperbound : bool
+            if True (default), the upperbound may be included.
+            if False, the upperbound will be excluded.
+
+        time_unit : str
+            specifies the time unit of the lowerbound or upperbound|n|
+            must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+            default : no conversion |n|
+
+        Note
+        ----
+        If, after number_of_tries retries, the sampled value is still not within the given bounds,
+        fail_value  will be returned |n|
+        Samples that cannot be converted to float (only possible with Pdf and CumPdf)
+        are assumed to be within the bounds.
+        """
+
+        def __init__(
+            self,
+            dis,
+            lowerbound: float = None,
+            upperbound: float = None,
+            fail_value: float = None,
+            number_of_retries: int = None,
+            include_lowerbound: bool = True,
+            include_upperbound: bool = True,
+            time_unit: str = None,
+            env: "Environment" = None,
+        ):
+            ...
+
+    class Exponential(_Distribution):
+        """
+        exponential distribution
+
+        Parameters
+        ----------
+        mean : float
+            mean of the distribtion (beta)|n|
+            if omitted, the rate is used |n|
+            must be >0
+
+        time_unit : str
+            specifies the time unit |n|
+            must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+            default : no conversion |n|
+
+        rate : float
+            rate of the distribution (lambda)|n|
+            if omitted, the mean is used |n|
+            must be >0
+
+        randomstream: randomstream
+            randomstream to be used |n|
+            if omitted, random will be used |n|
+            if used as random.Random(12299)
+            it assigns a new stream with the specified seed
+
+        env : Environment
+            environment where the distribution is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        Either mean or rate has to be specified, not both
+        """
+
+        def __init__(
+            self,
+            mean: float = None,
+            time_unit: str = None,
+            rate: float = None,
+            randomstream: Any = None,
+            env: "Environment" = None,
+        ):
+            ...
+
+    class Normal(_Distribution):
+        """
+        normal distribution
+
+        Parameters
+        ----------
+        mean : float
+            mean of the distribution
+
+        standard_deviation : float
+            standard deviation of the distribution |n|
+            if omitted, coefficient_of_variation, is used to specify the variation
+            if neither standard_devation nor coefficient_of_variation is given, 0 is used,
+            thus effectively a contant distribution |n|
+            must be >=0
+
+        coefficient_of_variation : float
+            coefficient of variation of the distribution |n|
+            if omitted, standard_deviation is used to specify variation |n|
+            the resulting standard_deviation must be >=0
+
+        use_gauss : bool
+            if False (default), use the random.normalvariate method |n|
+            if True, use the random.gauss method |n|
+            the documentation for random states that the gauss method should be slightly faster,
+            although that statement is doubtful.
+
+        time_unit : str
+            specifies the time unit |n|
+            must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+            default : no conversion |n|
+
+        randomstream: randomstream
+            randomstream to be used |n|
+            if omitted, random will be used |n|
+            if used as random.Random(12299)
+            it assigns a new stream with the specified seed
+
+        env : Environment
+            environment where the distribution is defined |n|
+            if omitted, default_env will be used
+        """
+
+        def __init__(
+            self,
+            mean: float,
+            standard_deviation: float = None,
+            time_unit: str = None,
+            coefficient_of_variation: float = None,
+            use_gauss: bool = False,
+            randomstream: Any = None,
+            env: "Environment" = None,
+        ):
+            ...
+
+    class IntUniform(_Distribution):
+        ...
+
+    class Uniform(_Distribution):
+        """
+        uniform distribution
+
+        Parameters
+        ----------
+        lowerbound : float
+            lowerbound of the distribution
+
+        upperbound : float
+            upperbound of the distribution |n|
+            if omitted, lowerbound will be used |n|
+            must be >= lowerbound
+
+        time_unit : str
+            specifies the time unit |n|
+            must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+            default : no conversion |n|
+
+        randomstream: randomstream
+            randomstream to be used |n|
+            if omitted, random will be used |n|
+            if used as random.Random(12299)
+            it assigns a new stream with the specified seed
+
+        env : Environment
+            environment where the distribution is defined |n|
+            if omitted, default_env will be used
+        """
+
+        def __init__(
+            self,
+            lowerbound: float,
+            upperbound: float = None,
+            time_unit: str = None,
+            randomstream: Any = None,
+            env: "Environment" = None,
+        ):
+            ...
+
+    class Triangular(_Distribution):
+        """
+        triangular distribution
+
+        Parameters
+        ----------
+        low : float
+            lowerbound of the distribution
+
+        high : float
+            upperbound of the distribution |n|
+            if omitted, low will be used, thus effectively a constant distribution |n|
+            high must be >= low
+
+        mode : float
+            mode of the distribution |n|
+            if omitted, the average of low and high will be used, thus a symmetric triangular distribution |n|
+            mode must be between low and high
+
+        time_unit : str
+            specifies the time unit |n|
+            must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+            default : no conversion |n|
+
+        randomstream: randomstream
+            randomstream to be used |n|
+            if omitted, random will be used |n|
+            if used as random.Random(12299)
+            it assigns a new stream with the specified seed
+
+        env : Environment
+            environment where the distribution is defined |n|
+            if omitted, default_env will be used
+        """
+
+        def __init__(
+            self,
+            low: float,
+            high: float = None,
+            mode: float = None,
+            time_unit: str = None,
+            randomstream: Any = None,
+            env: "Environment" = None,
+        ):
+            ...
+
+    class Constant(_Distribution):
+        """
+        constant distribution
+
+        Parameters
+        ----------
+        value : float
+            value to be returned in sample
+
+        time_unit : str
+            specifies the time unit |n|
+            must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+            default : no conversion |n|
+
+        randomstream: randomstream
+            randomstream to be used |n|
+            if omitted, random will be used |n|
+            if used as random.Random(12299)
+            it assigns a new stream with the specified seed |n|
+            Note that this is only for compatibility with other distributions
+
+        env : Environment
+            environment where the distribution is defined |n|
+            if omitted, default_env will be used
+        """
+
+        def __init__(
+            self,
+            value: float,
+            time_unit: str = None,
+            randomstream: Any = None,
+            env: "Environment" = None,
+        ):
+            ...
+
+    class Poisson(_Distribution):
+        """
+        Poisson distribution
+
+        Parameters
+        ----------
+        mean: float
+            mean (lambda) of the distribution
+
+        randomstream: randomstream
+            randomstream to be used |n|
+            if omitted, random will be used |n|
+            if used as random.Random(12299)
+            it assigns a new stream with the specified seed
+
+        Note
+        ----
+        The run time of this function increases when mean (lambda) increases. |n|
+        It is not recommended to use mean (lambda) > 100
+        """
+
+        def __init__(self, mean: float, randomstream: Any = None, prefer_numpy: bool = False):
+            ...
+
+    class Weibull(_Distribution):
+        """
+        weibull distribution
+
+        Parameters
+        ----------
+        scale: float
+            scale of the distribution (alpha or k)
+
+        shape: float
+            shape of the distribution (beta or lambda)|n|
+            should be >0
+
+        time_unit : str
+            specifies the time unit |n|
+            must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+            default : no conversion |n|
+
+        randomstream: randomstream
+            randomstream to be used |n|
+            if omitted, random will be used |n|
+            if used as random.Random(12299)
+            it assigns a new stream with the specified seed
+
+        env : Environment
+            environment where the distribution is defined |n|
+            if omitted, default_env will be used
+        """
+
+        def __init__(
+            self,
+            scale: float,
+            shape: float,
+            time_unit: str = None,
+            randomstream: Any = None,
+            env: "Environment" = None,
+        ):
+            ...
+
+    class Gamma(_Distribution):
+        """
+        gamma distribution
+
+        Parameters
+        ----------
+        shape: float
+            shape of the distribution (k) |n|
+            should be >0
+
+        scale: float
+            scale of the distribution (teta) |n|
+            should be >0
+
+        time_unit : str
+            specifies the time unit |n|
+            must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+            default : no conversion |n|
+
+        rate : float
+            rate of the distribution (beta) |n|
+            should be >0
+
+        randomstream: randomstream
+            randomstream to be used |n|
+            if omitted, random will be used |n|
+            if used as random.Random(12299)
+            it assigns a new stream with the specified seed
+
+
+        env : Environment
+            environment where the distribution is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        Either scale or rate has to be specified, not both.
+        """
+
+        def __init__(
+            self,
+            shape: float,
+            scale: float = None,
+            time_unit: str = None,
+            rate=None,
+            randomstream: Any = None,
+            env: "Environment" = None,
+        ):
+            ...
+
+    class Beta(_Distribution):
+        """
+        beta distribution
+
+        Parameters
+        ----------
+        alpha: float
+            alpha shape of the distribution |n|
+            should be >0
+
+        beta: float
+            beta shape of the distribution |n|
+            should be >0
+
+        randomstream: randomstream
+            randomstream to be used |n|
+            if omitted, random will be used |n|
+            if used as random.Random(12299)
+            it assigns a new stream with the specified seed
+        """
+
+        def __init__(self, alpha: float, beta: float, randomstream: Any = None):
+            ...
+
+    class Erlang(_Distribution):
+        """
+        erlang distribution
+
+        Parameters
+        ----------
+        shape: int
+            shape of the distribution (k) |n|
+            should be >0
+
+        rate: float
+            rate parameter (lambda) |n|
+            if omitted, the scale is used |n|
+            should be >0
+
+        time_unit : str
+            specifies the time unit |n|
+            must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+            default : no conversion |n|
+
+        scale: float
+            scale of the distribution (mu) |n|
+            if omitted, the rate is used |n|
+            should be >0
+
+        randomstream: randomstream
+            randomstream to be used |n|
+            if omitted, random will be used |n|
+            if used as random.Random(12299)
+            it assigns a new stream with the specified seed
+
+        env : Environment
+            environment where the distribution is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        Either rate or scale has to be specified, not both.
+        """
+
+        def __init__(
+            self,
+            shape: float,
+            rate: float = None,
+            time_unit: str = None,
+            scale: float = None,
+            randomstream: Any = None,
+            env: "Environment" = None,
+        ):
+            ...
+
+    class Cdf(_Distribution):
+        ...
+
+    class Pdf(_Distribution):
+        """
+        Probability distribution function
+
+        Parameters
+        ----------
+        spec : list, tuple or dict
+            either
+
+            -   if no probabilities specified: |n|
+                list/tuple with x-values and corresponding probability
+                dict where the keys are re x-values and the values are probabilities
+                (x0, p0, x1, p1, ...xn,pn) |n|
+            -   if probabilities is specified: |n|
+                list with x-values
+
+        probabilities : iterable or float
+            if omitted, spec contains the probabilities |n|
+            the iterable (p0, p1, ...pn) contains the probabilities of the corresponding
+            x-values from spec. |n|
+            alternatively, if a float is given (e.g. 1), all x-values
+            have equal probability. The value is not important.
+
+        time_unit : str
+            specifies the time unit |n|
+            must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+            default : no conversion |n|
+
+        randomstream : randomstream
+            if omitted, random will be used |n|
+            if used as random.Random(12299)
+            it assigns a new stream with the specified seed
+
+        env : Environment
+            environment where the distribution is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        p0+p1=...+pn>0 |n|
+        all densities are auto scaled according to the sum of p0 to pn,
+        so no need to have p0 to pn add up to 1 or 100. |n|
+        The x-values can be any type. |n|
+        If it is a salabim distribution, not the distribution,
+        but a sample will be returned when calling sample.
+        """
+
+        def __init__(
+            self,
+            spec: Union[Iterable, Dict],
+            probabilities=None,
+            time_unit: str = None,
+            randomstream: Any = None,
+            env: "Environment" = None,
+        ):
+            ...
+
+    class CumPdf(_Distribution):
+        """
+        Cumulative Probability distribution function
+
+        Parameters
+        ----------
+        spec : list or tuple
+            either
+
+            -   if no cumprobabilities specified: |n|
+                list with x-values and corresponding cumulative probability
+                (x0, p0, x1, p1, ...xn,pn) |n|
+            -   if cumprobabilities is specified: |n|
+                list with x-values
+
+        cumprobabilities : list, tuple or float
+            if omitted, spec contains the probabilities |n|
+            the list (p0, p1, ...pn) contains the cumulative probabilities of the corresponding
+            x-values from spec. |n|
+
+        time_unit : str
+            specifies the time unit |n|
+            must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+            default : no conversion |n|
+
+        randomstream : randomstream
+            if omitted, random will be used |n|
+            if used as random.Random(12299)
+            it assigns a new stream with the specified seed
+
+        env : Environment
+            environment where the distribution is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        p0<=p1<=..pn>0 |n|
+        all densities are auto scaled according to pn,
+        so no need to have pn be 1 or 100. |n|
+        The x-values can be any type. |n|
+        If it is a salabim distribution, not the distribution,
+        but a sample will be returned when calling sample.
+        """
+
+        def __init__(
+            self,
+            spec: Iterable,
+            cumprobabilities: Union[float, Iterable] = None,
+            time_unit: str = None,
+            randomstream: Any = None,
+            env: "Environment" = None,
+        ):
+            ...
+
+    class External(_Distribution):
+        """
+        External distribution function
+
+        This distribution allows distributions from other modules, notably random, numpy.random and scipy.stats
+        to be used as were they salabim distributions.
+
+        Parameters
+        ----------
+        dis : external distribution
+            either
+
+            -   random.xxx |n|
+            -   numpy.random.xxx |n|
+            -   scipy.stats.xxx
+
+        *args : any
+            positional arguments to be passed to the dis distribution
+
+        **kwargs : any
+            keyword arguments to be passed to the dis distribution
+
+        time_unit : str
+            specifies the time unit |n|
+            must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+            default : no conversion |n|
+
+        env : Environment
+            environment where the distribution is defined |n|
+            if omitted, default_env will be used
+        """
+
+        def __init__(self, dis: Any, *args, **kwargs):
+            ...
+
+    class Distribution(_Distribution):
+        """
+        Generate a distribution from a string
+
+        Parameters
+        ----------
+        spec : str
+            - string containing a valid salabim distribution, where only the first
+              letters are relevant and casing is not important. Note that Erlang,
+              Cdf, CumPdf and Poisson require at least two letters
+              (Er, Cd, Cu and Po)
+            - string containing one float (c1), resulting in Constant(c1)
+            - string containing two floats seperated by a comma (c1,c2),
+              resulting in a Uniform(c1,c2)
+            - string containing three floats, separated by commas (c1,c2,c3),
+              resulting in a Triangular(c1,c2,c3)
+
+        time_unit : str
+            Supported time_units: |n|
+            "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds" |n|
+            if spec has a time_unit as well, this parameter is ignored
+
+        randomstream : randomstream
+            if omitted, random will be used |n|
+            if used as random.Random(12299)
+            it assigns a new stream with the specified seed |n|
+
+        Note
+        ----
+        The randomstream in the specifying string is ignored. |n|
+        It is possible to use expressions in the specification, as long these
+        are valid within the context of the salabim module, which usually implies
+        a global variable of the salabim package.
+
+        Examples
+        --------
+        Uniform(13)  ==> Uniform(13) |n|
+        Uni(12,15)   ==> Uniform(12,15) |n|
+        UNIF(12,15)  ==> Uniform(12,15) |n|
+        N(12,3)      ==> Normal(12,3) |n|
+        Tri(10,20).  ==> Triangular(10,20,15) |n|
+        10.          ==> Constant(10) |n|
+        12,15        ==> Uniform(12,15) |n|
+        (12,15)      ==> Uniform(12,15) |n|
+        Exp(a)       ==> Exponential(100), provided sim.a=100 |n|
+        E(2)         ==> Exponential(2)
+        Er(2,3)      ==> Erlang(2,3)
+        """
+
+        def __init__(
+            self,
+            spec: str,
+            randomstream: Any = None,
+            time_unit: str = None,
+        ):
+            ...
+
+    class State:
+        """
+        State
+
+        Parameters
+        ----------
+        name : str
+            name of the state |n|
+            if the name ends with a period (.),
+            auto serializing will be applied |n|
+            if the name end with a comma,
+            auto serializing starting at 1 will be applied |n|
+            if omitted, the name will be derived from the class
+            it is defined in (lowercased)
+
+        value : any, preferably printable
+            initial value of the state |n|
+            if omitted, False
+
+        monitor : bool
+            if True (default) , the waiters queue and the value are monitored |n|
+            if False, monitoring is disabled.
+
+        type : str
+            specifies how the state values are monitored. Using a
+            int, uint of float type results in less memory usage and better
+            performance. Note that you should avoid the number not to use
+            as this is used to indicate 'off'
+
+            -  "any" (default) stores values in a list. This allows for
+               non numeric values. In calculations the values are
+               forced to a numeric value (0 if not possible) do not use -inf
+            -  "bool" bool (False, True). Actually integer >= 0 <= 254 1 byte do not use 255
+            -  "int8" integer >= -127 <= 127 1 byte do not use -128
+            -  "uint8" integer >= 0 <= 254 1 byte do not use 255
+            -  "int16" integer >= -32767 <= 32767 2 bytes do not use -32768
+            -  "uint16" integer >= 0 <= 65534 2 bytes do not use 65535
+            -  "int32" integer >= -2147483647 <= 2147483647 4 bytes do not use -2147483648
+            -  "uint32" integer >= 0 <= 4294967294 4 bytes do not use 4294967295
+            -  "int64" integer >= -9223372036854775807 <= 9223372036854775807 8 bytes do not use -9223372036854775808
+            -  "uint64" integer >= 0 <= 18446744073709551614 8 bytes do not use 18446744073709551615
+            -  "float" float 8 bytes do not use -inf
+
+        env : Environment
+            environment to be used |n|
+            if omitted, default_env is used
+        """
+
+        def __init__(
+            self,
+            name: str = None,
+            value: Any = False,
+            type: str = "any",
+            monitor: bool = True,
+            env: "Environment" = None,
+            *args,
+            **kwargs,
+        ):
+            ...
+
+    class Resource:
+        """
+        Resource
+
+        Parameters
+        ----------
+        name : str
+            name of the resource |n|
+            if the name ends with a period (.),
+            auto serializing will be applied |n|
+            if the name end with a comma,
+            auto serializing starting at 1 will be applied |n|
+            if omitted, the name will be derived from the class
+            it is defined in (lowercased)
+
+        capacity : float
+            capacity of the resource |n|
+            if omitted, 1
+
+        initial_claimed_quantity : float
+            initial claimed quantity. Only allowed to be non zero for anonymous resources |n|
+            if omitted, 0
+
+        anonymous : bool
+            anonymous specifier |n|
+            if True, claims are not related to any component. This is useful
+            if the resource is actually just a level. |n|
+            if False, claims belong to a component.
+
+        prememptive : bool
+            if True, components with a lower priority will be bumped out of the claimers queue if possible
+            if False (default), no bumping
+
+        honor_only_first : bool
+            if True, only the first component of requesters will be honoured (default: False)
+
+        honor_only_highest_priority : bool
+            if True, only component with the priority of the first requester will be honoured (default: False)
+            Note: only respected if honor_only_first is False
+
+        monitor : bool
+            if True (default), the requesters queue, the claimers queue,
+            the capacity, the available_quantity and the claimed_quantity are monitored |n|
+            if False, monitoring is disabled.
+
+        env : Environment
+            environment to be used |n|
+            if omitted, default_env is used
+        """
+
+        def __init__(
+            self,
+            name: str = None,
+            capacity: float = 1,
+            initial_claimed_quantity: float = 0,
+            anonymous: bool = False,
+            preemptive: bool = False,
+            honor_only_first: bool = False,
+            honor_only_highest_priority: bool = False,
+            monitor: bool = True,
+            env: "Environment" = None,
+            *args,
+            **kwargs,
+        ):
+            ...
+
+    class PeriodMonitor:
+        ...
+
+    class AudioClip:
+        ...
+
+    def audio_duration(filename: str) -> float:
+        ...
+
+    class AudioSegment:
+        def __init__(self, start, t0, filename, duration):
+            ...
+
+    def colornames() -> Dict:
+        ...
+
+    def salabim_logo_red_white_200():
+        ...
+
+    def salabim_logo_red_black_200():
+        ...
+
+    def hex_to_rgb(v):
+        ...
+
+    def spec_to_image(spec: ColorType) -> Tuple:
+        ...
+
+    def spec_to_image_width(spec):
+        ...
+
+    def interpolate(
+        t: float,
+        t0: float,
+        t1: float,
+        v0: Union[float, Iterable],
+        v1: Union[float, Iterable],
+    ) -> Union[float, Tuple]:
+        ...
+
+    def searchsorted(a: Iterable, v: float, side: str = "left") -> int:
+        ...
+
+    def arange(start: float, stop: float, step: float = 1) -> Iterable:
+        ...
+
+    def linspace(start: float, stop: float, num: int, endpoint: bool = True) -> Iterable:
+        ...
+
+    def interp(
+        x: float,
+        xp: Iterable,
+        fp: Iterable,
+        left: float = None,
+        right: float = None,
+    ) -> Any:
+        ...
+
+    def pad(txt, n):
+        ...
+
+    def rpad(txt, n):
+        ...
+
+    def fn(x, length, d):
+        ...
+
+    def type_to_typecode_off(type):
+        ...
+
+    def do_force_numeric(arg):
+        ...
+
+    def deep_flatten(arg):
+        ...
+
+    def merge_blanks(*arg) -> str:
+        ...
+
+    def normalize(s):
+        ...
+
+    def object_to_str(object, quoted=False):
+        ...
+
+    def return_or_print(result, as_str, file) -> str:
+        ...
+
+    def de_none(lst):
+        ...
+
+    def statuses() -> Tuple:
+        ...
+
+    def random_seed(
+        seed: Hashable = None,
+        randomstream: Any = None,
+        set_numpy_random_seed: bool = True,
+    ):
+        ...
+
+    def resize_with_pad(im, target_width, target_height):
+        ...
+
+    class Animate3dObj(Animate3dBase):
+        """
+        Creates a 3D animation object from an .obj file
+
+        Parameters
+        ----------
+        filename : str or Path
+            obj file to be read (default extension .obj) |n|
+            if there are .mtl or .jpg required by this file, they should be available
+
+        x : float
+            x position (default 0)
+
+        y : float
+            y position (default 0)
+
+        z : float
+            z position (default 0)
+
+        x_angle : float
+            angle along x axis (default: 0)
+
+        y_angle : float
+            angle along y axis (default: 0)
+
+        z_angle : float
+            angle along z axis (default: 0)
+
+        x_translate : float
+            translation in x direction (default: 0)
+
+        y_translate : float
+            translation in y direction (default: 0)
+
+        z_translate : float
+            translation in z direction (default: 0)
+
+        x_scale : float
+            scaling in x direction (default: 1)
+
+        y_translate : float
+            translation in y direction (default: 1)
+
+        z_translate : float
+            translation in z direction (default: 1)
+
+        show_warnings : bool
+            as pywavefront does not support all obj commands, reading the file sometimes leads
+            to (many) warning log messages |n|
+            with this flag, they can be turned off (the deafult)
+
+        visible : bool
+            visible |n|
+            if False, animation object is not shown, shown otherwise
+            (default True)
+
+        layer : int
+            layer value |n|
+            lower layer values are displayed later in the frame (default 0)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: my_x |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+
+        Note
+        ----
+        This method requires the pywavefront and pyglet module to be installed
+        """
+
+        def __init__(
+            self,
+            filename: Union[str, Callable],
+            x: Union[float, Callable] = 0,
+            y: Union[float, Callable] = 0,
+            z: Union[float, Callable] = 0,
+            x_angle: Union[float, Callable] = 0,
+            y_angle: Union[float, Callable] = 0,
+            z_angle: Union[float, Callable] = 0,
+            x_translate: Union[float, Callable] = 0,
+            y_translate: Union[float, Callable] = 0,
+            z_translate: Union[float, Callable] = 0,
+            x_scale: Union[float, Callable] = 1,
+            y_scale: Union[float, Callable] = 1,
+            z_scale: Union[float, Callable] = 1,
+            show_warnings: Union[bool, Callable] = False,
+            visible: Union[bool, Callable] = True,
+            arg: Any = None,
+            layer: Union[float, Callable] = 0,
+            parent: "Component" = None,
+            env: "Environment" = None,
+            **kwargs,
+        ):
+            ...
+
+    class Animate3dRectangle(Animate3dBase):
+        """
+        Creates a 3D rectangle
+
+        Parameters
+        ----------
+        x0 : float
+            lower left x position (default 0)
+
+        y0 : float
+            lower left y position (default 0)
+
+        x1 : float
+            upper right x position (default 1)
+
+        y1 : float
+            upper right y position (default 1)
+
+        z : float
+            z position of rectangle (default 0)
+
+        color : colorspec
+            color of the rectangle (default "white")
+
+        visible : bool
+            visible |n|
+            if False, animation object is not shown, shown otherwise
+            (default True)
+
+        layer : int
+             layer value |n|
+             lower layer values are displayed later in the frame (default 0)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: my_x |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+        """
+
+        def __init__(
+            self,
+            x0: Union[float, Callable] = 0,
+            y0: Union[float, Callable] = 0,
+            x1: Union[float, Callable] = 1,
+            y1: Union[float, Callable] = 1,
+            z: Union[float, Callable] = 0,
+            color: Union[ColorType, Callable] = "white",
+            visible: Union[bool, Callable] = True,
+            arg: Any = None,
+            layer: Union[float, Callable] = 0,
+            parent: "Component" = None,
+            env: "Environment" = None,
+            **kwargs,
+        ):
+            ...
+
+    class Animate3dLine(Animate3dBase):
+        """
+        Creates a 3D line
+
+        Parameters
+        ----------
+        x0 : float
+            x coordinate of start point (default 0)
+
+        y0 : float
+            y coordinate of start point (default 0)
+
+        z0 : float
+            z coordinate of start point (default 0)
+
+        x1 : float
+            x coordinate of end point (default 0)
+
+        y1 : float
+            y coordinate of end point (default 0)
+
+        z1 : float
+            z coordinate of end point (default 0)
+
+        color : colorspec
+            color of the line (default "white")
+
+        visible : bool
+            visible |n|
+            if False, animation object is not shown, shown otherwise
+            (default True)
+
+        layer : int
+             layer value |n|
+             lower layer values are displayed later in the frame (default 0)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: my_x |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+        """
+
+        def __init__(
+            self,
+            x0: Union[float, Callable] = 0,
+            y0: Union[float, Callable] = 0,
+            z0: Union[float, Callable] = 0,
+            x1: Union[float, Callable] = 1,
+            y1: Union[float, Callable] = 1,
+            z1: Union[float, Callable] = 0,
+            color: Union[ColorType, Callable] = "white",
+            visible: Union[bool, Callable] = True,
+            arg: Any = None,
+            layer: Union[float, Callable] = 0,
+            parent: "Component" = None,
+            env: "Environment" = None,
+            **kwargs,
+        ):
+            ...
+
+    class Animate3dGrid(Animate3dBase):
+        """
+        Creates a 3D grid
+
+        Parameters
+        ----------
+        x_range : iterable
+            x coordinates of grid lines (default [0])
+
+        y_range : iterable
+            y coordinates of grid lines (default [0])
+
+        z_range : iterable
+            z coordinates of grid lines (default [0])
+
+        color : colorspec
+            color of the line (default "white")
+
+        visible : bool
+            visible |n|
+            if False, animation object is not shown, shown otherwise
+            (default True)
+
+        layer : int
+             layer value |n|
+             lower layer values are displayed later in the frame (default 0)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: my_x |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+        """
+
+        def __init__(
+            self,
+            x_range: Union[Iterable[float], Callable] = [0],
+            y_range: Union[Iterable[float], Callable] = [0],
+            z_range: Union[Iterable[float], Callable] = [0],
+            color: Union[ColorType, Callable] = "white",
+            visible: Union[bool, Callable] = True,
+            arg: Any = None,
+            layer: Union[float, Callable] = 0,
+            parent: "Component" = None,
+            env: "Environment" = None,
+            **kwargs,
+        ):
+            ...
+
+    class Animate3dBox(Animate3dBase):
+        """
+        Creates a 3D box
+
+        Parameters
+        ----------
+        x_len : float
+            length of the box in x direction (deffult 1)
+
+        y_len : float
+            length of the box in y direction (default 1)
+
+        z_len : float
+            length of the box in z direction (default 1)
+
+        x : float
+            x position of the box (default 0)
+
+        y : float
+            y position of the box (default 0)
+
+        z : float
+            z position of the box (default 0)
+
+        z_angle : float
+            angle around the z-axis (default 0)
+
+        x_ref : int
+            if -1, the x parameter refers to the 'end' of the box |n|
+            if  0, the x parameter refers to the center of the box (default) |n|
+            if  1, the x parameter refers to the 'start' of the box
+
+        y_ref : int
+            if -1, the y parameter refers to the 'end' of the box |n|
+            if  0, the y parameter refers to the center of the box (default) |n|
+            if  1, the y parameter refers to the 'start' of the box
+
+        z_ref : int
+            if -1, the z parameter refers to the 'end' of the box |n|
+            if  0, the z parameter refers to the center of the box (default) |n|
+            if  1, the z parameter refers to the 'start' of the box
+
+        color : colorspec
+            color of the box (default "white") |n|
+            if the color is "" (or the alpha is 0), the sides will not be colored at all
+
+        edge_color : colorspec
+            color of the edges of the (default "") |n|
+            if the color is "" (or the alpha is 0), the edges will not be drawn at all
+
+        shaded : bool
+            if False (default), all sides will be colored with color
+            if True, the various sides will have a sligtly different darkness, thus resulting in a pseudo shaded object
+
+        visible : bool
+            visible |n|
+            if False, animation object is not shown, shown otherwise
+            (default True)
+
+        layer : int
+             layer value |n|
+             lower layer values are displayed later in the frame (default 0)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: my_x |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+        """
+
+        def __init__(
+            self,
+            x_len: Union[float, Callable] = 1,
+            y_len: Union[float, Callable] = 1,
+            z_len: Union[float, Callable] = 1,
+            x: Union[float, Callable] = 0,
+            y: Union[float, Callable] = 0,
+            z: Union[float, Callable] = 0,
+            z_angle: Union[float, Callable] = 0,
+            x_ref: Union[float, Callable] = 0,
+            y_ref: Union[float, Callable] = 0,
+            z_ref: Union[float, Callable] = 0,
+            color: Union[ColorType, Callable] = "white",
+            edge_color: Union[ColorType, Callable] = "",
+            shaded: Union[bool, Callable] = False,
+            visible: Union[bool, Callable] = True,
+            arg: Any = None,
+            layer: Union[float, Callable] = 0,
+            parent: "Component" = None,
+            env: "Environment" = None,
+            **kwargs,
+        ):
+            ...
+
+    class Animate3dBar(Animate3dBase):
+        """
+        Creates a 3D bar between two given points
+
+        Parameters
+        ----------
+        x0 : float
+            x coordinate of start point (default 0)
+
+        y0 : float
+            y coordinate of start point (default 0)
+
+        z0 : float
+            z coordinate of start point (default 0)
+
+        x1 : float
+            x coordinate of end point (default 0)
+
+        y1 : float
+            y coordinate of end point (default 0)
+
+        z1 : float
+            z coordinate of end point (default 0)
+
+        color : colorspec
+            color of the bar (default "white") |n|
+            if the color is "" (or the alpha is 0), the sides will not be colored at all
+
+        edge_color : colorspec
+            color of the edges of the (default "") |n|
+            if the color is "" (or the alpha is 0), the edges will not be drawn at all
+
+        shaded : bool
+            if False (default), all sides will be colored with color
+            if True, the various sides will have a sligtly different darkness, thus resulting in a pseudo shaded object
+
+        bar_width : float
+            width of the bar (default 1)
+
+        bar_width_2 : float
+            if not specified both sides will have equal width (bar_width) |n|
+            if specified, the bar will have width bar_width and bar_width_2
+
+        rotation_angle : float
+            rotation of the bar in degrees (default 0)
+
+        show_lids : bool
+            if True (default), show the 'lids' |n|
+            if False, it's a hollow bar
+
+        visible : bool
+            visible |n|
+            if False, animation object is not shown, shown otherwise
+            (default True)
+
+        layer : int
+             layer value |n|
+             lower layer values are displayed later in the frame (default 0)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: my_x |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+        """
+
+        def __init__(
+            self,
+            x0: Union[float, Callable] = 0,
+            y0: Union[float, Callable] = 0,
+            z0: Union[float, Callable] = 0,
+            x1: Union[float, Callable] = 1,
+            y1: Union[float, Callable] = 1,
+            z1: Union[float, Callable] = 1,
+            color: Union[ColorType, Callable] = "white",
+            edge_color: Union[ColorType, Callable] = "",
+            bar_width: Union[float, Callable] = 1,
+            bar_width_2: Union[float, Callable] = None,
+            shaded: Union[bool, Callable] = False,
+            rotation_angle: Union[float, Callable] = 0,
+            show_lids: Union[bool, Callable] = True,
+            visible: Union[bool, Callable] = True,
+            arg: Any = None,
+            layer: Union[float, Callable] = 0,
+            parent: "Component" = None,
+            env: "Environment" = None,
+            **kwargs,
+        ):
+            ...
+
+    class Animate3dCylinder(Animate3dBase):
+        """
+        Creates a 3D cylinder between two given points
+
+        Parameters
+        ----------
+        x0 : float
+            x coordinate of start point (default 0)
+
+        y0 : float
+            y coordinate of start point (default 0)
+
+        z0 : float
+            z coordinate of start point (default 0)
+
+        x1 : float
+            x coordinate of end point (default 0)
+
+        y1 : float
+            y coordinate of end point (default 0)
+
+        z1 : float
+            z coordinate of end point (default 0)
+
+        color : colorspec
+            color of the cylinder (default "white")
+
+        radius : float
+            radius of the cylinder (default 1)
+
+        number_of_sides : int
+            number of sides of the cylinder (default 8) |n|
+            must be >= 3
+
+        rotation_angle : float
+            rotation of the bar in degrees (default 0)
+
+        show_lids : bool
+            if True (default), the lids will be drawn
+            if False, tyhe cylinder will be open at both sides
+
+        visible : bool
+            visible |n|
+            if False, animation object is not shown, shown otherwise
+            (default True)
+
+        layer : int
+             layer value |n|
+             lower layer values are displayed later in the frame (default 0)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: my_x |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+        """
+
+        def __init__(
+            self,
+            x0: Union[float, Callable] = 0,
+            y0: Union[float, Callable] = 0,
+            z0: Union[float, Callable] = 0,
+            x1: Union[float, Callable] = 1,
+            y1: Union[float, Callable] = 1,
+            z1: Union[float, Callable] = 1,
+            color: Union[ColorType, Callable] = "white",
+            radius: Union[float, Callable] = 1,
+            number_of_sides: Union[int, Callable] = 8,
+            rotation_angle: Union[float, Callable] = 0,
+            show_lids: Union[bool, Callable] = True,
+            visible: Union[bool, Callable] = True,
+            arg: Any = None,
+            layer: Union[float, Callable] = 0,
+            parent: "Component" = None,
+            env: "Environment" = None,
+            **kwargs,
+        ):
+            ...
+
+    class Animate3dSphere(Animate3dBase):
+        """
+        Creates a 3D box
+
+        Parameters
+        ----------
+        radius : float
+            radius of the sphere
+
+        x : float
+            x position of the box (default 0)
+
+        y : float
+            y position of the box (default 0)
+
+        z : float
+            z position of the box (default 0)
+
+        color : colorspec
+            color of the sphere (default "white")
+
+        visible : bool
+            visible |n|
+            if False, animation object is not shown, shown otherwise
+            (default True)
+
+        layer : int
+             layer value |n|
+             lower layer values are displayed later in the frame (default 0)
+
+        arg : any
+            this is used when a parameter is a function with two parameters, as the first argument or
+            if a parameter is a method as the instance |n|
+            default: self (instance itself)
+
+        parent : Component
+            component where this animation object belongs to (default None) |n|
+            if given, the animation object will be removed
+            automatically when the parent component is no longer accessible
+
+        env : Environment
+            environment where the component is defined |n|
+            if omitted, default_env will be used
+
+        Note
+        ----
+        All parameters, apart from parent, arg and env can be specified as: |n|
+        - a scalar, like 10 |n|
+        - a function with zero arguments, like lambda: my_x |n|
+        - a function with one argument, being the time t, like lambda t: t + 10 |n|
+        - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state |n|
+        - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called |n|
+        """
+
+        def __init__(
+            self,
+            radius: Union[float, Callable] = 1,
+            x: Union[float, Callable] = 0,
+            y: Union[float, Callable] = 0,
+            z: Union[float, Callable] = 0,
+            color: Union[ColorType, Callable] = "white",
+            number_of_slices: Union[int, Callable] = 32,
+            number_of_stacks: Union[int, Callable] = None,
+            visible: Union[bool, Callable] = True,
+            arg: Any = None,
+            layer: Union[float, Callable] = 0,
+            parent: "Component" = None,
+            env: "Environment" = None,
+            **kwargs,
+        ):
+            ...
+
+    def draw_bar3d(
+        x0=0,
+        y0=0,
+        z0=0,
+        x1=1,
+        y1=1,
+        z1=1,
+        gl_color=(1, 1, 1),
+        show=True,
+        edge_gl_color=(1, 1, 1),
+        show_edge=False,
+        bar_width=1,
+        bar_width_2=None,
+        rotation_angle=0,
+        shaded=False,
+        show_lids=True,
+    ):
+        ...
+
+    def draw_cylinder3d(
+        x0=0,
+        y0=0,
+        z0=0,
+        x1=1,
+        y1=1,
+        z1=1,
+        gl_color=(1, 1, 1),
+        radius=1,
+        number_of_sides=8,
+        rotation_angle=0,
+        show_lids=True,
+    ):
+        ...
+
+    def draw_line3d(x0=0, y0=0, z0=0, x1=1, y1=1, z1=1, gl_color=(1, 1, 1)):
+        ...
+
+    def draw_rectangle3d(x0=0, y0=0, z=0, x1=1, y1=1, gl_color=(1, 1, 1)):
+        ...
+
+    def draw_box3d(
+        x_len=1,
+        y_len=1,
+        z_len=1,
+        x=0,
+        y=0,
+        z=0,
+        x_angle=0,
+        y_angle=0,
+        z_angle=0,
+        x_ref=0,
+        y_ref=0,
+        z_ref=0,
+        gl_color=(1, 1, 1),
+        show=True,
+        edge_gl_color=(1, 1, 1),
+        show_edge=False,
+        shaded=False,
+        _show_lids=True,
+    ):
+        ...
+
+    def draw_sphere3d(
+        x=0,
+        y=0,
+        z=0,
+        radius=1,
+        number_of_slices=32,
+        number_of_stacks=None,
+        gl_color=(1, 1, 1),
+    ):
+        ...
+
+    def fonts():
+        ...
+
+    def standardfonts():
+        ...
+
+    def getfont(fontname, fontsize):  # fontsize in screen_coordinates!
+        if hasattr(getfont, "lookup"):
+            ...
+
+    def show_fonts() -> None:
+        ...
+
+    def show_colornames() -> None:
+        ...
+
+    def arrow_polygon(size: float) -> Tuple:
+        ...
+
+    def centered_rectangle(width: float, height: float) -> Tuple:
+        ...
+
+    def regular_polygon(radius: float = 1, number_of_sides: int = 3, initial_angle: float = 0) -> List:
+        ...
+
+    def can_animate(try_only: bool = True) -> bool:
+        ...
+
+    def can_animate3d(try_only: bool = True) -> bool:
+        ...
+
+    def can_video(try_only: bool = True) -> bool:
+        ...
+
+    def has_numpy() -> bool:
+        ...
+
+    def default_env() -> "Environment":
+        ...
+
+    @contextlib.contextmanager
+    def over3d(val: bool = True):
+        ...
+
+    def default_over3d(val: bool = None):
+        ...
+
+    @contextlib.contextmanager
+    def cap_now(val: bool = True):
+        ...
+
+    def default_cap_now(val: bool = None) -> bool:
+        ...
+
+    def reset() -> None:
+        ...
+
+    def set_environment_aliases():
+        ...
+
+    # ENVIRONMENT ANNOTATION END
+
+    _nameserialize = {}
+    cached_modelname_width = [None, None]
 
     def setup(self) -> None:
         """
@@ -7281,10 +11457,10 @@ class Environment:
         c._scheduled_time = inf
         c._process = None
 
-    def _print_event_list(self, s: str="") -> None:
+    def _print_event_list(self, s: str = "") -> None:
         print("eventlist ", s)
         for t, priority, sequence, comp, return_value in self._event_list:
-            print("    ", self.time_to_str(t), comp.name(), "priority", priority, "return_value",return_value)
+            print("    ", self.time_to_str(t), comp.name(), "priority", priority, "return_value", return_value)
 
     def on_closing(self):
         self.an_quit()
@@ -13517,7 +17693,7 @@ class AnimateQueue(DynamicClass):
         self.over3d = _default_over3d if over3d is None else over3d
         self.trajectory = trajectory
         self.register_dynamic_attributes(
-            "xy_anchor x y id max_length direction reverse titleoffsetx titleoffsety titlefont titlefontsize titlecolor title layer visible keep"
+            "xy_anchor x y id max_length direction reverse titleoffsetx titleoffsety titlefont titlefontsize titlecolor title layer visible keep trajectory"
         )
 
         self.ao_title = AnimateText(
@@ -13545,15 +17721,16 @@ class AnimateQueue(DynamicClass):
         xy_anchor = self.xy_anchor(t)
         max_length = self.max_length(t)
         direction = self.direction(t).lower()
-        if self.trajectory is None:
+        if self.trajectory(t) is None:
             x = self.x(t)
             y = self.y(t)
         else:
             direction = "t"
             x = 0
             y = 0
-
-            trajectory = self.trajectory
+            xt = self.x(t)
+            yt = self.y(t)
+            trajectory = self.trajectory(t)
 
         reverse = self.reverse(t)
         self.visible_t = self.visible(t)
@@ -13584,8 +17761,8 @@ class AnimateQueue(DynamicClass):
             self.text_anchor_t = "sw"
             self.angle_t = 0
         elif direction == "t":
-            self.x_t = trajectory.x(t=x, _t0=0) + (-25 if titleoffsetx is None else titleoffsetx)
-            self.y_t = trajectory.y(t=x, _t0=0) + (25 if titleoffsety is None else titleoffsety)
+            self.x_t = xt + (-25 if titleoffsetx is None else titleoffsetx)
+            self.y_t = yt + (25 if titleoffsety is None else titleoffsety)
             self.text_anchor_t = "sw"
             self.angle_t = 0
         n = 0
@@ -13608,16 +17785,16 @@ class AnimateQueue(DynamicClass):
             for ao in animation_objects[2:]:
                 if isinstance(ao, AnimateClassic):
                     if direction == "t":
-                        ao.x0 = trajectory.x(t=x, _t0=0)
-                        ao.y0 = trajectory.y(t=x, _t0=0)
+                        ao.x0 = xt + trajectory.x(t=x * 1.00, _t0=0)
+                        ao.y0 = yt + trajectory.y(t=x * 1.00, _t0=0)
                     else:
                         ao.x0 = x
                         ao.y0 = y
                 else:
                     if direction == "t":
-                        ao.x = trajectory.x(t=x, _t0=0)
-                        ao.y = trajectory.y(t=x, _t0=0)
-                        ao.angle = trajectory.angle(t=x, _t0=0)
+                        ao.x = xt + trajectory.x(t=x * 1.00, _t0=0)
+                        ao.y = yt + trajectory.y(t=x * 1.00, _t0=0)
+                        ao.angle = trajectory.angle(t=x * 1.00, _t0=0)
                     else:
                         ao.x = x
                         ao.y = y
@@ -13631,7 +17808,7 @@ class AnimateQueue(DynamicClass):
             if direction == "n":
                 y += dimy
             if direction == "t":
-                x += dimx
+                x += dimx * 1
 
             n += 1
 
@@ -15558,14 +19735,14 @@ class Component:
                 result.append("    " + pad(s.name(), 20) + " value=" + str(value))
         return return_or_print(result, as_str, file)
 
-    def _push(self, t, priority, urgent,return_value=None):
+    def _push(self, t, priority, urgent, return_value=None):
         self.env._seq += 1
         if urgent:
             seq = -self.env._seq
         else:
             seq = self.env._seq
         self._on_event_list = True
-        heapq.heappush(self.env._event_list, (t, priority, seq, self,return_value))
+        heapq.heappush(self.env._event_list, (t, priority, seq, self, return_value))
 
     def _remove(self):
         if self._on_event_list:
@@ -16121,7 +20298,7 @@ class Component:
         store: Union["Store", Iterable],
         filter: Callable = lambda c: True,
         fail_priority: float = 0,
-        urgent: bool = False,
+        urgent: bool = True,
         fail_at: float = None,
         fail_delay: float = None,
         mode: str = None,
@@ -16254,7 +20431,7 @@ class Component:
         item: "Component",
         priority: float = 0,
         fail_priority: float = 0,
-        urgent: bool = False,
+        urgent: bool = True,
         fail_at: float = None,
         fail_delay: float = None,
         mode: str = None,
@@ -17494,15 +21671,14 @@ class Component:
         The component is placed just before the first component with a priority > given priority
         """
         self._checknotinqueue(q)
-        if q._length >=1 and priority < q._head.successor.priority: # direct enter component that's smaller than the rest
+        if q._length >= 1 and priority < q._head.successor.priority:  # direct enter component that's smaller than the rest
             m2 = q._head.successor
-        else:          
+        else:
             m2 = q._tail
             while (m2.predecessor != q._head) and (m2.predecessor.priority > priority):
                 m2 = m2.predecessor
         Qmember().insert_in_front_of(m2, self, q, priority)
         return self
-
 
     def leave(self, q: "Queue" = None) -> "Component":
         """
@@ -17898,7 +22074,8 @@ class Component:
 
 
 class ComponentGenerator(Component):
-    """Component generator object
+    """
+    Component generator object
 
     A component generator can be used to genetate components |n|
     There are two ways of generating components: |n|
@@ -18138,19 +22315,26 @@ class ComponentGenerator(Component):
     def do_spread(self):
         for interval in self.intervals:
             yield self.hold(interval)
+            save_default_env = g.default_env
+            g.default_env = self.env
             if isinstance(self.component_class, _Distribution):
                 self.component_class()(**self.kwargs)
             else:
                 self.component_class(**self.kwargs)
+            g.default_env = save_default_env
+
         self.env.print_trace("", "", "all components generated")
 
     def do_iat(self):
         n = 0
         while True:
+            save_default_env = g.default_env
+            g.default_env = self.env
             if isinstance(self.component_class, _Distribution):
                 self.component_class()(**self.kwargs)
             else:
                 self.component_class(**self.kwargs)
+            g.default_env = save_default_env
             n += 1
             if n >= self.number:
                 self.env.print_trace("", "", f"{n} components generated")
@@ -18167,10 +22351,14 @@ class ComponentGenerator(Component):
     def do_iat_disturbance(self):
         n = 0
         while True:
+            save_default_env = g.default_env
+            g.default_env = self.env
             if callable(self.iat):
                 iat = self.iat()
             else:
                 iat = self.iat
+            g.default_env = save_default_env
+
             if callable(self.disturbance):
                 disturbance = self.disturbance()
             else:
@@ -24893,37 +29081,40 @@ def reset() -> None:
     random_seed()  # always start with seed 1234567
 
 
+App = Environment
+
+
 def set_environment_aliases():
     cwd_parts = Path.cwd().parts
     if len(cwd_parts) >= 2 and cwd_parts[-2] == "salabim" and cwd_parts[-1] == "manual":
         return  # do not set when using Sphinx build!
 
     for name, obj in list(globals().items()):
-        if not name.startswith("_"):
+        if not name.startswith("_") or name in ("_Trajectory", "_Distribution"):
             if inspect.isclass(obj) and obj.__module__ == Environment.__module__:
 
                 if issubclass(obj, Exception):
                     exec(f"Environment.{name}={name}")
                 else:
-                    if "env" in inspect.signature(obj).parameters:
-                        exec(
-                            f"""\
-def local_{name}(self, *args, **kwargs):
-    if 'env' in kwargs or self == g.default_env:
-        return {name}(*args, **kwargs)
-    else:
-        kwargs['env']=self
-        return {name}(*args, **kwargs)
-Environment.{name} = local_{name}
+                    sig = inspect.signature(obj)
+                    if "env" in sig.parameters:
+                        sig1 = "self," + ",".join(map(str, sig.parameters.values()))
+                        sig2 = ",".join(str(v) if str(v.kind).startswith("VAR") else k for k, v in sig.parameters.items())
+                        s = f"""\
+def {name}({sig1}):
+    if env is None:
+        env=self
+    return {name}({sig2})
+Environment.{name}={name}
 Environment.{name}.__doc__ = {name}.__doc__"""
-                        )
+                        exec(s)
                     else:
                         exec(f"Environment.{name}={name}")
 
-            if inspect.isfunction(obj):
+            elif inspect.isfunction(obj):
                 exec(f"Environment.{name}=staticmethod({name})")
-    Environment.inf = inf
-    Environment.nan = nan
+            else:
+                exec(f"Environment.{name}={name}")
 
 
 reset()

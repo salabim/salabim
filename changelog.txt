@@ -1,5 +1,70 @@
 salabim changelog
 
+
+version 23.1.2  2023-03-19
+==========================
+Added functionality(0)
+----------------------
+When animating a queue, with a trajectory, it is now possible to specify the
+x and y coordinates, which may even be dynamic.
+And the trajectory may be dynamic now as well.
+
+It is now documented that for usage in Queue.animate() or AnimateQueue,
+t0 should be set to 0 for at least the first segment of a trajectory.
+
+Changed functionality (0)
+-------------------------
+It is more logical to use urgent=True in calls to Component.from_store and
+Component.to_store. Therefore the default value for urgent in these methods
+is now True.
+
+Improved type hint handling (0)
+-------------------------------
+The recently introduced functionality to use env. prefix where sim. prefix
+was required (like env.Component instead of sim.Component) did not show the
+type hints in IDEs. 
+From this version on type hints and the docstring will show these correctly.
+
+The consequence of this change is an increase in the size of the source code,
+but that shouldn't cause any problem.
+
+Alternative way to initialize a simulation (0)
+----------------------------------------------
+It is quite common to start an app(lication) with ::
+
+    app = App()
+
+This is now also possible with salabim as sim.App is now just an alias of
+sim.Environment. So ::
+
+    app = sim.App(trace=True)
+    app.ComponentGenerator(X, iat=app.Exponential(10))
+    app.run(app.Uniform(10,20))
+
+is now valid code.
+
+Note that the env parameter in several class definition has not been changed, though. 
+This might not cause too much problems as env= is hardly ever used in practice
+(as far as I know).
+
+Bug fix (0)
+-----------
+If Trajectory.length() was called without a time (t), an exception was raised. Fixed.
+
+Bug fix (1)
+-----------
+When using sim.ComponentGenerator the default environment was not propagated correctly. Fixed.
+
+Documentation updates (0)
+-------------------------
+The documentation now makes clear that t0 should be 0 in case a trajectory is
+to be used as a trajectory for queue animation.
+
+Documentation updates (1)
+-------------------------
+The HTML documentation now uses the better legible rtd (Read The Docs) theme.
+Also, many additions and changes have been done.
+
 version 23.1.1  2023-03-14
 ==========================
 New functionality (0)

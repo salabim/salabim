@@ -17,7 +17,7 @@ import pickle
 Pythonista = platform.system() == "Darwin"
 
 def exp():
-    exp201()
+    exp198()
 
 
 def exp203():
@@ -131,13 +131,17 @@ def exp199():
     
 def exp198():
     env1 = sim.Environment(name="env1")
-    env = sim.Environment(name="env")
+    env2 = sim.App(name="env2")
+    env = sim.Environment()
+    class X(sim.Component):
+        ...
+    print(env.name())
     x=env1.Component("comp")
-    print(env.Component.__doc__)
 
     print(x.env)
     print(type(sim.Component))
     print(type(env.Component))
+    print(env.inf)
 
 def exp197():
     class X(sim.Component):
