@@ -17,22 +17,37 @@ import pickle
 Pythonista = platform.system() == "Darwin"
 
 def exp():
-    exp198()
+    exp196()
 
 
 def exp203():
     class X(sim.Component):
         def process(self):
-            a=yield self.hold(1)
-            print(a)
-            a=yield self.hold(1)
-            print(a)
+            yield self.to_store((store0, store1), item=self)
+
+    class Y(sim.Component):
+        def setup(self, store):
+            self.store=store
+
+        def process(self):
+            while True:
+                yield self.from_store(self.store)
+                yield self.hold(1) 
+
+
 
     env = sim.Environment()
+    env.trace(True)
+    store0=env.Store("store0", capacity=1)
+    store1=env.Store("store1", capacity=1)
 
-    X()
-    X()
-    env.run(10)
+    Y(store=store0)
+    Y(store=store1)
+
+    env.ComponentGenerator(X, iat=0.25)
+    env.run()
+
+
 
 
 def exp202():
@@ -168,13 +183,21 @@ def exp197():
     env.run(0)
 
 def exp196():
+
+
     env = sim.Environment(trace=True)
+    
+    env.width(env.screen_width())
+    env.height(env.screen_height())
+    env.x1(env.width())
     for text in ["nw", "n", "ne", "c"]:
         env.AnimateLine((100,100,200,200),text=text,text_anchor=text)
     env.animate(True)
+    env.run(2)
+    print(env.screen_width(), env.screen_height())
+
     env.run(env.inf)
     
-
     
 def exp195():
     class Car(sim.Component):

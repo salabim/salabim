@@ -1,5 +1,47 @@
 salabim changelog
 
+version 23.1.3  2023-04-01
+==========================
+New functionality (0)
+---------------------
+Introduced two new functions to get the width and height of the screen:
+    sim.screen_width() / env.width()
+    sim.screen_height() / env.height()
+So now it is easy to have a full-screen animation:
+    env.width(env.screen_width())
+    env.height(env.screen_height())
+    env.x1(env.width())
+(Inspired by a question by Michiel Luyken)
+
+Improved type hinting (0)
+-------------------------
+The type hints and docstrings in sim.Environment cover now all 
+classes and methods.
+
+Improved type hinting (1)
+-------------------------
+Component.from_store now also has a type hint ("Component"), so
+    c = self.from_store(store)
+will show the typing info.
+(inspired by a discussion with Lukas Hollenstein)
+
+Docstrings improvement (0)
+--------------------------
+Docstrings used to contain many |n| characters, which were there
+to render the reference section of the documentation.
+But, these characters were annoying and did not work out well in
+tooltips.
+From now on, the docstrings don't contain |n| characters anymore,
+and can still be used in the automatic documentation-building process.
+(inspired by a discussion with Lukas Hollenstein)
+
+Bug fix (0)
+-----------
+A minor error in tracing from_store honor / to_store honor fixed.
+
+Bug fix (1)
+-----------
+Error when honouring a to_store request for multiple stores fixed.
 
 version 23.1.2  2023-03-19
 ==========================
