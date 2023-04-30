@@ -32014,7 +32014,8 @@ class Component:
         for store in from_stores:
             for c in store:
                 if filter(c):
-                    c = store.pop()
+                    idx = store.index(c)
+                    c = store.pop(idx)
                     self._from_store_item = c
                     self._from_store_store = store
                     self._remove()
