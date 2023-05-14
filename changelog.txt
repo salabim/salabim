@@ -1,12 +1,155 @@
 salabim changelog
 
+version 23.1.4  2023-05-14
+==========================
+New functionality (0)
+---------------------
+Introduced sim.full_screen() / env.full_screen() , which
+creates a true full screen window, without a title, where
+x0=0, y0=0, x1=width of screen
+(Inspired by a remark from Lukas Hollenstein)
+
+New parameter (0)
+-----------------
+The method sim.width() / env.width() now have a second parameter
+adjust_x0_x1_y0, which is False by default.
+If adjust_x0_x1_y0 is True, apart from setting the width,
+x0 will be set to 0, y0 will be set to 0 and x1 will be set to the given width.
+E.g.
+    env.width(1000, True)
+
+Note that existing programs won't be affected, as the parameter
+adjust_x0_x1_y0 is False by default.
+
+New functionality (1)
+---------------------
+sim.AnimateImage / env.AnimateImage now supports animated GIFs and
+animated .webp files.
+
+Therefore, AnimateImage has six new parameters:
+- animation_start (simulation) time that the animation should start
+- animation_repeat if False (default) no repeat, if True, repeat
+- animation_pingpong if False (default) no pingpong, if True, first goes forward then backward
+- animation_speed specifies how fast the animation should be (relative to env.speed)
+- animation_from specifies the time in the video from which to animate
+- animation_to specifies the time in the video to which to animate
+
+Note that these parameters may be specified for non animated images as well,
+but will have no meaning, then.
+All these parameters are dynamic.
+
+The AnimateImage now has a method duration that returns the duration of the image
+(0 if not animated).
+
+Note that animated GIFs and .webp files can have a transparent background,
+which makes it ideal for showing moving objects, like vehicles, cranes, animals, etc.
+
+New functionality (2)
+---------------------
+It is now possible to produce .webp format videos.
+E.g.
+    with env.video("my_video.webp"):
+        env.run(10)
+
+New functionality (3)
+---------------------
+The class sim.AnimateImage / env.AnimateImage can now be used with
+.webp files (still or animated).
+E.g.
+    env.AnimateImage(image="my_picture.webp")
+
+New functionality (4)
+---------------------
+The class sim.AnimateImage / env.AnimateImage can now be used also to
+animate an image given by a URL. 
+Any image parameter that contains // will be opened as a URL.
+E.g.
+    env.AnimateImage("https://salabim.org/manual/_images/2d1.gif")
+
+New functionality (5)
+---------------------
+The class sim.AnimateImage / env.AnimateImage now have two new (dynamic)
+boolean parameters:
+- flip_horizontal
+- flip_vertical
+Both parameters are False by default.
+When True, the image is flipped either horizontal or vertical.
+Note that this functionality is also available for animated
+images.
+E.g.
+    env.AnimateImage("mypicture.webp", flip_vertical=lambda t: t > 10)
+
+New functionality (6)
+---------------------
+The new function sim.video_duration() / method env.video_duration() 
+will return the length or a given animated GIF/Webp file or URL.
+This can be useful in animating a GIF/Webp file or URL.
+E.g.
+    duration =  env.video_duration("my_video.gif")
+    
+New functionality (7)
+---------------------
+ComponentGenerator has a new parameter: at_end. If not specified, no action when the component generator ends.
+If a parameterless function is specified, this function will be called when the component generator ends.
+The most obvious usage of this is to reactivate main when all components are generated.
+
+    ComponentGenerator(number=10, iat=env.Uniform(1,2), at_end=lambda: env.main().activate())
+
+Performance improvement (0)
+---------------------------
+When using AnimateImage, all images are now properly cached, which improves
+performance under certain conditions.
+
+Support for Pythonista 3.4 (0)
+------------------------------
+Fixed a problem in the set_aliases routine.
+
+A bug in Pythonista 3.4 makes that the using the Calibri font with fontsize between 12 and 17 crashes the
+system. Therefore, on Pythonista, Calibri font is replaced by the Arial font, until the Pythonista bug
+is fixed.
+
+Bug fix (0)
+-----------
+AnimateCombined did not handle a non list animation_objects parameter correctly. Fixed.
+(bug reported by Michiel Luyken)
+
+Bug fix (1)
+-----------
+Animated GIFs could not handle a transparent background color properly. Fixed.
+
+Bug fix (2)
+-----------
+Under Python 3.10 (Pythonista only?) classes that have no __init__ method, don't seem to have a signature, 
+which lead to some problems in the aliasing of globals into Environment. Fixed.
+
+Bug fix (3)
+-----------
+When using applying a filter for Store.from_store() the wrong component was returned. Fixed.
+(bug reported by Martin Kunkel, fix slightly different)
+
+Bug fix (4)
+-----------
+A bug in _AnimateIntro and _AnimateExtro made that Environment(isdefault_env=False) didn't work properly.
+Fixed.
+(bug reported by Michiel Luyken)
+
+Bug fix (5)
+-----------
+Under Pythonista, the simulation time was not animated correctly in unsynced mode. Fixed.
+
+HTML documentation readability enhancement (0)
+----------------------------------------------
+In the sidebar of the HTML documentation, level 4 items are now shown in a larger font,
+which makes it easier to read.
+(Inspired by a remark from Michiel Luyken)
+
 version 23.1.3  2023-04-01
 ==========================
 New functionality (0)
 ---------------------
 Introduced two new functions to get the width and height of the screen:
-    sim.screen_width() / env.width()
-    sim.screen_height() / env.height()
+    sim.screen_width() / env.screen_width()
+    sim.screen_height() / env.screen_height()
 So now it is easy to have a full-screen animation:
     env.width(env.screen_width())
     env.height(env.screen_height())
@@ -134,7 +277,7 @@ Changed functionality (0)
 -------------------------
 Considerable change in the implementation and API of stores.
 
-From now a store doesn't have a contents queue: It *is* a queue!
+From now a store doesn't *have* a contents queue: It *is* a queue!
 This has a lot of advantages. For instance, all normal queue operations
 are now also available for stores.
 
