@@ -46,14 +46,14 @@ class AnimateFork(sim.Animate):
 def do_animation():
     global nphilosophers, eatingtime_mean, thinkingtime_mean
     global nphilosophers_last
-    env.animation_parameters(
-        x0=-50 * env.width() / env.height(),
-        y0=-50,
-        x1=+50 * env.width() / env.height(),
-        modelname="Dining philosophers",
-        speed=8,
-        background_color="20%gray",
-    )
+    env.x0(-50 * env.width() / env.height())
+    env.y0(-50)
+    env.x1(50 * env.width() / env.height())
+    env.modelname("Dining philosophers")
+    env.speed(8)
+    env.background_color("20%gray")
+    env.animate(True)
+
     for i, _ in enumerate(philosopher):
         AnimatePhilosopher(i=i)
         AnimateFork(i=i)

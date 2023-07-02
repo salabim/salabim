@@ -36,7 +36,7 @@ class X(sim.Component):
 
 
 env = sim.Environment(trace=False)
-env.background_color("white")
+env.background_color("20% gray")
 
 
 q0 = sim.Queue("Drilling station")

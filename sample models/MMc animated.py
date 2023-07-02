@@ -34,7 +34,8 @@ def do_animation():
 
     sim.AnimateText(text="Clerks", x=900, y=100 - 50, text_anchor="n")
     sim.AnimateText(text="<-- Waiting clients", x=900 - 145, y=100 - 50, text_anchor="n")
-    env.animation_parameters(modelname="M/M/c")
+    env.modelname("M/M/c")
+    env.animate(True)
 
 
 class Client(sim.Component):

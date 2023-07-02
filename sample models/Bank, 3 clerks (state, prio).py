@@ -17,10 +17,13 @@ class Customer(sim.Component):
 
 
 class Clerk(sim.Component):
+    def setup(self, product):
+        self.product = product
+
     def process(self):
         while True:
             if len(waitingline) == 0:
-                yield self.wait((worktodo, True, 1))
+                yield self.wait((worktodo, True, self.product))
             self.customer = waitingline.pop()
             yield self.hold(30)
             self.customer.activate()
@@ -28,8 +31,8 @@ class Clerk(sim.Component):
 
 env = sim.Environment()
 CustomerGenerator()
-for i in range(3):
-    Clerk()
+for product in ("B", "A", "C"):
+    Clerk(name=product, product=product)
 waitingline = sim.Queue("waitingline")
 worktodo = sim.State("worktodo")
 

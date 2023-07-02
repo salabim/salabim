@@ -21,4 +21,5 @@ nphilosophers = 8
 env = sim.Environment(trace=True)
 forks = [sim.Resource() for _ in range(nphilosophers)]
 [Philosopher() for _ in range(nphilosophers)]
+
 env.run(100)

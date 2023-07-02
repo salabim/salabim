@@ -1,5 +1,6 @@
 import salabim as sim
-
+import sys
+import gc
 """
 In this model cars arrive randomly and want to be washed by two washers
 
@@ -26,45 +27,65 @@ class Car(sim.Component):
     def my_y(self, t):
         if self in washers.requesters():
             return self.index(washers.requesters()) * 30 + 50
-        if self in washers.claimers():
+        elif self in washers.claimers():
             return self.index(washers.claimers()) * 30 + 50
+        else:
+            return -100  # invisible
 
     def my_rectangle(self, t):
         if self in washers.requesters():
             return 0, 0, (t - self.enter_time(washers.requesters())) * 10, 20
-        if self in washers.claimers():
+        elif self in washers.claimers():
             return 0, 0, (t - self.enter_time(washers.claimers())) * 10, 20
+        else:
+            return -100, -100, -100, -100  # invisible
 
-    def setup(self):
-        self.wait_anim = sim.AnimateRectangle(
-            self.my_rectangle,
+
+    def process(self):
+        """
+            self.wait_anim = sim.AnimateRectangle(
+            (0,0,0,0), #self.my_rectangle,
             x=200,
-            y=self.my_y,
+            y=10, #self.my_y,
             fillcolor="red",
-            text=str(self.sequence_number()),
+            text="a", #str(self.sequence_number()),
             text_anchor="w",
             text_offsetx=-20,
             textcolor="white",
             arg=self,
             parent=self,
         )
+        """
+        self.wait_anim = sim.AnimateRectangle(
+            (0, 0, 1 * 10, 20), fillcolor="", linecolor="yellow", x=100, y=self.my_y, arg=self, parent=self
+        )
+
         #  the arg parameter is used to access the right car in my_y and my_rectangle (self)
         #  the parent parameter is used to automatically remove the animation when the car terminates
-
-    def process(self):
+ 
+        self.an =sim.AnimateText(self.name(), arg=self,parent=self)
         yield self.request(washers)
+
         duration = sim.Uniform(0, 5)()
         self.duration_anim = sim.AnimateRectangle(
             (0, 0, duration * 10, 20), fillcolor="", linecolor="yellow", x=100, y=self.my_y, arg=self, parent=self
         )
-        self.wait_anim.fillcolor = "yellow"
-        self.wait_anim.x = 100
-
+        print(self.name(), self.duration_anim)
+#        self.wait_anim.fillcolor = "yellow"
+#        self.wait_anim.x = 100
         yield self.hold(duration)
+        self.remove_animation_children()
 
+        print("ended")
+#        print(self.name(), sys.getrefcount(self))
+    
+class Y(sim.Component):
+    def process1(self):
+        yield self.hold(1)
 
-env = sim.Environment(trace=False)
+env = sim.Environment(trace=True)
 env.animate(True)
+env.animate_debug(True)
 env.modelname("Demo animation dynamic")
 env.background_color("20%gray")
 sim.AnimateText("Wash", x=100, y=25, text_anchor="sw")
@@ -72,5 +93,12 @@ sim.AnimateText("Wait", x=200, y=25, text_anchor="sw")
 
 washers = sim.Resource(name="washers", capacity=2)
 CarGenerator()
+y=object()
+print(sys.getrefcount(y))
 
-env.run(100)
+y=Y()
+env.run(0)
+
+env.run(30)
+del y
+

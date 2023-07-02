@@ -1,4 +1,3 @@
-            
 # Example - bank, 3 clerks, reneging (state).py
 import salabim as sim
 
@@ -25,7 +24,8 @@ class Customer(sim.Component):
             env.print_trace("", "", "reneged")
         else:
             yield self.passivate()  # wait for service to be completed
-            
+
+
 class Clerk(sim.Component):
     def process(self):
         while True:
@@ -46,8 +46,6 @@ waitingline = sim.Queue("waitingline")
 worktodo = sim.State("worktodo")
 env.run(till=50000)
 waitingline.print_histograms()
-worktodo.print_histograms() 
+worktodo.print_histograms()
 print("number reneged", env.number_reneged)
-print("number balked", env.number_balked) 
-
-                    
+print("number balked", env.number_balked)
