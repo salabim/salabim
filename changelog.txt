@@ -1,5 +1,157 @@
 salabim changelog
 
+version 23.2.0  2023-07-02
+==========================
+Completely new way of building processes (0)
+--------------------------------------------
+With this version comes a completely new way to build processes.
+Up to now, a Component's process was essentially a generator with yields to allow
+switching to other Components. Those yields are far from natural and often caused
+beginners (and sometimes experts) to make mistakes.
+And last but not least, if you wanted a specific task to be called as a method,
+you had to use 'yield from', which is a confusing concept to say the least.
+
+Therefore, from now on the process interaction may be done with so called greenlets.
+If you specify
+    sim.yieldless(True)
+prior to any sim.Environment call, salabim works differently, as you can and should
+refrain from the yield part.
+
+So,
+    def double_hold(self, duration):
+        yield self.hold(2 * duration)
+    
+    def process(self):
+        yield self.hold(5)
+        while not len(q):
+            yield self.passivate()
+        other.activate()
+        yield from self.double_hold(4)
+        item = yield self.from_store(store)
+
+, now reads:
+    def double_hold(self, duration):
+        self.hold(2 * duration)
+
+    def process(self):
+        self.hold(5)
+        while not len(q):
+            self.passivate()
+        other.activate()
+        self.double_hold(4)
+        item = self.from_store(store)
+
+Wow! So much cleaner.
+
+There's just one caveat: the code might run slower, although in practice not that much.
+But that's just a small price for a much cleaner API.
+
+For now, salabim offers both ways of defining processes, where coroutines (with yields) are
+still the default. However, that might change in the future. The same holds for the documentation
+and sample scripts.
+
+In order to run without yields, you can just do
+    sim.yieldless(True)
+before calling env = sim.Environment(), or do
+    env =  sim.Environment(yieldless=True)
+    
+Anyway, in that case the greenlet module has to be installed, most likely with:
+    pip install greenlet
+
+Note that this yieldless=True functionality is still experimental. Please report any bugs or
+strange behaviour.
+
+In order to facilitate the conversion to yieldless=True, there's a script to do just that:
+    salabim_unyield.py
+, which is a bit more intelligent than just removing the text 'yield' and 'yield from'.       
+
+
+New functionality (0)
+---------------------
+The method Component.from_store has a new parameter: key.
+If present, it should be function accepting a component and returning a value that can be compared
+to others, most likely a number or string.
+When applied, the component with the lowest key (and meeting the filter) will be returned, if any.
+(inspired by a request of Zhong Zhyu)
+
+New functionality (1)
+---------------------
+Introduced sim.AnimateGrid/env.AnimateGrid, which can be useful to align animation objects.
+The function will draw a grid with a given spacing and add text labels, like:
+    env.AnimateGrid(spacing=100, linecolor="blue")
+or 
+    env.AnimateGrid(spacing=100, linecolor="black", textcolor="black", visible=preview_mode)
+
+(inspired by a request of Michiel Luyken and a reference implementation by Richard)
+
+New functionality (2)
+---------------------
+From this version, an alternative user interface (UI) via PySimpleGUI is available.
+This makes it easier to control animations and simulations via a sererate window.
+
+In the new control window the aplication can add widgets, including input, buttons,
+radio buttons, sliders, ...
+
+It is now also possible to turn of animation up to a certain time (including
+at regular intervals) and regain control.
+
+This feature is not yet documented and still experimental.
+However, you can experiment with it. See sample models/demo_ui.py in the github
+repository.
+
+Functionality change (0)
+------------------------
+The attribute Environment.paused is now a method that can be used to set and get the value
+of the internal paused status.
+This can affect previous models that explicitely wrote or read the attribute env.paused.
+This for instance means that
+    self.paused = True
+has to be changed into
+    self.paused(True)
+Likewise
+    if self.paused:
+has to be changed into
+    if self.paused():
+USERS WHO HAVE PREVIOUSLY USED env.paused SHOULD CHECK AND CHANGE THEIR CODE !
+
+Enhancement (0)
+---------------
+sim.linspace / env.linspace did not have a default for the num parameter.
+From this version on the default is 50 (as in numpy.linspace).
+
+Documentation / docstring update (0)
+------------------------------------
+The layer parameter for Animatexxx classes was missing in the docstring. Fixed.
+Also, a section on Using layers is added to the Animation chapter of the documentation.
+
+Bug fix (0)
+-----------
+When using sim.Animate(image=) / env.Animate(image=), the animation crashed
+because the various new image parameters
+    flip_horizontal, flip_vertical, animation_start, animation_speed,
+    animation_repeat, animation_pingpong, animation_from and animation_to
+were not implemented at all. Fixed.
+
+Bug fix (1)
+-----------
+When an unexpected keyword was given in any 'step' method (hold, activate, ...),
+the process was incorrecly terminated without any warning.
+Fixed.
+
+Bug fix (2)
+-----------
+In AnimateImage, filename that contained // was incorrectly always opened as a URL.
+Thus not correctly handling files like C://test//abc.jpg, although these are
+valid file names. Fixed.
+(Inspired by problem reported by Harald Mutzke)
+
+Bug fix (3)
+-----------
+If simulation events happened after the current animation time (env.t()), salabim did
+'rewind' the animation time, thus causing unwanted behaviour.
+Fixed.
+(bug reported by Richard)
+
 version 23.1.4  2023-05-14
 ==========================
 New functionality (0)

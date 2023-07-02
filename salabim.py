@@ -1,13 +1,13 @@
-#               _         _      _               ____   _____     _     _  _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    / |   | || |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \    | |   | || |_
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | | _ |__   _|
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|_|(_)   |_|
+#               _         _      _               ____   _____     ____       ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    |___ \     / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \      __) |   | | | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _  / __/  _ | |_| |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|_____|(_) \___/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "23.1.4"
+__version__ = "23.2.0"
 
 import heapq
 import random
@@ -44,20 +44,7 @@ import urllib.error
 
 from pathlib import Path
 
-from typing import (
-    Any,
-    Union,
-    Iterable,
-    Tuple,
-    List,
-    Callable,
-    TextIO,
-    Dict,
-    Set,
-    Type,
-    Hashable,
-    Optional,
-)
+from typing import Any, Union, Iterable, Tuple, List, Callable, TextIO, Dict, Set, Type, Hashable, Optional
 
 dataframe = None  # to please PyLance
 
@@ -101,6 +88,37 @@ class QueueFullError(Exception):
 
 class SimulationStopped(Exception):
     pass
+
+
+_yieldless = False
+
+
+def yieldless(value: bool = None) -> bool:
+    """
+    sets/ get default yieldless status
+
+    Parameters
+    ----------
+    value : bool
+        sets the new default yieldless status
+
+        if omitted, no change
+
+    Returns
+    -------
+    default yieldless status: bool
+
+    Note
+    ----
+    At start up, the default yieldless status is False
+
+    The default yieldless status can be used in subsequent Environment instantations.
+    """
+
+    global _yieldless
+    if value is not None:
+        _yieldless = value
+    return _yieldless
 
 
 class ItemFile:
@@ -546,10 +564,7 @@ class Monitor:
             for t, _, x, weight in heapq.merge(
                 *[
                     zip(
-                        merge[index]._t,
-                        itertools.repeat(index),
-                        merge[index]._x,
-                        merge[index]._weight if merge[index]._weight else (1,) * len(merge[index]._x),
+                        merge[index]._t, itertools.repeat(index), merge[index]._x, merge[index]._weight if merge[index]._weight else (1,) * len(merge[index]._x)
                     )
                     for index in range(len(merge))
                 ]
@@ -639,16 +654,7 @@ class Monitor:
 
             curx = [new.off] * len(monitors)
             new._t = array.array("d")
-            for t, index, x in heapq.merge(
-                *[
-                    zip(
-                        monitors[index]._t,
-                        itertools.repeat(index),
-                        monitors[index]._x_any,
-                    )
-                    for index in range(len(monitors))
-                ]
-            ):
+            for t, index, x in heapq.merge(*[zip(monitors[index]._t, itertools.repeat(index), monitors[index]._x_any) for index in range(len(monitors))]):
                 curx[index] = x
 
                 if any(val == new.off for val in curx):
@@ -708,11 +714,7 @@ class Monitor:
         """
         self._block_stats_only()
         self_env = self.env
-        self.env = Environment(
-            to_freeze=True,
-            name=self.env.name() + ".copy.",
-            time_unit=self.env.get_time_unit(),
-        )
+        self.env = Environment(to_freeze=True, name=self.env.name() + ".copy.", time_unit=self.env.get_time_unit())
         m = copy.deepcopy(self)
         self.env = self_env
         m.isgenerated = True
@@ -723,13 +725,7 @@ class Monitor:
         m.env._t = self.env._t
         return m
 
-    def slice(
-        self,
-        start: float = None,
-        stop: float = None,
-        modulo: float = None,
-        name: str = None,
-    ) -> "Monitor":
+    def slice(self, start: float = None, stop: float = None, modulo: float = None, name: str = None) -> "Monitor":
         """
         slices this monitor (creates a subset)
 
@@ -816,13 +812,7 @@ class Monitor:
 
         enabled = False
         for t, type, x, weight in heapq.merge(
-            actions,
-            zip(
-                self._t,
-                itertools.repeat("c"),
-                self._x,
-                self._weight if (self._weight and not self._level) else (1,) * len(self._x),
-            ),
+            actions, zip(self._t, itertools.repeat("c"), self._x, self._weight if (self._weight and not self._level) else (1,) * len(self._x))
         ):
             if new._level:
                 if type == "a":
@@ -2194,14 +2184,7 @@ class Monitor:
     def sys_weight_zero(self):
         return self.sys_weight() - self.sys_weight(ex0=True)
 
-    def print_statistics(
-        self,
-        show_header: bool = True,
-        show_legend: bool = True,
-        do_indent: bool = False,
-        as_str: bool = False,
-        file: TextIO = None,
-    ) -> str:
+    def print_statistics(self, show_header: bool = True, show_legend: bool = True, do_indent: bool = False, as_str: bool = False, file: TextIO = None) -> str:
         """
         print monitor statistics
 
@@ -2366,16 +2349,7 @@ class Monitor:
 
         Exactly same functionality as Monitor.print_histogram()
         """
-        return self.print_histogram(
-            number_of_bins,
-            lowerbound,
-            bin_width,
-            values,
-            ex0,
-            as_str=as_str,
-            file=file,
-            graph_scale=graph_scale,
-        )
+        return self.print_histogram(number_of_bins, lowerbound, bin_width, values, ex0, as_str=as_str, file=file, graph_scale=graph_scale)
 
     def print_histogram(
         self,
@@ -2520,25 +2494,13 @@ class Monitor:
                         unique_values.append(v)
 
                     if sort_on_weight or sort_on_duration or sort_on_value:
-                        values_label = [
-                            v
-                            for v in self.values(
-                                ex0=ex0,
-                                sort_on_weight=sort_on_weight,
-                                sort_on_duration=sort_on_duration,
-                            )
-                            if v in values
-                        ]
+                        values_label = [v for v in self.values(ex0=ex0, sort_on_weight=sort_on_weight, sort_on_duration=sort_on_duration) if v in values]
                         values_not_in_monitor = [v for v in values if v not in values_label]
                         values_label.extend(sorted(values_not_in_monitor))
                     else:
                         values_label = values
                 else:
-                    values_label = self.values(
-                        ex0=ex0,
-                        sort_on_weight=sort_on_weight,
-                        sort_on_duration=sort_on_duration,
-                    )
+                    values_label = self.values(ex0=ex0, sort_on_weight=sort_on_weight, sort_on_duration=sort_on_duration)
 
                 values_condition = [[v] for v in values_label]
                 rest_values = self.values(ex0=ex0)
@@ -2595,14 +2557,7 @@ class Monitor:
 
                 if auto_scale:
                     bin_width, lowerbound, number_of_bins = self.histogram_autoscale()
-                result.append(
-                    self.print_statistics(
-                        show_header=False,
-                        show_legend=True,
-                        do_indent=False,
-                        as_str=True,
-                    )
-                )
+                result.append(self.print_statistics(show_header=False, show_legend=True, do_indent=False, as_str=True))
                 if not self._stats_only and number_of_bins >= 0:
                     result.append("")
                     if self._weight:
@@ -2639,13 +2594,7 @@ class Monitor:
         result.append("")
         return return_or_print(result, as_str=as_str, file=file)
 
-    def values(
-        self,
-        ex0: bool = False,
-        force_numeric: bool = False,
-        sort_on_weight: bool = False,
-        sort_on_duration: bool = False,
-    ) -> List:
+    def values(self, ex0: bool = False, force_numeric: bool = False, sort_on_weight: bool = False, sort_on_duration: bool = False) -> List:
         """
         values
 
@@ -2967,13 +2916,7 @@ class Monitor:
             raise TypeError("xduration not available for non level monitors")
         return self._xweight(ex0, force_numeric)
 
-    def xt(
-        self,
-        ex0: bool = False,
-        exoff=False,
-        force_numeric: bool = True,
-        add_now: bool = True,
-    ) -> Tuple:
+    def xt(self, ex0: bool = False, exoff=False, force_numeric: bool = True, add_now: bool = True) -> Tuple:
         """
         tuple of array/list with x-values and array with timestamp
 
@@ -3047,13 +2990,7 @@ class Monitor:
 
         return xx, t
 
-    def tx(
-        self,
-        ex0: bool = False,
-        exoff: bool = False,
-        force_numeric: bool = False,
-        add_now: bool = True,
-    ) -> Tuple:
+    def tx(self, ex0: bool = False, exoff: bool = False, force_numeric: bool = False, add_now: bool = True) -> Tuple:
         """
         tuple of array with timestamps and array/list with x-values
 
@@ -3136,13 +3073,7 @@ class Monitor:
 
             if self._weight:
                 if ex0:
-                    xweight = (
-                        x0,
-                        array.array(
-                            "d",
-                            [vweight for vx, vweight in zip(x, self._weight) if vx != 0],
-                        ),
-                    )
+                    xweight = (x0, array.array("d", [vweight for vx, vweight in zip(x, self._weight) if vx != 0]))
                 else:
                     xweight = (x, self._weight)
             else:
@@ -3819,10 +3750,7 @@ class AnimateMonitor(DynamicClass):
 
             except (ValueError, TypeError):
                 value = 0
-        return max(
-            0,
-            min(self.height_t, value * self.vertical_scale_t + self.vertical_offset_t),
-        )
+        return max(0, min(self.height_t, value * self.vertical_scale_t + self.vertical_offset_t))
 
     def line(self, t):
         result = []
@@ -4013,23 +3941,20 @@ if Pythonista:
                     if env._video:
                         env._t = env.video_t
                     else:
-                        if env.paused:
+                        if env._paused:
                             env._t = env.animation_start_time
                         else:
                             env._t = env.animation_start_time + ((time.time() - env.animation_start_clocktime) * env._speed)
                     while (env.peek() < env._t) and env.running and env._animate:
                         env.step()
-                        if env.paused:
-                            env._t = env.animation_start_time = env._now
-                            break
 
                 else:
-                    if (env._step_pressed or (not env.paused)) and env._animate:
+                    if (env._step_pressed or (not env._paused)) and env._animate:
                         env.step()
                         env._t = env._now
                         if not env._current_component._suppress_pause_at_step:
                             env._step_pressed = False
-                if not env.paused:
+                if not env._paused:
                     env.frametimes.append(time.time())
                 touchvalues = self.touches.values()
                 if env.retina > 1:
@@ -4056,7 +3981,7 @@ if Pythonista:
                         ims = scene.load_image_file(im_file)
                     scene.image(ims, 0, 0, *capture_image.size)
                     scene.unload_image(ims)
-                if env._video and (not env.paused):
+                if env._video and (not env._paused):
                     env._save_frame()
                     env.video_t += env._speed / env._real_fps
 
@@ -4178,13 +4103,7 @@ class Qmember:
                     requester._remove()
                     requester.status._value = scheduled
                     requester._reschedule(
-                        requester.env._now,
-                        0,
-                        False,
-                        f"from_store ({store.name()}) honor with {c.name()}",
-                        False,
-                        s0=requester.env.last_s0,
-                        return_value=c,
+                        requester.env._now, 0, False, f"from_store ({store.name()}) honor with {c.name()}", False, s0=requester.env.last_s0, return_value=c
                     )
                     break
 
@@ -4230,16 +4149,7 @@ class Queue:
         if omitted, default_env will be used
     """
 
-    def __init__(
-        self,
-        name: str = None,
-        monitor: Any = True,
-        fill: Iterable = None,
-        capacity: float = inf,
-        env: "Environment" = None,
-        *args,
-        **kwargs,
-    ) -> None:
+    def __init__(self, name: str = None, monitor: Any = True, fill: Iterable = None, capacity: float = inf, env: "Environment" = None, *args, **kwargs) -> None:
         if env is None:
             self.env = g.default_env
         else:
@@ -4261,36 +4171,12 @@ class Queue:
         self._isinternal = False
         self.arrival_rate(reset=True)
         self.departure_rate(reset=True)
-        self.length = _SystemMonitor(
-            "Length of " + self.name(),
-            level=True,
-            initial_tally=0,
-            monitor=monitor,
-            type="uint32",
-            env=self.env,
-        )
-        self.length_of_stay = Monitor(
-            "Length of stay in " + self.name(),
-            monitor=monitor,
-            type="float",
-            env=self.env,
-        )
-        self.capacity = _CapacityMonitor(
-            "Capacity of " + self.name(),
-            level=True,
-            initial_tally=capacity,
-            monitor=monitor,
-            type="float",
-            env=env,
-        )
+        self.length = _SystemMonitor("Length of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="uint32", env=self.env)
+        self.length_of_stay = Monitor("Length of stay in " + self.name(), monitor=monitor, type="float", env=self.env)
+        self.capacity = _CapacityMonitor("Capacity of " + self.name(), level=True, initial_tally=capacity, monitor=monitor, type="float", env=env)
         self.capacity.parent = self
         self.available_quantity = _SystemMonitor(
-            "Available quantity of " + self.name(),
-            level=True,
-            initial_tally=capacity,
-            monitor=monitor,
-            type="float",
-            env=env,
+            "Available quantity of " + self.name(), level=True, initial_tally=capacity, monitor=monitor, type="float", env=env
         )
 
         if fill is not None:
@@ -4700,13 +4586,7 @@ class Queue:
         result.append(self.length_of_stay.print_statistics(show_header=False, show_legend=False, do_indent=True, as_str=True))
         return return_or_print(result, as_str, file)
 
-    def print_histograms(
-        self,
-        exclude: Iterable = [],
-        as_str: bool = False,
-        file: bool = None,
-        graph_scale: float = None,
-    ) -> Any:
+    def print_histograms(self, exclude: Iterable = [], as_str: bool = False, file: bool = None, graph_scale: float = None) -> Any:
         """
         prints the histograms of the length and length_of_stay monitor of the queue
 
@@ -5576,12 +5456,7 @@ class Queue:
 
         return q1
 
-    def copy(
-        self,
-        name: str = None,
-        copy_capacity: bool = False,
-        monitor: bool = False,
-    ) -> "Queue":
+    def copy(self, name: str = None, copy_capacity: bool = False, monitor: bool = False) -> "Queue":
         """
         returns a copy of a queue
 
@@ -5674,14 +5549,7 @@ class Queue:
 
 
 class Store(Queue):
-    def __init__(
-        self,
-        name: str = None,
-        capacity: int = inf,
-        env: "Environment" = None,
-        *args,
-        **kwargs,
-    ):
+    def __init__(self, name: str = None, capacity: int = inf, env: "Environment" = None, *args, **kwargs):
         super().__init__(name=name, capacity=capacity, env=env, *args, **kwargs)
         with self.env.suppress_trace():
             self._to_store_requesters = Queue(f"{name}.to_store_requesters", env=env)
@@ -5734,15 +5602,7 @@ class Store(Queue):
                     c._from_store_store = self
                     c._remove()
                     c.status._value = scheduled
-                    c._reschedule(
-                        c.env._now,
-                        0,
-                        False,
-                        f"from_store ({self.name()}) honor with {item.name()}",
-                        False,
-                        s0=c.env.last_s0,
-                        return_value=item,
-                    )
+                    c._reschedule(c.env._now, 0, False, f"from_store ({self.name()}) honor with {item.name()}", False, s0=c.env.last_s0, return_value=item)
 
     def _rescan_to(self):
         """
@@ -5757,14 +5617,7 @@ class Store(Queue):
                 c._to_stores = []
                 c._remove()
                 c.status._value = scheduled
-                c._reschedule(
-                    c.env._now,
-                    0,
-                    False,
-                    f"to_store ({self.name()}) honor ",
-                    False,
-                    s0=c.env.last_s0,
-                )
+                c._reschedule(c.env._now, 0, False, f"to_store ({self.name()}) honor ", False, s0=c.env.last_s0)
                 c._to_store_item = None
                 c._to_store_store = self
             else:
@@ -5809,14 +5662,7 @@ class Animate3dBase(DynamicClass):
     """
 
     def __init__(
-        self,
-        visible: bool = True,
-        keep: bool = True,
-        arg: Any = None,
-        layer: float = 0,
-        parent: "Component" = None,
-        env: "Environment" = None,
-        **kwargs,
+        self, visible: bool = True, keep: bool = True, arg: Any = None, layer: float = 0, parent: "Component" = None, env: "Environment" = None, **kwargs
     ) -> None:
         super().__init__()
         self.env = g.default_env if env is None else env
@@ -5873,15 +5719,7 @@ class Animate3dBase(DynamicClass):
 
 class _Movement:
     # used by trajectories
-    def __init__(
-        self,
-        l,
-        vmax: float = None,
-        v0: float = None,
-        v1: float = None,
-        acc: float = None,
-        dec: float = None,
-    ) -> None:
+    def __init__(self, l, vmax: float = None, v0: float = None, v1: float = None, acc: float = None, dec: float = None) -> None:
         if vmax is None:
             vmax = 1
         if v0 is None:
@@ -6193,14 +6031,7 @@ class TrajectoryStandstill(_Trajectory):
         if omitted, default_env will be used
     """
 
-    def __init__(
-        self,
-        xy: Iterable,
-        duration: float,
-        orientation: Union[Callable, float] = 0,
-        t0: float = None,
-        env: "Environment" = None,
-    ):
+    def __init__(self, xy: Iterable, duration: float, orientation: Union[Callable, float] = 0, t0: float = None, env: "Environment" = None):
         env = g.default_env if env is None else env
         self._t0 = 0 if env is None else (env.now() if t0 is None else t0)
 
@@ -6951,6 +6782,2957 @@ class TrajectoryCircle(_Trajectory):
         return super().rendered_polygon(time_step)
 
 
+class Component:
+    """
+    Component object
+
+    A salabim component is used as component (primarily for queueing)
+    or as a component with a process
+
+    Usually, a component will be defined as a subclass of Component.
+
+    Parameters
+    ----------
+    name : str
+        name of the component.
+
+        if the name ends with a period (.),
+        auto serializing will be applied
+
+        if the name end with a comma,
+        auto serializing starting at 1 will be applied
+
+        if omitted, the name will be derived from the class
+        it is defined in (lowercased)
+
+    at : float or distribution
+        schedule time
+
+        if omitted, now is used
+
+        if distribution, the distribution is sampled
+
+    delay : float or distributiom
+        schedule with a delay
+
+        if omitted, no delay
+
+        if distribution, the distribution is sampled
+
+    priority : float
+        priority
+
+        default: 0
+
+        if a component has the same time on the event list, this component is sorted accoring to
+        the priority.
+
+    urgent : bool
+        urgency indicator
+
+        if False (default), the component will be scheduled
+        behind all other components scheduled
+        for the same time and priority
+
+        if True, the component will be scheduled
+        in front of all components scheduled
+        for the same time and priority
+
+    process : str
+        name of process to be started.
+
+        if None (default), it will try to start self.process()
+
+        if null string, no process will be started even if self.process() exists,
+        i.e. become a data component.
+
+
+    suppress_trace : bool
+        suppress_trace indicator
+
+        if True, this component will be excluded from the trace
+
+        If False (default), the component will be traced
+
+        Can be queried or set later with the suppress_trace method.
+
+    suppress_pause_at_step : bool
+        suppress_pause_at_step indicator
+
+        if True, if this component becomes current, do not pause when stepping
+
+        If False (default), the component will be paused when stepping
+
+        Can be queried or set later with the suppress_pause_at_step method.
+
+    skip_standby : bool
+        skip_standby indicator
+
+        if True, after this component became current, do not activate standby components
+
+        If False (default), after the component became current  activate standby components
+
+        Can be queried or set later with the skip_standby method.
+
+    mode : str preferred
+        mode
+
+        will be used in trace and can be used in animations
+
+        if omitted, the mode will be "".
+
+        also mode_time will be set to now.
+
+    cap_now : bool
+        indicator whether times (at, delay) in the past are allowed. If, so now() will be used.
+        default: sys.default_cap_now(), usualy False
+
+    env : Environment
+        environment where the component is defined
+
+        if omitted, default_env will be used
+    """
+
+    def __init__(
+        self,
+        name: str = None,
+        at: Union[float, Callable] = None,
+        delay: Union[float, Callable] = None,
+        priority: float = None,
+        urgent: bool = None,
+        process: str = None,
+        suppress_trace: bool = False,
+        suppress_pause_at_step: bool = False,
+        skip_standby: bool = False,
+        mode: str = "",
+        cap_now: bool = None,
+        env: "Environment" = None,
+        **kwargs,
+    ):
+        if env is None:
+            self.env = g.default_env
+        else:
+            self.env = env
+        _set_name(name, self.env._nameserializeComponent, self)
+        self._qmembers = {}
+        self._process = None
+        self.status = _StatusMonitor(name=self.name() + ".status", level=True, initial_tally=data, env=self.env)
+        self._requests = collections.OrderedDict()
+        self._claims = collections.OrderedDict()
+        self._waits = []
+        self._from_stores = []
+        self._to_stores = []
+        self._on_event_list = False
+        self._scheduled_time = inf
+        self._failed = False
+        self._skip_standby = skip_standby
+        self._creation_time = self.env._now
+        self._suppress_trace = suppress_trace
+        self._suppress_pause_at_step = suppress_pause_at_step
+        self.mode = _ModeMonitor(name=self.name() + ".mode", level=True, initial_tally=mode, env=self.env)
+        self._mode_time = self.env._now
+        self._aos = {}
+        self._animation_children = set()
+
+        if process is None:
+            if hasattr(self, "process"):
+                p = self.process
+                process_name = "process"
+            else:
+                p = None
+        else:
+            if process == "":
+                p = None
+            else:
+                try:
+                    p = getattr(self, process)
+                    process_name = process
+                except AttributeError:
+                    raise AttributeError("self." + process + " does not exist")
+
+        if p is None:
+            if at is not None:
+                raise TypeError("at is not allowed for a data component")
+            if delay is not None:
+                raise TypeError("delay is not allowed for a data component")
+            if urgent is not None:
+                raise TypeError("urgent is not allowed for a data component")
+            if priority is not None:
+                raise TypeError("priority is not allowed for a data component")
+            if self.env._trace:
+                if self._name == "main":
+                    self.env.print_trace("", "", self.name() + " create", self._modetxt())
+                else:
+                    self.env.print_trace("", "", self.name() + " create data component", self._modetxt())
+        else:
+            self.env.print_trace("", "", self.name() + " create", self._modetxt())
+
+            kwargs_p = {}
+            if kwargs:
+                parameters = inspect.signature(p).parameters
+
+                for kwarg in list(kwargs):
+                    if kwarg in parameters:
+                        kwargs_p[kwarg] = kwargs[kwarg]
+                        del kwargs[kwarg]  # here kwargs consumes the used arguments
+            if inspect.isgeneratorfunction(p):
+                if self.env._yieldless:
+                    raise ValueError("process may not be a generator (contain yield statements)")
+                self._process = p(**kwargs_p)
+                self._process_isgenerator = True
+            else:
+                self._process = p
+                self._process_isgenerator = False
+                self._process_kwargs = kwargs_p
+
+            extra = "process=" + process_name
+
+            urgent = bool(urgent)
+            if priority is None:
+                priority = 0
+
+            if delay is None:
+                delay = 0.0
+            elif callable(delay):
+                delay = delay()
+
+            if at is None:
+                scheduled_time = self.env._now + delay
+            else:
+                if callable(at):
+                    at = at()
+                scheduled_time = at + self.env._offset + delay
+            self.status._value = scheduled
+            if self.env._yieldless:
+                self._glet = greenlet.greenlet(self._process, parent=self.env._glet)
+            self._reschedule(scheduled_time, priority, urgent, "activate", cap_now, extra=extra)
+        self.setup(**kwargs)
+
+    overridden_lineno = None
+
+    def animation_objects(self, id: Any) -> Tuple:
+        """
+        defines how to display a component in AnimateQueue
+
+        Parameters
+        ----------
+        id : any
+            id as given by AnimateQueue. Note that by default this the reference to the AnimateQueue object.
+
+        Returns
+        -------
+        List or tuple containg
+
+            size_x : how much to displace the next component in x-direction, if applicable
+
+            size_y : how much to displace the next component in y-direction, if applicable
+
+            animation objects : instances of Animate class
+
+            default behaviour:
+
+            square of size 40 (displacements 50), with the sequence number centered.
+
+        Note
+        ----
+        If you override this method, be sure to use the same header, either with or without the id parameter.
+
+        """
+        size_x = 50
+        size_y = 50
+        ao0 = AnimateRectangle(text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg")
+        return (size_x, size_y, ao0)
+
+    def animation3d_objects(self, id: Any) -> Tuple:
+        """
+        defines how to display a component in Animate3dQueue
+
+        Parameters
+        ----------
+        id : any
+            id as given by Animate3dQueue. Note that by default this the reference to the Animate3dQueue object.
+
+        Returns
+        -------
+        List or tuple containg
+
+            size_x : how much to displace the next component in x-direction, if applicable
+
+            size_y : how much to displace the next component in y-direction, if applicable
+
+            size_z : how much to displace the next component in z-direction, if applicable
+
+            animation objects : instances of Animate3dBase class
+
+            default behaviour:
+
+            white 3dbox of size 8, placed on the z=0 plane (displacements 10).
+
+        Note
+        ----
+        If you override this method, be sure to use the same header, either with or without the id parameter.
+
+
+        Note
+        ----
+        The animation object should support the x_offset, y_offset and z_offset attributes, in order to be able
+        to position the object correctly. All native salabim Animate3d classes are offset aware.
+        """
+        size_x = 10
+        size_y = 10
+        size_z = 10
+        ao0 = Animate3dBox(x_len=8, y_len=8, z_len=8, x_ref=0, y_ref=0, z_ref=1, color="white", shaded=True)
+        return (size_x, size_y, size_z, ao0)
+
+    def _remove_from_aos(self, q):
+        if q in self._aos:
+            for ao in self._aos[q][2:]:
+                ao.remove()
+            del self._aos[q]
+
+    def setup(self) -> None:
+        """
+        called immediately after initialization of a component.
+
+        by default this is a dummy method, but it can be overridden.
+
+        only keyword arguments will be passed
+
+        Example
+        -------
+            class Car(sim.Component):
+                def setup(self, color):
+                    self.color = color
+
+                def process(self):
+                    ...
+
+            redcar=Car(color="red")
+
+            bluecar=Car(color="blue")
+        """
+        pass
+
+    def __repr__(self):
+        return object_to_str(self) + " (" + self.name() + ")"
+
+    def register(self, registry: List) -> "Component":
+        """
+        registers the component in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of (to be) registered objects
+
+        Returns
+        -------
+        component (self) : Component
+
+        Note
+        ----
+        Use Component.deregister if component does not longer need to be registered.
+        """
+        if not isinstance(registry, list):
+            raise TypeError("registry not list")
+        if self in registry:
+            raise ValueError(self.name() + " already in registry")
+        registry.append(self)
+        return self
+
+    def deregister(self, registry: List) -> "Component":
+        """
+        deregisters the component in the registry
+
+        Parameters
+        ----------
+        registry : list
+            list of registered components
+
+        Returns
+        -------
+        component (self) : Component
+        """
+        if not isinstance(registry, list):
+            raise TypeError("registry not list")
+        if self not in registry:
+            raise ValueError(self.name() + " not in registry")
+        registry.remove(self)
+        return self
+
+    def print_info(self, as_str: "bool" = False, file: TextIO = None) -> str:
+        """
+        prints information about the component
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        file: file
+            if None(default), all output is directed to stdout
+
+            otherwise, the output is directed to the file
+
+        Returns
+        -------
+        info (if as_str is True) : str
+        """
+        result = []
+        result.append(object_to_str(self) + " " + hex(id(self)))
+        result.append("  name=" + self.name())
+        result.append("  class=" + str(type(self)).split(".")[-1].split("'")[0])
+        result.append("  suppress_trace=" + str(self._suppress_trace))
+        result.append("  suppress_pause_at_step=" + str(self._suppress_pause_at_step))
+        result.append("  status=" + self.status())
+        result.append("  mode=" + self.mode())
+        result.append("  mode_time=" + self.env.time_to_str(self.mode_time()))
+        result.append("  creation_time=" + self.env.time_to_str(self.creation_time()))
+        result.append("  scheduled_time=" + self.env.time_to_str(self.scheduled_time()))
+        if len(self._qmembers) > 0:
+            result.append("  member of queue(s):")
+            for q in sorted(self._qmembers, key=lambda obj: obj.name().lower()):
+                result.append(
+                    "    "
+                    + pad(q.name(), 20)
+                    + " enter_time="
+                    + self.env.time_to_str(self._qmembers[q].enter_time - self.env._offset)
+                    + " priority="
+                    + str(self._qmembers[q].priority)
+                )
+        if len(self._requests) > 0:
+            result.append("  requesting resource(s):")
+
+            for r in sorted(list(self._requests), key=lambda obj: obj.name().lower()):
+                result.append("    " + pad(r.name(), 20) + " quantity=" + str(self._requests[r]))
+        if len(self._claims) > 0:
+            result.append("  claiming resource(s):")
+
+            for r in sorted(list(self._claims), key=lambda obj: obj.name().lower()):
+                result.append("    " + pad(r.name(), 20) + " quantity=" + str(self._claims[r]))
+        if len(self._waits) > 0:
+            if self._wait_all:
+                result.append("  waiting for all of state(s):")
+            else:
+                result.append("  waiting for any of state(s):")
+            for s, value, _ in self._waits:
+                result.append("    " + pad(s.name(), 20) + " value=" + str(value))
+        return return_or_print(result, as_str, file)
+
+    def _push(self, t, priority, urgent, return_value=None, switch=True):
+        if t != inf:
+            self.env._seq += 1
+            if urgent:
+                seq = -self.env._seq
+            else:
+                seq = self.env._seq
+            self._on_event_list = True
+            heapq.heappush(self.env._event_list, (t, priority, seq, self, return_value))
+        if self.env._yieldless:
+            if self is self.env._current_component:
+                self.env._glet.switch()
+
+    def _remove(self):
+        if self._on_event_list:
+            for i in range(len(self.env._event_list)):
+                if self.env._event_list[i][3] == self:
+                    self.env._event_list[i] = self.env._event_list[0]
+                    self.env._event_list.pop(0)
+                    heapq.heapify(self.env._event_list)
+                    self._on_event_list = False
+                    return
+            raise Exception("remove error", self.name())
+        if self.status.value == standby:
+            if self in self.env._standbylist:
+                self.env._standbylist.remove(self)
+            if self in self.env._pendingstandbylist:
+                self.env._pendingstandbylist.remove(self)
+
+    def _check_fail(self):
+        if self._requests:
+            if self.env._trace:
+                self.env.print_trace("", "", self.name(), "request failed")
+            for r in list(self._requests):
+                self.leave(r._requesters)
+                if r._requesters._length == 0:
+                    r._minq = inf
+            self._requests = collections.OrderedDict()
+            self._failed = True
+
+        if self._waits:
+            if self.env._trace:
+                self.env.print_trace("", "", self.name(), "wait failed")
+            for state, _, _ in self._waits:
+                if self in state._waiters:  # there might be more values for this state
+                    self.leave(state._waiters)
+            self._waits = []
+            self._failed = True
+
+        if self._from_stores:
+            if self.env._trace:
+                self.env.print_trace("", "", self.name(), "from_store failed")
+            for store in list(self._from_stores):
+                self.leave(store._from_store_requesters)
+            self._from_stores = []
+            self._failed = True
+
+        if self._to_stores:
+            if self.env._trace:
+                self.env.print_trace("", "", self.name(), "to_store failed")
+            for store in list(self._to_stores):
+                self.leave(store._to_store_requesters)
+            self._to_stores = []
+            self._failed = True
+
+    def _reschedule(self, scheduled_time, priority, urgent, caller, cap_now, extra="", s0=None, return_value=None):
+        if scheduled_time < self.env._now:
+            if cap_now is None:
+                cap_now = g._default_cap_now
+            if cap_now:
+                scheduled_time = self.env._now
+            else:
+                raise ValueError(f"scheduled time ({scheduled_time:0.3f}) before now ({self.env._now:0.3f})")
+        self._scheduled_time = scheduled_time
+        if self.env._trace:
+            if extra == "*":
+                scheduled_time_str = "ends on no events left  "
+                extra = " "
+            else:
+                scheduled_time_str = "scheduled for " + self.env.time_to_str(scheduled_time - self.env._offset).strip()
+            if (scheduled_time == self.env._now) or (scheduled_time == inf):
+                delta = ""
+            else:
+                delta = f" +{self.env.duration_to_str(scheduled_time - self.env._now)}"
+            lineno = self.lineno_txt(add_at=True)
+            self.env.print_trace(
+                "",
+                "",
+                self.name() + " " + caller + delta,
+                merge_blanks(scheduled_time_str + _prioritytxt(priority) + _urgenttxt(urgent) + lineno, self._modetxt(), extra),
+                s0=s0,
+            )
+        self._push(scheduled_time, priority, urgent, return_value)
+
+    def activate(
+        self,
+        at: Union[float, Callable] = None,
+        delay: Union[Callable, float] = 0,
+        priority: float = 0,
+        urgent: bool = False,
+        process: str = None,
+        keep_request: bool = False,
+        keep_wait: bool = False,
+        mode: str = None,
+        cap_now: bool = None,
+        **kwargs,
+    ) -> None:
+        """
+        activate component
+
+        Parameters
+        ----------
+        at : float or distribution
+            schedule time
+
+            if omitted, now is used
+
+            inf is allowed
+
+            if distribution, the distribution is sampled
+
+        delay : float or distribution
+            schedule with a delay
+
+            if omitted, no delay
+
+            if distribution, the distribution is sampled
+
+        priority : float
+            priority
+
+            default: 0
+
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+
+        urgent : bool
+            urgency indicator
+
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority
+
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority
+
+        process : str
+            name of process to be started.
+
+            if None (default), process will not be changed
+
+            if the component is a data component, the
+            generator function process will be used as the default process.
+
+            note that the function *must* be a generator,
+            i.e. contains at least one yield.
+
+        keep_request : bool
+            this affects only components that are requesting.
+
+            if True, the requests will be kept and thus the status will remain requesting
+
+            if False (the default), the request(s) will be canceled and the status will become scheduled
+
+        keep_wait : bool
+            this affects only components that are waiting.
+
+            if True, the waits will be kept and thus the status will remain waiting
+
+            if False (the default), the wait(s) will be canceled and the status will become scheduled
+
+        cap_now : bool
+            indicator whether times (at, delay) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+
+        mode : str preferred
+            mode
+
+            will be used in the trace and can be used in animations
+
+            if nothing specified, the mode will be unchanged.
+
+            also mode_time will be set to now, if mode is set.
+
+        Note
+        ----
+        if to be applied to the current component, use ``yield self.activate()``.
+
+        if both at and delay are specified, the component becomes current at the sum
+        of the two values.
+        """
+        p = None
+        if process is None:
+            if self.status.value == data:
+                if hasattr(self, "process"):
+                    p = self.process
+                    process_name = "process"
+                else:
+                    raise AttributeError("no process for data component")
+        else:
+            try:
+                p = getattr(self, process)
+                process_name = process
+            except AttributeError:
+                raise AttributeError("self." + process + " does not exist")
+
+        if p is None:
+            extra = ""
+        else:
+            if kwargs:
+                parameters = inspect.signature(p).parameters
+
+                for kwarg in kwargs:
+                    if kwarg not in parameters:
+                        raise TypeError("unexpected keyword argument '" + kwarg + "'")
+
+            if inspect.isgeneratorfunction(p):
+                if self.env._yieldless:
+                    raise ValueError("process may not be a generator (contain yield statements)")
+                self._process = p(**kwargs)
+                self._process_isgenerator = True
+            else:
+                self._process = p
+                self._process_isgenerator = False
+                self._process_kwargs = kwargs
+
+            extra = "process=" + process_name
+            if self.env._yieldless:
+                self._glet = greenlet.greenlet(self._process, parent=self.env._glet)
+
+        if self.status.value != current:
+            self._remove()
+            if p is None:
+                if not (keep_request or keep_wait):
+                    self._check_fail()
+            else:
+                self._check_fail()
+
+        self.set_mode(mode)
+
+        if callable(delay):
+            delay = delay()
+
+        if at is None:
+            scheduled_time = self.env._now + delay
+        else:
+            if callable(at):
+                at = at()
+            scheduled_time = at + self.env._offset + delay
+
+        self.status._value = scheduled
+        self._reschedule(scheduled_time, priority, urgent, "activate", cap_now, extra=extra)
+
+    def hold(
+        self,
+        duration: Union[float, Callable] = None,
+        till: Union[float, Callable] = None,
+        priority: float = 0,
+        urgent: bool = False,
+        mode: str = None,
+        cap_now: bool = None,
+    ) -> None:
+        """
+        hold the component
+
+        Parameters
+        ----------
+        duration : float or distribution
+            specifies the duration
+
+            if omitted, 0 is used
+
+            inf is allowed
+
+            if distribution, the distribution is sampled
+
+        till : float or distribution
+            specifies at what time the component will become current
+
+            if omitted, now is used
+
+            inf is allowed
+
+            if distribution, the distribution is sampled
+
+        priority : float
+            priority
+
+            default: 0
+
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+
+        urgent : bool
+            urgency indicator
+
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority
+
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority
+
+        mode : str preferred
+            mode
+
+            will be used in trace and can be used in animations
+
+            if nothing specified, the mode will be unchanged.
+
+            also mode_time will be set to now, if mode is set.
+
+        cap_now : bool
+            indicator whether times (duration, till) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+
+        Note
+        ----
+        if to be used for the current component, use ``yield self.hold(...)``.
+
+
+        if both duration and till are specified, the component will become current at the sum of
+        these two.
+        """
+        if self.status.value != passive:
+            if self.status.value != current:
+                self._checkisnotdata()
+                self._remove()
+                self._check_fail()
+
+        self.set_mode(mode)
+
+        if till is None:
+            if duration is None:
+                scheduled_time = self.env._now
+            else:
+                if callable(duration):
+                    duration = duration()
+                scheduled_time = self.env._now + duration
+        else:
+            if duration is None:
+                if callable(till):
+                    till = till()
+                scheduled_time = till + self.env._offset
+            else:
+                raise ValueError("both duration and till specified")
+        self.status._value = scheduled
+        self._reschedule(scheduled_time, priority, urgent, "hold", cap_now)
+
+    def passivate(self, mode: str = None) -> None:
+        """
+        passivate the component
+
+        Parameters
+        ----------
+        mode : str preferred
+            mode
+
+            will be used in trace and can be used in animations
+
+            if nothing is specified, the mode will be unchanged.
+
+            also mode_time will be set to now, if mode is set.
+
+        Note
+        ----
+        if to be used for the current component (nearly always the case), use ``yield self.passivate()``.
+        """
+        if self.status.value == current:
+            self._remaining_duration = 0.0
+        else:
+            self._checkisnotdata()
+            self._remove()
+            self._check_fail()
+            self._remaining_duration = self._scheduled_time - self.env._now
+        self._scheduled_time = inf
+
+        self.set_mode(mode)
+        if self.env._trace:
+            lineno = self.lineno_txt(add_at=True)
+            self.env.print_trace("", "", self.name() + " passivate", merge_blanks(lineno, self._modetxt()))
+        self.status._value = passive
+        if self.env._yieldless:
+            self.env._glet.switch()
+
+    def interrupt(self, mode: str = None) -> None:
+        """
+        interrupt the component
+
+        Parameters
+        ----------
+        mode : str preferred
+            mode
+
+            will be used in trace and can be used in animations
+
+            if nothing is specified, the mode will be unchanged.
+
+            also mode_time will be set to now, if mode is set.
+
+        Note
+        ----
+        Cannot be applied on the current component.
+
+        Use resume() to resume
+        """
+        if self.status.value == current:
+            raise ValueError(self.name() + " current component cannot be interrupted")
+        else:
+            self.set_mode(mode)
+            if self.status.value == interrupted:
+                self._interrupt_level += 1
+                extra = "." + str(self._interrupt_level)
+            else:
+                self._checkisnotdata()
+                self._remove()
+                self._remaining_duration = self._scheduled_time - self.env._now
+                self._interrupted_status = self.status.value
+                self._interrupt_level = 1
+                self.status._value = interrupted
+                extra = ""
+            lineno = self.lineno_txt(add_at=True)
+            self.env.print_trace("", "", self.name() + " interrupt" + extra, merge_blanks(lineno, self._modetxt()))
+
+    def resume(self, all: bool = False, mode: str = None, priority: float = 0, urgent: bool = False) -> None:
+        """
+        resumes an interrupted component
+
+        Parameters
+        ----------
+        all : bool
+            if True, the component returns to the original status, regardless of the number of interrupt levels
+
+            if False (default), the interrupt level will be decremented and if the level reaches 0,
+            the component will return to the original status.
+
+        mode : str preferred
+            mode
+
+            will be used in trace and can be used in animations
+
+            if nothing is specified, the mode will be unchanged.
+
+            also mode_time will be set to now, if mode is set.
+
+        priority : float
+            priority
+
+            default: 0
+
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+
+
+        urgent : bool
+            urgency indicator
+
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority
+
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority
+
+        Note
+        ----
+        Can be only applied to interrupted components.
+
+        """
+        if self.status.value == interrupted:
+            self.set_mode(mode)
+            self._interrupt_level -= 1
+            if self._interrupt_level and (not all):
+                self.env.print_trace("", "", self.name() + " resume (interrupted." + str(self._interrupt_level) + ")", merge_blanks(self._modetxt()))
+            else:
+                self.status._value = self._interrupted_status
+                lineno = self.lineno_txt(add_at=True)
+                self.env.print_trace("", "", self.name() + " resume (" + self.status() + ")", merge_blanks(lineno, self._modetxt()))
+                if self.status.value == passive:
+                    self.env.print_trace("", "", self.name() + " passivate", merge_blanks(lineno, self._modetxt()))
+                elif self.status.value == standby:
+                    self._scheduled_time = self.env._now
+                    self.env._standbylist.append(self)
+                    self.env.print_trace("", "", self.name() + " standby", merge_blanks(lineno, self._modetxt()))
+                elif self.status.value in (scheduled, waiting, requesting):
+                    if self.status.value == waiting:
+                        if self._waits:
+                            if self._trywait():
+                                return
+                            reason = "wait"
+                    elif self.status.value == requesting:
+                        if self._tryrequest():
+                            return
+                        reason = "request"
+                    elif self.status.value == scheduled:
+                        reason = "hold"
+                    self._reschedule(self.env._now + self._remaining_duration, priority, urgent, reason, False)
+                else:
+                    raise Exception(self.name() + " unexpected interrupted_status", self.status.value())
+        else:
+            raise ValueError(self.name() + " not interrupted")
+
+    def cancel(self, mode: str = None) -> None:
+        """
+        cancel component (makes the component data)
+
+        Parameters
+        ----------
+        mode : str preferred
+            mode
+
+            will be used in trace and can be used in animations
+
+            if nothing specified, the mode will be unchanged.
+
+            also mode_time will be set to now, if mode is set.
+
+        Note
+        ----
+        if to be used for the current component, use ``yield self.cancel()``.
+        """
+        if self.status.value != current:
+            self._checkisnotdata()
+            self._remove()
+            self._check_fail()
+        self._process = None
+        self._scheduled_time = inf
+        self.set_mode(mode)
+        if self.env._trace:
+            self.env.print_trace("", "", "cancel " + self.name() + " " + self._modetxt())
+        self.status._value = data
+
+    def standby(self, mode: str = None) -> None:
+        """
+        puts the component in standby mode
+
+        Parameters
+        ----------
+        mode : str preferred
+            mode
+
+            will be used in trace and can be used in animations
+
+            if nothing specified, the mode will be unchanged.
+
+            also mode_time will be set to now, if mode is set.
+
+        Note
+        ----
+        Not allowed for data components or main.
+
+        if to be used for the current component
+        (which will be nearly always the case),
+        use ``yield self.standby()``.
+        """
+        if self.status.value != current:
+            self._checkisnotdata()
+            self._checkisnotmain()
+            self._remove()
+            self._check_fail()
+        self._scheduled_time = self.env._now
+        self.env._standbylist.append(self)
+        self.set_mode(mode)
+        if self.env._trace:
+            if self.env._buffered_trace:
+                self.env._buffered_trace = False
+            else:
+                lineno = self.lineno_txt(add_at=True)
+                self.env.print_trace("", "", "standby", merge_blanks(lineno, self._modetxt()))
+        self.status._value = standby
+        if self.env._yieldless:
+            self.env._glet.switch()
+
+    def from_store(
+        self,
+        store: Union["Store", Iterable],
+        filter: Callable = lambda c: True,
+        fail_priority: float = 0,
+        urgent: bool = True,
+        fail_at: float = None,
+        fail_delay: float = None,
+        mode: str = None,
+        cap_now: bool = None,
+        key: callable = None,
+    ) -> "Component":
+        """
+        get item from store(s)
+
+        Parameters
+        ----------
+        store : store or iterable stores
+            store(s) to get item from
+
+        filter : callable
+            only components that return True when applied to them will be considered
+
+            should be a function with one parameter(component) and returning a bool
+
+            default: lambda c: True (i.e. always return True)
+
+        fail_priority : float
+            priority of the fail event
+
+            default: 0
+
+            if a component has the same time on the event list, this component is sorted according to
+            the priority.
+
+        urgent : bool
+            urgency indicator
+
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority
+
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority
+
+        fail_at : float or distribution
+            time out
+
+            if the request is not honored before fail_at,
+            the request will be cancelled and the
+            parameter failed will be set.
+
+            if not specified, the request will not time out.
+
+            if distribution, the distribution is sampled
+
+        fail_delay : float or distribution
+            time out
+
+            if the request is not honored before now+fail_delay,
+            the request will be cancelled and the
+            parameter failed will be set.
+
+            if not specified, the request will not time out.
+
+            if distribution, the distribution is sampled
+
+        mode : str preferred
+            mode
+
+            will be used in trace and can be used in animations
+
+            if nothing specified, the mode will be unchanged.
+
+            also mode_time will be set to now, if mode is set.
+
+        cap_now : bool
+            indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+
+        key : callable
+            should be a function with one parameter (a component) and return a key value, to be used
+            to compare components (most likely a number or string).
+
+            The component with lowest key value (satisfying the filter condition) will be returned.
+
+            If omitted, no sorting will be applied.
+
+        Note
+        ----
+        Only allowed for current component
+
+        Always use as
+        use ``item = yield self.from_store(...)``.
+
+        The parameter failed will be reset by a calling request, wait, from_store or to_store
+        """
+
+        if isinstance(store, Store):
+            from_stores = [store]
+        else:
+            from_stores = list(store)
+            if len(set(from_stores)) != len(from_stores):
+                raise ValueError("one or more stores specified more than once")
+            if len(from_stores) == 0:
+                raise ValueError("no stores specified")
+
+        if self.status.value != current:
+            self._checkisnotdata()
+            self._checkisnotmain()
+            self._remove()
+            self._check_fail()
+
+        if fail_at is None:
+            if fail_delay is None:
+                scheduled_time = inf
+            else:
+                if fail_delay == inf:
+                    scheduled_time = inf
+                else:
+                    if callable(fail_delay):
+                        fail_delay = fail_delay()
+                    scheduled_time = self.env._now + fail_delay
+        else:
+            if fail_delay is None:
+                if callable(fail_at):
+                    fail_at = fail_at()
+                scheduled_time = fail_at + self.env._offset
+            else:
+                raise ValueError("both fail_at and fail_delay specified")
+
+        self.set_mode(mode)
+
+        self._failed = False
+
+        if self.env._trace:
+            self.env.print_trace("", "", self.name(), f"from_store ({', '.join(store._name for store in from_stores)})")
+
+        found_c = None
+        found_key = None
+        done = False
+        for store in from_stores:
+            for c in store:
+                if filter(c):
+                    if key:
+                        this_key = key(c)
+                        if found_key is None or this_key < found_key:
+                            found_c = c
+                            found_key = this_key
+                    else:
+                        found_c = c
+                        done = True
+                        break
+            if done:
+                break
+        if found_c:
+            found_c.leave(store)
+            self._from_store_item = found_c
+            self._from_store_store = store
+            self._remove()
+            self.status._value = scheduled
+            self._reschedule(
+                self.env._now, 0, False, f"from_store ({store.name()}) honor with {found_c.name()}", False, s0=self.env.last_s0, return_value=found_c
+            )
+
+        self._from_stores = from_stores
+        for store in from_stores:
+            self.enter(store._from_store_requesters)
+        self.status._value = requesting
+        self._from_store_item = None
+        self._from_store_filter = filter
+
+        self._reschedule(scheduled_time, fail_priority, urgent, "request from_store", cap_now)
+        if self.env._yieldless:
+            return self._from_store_item
+
+    def to_store(
+        self,
+        store: Union["Store", Iterable],
+        item: "Component",
+        priority: float = 0,
+        fail_priority: float = 0,
+        urgent: bool = True,
+        fail_at: float = None,
+        fail_delay: float = None,
+        mode: str = None,
+        cap_now: bool = None,
+    ) -> "Component":
+        """
+        put item to store(s)
+
+        Parameters
+        ----------
+        store : store or iterable stores
+            store(s) to put item to
+
+        item: Component
+            component to put to store
+
+        fail_priority : float
+            priority of the fail event
+
+            default: 0
+
+            if a component has the same time on the event list, this component is sorted according to
+            the priority.
+
+        urgent : bool
+            urgency indicator
+
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority
+
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority
+
+        fail_at : float or distribution
+            time out
+
+            if the request is not honored before fail_at,
+            the request will be cancelled and the
+            parameter failed will be set.
+
+            if not specified, the request will not time out.
+
+            if distribution, the distribution is sampled
+
+        fail_delay : float or distribution
+            time out
+
+            if the request is not honored before now+fail_delay,
+            the request will be cancelled and the
+            parameter failed will be set.
+
+            if not specified, the request will not time out.
+
+            if distribution, the distribution is sampled
+
+        mode : str preferred
+            mode
+
+            will be used in trace and can be used in animations
+
+            if nothing specified, the mode will be unchanged.
+
+            also mode_time will be set to now, if mode is set.
+
+        cap_now : bool
+            indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+
+        Note
+        ----
+        Only allowed for current component
+
+        Always use as
+        use ``yield self.to_store(...)``.
+
+        The parameter failed will be reset by a calling request, wait, from_store, to_store
+        """
+        if isinstance(store, Store):
+            to_stores = [store]
+        else:
+            to_stores = list(store)
+            if len(set(to_stores)) != len(to_stores):
+                raise ValueError("one or more stores specified more than once")
+            if len(to_stores) == 0:
+                raise ValueError("no stores specified")
+
+        if self.status.value != current:
+            self._checkisnotdata()
+            self._checkisnotmain()
+            self._remove()
+            self._check_fail()
+
+        if fail_at is None:
+            if fail_delay is None:
+                scheduled_time = inf
+            else:
+                if fail_delay == inf:
+                    scheduled_time = inf
+                else:
+                    if callable(fail_delay):
+                        fail_delay = fail_delay()
+                    scheduled_time = self.env._now + fail_delay
+        else:
+            if fail_delay is None:
+                if callable(fail_at):
+                    fail_at = fail_at()
+                scheduled_time = fail_at + self.env._offset
+            else:
+                raise ValueError("both fail_at and fail_delay specified")
+
+        self.set_mode(mode)
+
+        self._failed = False
+
+        if self.env._trace:
+            self.env.print_trace("", "", self.name(), f"{item._name} to_store ({', '.join(store._name for store in to_stores)})")
+        for store in to_stores:
+            q = store
+            if q.available_quantity() > 0:
+                item.enter_sorted(q, priority)
+                self._to_store_item = None
+                self._to_store_store = store
+                self._remove()
+                self.status._value = scheduled
+                self._reschedule(self.env._now, 0, False, f"to_store ({store.name()}) honor with {item.name()}", False, s0=self.env.last_s0)
+                return
+
+        for store in to_stores:
+            self.enter(store._to_store_requesters)
+
+        self.status._value = requesting
+        self._to_store_item = item
+        self._to_store_priority = priority
+        self._to_stores = to_stores
+
+        if self._to_store_item:
+            self._reschedule(scheduled_time, fail_priority, urgent, "request to_store", cap_now)
+
+    def filter(self, value: callable):
+        """
+        updates the filter used in yield self.from_to
+
+        Parameters
+        ----------
+        value : callable
+            new filter, which should be a function with one parameter(component) and returning a bool
+
+        Note
+        ----
+        After applying the new filter, items (components) may leave or enter the store
+        """
+        self._from_store_filter = value
+        for store in self._from_stores:
+            store.rescan()
+
+    def request(self, *args, **kwargs) -> None:
+        """
+        request from a resource or resources
+
+        Parameters
+        ----------
+        args : sequence of items where each item can be:
+            - resource, where quantity=1, priority=tail of requesters queue
+            - tuples/list containing a resource, a quantity and optionally a priority.
+                if the priority is not specified, the request
+                for the resource be added to the tail of
+                the requesters queue
+
+
+        priority : float
+            priority of the fail event
+
+            default: 0
+
+            if a component has the same time on the event list, this component is sorted according to
+            the priority.
+
+        urgent : bool
+            urgency indicator
+
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority
+
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority
+
+        fail_at : float or distribution
+            time out
+
+            if the request is not honored before fail_at,
+            the request will be cancelled and the
+            parameter failed will be set.
+
+            if not specified, the request will not time out.
+
+            if distribution, the distribution is sampled
+
+        fail_delay : float or distribution
+            time out
+
+            if the request is not honored before now+fail_delay,
+            the request will be cancelled and the
+            parameter failed will be set.
+
+            if not specified, the request will not time out.
+
+            if distribution, the distribution is sampled
+
+        oneof : bool
+            if oneof is True, just one of the requests has to be met (or condition),
+            where honoring follows the order given.
+
+            if oneof is False (default), all requests have to be met to be honored
+
+        mode : str preferred
+            mode
+
+            will be used in trace and can be used in animations
+
+            if nothing specified, the mode will be unchanged.
+
+            also mode_time will be set to now, if mode is set.
+
+        cap_now : bool
+            indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+
+        Note
+        ----
+        Not allowed for data components or main.
+
+        If to be used for the current component
+        (which will be nearly always the case),
+        use ``yield self.request(...)``.
+
+        If the same resource is specified more that once, the quantities are summed
+
+
+        The requested quantity may exceed the current capacity of a resource
+
+
+        The parameter failed will be reset by a calling request or wait
+
+        Example
+        -------
+        ``yield self.request(r1)``
+
+        --> requests 1 from r1
+
+        ``yield self.request(r1,r2)``
+
+        --> requests 1 from r1 and 1 from r2
+
+        ``yield self.request(r1,(r2,2),(r3,3,100))``
+
+        --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100
+
+        ``yield self.request((r1,1),(r2,2))``
+
+        --> requests 1 from r1, 2 from r2
+
+        ``yield self.request(r1, r2, r3, oneoff=True)``
+
+        --> requests 1 from r1, r2 or r3
+
+        """
+        fail_at = kwargs.pop("fail_at", None)
+        fail_delay = kwargs.pop("fail_delay", None)
+        mode = kwargs.pop("mode", None)
+        urgent = kwargs.pop("urgent", False)
+        schedule_priority = kwargs.pop("priority", 0)
+        cap_now = kwargs.pop("cap_now", None)
+
+        self.oneof_request = kwargs.pop("oneof", False)
+        called_from = kwargs.pop("called_from", "request")
+        if kwargs:
+            raise TypeError(called_from + "() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
+
+        if self.status.value != current:
+            self._checkisnotdata()
+            self._checkisnotmain()
+            self._remove()
+            self._check_fail()
+        if fail_at is None:
+            if fail_delay is None:
+                scheduled_time = inf
+            else:
+                if fail_delay == inf:
+                    scheduled_time = inf
+                else:
+                    if callable(fail_delay):
+                        fail_delay = fail_delay()
+                    scheduled_time = self.env._now + fail_delay
+        else:
+            if fail_delay is None:
+                if callable(fail_at):
+                    fail_at = fail_at()
+                scheduled_time = fail_at + self.env._offset
+            else:
+                raise ValueError("both fail_at and fail_delay specified")
+
+        self.set_mode(mode)
+
+        self._failed = False
+        for arg in args:
+            q = 1
+            priority = inf
+            if isinstance(arg, Resource):
+                r = arg
+            elif isinstance(arg, (tuple, list)):
+                r = arg[0]
+                if len(arg) >= 2:
+                    q = arg[1]
+                if len(arg) >= 3:
+                    priority = arg[2]
+            else:
+                raise TypeError("incorrect specifier", arg)
+
+            if r._preemptive:
+                if len(args) > 1:
+                    raise ValueError("preemptive resources do not support multiple resource requests")
+
+            if called_from == "put":
+                q = -q
+
+            if q < 0 and not r._anonymous:
+                raise ValueError("quantity " + str(q) + " <0")
+            if r in self._requests:
+                self._requests[r] += q  # is same resource is specified several times, just add them up
+            else:
+                self._requests[r] = q
+            if called_from == "request":
+                req_text = "request " + str(q) + " from "
+            elif called_from == "put":
+                req_text = "put (request) " + str(-q) + " to "
+            elif called_from == "get":
+                req_text = "get (request) " + str(q) + " from "
+
+            addstring = ""
+            addstring += " priority=" + str(priority)
+
+            if self.oneof_request:
+                addstring += " (oneof)"
+
+            self.enter_sorted(r._requesters, priority)
+            if self.env._trace:
+                self.env.print_trace("", "", self.name(), req_text + r.name() + addstring)
+
+            if r._preemptive:
+                av = r.available_quantity()
+                this_claimers = r.claimers()
+                bump_candidates = []
+                for c in reversed(r.claimers()):
+                    if av >= q:
+                        break
+                    if priority >= c.priority(this_claimers):
+                        break
+                    av += c.claimed_quantity(this_claimers)
+                    bump_candidates.append(c)
+                if av >= 0:
+                    for c in bump_candidates:
+                        c._release(r, bumped_by=self)
+                        c.activate()
+        for r, q in self._requests.items():
+            if q < r._minq:
+                r._minq = q
+
+        self._tryrequest()
+
+        if self._requests:
+            self.status._value = requesting
+            self._reschedule(scheduled_time, schedule_priority, urgent, "request", cap_now)
+
+
+    def isbumped(self, resource: "Resource" = None) -> bool:
+        """
+        check whether component is bumped from resource
+
+        Parameters
+        ----------
+        resource : Resource
+            resource to be checked
+            if omitted, checks whether component belongs to any resource claimers
+
+        Returns
+        -------
+        True if this component is not in the resource claimers : bool
+            False otherwise
+        """
+        return not self.isclaiming(resource)
+
+    def isclaiming(self, resource: "Resource" = None) -> bool:
+        """
+        check whether component is claiming from resource
+
+        Parameters
+        ----------
+        resource : Resource
+            resource to be checked
+            if omitted, checks whether component is in any resource claimers
+
+        Returns
+        -------
+        True if this component is in the resource claimers : bool
+            False otherwise
+        """
+        if resource is None:
+            for q in self._qmembers:
+                if hasattr(q, "_isclaimers"):
+                    return True
+            return False
+        else:
+            return self in resource.claimers()
+
+    def get(self, *args, **kwargs) -> None:
+        """
+        equivalent to request
+        """
+        return self.request(*args, called_from="get", **kwargs)
+
+    def put(self, *args, **kwargs) -> None:
+        """
+        equivalent to request, but anonymous quantities are negated
+        """
+        return self.request(*args, called_from="put", **kwargs)
+
+    def honor_all(self):
+        for r in self._requests:
+            if r._honor_only_first and r._requesters[0] != self:
+                return []
+            self_prio = self.priority(r._requesters)
+            if r._honor_only_highest_priority and self_prio != r._requesters._head.successor.priority:
+                return []
+            if self._requests[r] > 0:
+                if self._requests[r] > (r._capacity - r._claimed_quantity + 1e-8):
+                    return []
+            else:
+                if -self._requests[r] > r._claimed_quantity + 1e-8:
+                    return []
+        return list(self._requests.keys())
+
+    def honor_any(self):
+        for r in self._requests:
+            if r._honor_only_first and r._requesters[0] != self:
+                continue
+            self_prio = self.priority(r._requesters)
+            if r._honor_only_highest_priority and self_prio != r._requesters._head.successor.priority:
+                continue
+
+            if self._requests[r] > 0:
+                if self._requests[r] <= (r._capacity - r._claimed_quantity + 1e-8):
+                    return [r]
+            else:
+                if -self._requests[r] <= r._claimed_quantity + 1e-8:
+                    return [r]
+        return []
+
+    def _tryrequest(self):
+        # this is Component._tryrequest
+        if self.status.value == interrupted:
+            return False
+
+        if self.oneof_request:
+            r_honor = self.honor_any()
+        else:
+            r_honor = self.honor_all()
+
+        if r_honor:
+            anonymous_resources = []
+            for r in list(self._requests):
+                if r._anonymous:
+                    anonymous_resources.append(r)
+                if r in r_honor:
+                    r._claimed_quantity += self._requests[r]
+                    this_prio = self.priority(r._requesters)
+                    if r._anonymous:
+                        prio_trace = ""
+                    else:
+                        if r in self._claims:
+                            self._claims[r] += self._requests[r]
+                        else:
+                            self._claims[r] = self._requests[r]
+                        mx = self._member(r._claimers)
+                        if mx is None:
+                            self.enter_sorted(r._claimers, this_prio)
+                        prio_trace = " priority=" + str(this_prio)
+                    r.claimed_quantity.tally(r._claimed_quantity)
+                    r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
+                    r.available_quantity.tally(r._capacity - r._claimed_quantity)
+                    if self.env._trace:
+                        self.env.print_trace("", "", self.name(), "claim " + str(r._claimed_quantity) + " from " + r.name() + prio_trace)
+                self.leave(r._requesters)
+                if r._requesters._length == 0:
+                    r._minq = inf
+
+            self._requests = collections.OrderedDict()
+            self._remove()
+            honoredstr = r_honor[0].name() + (len(r_honor) > 1) * " ++"
+            self.status._value = scheduled
+            self._reschedule(self.env._now, 0, False, "request honor " + honoredstr, False, s0=self.env.last_s0)
+            for r in anonymous_resources:
+                r._tryrequest()
+            return True
+        else:
+            return False
+
+    def _release(self, r, q=None, s0=None, bumped_by=None):
+        if r not in self._claims:
+            raise ValueError(self.name() + " not claiming from resource " + r.name())
+        if q is None:
+            q = self._claims[r]
+        if q > self._claims[r]:
+            q = self._claims[r]
+        r._claimed_quantity -= q
+        self._claims[r] -= q
+        if self._claims[r] < 1e-8:
+            self.leave(r._claimers)
+            if r._claimers._length == 0:
+                r._claimed_quantity = 0  # to avoid rounding problems
+            del self._claims[r]
+        r.claimed_quantity.tally(r._claimed_quantity)
+        r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
+        r.available_quantity.tally(r._capacity - r._claimed_quantity)
+        extra = " bumped by " + bumped_by.name() if bumped_by else ""
+        if self.env._trace:
+            if bumped_by:
+                self.env.print_trace("", "", self.name(), "bumped from " + r.name() + " by " + bumped_by.name() + " (release " + str(q) + ")", s0=s0)
+            else:
+                self.env.print_trace("", "", self.name(), "release " + str(q) + " from " + r.name() + extra, s0=s0)
+        if not bumped_by:
+            r._tryrequest()
+
+    def release(self, *args) -> None:
+        """
+        release a quantity from a resource or resources
+
+        Parameters
+        ----------
+        args : sequence of items, where each items can be
+            - a resources, where quantity=current claimed quantity
+            - a tuple/list containing a resource and the quantity to be released
+
+        Note
+        ----
+        It is not possible to release from an anonymous resource, this way.
+        Use Resource.release() in that case.
+
+        Example
+        -------
+        yield self.request(r1,(r2,2),(r3,3,100))
+
+        --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100
+
+
+        c1.release
+
+        --> releases 1 from r1, 2 from r2 and 3 from r3
+
+
+        yield self.request(r1,(r2,2),(r3,3,100))
+
+        c1.release((r2,1))
+
+        --> releases 1 from r2
+
+
+        yield self.request(r1,(r2,2),(r3,3,100))
+
+        c1.release((r2,1),r3)
+
+        --> releases 2 from r2,and 3 from r3
+        """
+        if args:
+            for arg in args:
+                q = None
+                if isinstance(arg, Resource):
+                    r = arg
+                elif isinstance(arg, (tuple, list)):
+                    r = arg[0]
+                    if len(arg) >= 2:
+                        q = arg[1]
+                else:
+                    raise TypeError("incorrect specifier" + arg)
+                if r._anonymous:
+                    raise ValueError("not possible to release anonymous resources " + r.name())
+                self._release(r, q)
+        else:
+            for r in list(self._claims):
+                self._release(r)
+
+    def wait(self, *args, **kwargs) -> None:
+        """
+        wait for any or all of the given state values are met
+
+        Parameters
+        ----------
+        args : sequence of items, where each item can be
+            - a state, where value=True, priority=tail of waiters queue)
+            - a tuple/list containing
+
+                state, a value and optionally a priority.
+
+                if the priority is not specified, this component will
+                be added to the tail of
+                the waiters queue
+
+
+        priority : float
+            priority of the fail event
+
+            default: 0
+
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+
+        urgent : bool
+            urgency indicator
+
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority
+
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority
+
+        fail_at : float or distribution
+            time out
+
+            if the wait is not honored before fail_at,
+            the wait will be cancelled and the
+            parameter failed will be set.
+
+            if not specified, the wait will not time out.
+
+            if distribution, the distribution is sampled
+
+        fail_delay : float or distribution
+            time out
+
+            if the wait is not honored before now+fail_delay,
+            the request will be cancelled and the
+            parameter failed will be set.
+
+            if not specified, the wait will not time out.
+
+            if distribution, the distribution is sampled
+
+        all : bool
+            if False (default), continue, if any of the given state/values is met
+
+            if True, continue if all of the given state/values are met
+
+        mode : str preferred
+            mode
+
+            will be used in trace and can be used in animations
+
+            if nothing specified, the mode will be unchanged.
+
+            also mode_time will be set to now, if mode is set.
+
+        cap_now : bool
+            indicator whether times (fail_at, fail_duration) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+
+        Note
+        ----
+        Not allowed for data components or main.
+
+        If to be used for the current component
+        (which will be nearly always the case),
+        use ``yield self.wait(...)``.
+
+        It is allowed to wait for more than one value of a state
+
+        the parameter failed will be reset by a calling wait
+
+        If you want to check for all components to meet a value (and clause),
+        use Component.wait(..., all=True)
+
+        The value may be specified in three different ways:
+
+        * constant, that value is just compared to state.value()
+
+          yield self.wait((light,"red"))
+        * an expression, containg one or more $-signs
+          the $ is replaced by state.value(), each time the condition is tested.
+
+          self refers to the component under test, state refers to the state
+          under test.
+
+          yield self.wait((light,'$ in ("red","yellow")'))
+
+          yield self.wait((level,"$<30"))
+
+        * a function. In that case the parameter should function that
+          should accept three arguments: the value, the component under test and the
+          state under test.
+
+          usually the function will be a lambda function, but that's not
+          a requirement.
+
+          yield self.wait((light,lambda t, comp, state: t in ("red","yellow")))
+
+          yield self.wait((level,lambda t, comp, state: t < 30))
+
+
+        Example
+        -------
+        ``yield self.wait(s1)``
+
+        --> waits for s1.value()==True
+
+        ``yield self.wait(s1,s2)``
+
+        --> waits for s1.value()==True or s2.value==True
+
+        ``yield self.wait((s1,False,100),(s2,"on"),s3)``
+
+        --> waits for s1.value()==False or s2.value=="on" or s3.value()==True
+
+        s1 is at the tail of waiters, because of the set priority
+
+        ``yield self.wait(s1,s2,all=True)``
+
+        --> waits for s1.value()==True and s2.value==True
+
+        """
+        fail_at = kwargs.pop("fail_at", None)
+        fail_delay = kwargs.pop("fail_delay", None)
+        all = kwargs.pop("all", False)
+        mode = kwargs.pop("mode", None)
+        urgent = kwargs.pop("urgent", False)
+        schedule_priority = kwargs.pop("priority", 0)
+        cap_now = kwargs.pop("cap_now", None)
+
+        if kwargs:
+            raise TypeError("wait() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
+
+        if self.status.value != current:
+            self._checkisnotdata()
+            self._checkisnotmain()
+            self._remove()
+            self._check_fail()
+
+        self._wait_all = all
+        self._failed = False
+
+        if fail_at is None:
+            if fail_delay is None:
+                scheduled_time = inf
+            else:
+                if fail_delay == inf:
+                    scheduled_time = inf
+                else:
+                    if callable(fail_delay):
+                        fail_delay = fail_delay()
+                    scheduled_time = self.env._now + fail_delay
+        else:
+            if fail_delay is None:
+                if callable(fail_at):
+                    fail_at = fail_at()
+                scheduled_time = fail_at + self.env._offset
+            else:
+                raise ValueError("both fail_at and fail_delay specified")
+
+        self.set_mode(mode)
+
+        for arg in args:
+            value = True
+            priority = None
+            if isinstance(arg, State):
+                state = arg
+            elif isinstance(arg, (tuple, list)):
+                state = arg[0]
+                if not isinstance(state, State):
+                    raise TypeError("incorrect specifier", arg)
+                if len(arg) >= 2:
+                    value = arg[1]
+                if len(arg) >= 3:
+                    priority = arg[2]
+                if len(arg) >= 4:
+                    raise TypeError("incorrect specifier", arg)
+            else:
+                raise TypeError("incorrect specifier", arg)
+
+            for statex, _, _ in self._waits:
+                if statex == state:
+                    break
+            else:
+                if priority is None:
+                    self.enter(state._waiters)
+                else:
+                    self.enter_sorted(state._waiters, priority)
+            if inspect.isfunction(value):
+                self._waits.append((state, value, 2))
+            elif "$" in str(value):
+                self._waits.append((state, value, 1))
+            else:
+                self._waits.append((state, value, 0))
+
+        if not self._waits:
+            raise TypeError("no states specified")
+        self._trywait()
+
+        if self._waits:
+            self.status._value = waiting
+            self._reschedule(scheduled_time, schedule_priority, urgent, "wait", cap_now)
+        else:
+            if self.env._yieldless:
+                self.env._glet.switch()
+
+    def _trywait(self):
+        if self.status.value == interrupted:
+            return False
+        if self._wait_all:
+            honored = True
+            for state, value, valuetype in self._waits:
+                if valuetype == 0:
+                    if value != state._value:
+                        honored = False
+                        break
+                elif valuetype == 1:
+                    if eval(value.replace("$", "state._value")):
+                        honored = False
+                        break
+                elif valuetype == 2:
+                    if not value(state._value, self, state):
+                        honored = False
+                        break
+
+        else:
+            honored = False
+            for state, value, valuetype in self._waits:
+                if valuetype == 0:
+                    if value == state._value:
+                        honored = True
+                        break
+                elif valuetype == 1:
+                    if eval(value.replace("$", str(state._value))):
+                        honored = True
+                        break
+                elif valuetype == 2:
+                    if value(state._value, self, state):
+                        honored = True
+                        break
+
+        if honored:
+            for s, _, _ in self._waits:
+                if self in s._waiters:  # there might be more values for this state
+                    self.leave(s._waiters)
+            self._waits = []
+            self._remove()
+            self.status._value = scheduled
+            self._reschedule(self.env._now, 0, False, "wait honor", False, s0=self.env.last_s0)
+
+        return honored
+
+    def claimed_quantity(self, resource: "Resource" = None) -> float:
+        """
+        Parameters
+        ----------
+        resource : Resoure
+            resource to be queried
+
+        Returns
+        -------
+        the claimed quantity from a resource : float or int
+            if the resource is not claimed, 0 will be returned
+        """
+        return self._claims.get(resource, 0)
+
+    def claimed_resources(self) -> List:
+        """
+        Returns
+        -------
+        list of claimed resources : list
+        """
+        return list(self._claims)
+
+    def requested_resources(self) -> List:
+        """
+        Returns
+        -------
+        list of requested resources : list
+        """
+        return list(self._requests)
+
+    def requested_quantity(self, resource: "Resource" = None) -> float:
+        """
+        Parameters
+        ----------
+        resource : Resoure
+            resource to be queried
+
+        Returns
+        -------
+        the requested (not yet honored) quantity from a resource : float or int
+            if there is no request for the resource, 0 will be returned
+        """
+        return self._requests.get(resource, 0)
+
+    def failed(self) -> bool:
+        """
+        Returns
+        -------
+        True, if the latest request/wait has failed (either by timeout or external) : bool
+        False, otherwise
+        """
+        return self._failed
+
+    def name(self, value: str = None) -> str:
+        """
+        Parameters
+        ----------
+        value : str
+            new name of the component
+            if omitted, no change
+
+        Returns
+        -------
+        Name of the component : str
+
+        Note
+        ----
+        base_name and sequence_number are not affected if the name is changed
+        """
+        if value is not None:
+            self._name = value
+        return self._name
+
+    def base_name(self) -> str:
+        """
+        Returns
+        -------
+        base name of the component (the name used at initialization): str
+        """
+        return self._base_name
+
+    def sequence_number(self) -> int:
+        """
+        Returns
+        -------
+        sequence_number of the component : int
+            (the sequence number at initialization)
+
+            normally this will be the integer value of a serialized name,
+            but also non serialized names (without a dotcomma at the end)
+            will be numbered)
+        """
+        return self._sequence_number
+
+    def running_process(self) -> str:
+        """
+        Returns
+        -------
+        name of the running process : str
+            if data component, None
+        """
+        if self._process is None:
+            return None
+        else:
+            return self._process.__name__
+
+    def remove_animation_children(self) -> None:
+        """
+        removes animation children
+
+        Note
+        ----
+        Normally, the animation_children are removed automatically upon termination of a component (when it terminates)
+        """
+        for ao in self._animation_children:
+            ao.remove()
+        self._animation_children = set()
+
+    def suppress_trace(self, value: bool = None) -> bool:
+        """
+        Parameters
+        ----------
+        value: bool
+            new suppress_trace value
+
+            if omitted, no change
+
+        Returns
+        -------
+        suppress_trace : bool
+            components with the suppress_status of True, will be ignored in the trace
+        """
+        if value is not None:
+            self._suppress_trace = value
+        return self._suppress_trace
+
+    def suppress_pause_at_step(self, value: bool = None) -> bool:
+        """
+        Parameters
+        ----------
+        value: bool
+            new suppress_trace value
+
+            if omitted, no change
+
+        Returns
+        -------
+        suppress_pause_at_step : bool
+            components with the suppress_pause_at_step of True, will be ignored in a step
+        """
+        if value is not None:
+            self._suppress_pause_at_step = value
+        return self._suppress_pause_at_step
+
+    def skip_standby(self, value: bool = None) -> bool:
+        """
+        Parameters
+        ----------
+        value: bool
+            new skip_standby value
+
+            if omitted, no change
+
+        Returns
+        -------
+        skip_standby indicator : bool
+            components with the skip_standby indicator of True, will not activate standby components after
+            the component became current.
+        """
+        if value is not None:
+            self._skip_standby = value
+        return self._skip_standby
+
+    def set_mode(self, value: str = None) -> None:
+        """
+        Parameters
+        ----------
+        value: any, str recommended
+            new mode
+
+            mode_time will be set to now
+            if omitted, no change
+        """
+        if value is not None:
+            self._mode_time = self.env._now
+            self.mode.tally(value)
+
+    def _modetxt(self) -> str:
+        if self.mode() == "":
+            return ""
+        else:
+            return "mode=" + str(self.mode())
+
+    def ispassive(self) -> bool:
+        """
+        Returns
+        -------
+        True if status is passive, False otherwise : bool
+
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True!
+        """
+        return self.status.value == passive
+
+    def iscurrent(self) -> bool:
+        """
+        Returns
+        -------
+        True if status is current, False otherwise : bool
+
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True!
+        """
+        return self.status.value == current
+
+    def isrequesting(self):
+        """
+        Returns
+        -------
+        True if status is requesting, False otherwise : bool
+
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True!
+        """
+        return self.status.value == requesting
+
+    def iswaiting(self) -> bool:
+        """
+        Returns
+        -------
+        True if status is waiting, False otherwise : bool
+
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True!
+        """
+        return self.status.value == waiting
+
+    def isscheduled(self) -> bool:
+        """
+        Returns
+        -------
+        True if status is scheduled, False otherwise : bool
+
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True!
+        """
+        return self.status.value == scheduled
+
+    def isstandby(self) -> bool:
+        """
+        Returns
+        -------
+        True if status is standby, False otherwise : bool
+
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True
+        """
+        return self.status.value == standby
+
+    def isinterrupted(self) -> bool:
+        """
+        Returns
+        -------
+        True if status is interrupted, False otherwise : bool
+
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True
+        """
+        return self.status.value == interrupted
+
+    def isdata(self) -> bool:
+        """
+        Returns
+        -------
+        True if status is data, False otherwise : bool
+
+        Note
+        ----
+        Be sure to always include the parentheses, otherwise the result will be always True!
+        """
+        return self.status.value == data
+
+    def queues(self) -> Set:
+        """
+        Returns
+        -------
+        set of queues where the component belongs to : set
+        """
+        return set(self._qmembers)
+
+    def count(self, q: "Queue" = None) -> int:
+        """
+        queue count
+
+        Parameters
+        ----------
+        q : Queue
+            queue to check or
+
+            if omitted, the number of queues where the component is in
+
+        Returns
+        -------
+        1 if component is in q, 0 otherwise : int
+
+
+            if q is omitted, the number of queues where the component is in
+        """
+        if q is None:
+            return len(self._qmembers)
+        else:
+            return 1 if self in q else 0
+
+    def index(self, q: "Queue") -> int:
+        """
+        Parameters
+        ----------
+        q : Queue
+            queue to be queried
+
+        Returns
+        -------
+        index of component in q : int
+            if component belongs to q
+
+            -1 if component does not belong to q
+        """
+        m1 = self._member(q)
+        if m1 is None:
+            return -1
+        else:
+            mx = q._head.successor
+            index = 0
+            while mx != m1:
+                mx = mx.successor
+                index += 1
+            return index
+
+    def enter(self, q: "Queue") -> "Component":
+        """
+        enters a queue at the tail
+
+        Parameters
+        ----------
+        q : Queue
+            queue to enter
+
+        Note
+        ----
+        the priority will be set to
+        the priority of the tail component of the queue, if any
+        or 0 if queue is empty
+        """
+        self._checknotinqueue(q)
+        priority = q._tail.predecessor.priority
+        Qmember().insert_in_front_of(q._tail, self, q, priority)
+        return self
+
+    def enter_at_head(self, q: "Queue") -> "Component":
+        """
+        enters a queue at the head
+
+        Parameters
+        ----------
+        q : Queue
+            queue to enter
+
+        Note
+        ----
+        the priority will be set to
+        the priority of the head component of the queue, if any
+        or 0 if queue is empty
+        """
+
+        self._checknotinqueue(q)
+        priority = q._head.successor.priority
+        Qmember().insert_in_front_of(q._head.successor, self, q, priority)
+        return self
+
+    def enter_in_front_of(self, q: "Queue", poscomponent: "Component") -> "Component":
+        """
+        enters a queue in front of a component
+
+        Parameters
+        ----------
+        q : Queue
+            queue to enter
+
+        poscomponent : Component
+            component to be entered in front of
+
+        Note
+        ----
+        the priority will be set to the priority of poscomponent
+        """
+
+        self._checknotinqueue(q)
+        m2 = poscomponent._checkinqueue(q)
+        priority = m2.priority
+        Qmember().insert_in_front_of(m2, self, q, priority)
+        return self
+
+    def enter_behind(self, q: "Queue", poscomponent: "Component") -> "Component":
+        """
+        enters a queue behind a component
+
+        Parameters
+        ----------
+        q : Queue
+            queue to enter
+
+        poscomponent : Component
+            component to be entered behind
+
+        Note
+        ----
+        the priority will be set to the priority of poscomponent
+        """
+
+        self._checknotinqueue(q)
+        m1 = poscomponent._checkinqueue(q)
+        priority = m1.priority
+        Qmember().insert_in_front_of(m1.successor, self, q, priority)
+        return self
+
+    def enter_sorted(self, q: "Queue", priority: float) -> "Component":
+        """
+        enters a queue, according to the priority
+
+        Parameters
+        ----------
+        q : Queue
+            queue to enter
+
+        priority: type that can be compared with other priorities in the queue
+            priority in the queue
+
+        Note
+        ----
+        The component is placed just before the first component with a priority > given priority
+        """
+        self._checknotinqueue(q)
+        if q._length >= 1 and priority < q._head.successor.priority:  # direct enter component that's smaller than the rest
+            m2 = q._head.successor
+        else:
+            m2 = q._tail
+            while (m2.predecessor != q._head) and (m2.predecessor.priority > priority):
+                m2 = m2.predecessor
+        Qmember().insert_in_front_of(m2, self, q, priority)
+        return self
+
+    def leave(self, q: "Queue" = None) -> "Component":
+        """
+        leave queue
+
+        Parameters
+        ----------
+        q : Queue
+            queue to leave
+
+        Note
+        ----
+        statistics are updated accordingly
+        """
+        if q is None:
+            for q in list(self._qmembers):
+                if not q._isinternal:
+                    self.leave(q)
+            return self
+
+        mx = self._checkinqueue(q)
+        m1 = mx.predecessor
+        m2 = mx.successor
+        m1.successor = m2
+        m2.predecessor = m1
+        mx.component = None
+        # signal for components method that member is not in the queue
+        q._length -= 1
+        del self._qmembers[q]
+        if self.env._trace:
+            if not q._isinternal:
+                self.env.print_trace("", "", self.name(), "leave " + q.name())
+        length_of_stay = self.env._now - mx.enter_time
+        q.length_of_stay.tally(length_of_stay)
+        q.length.tally(q._length)
+        q.available_quantity.tally(q.capacity._tally - q._length)
+        q.number_of_departures += 1
+
+        if isinstance(q, Store):
+            store = q
+            available_quantity = q.capacity._tally - q._length
+            if available_quantity > 0:
+                if len(store._to_store_requesters) > 0:
+                    requester = store._to_store_requesters[0]
+                    with self.env.suppress_trace():
+                        requester._to_store_item.enter_sorted(q, requester._to_store_priority)
+                    for store0 in requester._to_stores:
+                        requester.leave(store0._to_store_requesters)
+                    requester._to_stores = []
+                    requester._remove()
+                    requester.status._value = scheduled
+                    requester._reschedule(requester.env._now, 0, False, f"to_store ({store.name()}) honor ", False, s0=requester.env.last_s0)
+                    requester._to_store_item = None
+                    requester._to_store_store = self
+        return self
+
+    def priority(self, q: "Queue", priority: float = None) -> float:
+        """
+        gets/sets the priority of a component in a queue
+
+        Parameters
+        ----------
+        q : Queue
+            queue where the component belongs to
+
+        priority : type that can be compared with other priorities in the queue
+            priority in queue
+
+            if omitted, no change
+
+        Returns
+        -------
+        the priority of the component in the queue : float
+
+        Note
+        ----
+        if you change the priority, the order of the queue may change
+        """
+
+        mx = self._checkinqueue(q)
+        if priority is not None:
+            if priority != mx.priority:
+                # leave.sort is not possible, because statistics will be affected
+                mx.predecessor.successor = mx.successor
+                mx.successor.predecessor = mx.predecessor
+
+                m2 = q._head.successor
+                while (m2 != q._tail) and (m2.priority <= priority):
+                    m2 = m2.successor
+
+                m1 = m2.predecessor
+                m1.successor = mx
+                m2.predecessor = mx
+                mx.predecessor = m1
+                mx.successor = m2
+                mx.priority = priority
+                for iter in q._iter_touched:
+                    q._iter_touched[iter] = True
+        return mx.priority
+
+    def successor(self, q: "Queue") -> "Component":
+        """
+        Parameters
+        ----------
+        q : Queue
+            queue where the component belongs to
+
+        Returns
+        -------
+        the successor of the component in the queue: Component
+            if component is not at the tail.
+
+            returns None if component is at the tail.
+        """
+
+        mx = self._checkinqueue(q)
+        return mx.successor.component
+
+    def predecessor(self, q: "Queue") -> "Component":
+        """
+        Parameters
+        ----------
+        q : Queue
+            queue where the component belongs to
+
+        Returns : Component
+            predecessor of the component in the queue
+            if component is not at the head.
+
+            returns None if component is at the head.
+        """
+
+        mx = self._checkinqueue(q)
+        return mx.predecessor.component
+
+    def enter_time(self, q: "Queue") -> float:
+        """
+        Parameters
+        ----------
+        q : Queue
+            queue where component belongs to
+
+        Returns
+        -------
+        time the component entered the queue : float
+        """
+        mx = self._checkinqueue(q)
+        return mx.enter_time - self.env._offset
+
+    def creation_time(self) -> float:
+        """
+        Returns
+        -------
+        time the component was created : float
+        """
+        return self._creation_time - self.env._offset
+
+    def scheduled_time(self) -> float:
+        """
+        Returns
+        -------
+        time the component scheduled for, if it is scheduled : float
+            returns inf otherwise
+        """
+        return self._scheduled_time - self.env._offset
+
+    def scheduled_priority(self) -> float:
+        """
+        Returns
+        -------
+        priority the component is scheduled with : float
+            returns None otherwise
+
+        Note
+        ----
+        The method has to traverse the event list, so performance may be an issue.
+        """
+        for t, priority, seq, component, return_value in self.env._event_list:
+            if component is self:
+                return priority
+        return None
+
+    def remaining_duration(self, value: float = None, priority: float = 0, urgent: bool = False) -> float:
+        """
+        Parameters
+        ----------
+        value : float
+            set the remaining_duration
+
+            The action depends on the status where the component is in:
+
+            - passive: the remaining duration is update according to the given value
+
+            - standby and current: not allowed
+
+            - scheduled: the component is rescheduled according to the given value
+
+            - waiting or requesting: the fail_at is set according to the given value
+
+            - interrupted: the remaining_duration is updated according to the given value
+
+
+        priority : float
+            priority
+
+            default: 0
+
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+
+        urgent : bool
+            urgency indicator
+
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority
+
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority
+
+        Returns
+        -------
+        remaining duration : float
+            if passive, remaining time at time of passivate
+
+            if scheduled, remaing time till scheduled time
+
+            if requesting or waiting, time till fail_at time
+
+            else: 0
+
+        Note
+        ----
+        This method is useful for interrupting a process and then resuming it,
+        after some (breakdown) time
+        """
+        if value is not None:
+            if self.status.value in (passive, interrupted):
+                self._remaining_duration = value
+            elif self.status.value == current:
+                raise ValueError("setting remaining_duration not allowed for current component (" + self.name() + ")")
+            elif self.status.value == standby:
+                raise ValueError("setting remaining_duration not allowed for standby component (" + self.name() + ")")
+            else:
+                self._remove()
+                self._reschedule(value + self.env._now, priority, urgent, "set remaining_duration", False, extra="")
+
+        if self.status.value in (passive, interrupted):
+            return self._remaining_duration
+        elif self.status.value in (scheduled, waiting, requesting):
+            return self._scheduled_time - self.env._now
+        else:
+            return 0
+
+    def mode_time(self) -> float:
+        """
+        Returns
+        -------
+        time the component got it's latest mode : float
+            For a new component this is
+            the time the component was created.
+
+            this function is particularly useful for animations.
+        """
+        return self._mode_time - self.env._offset
+
+    def interrupted_status(self) -> Any:
+        """
+        returns the original status of an interrupted component
+
+        possible values are
+            - passive
+            - scheduled
+            - requesting
+            - waiting
+            - standby
+        """
+        if self.status.value != interrupted:
+            raise ValueError(self.name() + "not interrupted")
+
+        return self._interrupted_status
+
+    def interrupt_level(self) -> int:
+        """
+        returns interrupt level of an interrupted component
+
+        non interrupted components return 0
+        """
+        if self.status.value == interrupted:
+            return self._interrupt_level
+        else:
+            return 0
+
+    def _member(self, q):
+        return self._qmembers.get(q, None)
+
+    def _checknotinqueue(self, q):
+        mx = self._member(q)
+        if mx is None:
+            pass
+        else:
+            raise ValueError(self.name() + " is already member of " + q.name())
+
+    def _checkinqueue(self, q):
+        mx = self._member(q)
+        if mx is None:
+            raise ValueError(self.name() + " is not member of " + q.name())
+        else:
+            return mx
+
+    def _checkisnotdata(self):
+        if self.status.value == data:
+            raise ValueError(self.name() + " data component not allowed")
+
+    def _checkisnotmain(self):
+        if self == self.env._main:
+            raise ValueError(self.name() + " main component not allowed")
+
+    def lineno_txt(self, add_at=False):
+        if self.env._suppress_trace_linenumbers:
+            return ""
+        if self.overridden_lineno:
+            return ""
+
+        plus = "+"
+        if self.env._yieldless:
+            if self.isdata():
+                return "N/A"
+            if self._process is None:
+                s0 = ""  # ***
+                frame = _get_caller_frame()
+                lineno = inspect.getframeinfo(frame).lineno
+                s0 = rpad(str(lineno) + "+", 6)
+
+            else:
+                frame = self._glet.gr_frame
+                if frame is None:
+                    if not bool(self._glet):
+                        lineno = self.process.__code__.co_firstlineno
+                    else:
+                        frame = _get_caller_frame()
+                        lineno = inspect.getframeinfo(frame).lineno
+                else:
+                    while frame.f_back is not None:
+                        frame = frame.f_back
+                    lineno = inspect.getframeinfo(frame).lineno
+                s0 = self.env.filename_lineno_to_str(self._process.__code__.co_filename, lineno) + "+"
+                return f"{'@' if add_at else ''}{s0}"
+
+            return f"{'@' if add_at else ''}{s0}"
+
+        else:
+            if self == self.env._main:
+                frame = self.frame
+            else:
+                if self.isdata():
+                    return "N/A"
+                if self._process_isgenerator:
+                    frame = self._process.gi_frame
+                    if frame.f_lasti == -1:  # checks whether generator is created
+                        plus = " "
+                else:
+                    gs = inspect.getsourcelines(self._process)
+                    s0 = self.env.filename_lineno_to_str(self._process.__code__.co_filename, gs[1]) + " "
+                    return f"{'@' if add_at else ''}{s0}"
+            return f"{'@' if add_at else ''}{self.env._frame_to_lineno(frame)}{plus}"
+
+    def line_number(self) -> str:
+        """
+        current line number of the process
+
+        Returns
+        -------
+        Current line number : str
+            for data components, "" will be returned
+        """
+        save_suppress_trace_linenumbers = self.env._suppress_trace_linenumbers
+        self.env._suppress_trace_linenumbers = False
+        s = self.lineno_txt().strip()
+        self.env._suppress_trace_linenumbers = save_suppress_trace_linenumbers
+        return s
+
+    def to_store_requesters(self) -> "Queue":
+        """
+        get the queue holding all to_store requesting components
+
+        Returns
+        -------
+        queue holding all to_store requesting components : Queue
+        """
+        return self._to_store_requesters
+
+    def from_store_item(self) -> Optional["Component"]:
+        """
+        return item returned from a yield self.from_store(...) if valid
+
+        Returns
+        -------
+        item returned : Component or None, if not valid
+        """
+        try:
+            return self._from_store_item
+        except AttributeError:
+            return None
+
+    def from_store_store(self) -> Optional["Component"]:
+        """
+        return store where item was returned from a yield self.from_store(...) if valid
+
+        Returns
+        -------
+        item returned : Component or None, if not valid
+        """
+        try:
+            return self._from_store_store
+        except AttributeError:
+            return None
+
+    def to_store_store(self) -> Optional["Component"]:
+        """
+        return store where item was sent to with last yield self.to_store(...) if valid
+
+        Returns
+        -------
+        item returned : Component or None, if not valid
+        """
+        try:
+            return self._to_store_store
+        except AttributeError:
+            return None
+
+
 class Environment:
     """
     environment object
@@ -7064,6 +9846,7 @@ class Environment:
         retina: bool = False,
         do_reset: bool = None,
         blind_animation: bool = False,
+        yieldless: bool = None,
         *args,
         **kwargs,
     ):
@@ -7074,12 +9857,18 @@ class Environment:
         self._nameserializeMonitor = {}  # required here for to_freeze functionality
         self._time_unit = _time_unit_lookup(time_unit)
         self._time_unit_name = time_unit
+        if yieldless is None:
+            self._yieldless = _yieldless
+        else:
+            self._yieldless = yieldless
         if datetime0 is None:
             datetime0 = False
         self.datetime0(datetime0)
         if "to_freeze" in kwargs:
             self.isfrozen = True
             return
+        self._ui = False
+
         if do_reset is None:
             do_reset = Pythonista
         if do_reset:
@@ -7144,7 +9933,7 @@ class Environment:
         self._synced = True
         self._step_pressed = False
         self.stopped = False
-        self.paused = False
+        self._paused = False
         self.last_s0 = ""
         self._blind_animation = blind_animation
         if self._blind_animation:
@@ -7193,6 +9982,12 @@ class Environment:
         self._video_out = None
         self._video_repeat = 1
         self._video_pingpong = False
+        if self.env._yieldless:
+            global greenlet
+            import greenlet
+
+            self._glet = greenlet.greenlet(self.do_simulate)
+
         if Pythonista:
             can_animate()
             fonts()  # this speeds up for strange reasons
@@ -7205,59 +10000,76 @@ class Environment:
     # ENVIRONMENT ANNOTATION START
     def a_log(*args):
         ...
-
     class g:
         ...
-
     class QueueFullError(Exception):
         ...
-
     class SimulationStopped(Exception):
         ...
-
+    def yieldless(value: bool = None) -> bool:
+        """
+        sets/ get default yieldless status
+    
+        Parameters
+        ----------
+        value : bool
+            sets the new default yieldless status
+    
+            if omitted, no change
+    
+        Returns
+        -------
+        default yieldless status: bool
+    
+        Note
+        ----
+        At start up, the default yieldless status is False
+    
+        The default yieldless status can be used in subsequent Environment instantations.
+        """
     class ItemFile:
         """
         define an item file to be used with read_item, read_item_int, read_item_float and read_item_bool
-
+    
         Parameters
         ----------
         filename : str
             file to be used for subsequent read_item, read_item_int, read_item_float and read_item_bool calls
-
+    
             or
-
+    
             content to be interpreted used in subsequent read_item calls. The content should have at least one linefeed
             character and will be usually  triple quoted.
-
+    
         Note
         ----
         It is advised to use ItemFile with a context manager, like ::
-
+    
             with sim.ItemFile("experiment0.txt") as f:
                 run_length = f.read_item_float()
-
+    
                 run_name = f.read_item()
-
-
+    
+    
         Alternatively, the file can be opened and closed explicitely, like ::
-
+    
             f = sim.ItemFile("experiment0.txt")
             run_length = f.read_item_float()
             run_name = f.read_item()
             f.close()
-
+    
         Item files consist of individual items separated by whitespace (blank or tab)
-
+    
         If a blank or tab is required in an item, use single or double quotes
-
+    
         All text following # on a line is ignored
-
+    
         All texts on a line within curly brackets {} is ignored and considered white space.
-
+    
         Curly braces cannot spawn multiple lines and cannot be nested.
-
+    
         Example ::
-
+    
             Item1
             "Item 2"
                 Item3 Item4 # comment
@@ -7266,97 +10078,87 @@ class Environment:
             "Single quote' in item"
             True
         """
-
         def __init__(self, filename: str):
             ...
-
         def __enter__(self):
             ...
-
         def __exit__(self, *args):
             ...
-
         def close(self):
             ...
-
         def read_item_int(self) -> int:
             """
             read next field from the ItemFile as int.h
-
+    
             if the end of file is reached, EOFError is raised
             """
-
         def read_item_float(self) -> float:
             """
             read next item from the ItemFile as float
-
+    
             if the end of file is reached, EOFError is raised
             """
-
         def read_item_bool(self) -> bool:
             """
             read next item from the ItemFile as bool
-
+    
             A value of False (not case sensitive) will return False
-
+    
             A value of 0 will return False
-
+    
             The null string will return False
-
+    
             Any other value will return True
-
+    
             if the end of file is reached, EOFError is raised
             """
-
         def read_item(self) -> Any:
             """
             read next item from the ItemFile
-
+    
             if the end of file is reached, EOFError is raised
             """
-
         def _nextread(self):
             ...
-
     class Monitor:
         """
         Monitor object
-
+    
         Parameters
         ----------
         name : str
             name of the monitor
-
+    
             if the name ends with a period (.),
             auto serializing will be applied
-
+    
             if the name end with a comma,
             auto serializing starting at 1 will be applied
-
+    
             if omitted, the name will be derived from the class
             it is defined in (lowercased)
-
+    
         monitor : bool
             if True (default), monitoring will be on.
-
+    
             if False, monitoring is disabled
-
+    
             it is possible to control monitoring later,
             with the monitor method
-
+    
         level : bool
             if False (default), individual values are tallied, optionally with weight
-
+    
             if True, the tallied vslues are interpreted as levels
-
+    
         initial_tally : any, preferably int, float or translatable into int or float
             initial value for the a level monitor
-
+    
             it is important to set the value correctly.
             default: 0
-
+    
             not available for non level monitors
-
+    
         type : str
             specifies how tallied values are to be stored
                 - "any" (default) stores values in a list. This allows
@@ -7372,29 +10174,28 @@ class Environment:
                 - "int64" integer >= -9223372036854775808 <= 9223372036854775807 8 bytes
                 - "uint64" integer >= 0 <= 18446744073709551615 8 bytes
                 - "float" float 8 bytes
-
+    
         weight_legend : str
             used in print_statistics and print_histogram to indicate the dimension of weight or duration (for
             level monitors, e.g. minutes. Default: weight for non level monitors, duration for level monitors.
-
+    
         stats_only : bool
             if True, only statistics will be collected (using less memory, but also less functionality)
-
+    
             if False (default), full functionality
-
-
+    
+    
         fill : list or tuple
             can be used to fill the tallied values (all at time now).
-
+    
             fill is only available for non level and not stats_only monitors.
-
-
+    
+    
         env : Environment
             environment where the monitor is defined
-
+    
             if omitted, default_env will be used
         """
-
         def __init__(
             self,
             name: str = None,
@@ -7410,333 +10211,301 @@ class Environment:
             **kwargs,
         ):
             ...
-
         def __add__(self, other):
             ...
-
         def __radd__(self, other):
             ...
-
         def __mul__(self, other):
             ...
-
         def __rmul__(self, other):
             ...
-
         def __truediv__(self, other):
             ...
-
         def _block_stats_only(self):
             ...
-
         def stats_only(self) -> bool:
             ...
-
         def merge(self, *monitors, **kwargs) -> "Monitor":
             """
             merges this monitor with other monitor(s)
-
+    
             Parameters
             ----------
             monitors : sequence
                zero of more monitors to be merged to this monitor
-
+    
             name : str
                 name of the merged monitor
-
+    
                 default: name of this monitor + ".merged"
-
+    
             Returns
             -------
             merged monitor : Monitor
-
+    
             Note
             ----
             Level monitors can only be merged with level monitors
-
+    
             Non level monitors can only be merged with non level monitors
-
+    
             Only monitors with the same type can be merged
-
+    
             If no monitors are specified, a copy is created.
-
+    
             For level monitors, merging means summing the available x-values
-
+    
             """
-
         def t_multiply(self, factor, name=None):
             ...
-
         def x_map(self, func: Callable, monitors: List["Monitor"] = [], name: str = None) -> "Monitor":
             """
             maps a function to the x-values of the given monitors (static method)
-
+    
             Parameters
             ----------
             func : function
                a function that accepts n x-values, where n is the number of monitors
                note that the function will not be called during the time any of the monitors is off
-
+    
             monitors : list/tuple of additional monitors
                monitor(s) to be mapped
-
+    
                only allowed for level monitors-
-
+    
             name : str
                 name of the mapped monitor
-
+    
                 default: "mapped"
-
+    
             Returns
             -------
             mapped monitor : Monitor, type 'any'
             """
-
         def __getitem__(self, key):
             ...
-
         def freeze(self, name: str = None) -> "Monitor":
             """
             freezes this monitor (particularly useful for pickling)
-
+    
             Parameters
             ----------
             name : str
                 name of the frozen monitor
-
+    
                 default: name of this monitor + ".frozen"
-
+    
             Returns
             -------
             frozen monitor : Monitor
-
+    
             Notes
             -----
             The env attribute will become a partial copy of the original environment, with the name
             of the original environment, padded with '.copy.<serial number>'
             """
-
-        def slice(
-            self,
-            start: float = None,
-            stop: float = None,
-            modulo: float = None,
-            name: str = None,
-        ) -> "Monitor":
+        def slice(self, start: float = None, stop: float = None, modulo: float = None, name: str = None) -> "Monitor":
             """
             slices this monitor (creates a subset)
-
+    
             Parameters
             ----------
             start : float
                if modulo is not given, the start of the slice
-
+    
                if modulo is given, this is indicates the slice period start (modulo modulo)
-
+    
             stop : float
                if modulo is not given, the end of the slice
-
+    
                if modulo is given, this is indicates the slice period end (modulo modulo)
-
+    
                note that stop is excluded from the slice (open at right hand side)
-
+    
             modulo : float
                 specifies the distance between slice periods
-
+    
                 if not specified, just one slice subset is used.
-
+    
             name : str
                 name of the sliced monitor
-
+    
                 default: name of this monitor + ".sliced"
-
+    
             Returns
             -------
             sliced monitor : Monitor
-
+    
             Note
             ----
             It is also possible to use square bracktets to slice, like m[0:1000].
             """
-
         def setup(self) -> None:
             """
             called immediately after initialization of a monitor.
-
+    
             by default this is a dummy method, but it can be overridden.
-
+    
             only keyword arguments are passed
             """
-
         def register(self, registry: List) -> "Monitor":
             """
             registers the monitor in the registry
-
+    
             Parameters
             ----------
             registry : list
                 list of (to be) registered objects
-
+    
             Returns
             -------
             monitor (self) : Monitor
-
+    
             Note
             ----
             Use Monitor.deregister if monitor does not longer need to be registered.
             """
-
         def deregister(self, registry: List) -> "Monitor":
             """
             deregisters the monitor in the registry
-
+    
             Parameters
             ----------
             registry : list
                 list of registered objects
-
+    
             Returns
             -------
             monitor (self) : Monitor
             """
-
         def __repr__(self):
             ...
-
         def __call__(self, t=None):
             ...
-
         def get(self, t: float = None) -> Any:
             """
             get the value of a level monitor
-
+    
             Parameters
             ----------
             t : float
                 time at which the value of the level is to be returned
-
+    
                 default: now
-
+    
             Returns
             -------
             last tallied value : any, usually float
-
+    
                 Instead of this method, the level monitor can also be called directly, like
-
-
+    
+    
                 level = sim.Monitor("level", level=True)
-
+    
                 ...
-
+    
                 print(level())
-
+    
                 print(level.get())  # identical
-
-
+    
+    
             Note
             ----
             If the value is not available, self.off will be returned.
-
+    
             Only available for level monitors
             """
-
         def value(self) -> Any:
             """
             get/set the value of a level monitor
-
+    
             :getter:
                 gets the last tallied value : any (often float)
-
+    
             :setter:
                 equivalent to m.tally()
-
+    
             Note
             ----
             value is only available for level monitors
-
+    
             value is available even if the monitor is turned off
             """
-
         def value(self, value: Any) -> None:
             ...
-
         def t(self) -> float:
             """
             get the time of last tally of a level monitor
-
+    
             :getter:
                 gets the time of the last tallied value : float
-
+    
             Note
             ----
             t is only available for level monitors
-
+    
             t is available even if the monitor is turned off
             """
-
         def reset_monitors(self, monitor: bool = None, stats_only: bool = None) -> None:
             """
             resets monitor
-
+    
             Parameters
             ----------
             monitor : bool
                 if True (default), monitoring will be on.
-
+    
                 if False, monitoring is disabled
-
+    
                 if omitted, the monitor state remains unchanged
-
+    
             stats_only : bool
                 if True, only statistics will be collected (using less memory, but also less functionality)
-
+    
                 if False, full functionality
-
+    
                 if omittted, no change of stats_only
-
+    
             Note
             ----
             Exactly same functionality as Monitor.reset()
             """
-
         def reset(self, monitor: bool = None, stats_only: bool = None) -> None:
             """
             resets monitor
-
+    
             Parameters
             ----------
             monitor : bool
                 if True, monitoring will be on.
-
+    
                 if False, monitoring is disabled
                 if omitted, no change of monitoring state
-
+    
             stats_only : bool
                 if True, only statistics will be collected (using less memory, but also less functionality)
-
+    
                 if False, full functionality
-
+    
                 if omittted, no change of stats_only
             """
-
         def monitor(self, value: bool = None) -> bool:
             """
             enables/disables monitor
-
+    
             Parameters
             ----------
             value : bool
                 if True, monitoring will be on.
-
+    
                 if False, monitoring is disabled
-
+    
                 if omitted, no change
-
+    
             Returns
             -------
             True, if monitoring enabled. False, if not : bool
             """
-
         def start_time(self) -> float:
             """
             Returns
@@ -7744,254 +10513,240 @@ class Environment:
             Start time of the monitor : float
                  either the time of creation or latest reset
             """
-
         def tally(self, value: Any, weight: float = 1) -> None:
             """
             Parameters
             ----------
             value : any, preferably int, float or translatable into int or float
                 value to be tallied
-
+    
             weight: float
                 weight to be tallied
-
+    
                 default : 1
-
+    
             """
-
         def _tally_add_now(self):
             ...
-
         def _tally_off(self):
             ...
-
         def to_years(self, name: str = None) -> "Monitor":
             """
             makes a monitor with all x-values converted to years
-
+    
             Parameters
             ----------
             name : str
                 name of the converted monitor
-
+    
                 default: name of this monitor
-
+    
             Returns
             -------
             converted monitor : Monitor
-
+    
             Note
             ----
             Only non level monitors with type float can be converted.
-
+    
             It is required that a time_unit is defined for the environment.
             """
-
         def to_weeks(self, name: str = None) -> "Monitor":
             """
             makes a monitor with all x-values converted to weeks
-
+    
             Parameters
             ----------
             name : str
                 name of the converted monitor
-
+    
                 default: name of this monitor
-
+    
             Returns
             -------
             converted monitor : Monitor
-
+    
             Note
             ----
             Only non level monitors with type float can be converted.
-
+    
             It is required that a time_unit is defined for the environment.
             """
-
         def to_days(self, name: str = None) -> "Monitor":
             """
             makes a monitor with all x-values converted to days
-
+    
             Parameters
             ----------
             name : str
                 name of the converted monitor
-
+    
                 default: name of this monitor
-
+    
             Returns
             -------
             converted monitor : Monitor
-
+    
             Note
             ----
             Only non level monitors with type float can be converted.
-
+    
             It is required that a time_unit is defined for the environment.
             """
-
         def to_hours(self, name: str = None) -> "Monitor":
             """
             makes a monitor with all x-values converted to hours
-
+    
             Parameters
             ----------
             name : str
                 name of the converted monitor
-
+    
                 default: name of this monitor
-
+    
             Returns
             -------
             converted monitor : Monitor
-
+    
             Note
             ----
             Only non level monitors with type float can be converted.
-
+    
             It is required that a time_unit is defined for the environment.
             """
-
         def to_minutes(self, name: str = None) -> "Monitor":
             """
             makes a monitor with all x-values converted to minutes
-
+    
             Parameters
             ----------
             name : str
                 name of the converted monitor
-
+    
                 default: name of this monitor
-
+    
             Returns
             -------
             converted monitor : Monitor
-
+    
             Note
             ----
             Only non level monitors with type float can be converted.
-
+    
             It is required that a time_unit is defined for the environment.
             """
-
         def to_seconds(self, name: str = None) -> "Monitor":
             """
             makes a monitor with all x-values converted to seconds
-
+    
             Parameters
             ----------
             name : str
                 name of the converted monitor
-
+    
                 default: name of this monitor
-
+    
             Returns
             -------
             converted monitor : Monitor
-
+    
             Note
             ----
             Only non level monitors with type float can be converted.
-
+    
             It is required that a time_unit is defined for the environment.
             """
-
         def to_milliseconds(self, name: str = None) -> "Monitor":
             """
             makes a monitor with all x-values converted to milliseconds
-
+    
             Parameters
             ----------
             name : str
                 name of the converted monitor
-
+    
                 default: name of this monitor
-
+    
             Returns
             -------
             converted monitor : Monitor
-
+    
             Note
             ----
             Only non level monitors with type float can be converted.
-
+    
             It is required that a time_unit is defined for the environment.
             """
-
         def to_microseconds(self, name: str = None) -> "Monitor":
             """
             makes a monitor with all x-values converted to microseconds
-
+    
             Parameters
             ----------
             name : str
                 name of the converted monitor
-
+    
                 default: name of this monitor
-
+    
             Returns
             -------
             converted monitor : Monitor
-
+    
             Note
             ----
             Only non level monitors with type float can be converted.
-
+    
             It is required that a time_unit is defined for the environment.
             """
-
         def to_time_unit(self, time_unit: str, name: str = None) -> "Monitor":
             """
             makes a monitor with all x-values converted to the specified time unit
-
+    
             Parameters
             ----------
             time_unit : str
                 Supported time_units:
-
+    
                 "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             name : str
                 name of the converted monitor
-
+    
                 default: name of this monitor
-
+    
             Returns
             -------
             converted monitor : Monitor
-
+    
             Note
             ----
             Only non level monitors with type float can be converted.
-
+    
             It is required that a time_unit is defined for the environment.
             """
-
         def multiply(self, scale: float = 1, name: str = None) -> "Monitor":
             """
             makes a monitor with all x-values multiplied with scale
-
+    
             Parameters
             ----------
             scale : float
                scale to be applied
-
+    
             name : str
                 name of the multiplied monitor
-
+    
                 default: name of this monitor
-
+    
             Returns
             -------
             multiplied monitor : Monitor
-
+    
             Note
             ----
             Only non level monitors with type float can be multiplied
-
+    
             """
-
         def name(self, value: str = None) -> str:
             """
             Parameters
@@ -7999,16 +10754,15 @@ class Environment:
             value : str
                 new name of the monitor
                 if omitted, no change
-
+    
             Returns
             -------
             Name of the monitor : str
-
+    
             Note
             ----
             base_name and sequence_number are not affected if the name is changed
             """
-
         def rename(self, value: str = None) -> "Monitor":
             """
             Parameters
@@ -8016,491 +10770,457 @@ class Environment:
             value : str
                 new name of the monitor
                 if omitted, no change
-
+    
             Returns
             -------
             self : monitor
-
+    
             Note
             ----
             in contrast to name(), this method returns itself, so can used to chain, e.g.
-
+    
             (m0 + m1 + m2+ m3).rename('m0-m3').print_histograms()
-
+    
             m0[1000 : 2000].rename('m between t=1000 and t=2000').print_histograms()
-
+    
             """
-
         def base_name(self) -> str:
             """
             Returns
             -------
             base name of the monitor (the name used at initialization): str
             """
-
         def sequence_number(self) -> int:
             """
             Returns
             -------
             sequence_number of the monitor : int
                 (the sequence number at initialization)
-
+    
                 normally this will be the integer value of a serialized name,
                 but also non serialized names (without a dot or a comma at the end)
                 will be numbered)
             """
-
         def mean(self, ex0: bool = False) -> float:
             """
             mean of tallied values
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             Returns
             -------
             mean : float
-
+    
             Note
             ----
             If weights are applied , the weighted mean is returned
             """
-
         def std(self, ex0: bool = False) -> float:
             """
             standard deviation of tallied values
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             Returns
             -------
             standard deviation : float
-
+    
             Note
             ----
             If weights are applied, the weighted standard deviation is returned
             """
-
         def minimum(self, ex0: bool = False) -> float:
             """
             minimum of tallied values
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             Returns
             -------
             minimum : float
             """
-
         def maximum(self, ex0: bool = False) -> float:
             """
             maximum of tallied values
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             Returns
             -------
             maximum : float
             """
-
         def median(self, ex0: bool = False, interpolation: str = "linear") -> float:
             """
             median of tallied values
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             interpolation : str
                 Default: 'linear'
-
-
-
+    
+    
+    
                 For non weighted monitors:
-
+    
                 This optional parameter specifies the interpolation method to use when the 50% percentile lies between two data points i < j:
-
+    
                 'linear': i + (j - i) * fraction, where fraction is the fractional part of the index surrounded by i and j. (default for monitors that are not weighted not level
-
+    
                 'lower': i.
-
+    
                 'higher': j. (default for weighted and level monitors)
-
+    
                 'nearest': i or j, whichever is nearest.
-
+    
                 'midpoint': (i + j) / 2.
-
-
-
+    
+    
+    
                 For weighted and level monitors:
-
+    
                 This optional parameter specifies the interpolation method to use when the 50% percentile corresponds exactly to two data points i and j
-
+    
                 'linear': (i + j) /2
-
+    
                 'lower': i.
-
+    
                 'higher': j
-
+    
                 'midpoint': (i + j) / 2.
-
-
+    
+    
             Returns
             -------
             median (50% percentile): float
             """
-
         def percentile(self, q: float, ex0: bool = False, interpolation: str = "linear") -> float:
             """
             q-th percentile of tallied values
-
+    
             Parameters
             ----------
             q : float
                 percentage of the distribution
-
+    
                 values <0 are treated a 0
-
+    
                 values >100 are treated as 100
-
+    
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             interpolation : str
                 Default: 'linear'
-
-
-
+    
+    
+    
                 For non weighted monitors:
-
+    
                 This optional parameter specifies the interpolation method to use when the desired percentile lies between two data points i < j:
-
+    
                 'linear': i + (j - i) * fraction, where fraction is the fractional part of the index surrounded by i and j. (default for monitors that are not weighted not level
-
+    
                 'lower': i.
-
+    
                 'higher': j. (default for weighted and level monitors)
-
+    
                 'nearest': i or j, whichever is nearest.
-
+    
                 'midpoint': (i + j) / 2.
-
-
-
+    
+    
+    
                 For weighted and level monitors:
-
+    
                 This optional parameter specifies the interpolation method to use when the percentile corresponds exactly to two data points i and j
-
+    
                 'linear': (i + j) /2
-
+    
                 'lower': i.
-
+    
                 'higher': j
-
+    
                 'midpoint': (i + j) / 2.
-
-
+    
+    
             Returns
             -------
             q-th percentile : float
                  0 returns the minimum, 50 the median and 100 the maximum
             """
-
         def bin_number_of_entries(self, lowerbound: float, upperbound: float, ex0: bool = False) -> int:
             """
             count of the number of tallied values in range (lowerbound,upperbound]
-
+    
             Parameters
             ----------
             lowerbound : float
                 non inclusive lowerbound
-
+    
             upperbound : float
                 inclusive upperbound
-
+    
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             Returns
             -------
             number of values >lowerbound and <=upperbound : int
-
+    
             Note
             ----
             Not available for level monitors
             """
-
         def bin_weight(self, lowerbound: float, upperbound: float) -> float:
             """
             total weight of tallied values in range (lowerbound,upperbound]
-
+    
             Parameters
             ----------
             lowerbound : float
                 non inclusive lowerbound
-
+    
             upperbound : float
                 inclusive upperbound
-
+    
             Returns
             -------
             total weight of values >lowerbound and <=upperbound : float
-
+    
             Note
             ----
             Not available for level monitors
             """
-
         def bin_duration(self, lowerbound: float, upperbound: float) -> float:
             """
             total duration of tallied values in range (lowerbound,upperbound]
-
+    
             Parameters
             ----------
             lowerbound : float
                 non inclusive lowerbound
-
+    
             upperbound : float
                 inclusive upperbound
-
+    
             Returns
             -------
             total duration of values >lowerbound and <=upperbound : float
-
+    
             Note
             ----
             Not available for level monitors
             """
-
         def sys_bin_weight(self, lowerbound, upperbound):
             ...
-
         def value_number_of_entries(self, value: Any) -> int:
             """
             count of the number of tallied values equal to value or in value
-
+    
             Parameters
             ----------
             value : any
                 if list, tuple or set, check whether the tallied value is in value
-
+    
                 otherwise, check whether the tallied value equals the given value
-
+    
             Returns
             -------
             number of tallied values in value or equal to value : int
-
+    
             Note
             ----
             Not available for level monitors
             """
-
         def value_weight(self, value: Any) -> float:
             """
             total weight of tallied values equal to value or in value
-
+    
             Parameters
             ----------
             value : any
                 if list, tuple or set, check whether the tallied value is in value
-
+    
                 otherwise, check whether the tallied value equals the given value
-
+    
             Returns
             -------
             total of weights of tallied values in value or equal to value : float
-
+    
             Note
             ----
             Not available for level monitors
             """
-
         def value_duration(self, value: Any) -> float:
             """
             total duration of tallied values equal to value or in value
-
+    
             Parameters
             ----------
             value : any
                 if list, tuple or set, check whether the tallied value is in value
-
+    
                 otherwise, check whether the tallied value equals the given value
-
+    
             Returns
             -------
             total of duration of tallied values in value or equal to value : float
-
+    
             Note
             ----
             Not available for non level monitors
             """
-
         def sys_value_weight(self, value):
             ...
-
         def number_of_entries(self, ex0: bool = False) -> int:
             """
             count of the number of entries
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             Returns
             -------
             number of entries : int
-
+    
             Note
             ----
             Not available for level monitors
             """
-
         def number_of_entries_zero(self) -> int:
             """
             count of the number of zero entries
-
+    
             Returns
             -------
             number of zero entries : int
-
+    
             Note
             ----
             Not available for level monitors
             """
-
         def weight(self, ex0: bool = False) -> float:
             """
             sum of weights
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             Returns
             -------
             sum of weights : float
-
+    
             Note
             ----
             Not available for level monitors
             """
-
         def duration(self, ex0: bool = False) -> float:
             """
             total duration
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             Returns
             -------
             total duration : float
-
+    
             Note
             ----
             Not available for non level monitors
             """
-
         def sys_weight(self, ex0: bool = False):
             ...
-
         def weight_zero(self) -> float:
             """
             sum of weights of zero entries
-
+    
             Returns
             -------
             sum of weights of zero entries : float
-
+    
             Note
             ----
             Not available for level monitors
             """
-
         def duration_zero(self) -> float:
             """
             total duratiom of zero entries
-
+    
             Returns
             -------
             total duration of zero entries : float
-
+    
             Note
             ----
             Not available for non level monitors
             """
-
         def sys_weight_zero(self):
             ...
-
-        def print_statistics(
-            self,
-            show_header: bool = True,
-            show_legend: bool = True,
-            do_indent: bool = False,
-            as_str: bool = False,
-            file: TextIO = None,
-        ) -> str:
+        def print_statistics(self, show_header: bool = True, show_legend: bool = True, do_indent: bool = False, as_str: bool = False, file: TextIO = None) -> str:
             """
             print monitor statistics
-
+    
             Parameters
             ----------
             show_header: bool
                 primarily for internal use
-
+    
             show_legend: bool
                 primarily for internal use
-
+    
             do_indent: bool
                 primarily for internal use
-
+    
             as_str: bool
                 if False (default), print the statistics
                 if True, return a string containing the statistics
-
+    
             file: file
                 if None (default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             statistics (if as_str is True) : str
             """
-
         def histogram_autoscale(self, ex0: bool = False) -> Tuple[float, float, int]:
             """
             used by histogram_print to autoscale
-
+    
             may be overridden.
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             Returns
             -------
             bin_width, lowerbound, number_of_bins : tuple
             """
-
         def print_histograms(
             self,
             number_of_bins: int = None,
@@ -8514,60 +11234,59 @@ class Environment:
         ) -> str:
             """
             print monitor statistics and histogram
-
+    
             Parameters
             ----------
             number_of_bins : int
                 number of bins
-
+    
                 default: 30
-
+    
                 if <0, also the header of the histogram will be surpressed
-
+    
             lowerbound: float
                 first bin
-
+    
                 default: 0
-
+    
             bin_width : float
                 width of the bins
-
+    
                 default: 1
-
+    
             values : bool
                 if False (default), bins will be used
-
+    
                 if True, the individual values will be shown (sorted on the value).
                 in that case, no cumulative values will be given
-
-
+    
+    
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             as_str: bool
                 if False (default), print the histogram
                 if True, return a string containing the histogram
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             graph_scale : float
                 Scale in the graphical representation of the % and cum% (default=80)
-
+    
             Returns
             -------
             histogram (if as_str is True) : str
-
+    
             Note
             ----
             If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
             with a maximum of 30 classes.
-
+    
             Exactly same functionality as Monitor.print_histogram()
             """
-
         def print_histogram(
             self,
             number_of_bins: int = None,
@@ -8584,476 +11303,448 @@ class Environment:
         ) -> str:
             """
             print monitor statistics and histogram
-
+    
             Parameters
             ----------
             number_of_bins : int
                 number of bins
-
+    
                 default: 30
-
+    
                 if <0, also the header of the histogram will be surpressed
-
+    
             lowerbound: float
                 first bin
-
+    
                 default: 0
-
+    
             bin_width : float
                 width of the bins
-
+    
                 default: 1
-
+    
             values : bool
                 if False (default), bins will be used
-
+    
                 if True, the individual values will be shown (in alphabetical order).
                 in that case, no cumulative values will be given
-
-
+    
+    
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             as_str: bool
                 if False (default), print the histogram
                 if True, return a string containing the histogram
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             graph_scale : float
                 Scale in the graphical representation of the % and cum% (default=80)
-
+    
             sort_on_weight : bool
                 if True, sort the values on weight first (largest first), then on the values itself
-
+    
                 if False, sort the values on the values itself
-
+    
                 False is the default for non level monitors. Not permitted for level monitors.
-
+    
             sort_on_duration : bool
                 if True, sort the values on duration first (largest first), then on the values itself
-
+    
                 if False, sort the values on the values itself
-
+    
                 False is the default for level monitors. Not permitted for non level monitors.
-
+    
             sort_on_value : bool
                 if True, sort on the values.
-
+    
                 if False (default), no sorting will take place, unless values is an iterable, in which case
                 sorting will be done on the values anyway.
-
+    
             Returns
             -------
             histogram (if as_str is True) : str
-
+    
             Note
             ----
             If number_of_bins, lowerbound and bin_width are omitted, the histogram will be autoscaled,
             with a maximum of 30 classes.
             """
-
-        def values(
-            self,
-            ex0: bool = False,
-            force_numeric: bool = False,
-            sort_on_weight: bool = False,
-            sort_on_duration: bool = False,
-        ) -> List:
+        def values(self, ex0: bool = False, force_numeric: bool = False, sort_on_weight: bool = False, sort_on_duration: bool = False) -> List:
             """
             values
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             force_numeric : bool
                 if True, convert non numeric tallied values numeric if possible, otherwise assume 0
-
+    
                 if False (default), do not interpret x-values, return as list if type is list
-
+    
             sort_on_weight : bool
                 if True, sort the values on weight first (largest first), then on the values itself
-
+    
                 if False, sort the values on the values itself
-
+    
                 False is the default for non level monitors. Not permitted for level monitors.
-
+    
             sort_on_duration : bool
                 if True, sort the values on duration first (largest first), then on the values itself
-
+    
                 if False, sort the values on the values itself
-
+    
                 False is the default for level monitors. Not permitted for non level monitors.
-
+    
             Returns
             -------
             all tallied values : list
             """
-
         def animate(self, *args, **kwargs):
             """
             animates the monitor in a panel
-
+    
             Parameters
             ----------
             linecolor : colorspec
                 color of the line or points (default foreground color)
-
+    
             linewidth : int
                 width of the line or points (default 1 for level, 3 for non level monitors)
-
+    
             fillcolor : colorspec
                 color of the panel (default transparent)
-
+    
             bordercolor : colorspec
                 color of the border (default foreground color)
-
+    
             borderlinewidth : int
                 width of the line around the panel (default 1)
-
+    
             nowcolor : colorspec
                 color of the line indicating now (default red)
-
+    
             titlecolor : colorspec
                 color of the title (default foreground color)
-
+    
             titlefont : font
                 font of the title (default null string)
-
+    
             titlefontsize : int
                 size of the font of the title (default 15)
-
+    
             title : str
                 title to be shown above panel
-
+    
                 default: name of the monitor
-
+    
             x : int
                 x-coordinate of panel, relative to xy_anchor, default 0
-
+    
             y : int
                 y-coordinate of panel, relative to xy_anchor. default 0
-
+    
             offsetx : float
                 offsets the x-coordinate of the panel (default 0)
-
+    
             offsety : float
                 offsets the y-coordinate of the panel (default 0)
-
+    
             angle : float
                 rotation angle in degrees, default 0
-
+    
             xy_anchor : str
                 specifies where x and y are relative to
-
+    
                 possible values are (default: sw):
-
+    
                 ``nw    n    ne``
-
+    
                 ``w     c     e``
-
+    
                 ``sw    s    se``
-
+    
             vertical_offset : float
                 the vertical position of x within the panel is
                  vertical_offset + x * vertical_scale (default 0)
-
+    
             vertical_scale : float
                 the vertical position of x within the panel is
                 vertical_offset + x * vertical_scale (default 5)
-
+    
             horizontal_scale : float
                 the relative horizontal position of time t within the panel is on
                 t * horizontal_scale, possibly shifted (default 1)
-
-
+    
+    
             width : int
                 width of the panel (default 200)
-
+    
             height : int
                 height of the panel (default 75)
-
+    
             vertical_map : function
                 when a y-value has to be plotted it will be translated by this function
-
+    
                 default: float
-
+    
                 when the function results in a TypeError or ValueError, the value 0 is assumed
-
+    
                 when y-values are non numeric, it is advised to provide an approriate map function, like:
-
+    
                 vertical_map = "unknown red green blue yellow".split().index
-
+    
             labels : iterable
                 labels to be shown on the vertical axis (default: empty tuple)
-
+    
                 the placement of the labels is controlled by the vertical_map method
-
+    
             label_color : colorspec
                 color of labels (default: foreground color)
-
+    
             label_font : font
                 font of the labels (default null string)
-
+    
             label_fontsize : int
                 size of the font of the labels (default 15)
-
+    
             label_anchor : str
                 specifies where the label coordinates (as returned by map_value) are relative to
-
+    
                 possible values are (default: e):
-
+    
                 ``nw    n    ne``
-
+    
                 ``w     c     e``
-
+    
                 ``sw    s    se``
-
+    
             label_offsetx : float
                 offsets the x-coordinate of the label (default 0)
-
+    
             label_offsety : float
                 offsets the y-coordinate of the label (default 0)
-
+    
             label_linewidth : int
                 width of the label line (default 1)
-
+    
             label_linecolor : colorspec
                 color of the label lines (default foreground color)
-
+    
             layer : int
                 layer (default 0)
-
+    
             as_points : bool
                 allows to override the as_points setting of tallies, which is
                 by default False for level monitors and True for non level monitors
-
+    
             parent : Component
                 component where this animation object belongs to (default None)
-
+    
                 if given, the animation object will be removed
                 automatically when the parent component is no longer accessible
-
+    
             screen_coordinates : bool
                 use screen_coordinates
-
+    
                 normally, the scale parameters are use for positioning and scaling
                 objects.
-
+    
                 if True, screen_coordinates will be used instead.
-
+    
             over3d : bool
                 if True, this object will be rendered to the OpenGL window
-
+    
                 if False (default), the normal 2D plane will be used.
-
+    
             Returns
             -------
             reference to AnimateMonitor object : AnimateMonitor
-
+    
             Note
             ----
             All measures are in screen coordinates
-
-
+    
+    
             Note
             ----
             It is recommended to use sim.AnimateMonitor instead
-
-
+    
+    
             All measures are in screen coordinates
-
+    
             """
-
         def x(self, ex0: bool = False, force_numeric: bool = True) -> Union[List, array.array]:
             """
             array/list of tallied values
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             force_numeric : bool
                 if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0
-
+    
                 if False, do not interpret x-values, return as list if type is any (list)
-
+    
             Returns
             -------
             all tallied values : array/list
-
+    
             Note
             ----
             Not available for level monitors. Use xduration(), xt() or tx() instead.
             """
-
         def xweight(self, ex0: bool = False, force_numeric: bool = True) -> Union[List, array.array]:
             """
             array/list of tallied values
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             force_numeric : bool
                 if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0
-
+    
                 if False, do not interpret x-values, return as list if type is list
-
+    
             Returns
             -------
             all tallied values : array/list
-
+    
             Note
             ----
             not available for level monitors
             """
-
         def xduration(self, ex0: bool = False, force_numeric: bool = True) -> Tuple:
             """
             array/list of tallied values
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             force_numeric : bool
                 if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0
-
+    
                 if False, do not interpret x-values, return as list if type is list
-
+    
             Returns
             -------
             tuple of tallied value and duration : array/list
-
+    
             Note
             ----
             not available for non level monitors
             """
-
-        def xt(
-            self,
-            ex0: bool = False,
-            exoff=False,
-            force_numeric: bool = True,
-            add_now: bool = True,
-        ) -> Tuple:
+        def xt(self, ex0: bool = False, exoff=False, force_numeric: bool = True, add_now: bool = True) -> Tuple:
             """
             tuple of array/list with x-values and array with timestamp
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             exoff : bool
                 if False (default), include self.off. if True, exclude self.off's
-
+    
                 non level monitors will return all values, regardless of exoff
-
+    
             force_numeric : bool
                 if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0
-
+    
                 if False, do not interpret x-values, return as list if type is list
-
+    
             add_now : bool
                 if True (default), the last tallied x-value and the current time is added to the result
-
+    
                 if False, the result ends with the last tallied value and the time that was tallied
-
+    
                 non level monitors will never add now
-
+    
                 if now is <= last tallied value, nothing will be added, even if add_now is True
-
+    
             Returns
             -------
             array/list with x-values and array with timestamps : tuple
-
+    
             Note
             ----
             The value self.off is stored when monitoring is turned off
-
+    
             The timestamps are not corrected for any reset_now() adjustment.
             """
-
-        def tx(
-            self,
-            ex0: bool = False,
-            exoff: bool = False,
-            force_numeric: bool = False,
-            add_now: bool = True,
-        ) -> Tuple:
+        def tx(self, ex0: bool = False, exoff: bool = False, force_numeric: bool = False, add_now: bool = True) -> Tuple:
             """
             tuple of array with timestamps and array/list with x-values
-
+    
             Parameters
             ----------
             ex0 : bool
                 if False (default), include zeroes. if True, exclude zeroes
-
+    
             exoff : bool
                 if False (default), include self.off. if True, exclude self.off's
-
+    
                 non level monitors will return all values, regardless of exoff
-
+    
             force_numeric : bool
                 if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0
-
+    
                 if False, do not interpret x-values, return as list if type is list
-
+    
             add_now : bool
                 if True (default), the last tallied x-value and the current time is added to the result
-
+    
                 if False, the result ends with the last tallied value and the time that was tallied
-
+    
                 non level monitors will never add now
-
+    
             Returns
             -------
             array with timestamps and array/list with x-values : tuple
-
+    
             Note
             ----
             The value self.off is stored when monitoring is turned off
-
+    
             The timestamps are not corrected for any reset_now() adjustment.
             """
-
         def _xweight(self, ex0=False, force_numeric=True):
             ...
-
         def as_dataframe(self, include_t: bool = True, use_datetime0=False) -> "dataframe":
             """
             makes a pandas dataframe with the x-values and optionally the t-values of the monitors
-
+    
             The x column names will be the name of the monitor, suffixed with ".x".
-
+    
             Parameters
             ----------
             include_t: bool
                 if True (default), include the t values in the dataframe
-
+    
                 if False, do not include t values in the dataframe
-
+    
             Returns
             -------
             dataframe containing x (and t) values : pandas dataframe
-
+    
             Notes
             -----
             Requires pandas to be installed
-
+    
             For level monitors, Monitor.as_resamplke_dataframe is likely more useful
             """
-
         def as_resampled_dataframe(
             self,
             extra_monitors: Iterable = [],
@@ -9064,268 +11755,259 @@ class Environment:
         ) -> "dataframe":
             """
             makes a pandas dataframe with t, and x_values for the monitor(s)
-
+    
             the t values will be uniformly distributes between min_t and max_t with a time step of delta_t
-
+    
             this is essentially the result of a resampling process. It is guaranteed that the values
             at the given times are correct.
-
+    
             The x column names will be the name of the monitor, suffixed with ".x".
-
+    
             Parameters
             ----------
             extra_monitors : iterable of level monitors
                 monitors to be included in the dataframe
-
-
+    
+    
             delta_t : float or datetime.timedelta
                 time step (default: 1)
-
+    
                 specification as datetime.timedelta only allowed if use_datetime0=True
-
+    
             min_t : float or datetime.datetime
                 start of the resampled time (default: start time of the monitor)
-
+    
                 specification as datetime.datetime only allowed if use_datetime0=True
-
+    
             max_t : float or datetime.datetime
                 end of the resampled time (default: env.now())
-
+    
                 specification as datetime.datetime only allowed if use_datetime0=True
-
+    
             use_datetime0 : bool
                 if False (default), use t-values as such
                 if True, use datetime.datetime as t-values (only allowed datetime0 is set for the environment)
-
+    
             Returns
             -------
             dataframe containing t and x values : pandas dataframe
-
+    
             Notes
             -----
             Requires pandas to be installed
             """
-
     class DynamicClass:
         def __init__(self):
             ...
-
         def register_dynamic_attributes(self, attributes):
             """
             Registers one or more attributes as being dynamic
-
+    
             Parameters
             ----------
             attributes : str
                 a specification of attributes to be registered as dynamic
-
+    
                 e.g. "x y"
             """
-
         def deregister_dynamic_attributes(self, attributes):
             """
             Deregisters one or more attributes as being dynamic
-
+    
             Parameters
             ----------
             attributes : str
                 a specification of attributes to be registered as dynamic
-
+    
                 e.g. "x y"
             """
-
         def __getattribute__(self, attr):
             ...
-
         def getattribute_spec(self, attr):
             """
             special version of getattribute.
             When it's dynamic it will return the value in case of a constan or a parameterless function
             Used only in AnimateCombined
             """
-
         def __call__(self, **kwargs):
             ...
-
         def add_attr(self, **kwargs):
             ...
-
     class AnimateMonitor(DynamicClass):
         """
         animates a monitor in a panel
-
+    
         Parameters
         ----------
         monitor : Monitor
             monitor to be animated
-
+    
         linecolor : colorspec
             color of the line or points (default foreground color)
-
+    
         linewidth : int
             width of the line or points (default 1 for level, 3 for non level monitors)
-
+    
         fillcolor : colorspec
             color of the panel (default transparent)
-
+    
         bordercolor : colorspec
             color of the border (default foreground color)
-
+    
         borderlinewidth : int
             width of the line around the panel (default 1)
-
+    
         nowcolor : colorspec
             color of the line indicating now (default red)
-
+    
         titlecolor : colorspec
             color of the title (default foreground color)
-
+    
         titlefont : font
             font of the title (default null string)
-
+    
         titlefontsize : int
             size of the font of the title (default 15)
-
+    
         title : str
             title to be shown above panel
-
+    
             default: name of the monitor
-
+    
         x : int
             x-coordinate of panel, relative to xy_anchor, default 0
-
+    
         y : int
             y-coordinate of panel, relative to xy_anchor. default 0
-
+    
         offsetx : float
             offsets the x-coordinate of the panel (default 0)
-
+    
         offsety : float
             offsets the y-coordinate of the panel (default 0)
-
+    
         angle : float
             rotation angle in degrees, default 0
-
+    
         xy_anchor : str
             specifies where x and y are relative to
-
+    
             possible values are (default: sw):
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
         vertical_offset : float
             the vertical position of x within the panel is
              vertical_offset + x * vertical_scale (default 0)
-
+    
         vertical_scale : float
             the vertical position of x within the panel is
             vertical_offset + x * vertical_scale (default 5)
-
+    
         horizontal_scale : float
             the relative horizontal position of time t within the panel is on
             t * horizontal_scale, possibly shifted (default 1)
-
-
+    
+    
         width : int
             width of the panel (default 200)
-
+    
         height : int
             height of the panel (default 75)
-
+    
         vertical_map : function
             when a y-value has to be plotted it will be translated by this function
-
+    
             default: float
-
+    
             when the function results in a TypeError or ValueError, the value 0 is assumed
-
+    
             when y-values are non numeric, it is advised to provide an approriate map function, like:
-
+    
             vertical_map = "unknown red green blue yellow".split().index
-
+    
         labels : iterable or dict
             if an iterable, these are the values of the labels to be shown
-
+    
             if a dict, the keys are the values of the labels, the keys are the texts to be shown
-
+    
             labels will be shown on the vertical axis (default: empty tuple)
-
+    
             the placement of the labels is controlled by the vertical_map method
-
+    
         label_color : colorspec
             color of labels (default: foreground color)
-
+    
         label_font : font
             font of the labels (default null string)
-
+    
         label_fontsize : int
             size of the font of the labels (default 15)
-
+    
         label_anchor : str
             specifies where the label coordinates (as returned by map_value) are relative to
-
+    
             possible values are (default: e):
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
         label_offsetx : float
             offsets the x-coordinate of the label (default 0)
-
+    
         label_offsety : float
             offsets the y-coordinate of the label (default 0)
-
+    
         label_linewidth : int
             width of the label line (default 1)
-
+    
         label_linecolor : colorspec
             color of the label lines (default foreground color)
-
+    
         layer : int
             layer (default 0)
-
+    
         as_points : bool
             allows to override the line/point setting, which is by default False for level
             monitors and True for non level monitors
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         over3d : bool
             if True, this object will be rendered to the OpenGL window
-
+    
             if False (default), the normal 2D plane will be used.
-
+    
         visible : bool
             visible
-
+    
             if False, animation monitor is not shown, shown otherwise
             (default True)
-
+    
         screen_coordinates : bool
             use screen_coordinates
-
+    
             if False,  the scale parameters are use for positioning and scaling
             objects.
-
+    
             if True (default), screen_coordinates will be used.
-
+    
         Note
         ----
         All measures are in screen coordinates
-
+    
         """
-
         def __init__(
             self,
             monitor: "Monitor",
@@ -9370,484 +12052,440 @@ class Environment:
             arg: Any = None,
         ):
             ...
-
         def t_to_x(self, t):
             ...
-
         def value_to_y(self, value):
             ...
-
         def line(self, t):
             ...
-
         def now_line(self, t):
             ...
-
         def update(self, t):
             ...
-
         def monitor(self) -> "Monitor":
             """
             Returns
             -------
             monitor this animation object refers to : Monitor
             """
-
         def show(self) -> None:
             """
             show (unremove)
-
+    
             It is possible to use this method if already shown
             """
-
         def remove(self) -> None:
             """
             removes the animate object and thus closes this animation
             """
-
         def is_removed(self) -> bool:
             ...
-
     class Qmember:
         def __init__(self):
             ...
-
         def insert_in_front_of(self, m2, c, q, priority):
             ...
-
     class Queue:
         """
         Queue object
-
+    
         Parameters
         ----------
         fill : iterable, usually Queue, list or tuple
             fill the queue with the components in fill
-
+    
             if omitted, the queue will be empty at initialization
-
+    
         name : str
             name of the queue
-
+    
             if the name ends with a period (.),
             auto serializing will be applied
-
+    
             if the name end with a comma,
             auto serializing starting at 1 will be applied
-
+    
             if omitted, the name will be derived from the class
             it is defined in (lowercased)
-
+    
         capacity : float
             maximum number of components the queue can contain.
-
+    
             if exceeded, a QueueFullError will be raised
-
+    
             default: inf
-
+    
         monitor : bool
             if True (default) , both length and length_of_stay are monitored
-
+    
             if False, monitoring is disabled.
-
+    
         env : Environment
             environment where the queue is defined
-
+    
             if omitted, default_env will be used
         """
-
-        def __init__(
-            self,
-            name: str = None,
-            monitor: Any = True,
-            fill: Iterable = None,
-            capacity: float = inf,
-            env: "Environment" = None,
-            *args,
-            **kwargs,
-        ) -> None:
+        def __init__(self, name: str = None, monitor: Any = True, fill: Iterable = None, capacity: float = inf, env: "Environment" = None, *args, **kwargs) -> None:
             ...
-
         def setup(self) -> None:
             """
             called immediately after initialization of a queue.
-
+    
             by default this is a dummy method, but it can be overridden.
-
+    
             only keyword arguments are passed
             """
-
         def animate(self, *args, **kwargs) -> "AnimateQueue":
             """
             Animates the components in the queue.
-
+    
             Parameters
             ----------
             x : float
                 x-position of the first component in the queue
-
+    
                 default: 50
-
+    
             y : float
                 y-position of the first component in the queue
-
+    
                 default: 50
-
+    
             direction : str
                 if "w", waiting line runs westwards (i.e. from right to left)
-
+    
                 if "n", waiting line runs northeards (i.e. from bottom to top)
-
+    
                 if "e", waiting line runs eastwards (i.e. from left to right) (default)
-
+    
                 if "s", waiting line runs southwards (i.e. from top to bottom)
                 if "t", waiting line runs follows given trajectory
-
+    
             trajectory : Trajectory
                 trajectory to be followed if direction == "t"
-
+    
             reverse : bool
                 if False (default), display in normal order. If True, reversed.
-
+    
             max_length : int
                 maximum number of components to be displayed
-
+    
             xy_anchor : str
                 specifies where x and y are relative to
-
+    
                 possible values are (default: sw):
-
+    
                 ``nw    n    ne``
-
+    
                 ``w     c     e``
-
+    
                 ``sw    s    se``
-
+    
             id : any
                 the animation works by calling the animation_objects method of each component, optionally
                 with id. By default, this is self, but can be overriden, particularly with the queue
-
+    
             arg : any
                 this is used when a parameter is a function with two parameters, as the first argument or
                 if a parameter is a method as the instance
-
+    
                 default: self (instance itself)
-
+    
             Returns
             -------
             reference to AnimationQueue object : AnimationQueue
-
+    
             Note
             ----
             It is recommended to use sim.AnimateQueue instead
-
-
+    
+    
             All measures are in screen coordinates
-
-
+    
+    
             All parameters, apart from queue and arg can be specified as:
-
+    
             - a scalar, like 10
-
+    
             - a function with zero arguments, like lambda: title
-
+    
             - a function with one argument, being the time t, like lambda t: t + 10
-
+    
             - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
             - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-
+    
             """
-
         def animate3d(self, *args, **kwargs) -> "Animate3dQueue":
             """
             Animates the components in the queue in 3D.
-
+    
             Parameters
             ----------
             x : float
                 x-position of the first component in the queue
-
+    
                 default: 0
-
+    
             y : float
                 y-position of the first component in the queue
-
+    
                 default: 0
-
+    
             z : float
                 z-position of the first component in the queue
-
+    
                 default: 0
-
+    
             direction : str
                 if "x+", waiting line runs in positive x direction (default)
-
+    
                 if "x-", waiting line runs in negative x direction
-
+    
                 if "y+", waiting line runs in positive y direction
-
+    
                 if "y-", waiting line runs in negative y direction
-
+    
                 if "z+", waiting line runs in positive z direction
-
+    
                 if "z-", waiting line runs in negative z direction
-
-
+    
+    
             reverse : bool
                 if False (default), display in normal order. If True, reversed.
-
+    
             max_length : int
                 maximum number of components to be displayed
-
+    
             layer : int
                 layer (default 0)
-
+    
             id : any
                 the animation works by calling the animation_objects method of each component, optionally
                 with id. By default, this is self, but can be overriden, particularly with the queue
-
+    
             arg : any
                 this is used when a parameter is a function with two parameters, as the first argument or
                 if a parameter is a method as the instance
-
+    
                 default: self (instance itself)
-
+    
             Returns
             -------
             reference to Animation3dQueue object : Animation3dQueue
-
+    
             Note
             ----
             It is recommended to use sim.AnimatedQueue instead
-
-
+    
+    
             All parameters, apart from queue and arg can be specified as:
-
+    
             - a scalar, like 10
-
+    
             - a function with zero arguments, like lambda: title
-
+    
             - a function with one argument, being the time t, like lambda t: t + 10
-
+    
             - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
             - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-
+    
             """
-
         def all_monitors(self) -> Tuple:
             """
             returns all monitors belonging to the queue
-
+    
             Returns
             -------
             all monitors : tuple of monitors
             """
-
         def reset_monitors(self, monitor: bool = None, stats_only: bool = None) -> None:
             """
             resets queue monitor length_of_stay and length
-
+    
             Parameters
             ----------
             monitor : bool
                 if True, monitoring will be on.
-
+    
                 if False, monitoring is disabled
-
+    
                 if omitted, no change of monitoring state
-
+    
             stats_only : bool
                 if True, only statistics will be collected (using less memory, but also less functionality)
-
+    
                 if False, full functionality
-
+    
                 if omittted, no change of stats_only
-
+    
             Note
             ----
             it is possible to reset individual monitoring with length_of_stay.reset() and length.reset()
             """
-
         def arrival_rate(self, reset: bool = False) -> float:
             """
             returns the arrival rate
-
+    
             When the queue is created, the registration is reset.
-
+    
             Parameters
             ----------
             reset : bool
                 if True, number_of_arrivals is set to 0 since last reset and the time of the last reset to now
-
+    
                 default: False ==> no reset
-
+    
             Returns
             -------
             arrival rate :  float
                 number of arrivals since last reset / duration since last reset
-
+    
                 nan if duration is zero
             """
-
         def departure_rate(self, reset: bool = False) -> float:
             """
             returns the departure rate
-
+    
             When the queue is created, the registration is reset.
-
+    
             Parameters
             ----------
             reset : bool
                 if True, number_of_departures is set to 0 since last reset and the time of the last reset to now
-
+    
                 default: False ==> no reset
-
+    
             Returns
             -------
             departure rate :  float
                 number of departures since last reset / duration since last reset
-
+    
                 nan if duration is zero
             """
-
         def monitor(self, value: bool) -> None:
             """
             enables/disables monitoring of length_of_stay and length
-
+    
             Parameters
             ----------
             value : bool
                 if True, monitoring will be on.
-
+    
                 if False, monitoring is disabled
-
-
+    
+    
             Note
             ----
             it is possible to individually control monitoring with length_of_stay.monitor() and length.monitor()
             """
-
         def register(self, registry: List) -> "Queue":
             """
             registers the queue in the registry
-
+    
             Parameters
             ----------
             registry : list
                 list of (to be) registered objects
-
+    
             Returns
             -------
             queue (self) : Queue
-
+    
             Note
             ----
             Use Queue.deregister if queue does not longer need to be registered.
             """
-
         def deregister(self, registry: List) -> "Queue":
             """
             deregisters the queue in the registry
-
+    
             Parameters
             ----------
             registry : list
                 list of registered queues
-
+    
             Returns
             -------
             queue (self) : Queue
             """
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the queue
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def print_statistics(self, as_str: bool = False, file: TextIO = None) -> Any:
             """
             prints a summary of statistics of a queue
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the statistics
                 if True, return a string containing the statistics
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             statistics (if as_str is True) : str
             """
-
-        def print_histograms(
-            self,
-            exclude: Iterable = [],
-            as_str: bool = False,
-            file: bool = None,
-            graph_scale: float = None,
-        ) -> Any:
+        def print_histograms(self, exclude: Iterable = [], as_str: bool = False, file: bool = None, graph_scale: float = None) -> Any:
             """
             prints the histograms of the length and length_of_stay monitor of the queue
-
+    
             Parameters
             ----------
             exclude : tuple or list
                 specifies which monitors to exclude
-
+    
                 default: ()
-
-
+    
+    
             as_str: bool
                 if False (default), print the histograms
                 if True, return a string containing the histograms
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             graph_scale : float
                 Scale in the graphical representation of the % and cum% (default=80)
-
+    
             Returns
             -------
             histograms (if as_str is True) : str
             """
-
         def set_capacity(self, cap: float) -> None:
             """
             Parameters
             ----------
             cap : float or int
                 capacity of the queue
-
+    
             """
-
         def name(self, value: str = None) -> str:
             """
             Parameters
@@ -9855,18 +12493,17 @@ class Environment:
             value : str
                 new name of the queue
                 if omitted, no change
-
+    
             Returns
             -------
             Name of the queue : str
-
+    
             Note
             ----
             base_name and sequence_number are not affected if the name is changed
-
+    
             All derived named are updated as well.
             """
-
         def rename(self, value: str = None) -> "Queue":
             """
             Parameters
@@ -9874,1137 +12511,1020 @@ class Environment:
             value : str
                 new name of the queue
                 if omitted, no change
-
+    
             Returns
             -------
             self : queue
-
+    
             Note
             ----
             in contrast to name(), this method returns itself, so can used to chain, e.g.
-
+    
             (q0 + q1 + q2 + q3).rename('q0 - q3').print_statistics()
-
+    
             (q1 - q0).rename('difference of q1 and q0)').print_histograms()
             """
-
         def base_name(self) -> str:
             """
             Returns
             -------
             base name of the queue (the name used at initialization): str
             """
-
         def sequence_number(self) -> int:
             """
             Returns
             -------
             sequence_number of the queue : int
                 (the sequence number at initialization)
-
+    
                 normally this will be the integer value of a serialized name,
                 but also non serialized names (without a dot or a comma at the end)
                 will be numbered)
             """
-
         def add(self, component: "Component") -> "Queue":
             """
             adds a component to the tail of a queue
-
+    
             Parameters
             ----------
             component : Component
                 component to be added to the tail of the queue
-
+    
                 may not be member of the queue yet
-
+    
             Note
             ----
             the priority will be set to
             the priority of the tail of the queue, if any
             or 0 if queue is empty
-
+    
             This method is equivalent to append()
             """
-
         def append(self, component: "Component") -> "Queue":
             """
             appends a component to the tail of a queue
-
+    
             Parameters
             ----------
             component : Component
                 component to be appened to the tail of the queue
-
+    
                 may not be member of the queue yet
-
+    
             Note
             ----
             the priority will be set to
             the priority of the tail of the queue, if any
             or 0 if queue is empty
-
+    
             This method is equivalent to add()
             """
-
         def add_at_head(self, component: "Component") -> "Queue":
             """
             adds a component to the head of a queue
-
+    
             Parameters
             ----------
-
+    
             component : Component
                 component to be added to the head of the queue
-
+    
                 may not be member of the queue yet
-
+    
             Note
             ----
             the priority will be set to
             the priority of the head of the queue, if any
             or 0 if queue is empty
             """
-
         def add_in_front_of(self, component: "Component", poscomponent: "Component") -> "Queue":
             """
             adds a component to a queue, just in front of a component
-
+    
             Parameters
             ----------
             component : Component
                 component to be added to the queue
-
+    
                 may not be member of the queue yet
-
+    
             poscomponent : Component
                 component in front of which component will be inserted
-
+    
                 must be member of the queue
-
+    
             Note
             ----
             the priority of component will be set to the priority of poscomponent
             """
-
         def insert(self, index: int, component: "Component") -> "Queue":
             """
             Insert component before index-th element of the queue
-
+    
             Parameters
             ----------
             index : int
                 component to be added just before index'th element
-
+    
                 should be >=0 and <=len(self)
-
+    
             component : Component
                 component to be added to the queue
-
+    
             Note
             ----
             the priority of component will be set to the priority of the index'th component,
             or 0 if the queue is empty
             """
-
         def add_behind(self, component: "Component", poscomponent: "Component") -> "Queue":
             """
             adds a component to a queue, just behind a component
-
+    
             Parameters
             ----------
             component : Component
                 component to be added to the queue
-
+    
                 may not be member of the queue yet
-
+    
             poscomponent : Component
                 component behind which component will be inserted
-
+    
                 must be member of the queue
-
+    
             Note
             ----
             the priority of component will be set to the priority of poscomponent
-
+    
             """
-
         def add_sorted(self, component: "Component", priority: Any) -> "Queue":
             """
             adds a component to a queue, according to the priority
-
+    
             Parameters
             ----------
             component : Component
                 component to be added to the queue
-
+    
                 may not be member of the queue yet
-
+    
             priority: type that can be compared with other priorities in the queue
                 priority in the queue
-
+    
             Note
             ----
             The component is placed just before the first component with a priority > given priority
             """
-
         def remove(self, component: "Component" = None) -> "Queue":
             """
             removes component from the queue
-
+    
             Parameters
             ----------
             component : Component
                 component to be removed
-
+    
                 if omitted, all components will be removed.
-
+    
             Note
             ----
             component must be member of the queue
             """
-
         def head(self) -> "Component":
             """
             Returns
             -------
             the head component of the queue, if any. None otherwise : Component
-
+    
             Note
             ----
             q[0] is a more Pythonic way to access the head of the queue
             """
-
         def tail(self) -> "Component":
             """
             Returns
             -------
             the tail component of the queue, if any. None otherwise : Component
-
+    
             Note
             -----
             q[-1] is a more Pythonic way to access the tail of the queue
             """
-
         def pop(self, index: int = None) -> "Component":
             """
             removes a component by its position (or head)
-
+    
             Parameters
             ----------
             index : int
                 index-th element to remove, if any
-
+    
                 if omitted, return the head of the queue, if any
-
+    
             Returns
             -------
             The i-th component or head : Component
                 None if not existing
             """
-
         def successor(self, component: "Component") -> "Component":
             """
             successor in queue
-
+    
             Parameters
             ----------
             component : Component
                 component whose successor to return
-
+    
                 must be member of the queue
-
+    
             Returns
             -------
             successor of component, if any : Component
                 None otherwise
             """
-
         def predecessor(self, component: "Component") -> "Component":
             """
             predecessor in queue
-
+    
             Parameters
             ----------
             component : Component
                 component whose predecessor to return
-
+    
                 must be member of the queue
-
+    
             Returns
             -------
             predecessor of component, if any : Component
-
+    
                 None otherwise.
             """
-
         def __contains__(self, component: "Component") -> bool:
             ...
-
         def __getitem__(self, key):
             ...
-
         def __delitem__(self, key):
             ...
-
         def __len__(self):
             ...
-
         def __reversed__(self):
             ...
-
         def __add__(self, other):
             ...
-
         def __radd__(self, other):
             ...
-
         def __or__(self, other):
             ...
-
         def __sub__(self, other):
             ...
-
         def __and__(self, other):
             ...
-
         def __xor__(self, other):
             ...
-
         def _operator(self, other, op):
             ...
-
         def __hash__(self):
             ...
-
         def __eq__(self, other):
             ...
-
         def __ne__(self, other):
             ...
-
         def __lt__(self, other):
             ...
-
         def __le__(self, other):
             ...
-
         def __gt__(self, other):
             ...
-
         def __ge__(self, other):
             ...
-
         def count(self, component: "Component") -> int:
             """
             component count
-
+    
             Parameters
             ---------
             component : Component
                 component to count
-
+    
             Returns
             -------
             number of occurences of component in the queue
-
+    
             Note
             ----
             The result can only be 0 or 1
             """
-
         def index(self, component: "Component") -> int:
             """
             get the index of a component in the queue
-
+    
             Parameters
             ----------
             component : Component
                 component to be queried
-
+    
                 does not need to be in the queue
-
+    
             Returns
             -------
             index of component in the queue : int
                 0 denotes the head,
-
+    
                 returns -1 if component is not in the queue
             """
-
         def component_with_name(self, txt: str) -> "Component":
             """
             returns a component in the queue according to its name
-
+    
             Parameters
             ----------
             txt : str
                 name of component to be retrieved
-
+    
             Returns
             -------
             the first component in the queue with name txt : Component
-
+    
                 returns None if not found
             """
-
         def __iter__(self):
             ...
-
         def extend(self, source: Iterable, clear_source: bool = False) -> None:
             """
             extends the queue with components of source that are not already in self (at the end of self)
-
+    
             Parameters
             ----------
             source : iterable (usually queue, list or tuple)
-
+    
             clear_source : bool
                 if False (default), the elements will remain in source
-
+    
                 if True, source will be cleared, so effectively moving all elements in source to self. If source is
                 not a queue, but a list or tuple, the clear_source flag may not be set.
-
+    
             Returns
             -------
             None
-
+    
             Note
             ----
             The components in source added to the queue will get the priority of the tail of self.
             """
-
         def as_set(self):
             ...
-
         def as_list(self):
             ...
-
         def union(self, q: "Queue", name: str = None, monitor: bool = False) -> "Queue":
             """
             Parameters
             ----------
             q : Queue
                 queue to be unioned with self
-
+    
             name : str
                 name of the  new queue
-
+    
                 if omitted, self.name() + q.name()
-
+    
             monitor : bool
                 if True, monitor the queue
-
+    
                 if False (default), do not monitor the queue
-
+    
             Returns
             -------
             queue containing all elements of self and q : Queue
-
+    
             Note
             ----
             the priority will be set to 0 for all components in the
             resulting  queue
-
+    
             the order of the resulting queue is as follows:
-
+    
             first all components of self, in that order,
             followed by all components in q that are not in self,
             in that order.
-
+    
             Alternatively, the more pythonic | operator is also supported, e.g. q1 | q2
             """
-
         def intersection(self, q: "Queue", name: str = None, monitor: bool = False) -> "Queue":
             """
             returns the intersect of two queues
-
+    
             Parameters
             ----------
             q : Queue
                 queue to be intersected with self
-
+    
             name : str
                 name of the  new queue
-
+    
                 if omitted, self.name() + q.name()
-
+    
             monitor : bool
                 if True, monitor the queue
-
+    
                 if False (default), do not monitor the queue
-
+    
             Returns
             -------
             queue with all elements that are in self and q : Queue
-
+    
             Note
             ----
             the priority will be set to 0 for all components in the
             resulting  queue
-
+    
             the order of the resulting queue is as follows:
-
+    
             in the same order as in self.
-
+    
             Alternatively, the more pythonic & operator is also supported, e.g. q1 & q2
             """
-
         def difference(self, q: "Queue", name: str = None, monitor: bool = False) -> "Queue":
             """
             returns the difference of two queues
-
+    
             Parameters
             ----------
             q : Queue
                 queue to be 'subtracted' from self
-
+    
             name : str
                 name of the  new queue
-
+    
                 if omitted, self.name() - q.name()
-
+    
             monitor : bool
                 if True, monitor the queue
-
+    
                 if False (default), do not monitor the queue
-
+    
             Returns
             -------
             queue containing all elements of self that are not in q
-
+    
             Note
             ----
             the priority will be copied from the original queue.
             Also, the order will be maintained.
-
+    
             Alternatively, the more pythonic - operator is also supported, e.g. q1 - q2
             """
-
         def symmetric_difference(self, q: "Queue", name: str = None, monitor: bool = False) -> "Queue":
             """
             returns the symmetric difference of two queues
-
+    
             Parameters
             ----------
             q : Queue
                 queue to be 'subtracted' from self
-
+    
             name : str
                 name of the  new queue
-
+    
                 if omitted, self.name() - q.name()
-
+    
             monitor : bool
                 if True, monitor the queue
-
+    
                 if False (default), do not monitor the queue
-
+    
             Returns
             -------
             queue containing all elements that are either in self or q, but not in both
-
+    
             Note
             ----
             the priority of all elements will be set to 0 for all components in the new queue.
             Order: First, elelements in self (in that order), then elements in q (in that order)
             Alternatively, the more pythonic ^ operator is also supported, e.g. q1 ^ q2
             """
-
-        def copy(
-            self,
-            name: str = None,
-            copy_capacity: bool = False,
-            monitor: bool = False,
-        ) -> "Queue":
+        def copy(self, name: str = None, copy_capacity: bool = False, monitor: bool = False) -> "Queue":
             """
             returns a copy of a queue
-
+    
             Parameters
             ----------
             name : str
                 name of the new queue
-
+    
                 if omitted, "copy of " + self.name()
-
+    
             monitor : bool
                 if True, monitor the queue
-
+    
                 if False (default), do not monitor the queue
-
+    
             copy_capacity : bool
                 if True, the capacity will be copied
-
+    
                 if False (default), the resulting queue will always be unrestricted
-
+    
             Returns
             -------
             queue with all elements of self : Queue
-
+    
             Note
             ----
             The priority will be copied from original queue.
             Also, the order will be maintained.
             """
-
         def move(self, name: str = None, monitor: bool = False, copy_capacity=False):
             """
             makes a copy of a queue and empties the original
-
+    
             Parameters
             ----------
             name : str
                 name of the new queue
-
+    
             monitor : bool
                 if True, monitor the queue
-
+    
                 if False (default), do not monitor the yqueue
-
+    
             copy_capacity : bool
                 if True, the capacity will be copied
-
+    
                 if False (default), the new queue will always be unrestricted
-
+    
             Returns
             -------
             queue containing all elements of self: Queue
             the capacity of the original queue will not be changed
-
+    
             Note
             ----
             Priorities will be kept
-
+    
             self will be emptied
             """
-
         def clear(self):
             """
             empties a queue
-
+    
             removes all components from a queue
             """
-
     class Store(Queue):
-        def __init__(
-            self,
-            name: str = None,
-            capacity: int = inf,
-            env: "Environment" = None,
-            *args,
-            **kwargs,
-        ):
+        def __init__(self, name: str = None, capacity: int = inf, env: "Environment" = None, *args, **kwargs):
             ...
-
         def set_capacity(self, cap: float) -> None:
             """
             Parameters
             ----------
             cap : float or int
                 capacity of the store
-
-
+    
+    
             Note
             ----
             Might cause (to_store requests to be honoured)
             """
-
         def from_store_requesters(self) -> "Queue":
             """
             get the queue holding all from_store requesting components
-
+    
             Returns
             -------
             queue holding all from_store requesting components : Queue
             """
-
         def rescan(self):
             """
             Rescan for any components to be allowed from.
             """
-
         def _rescan_to(self):
             """
             Rescan for any components to be allowed to.
             """
-
     class Animate3dBase(DynamicClass):
         """
         Base class for a 3D animation object
-
+    
         When a class inherits from this base class, it will be added to the animation objects list to be shown
-
+    
         Parameters
         ----------
         visible : bool
             visible
-
+    
             if False, animation object is not shown, shown otherwise
             (default True)
-
+    
         layer : int
              layer value
-
+    
              lower layer values are displayed later in the frame (default 0)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
         """
-
         def __init__(
-            self,
-            visible: bool = True,
-            keep: bool = True,
-            arg: Any = None,
-            layer: float = 0,
-            parent: "Component" = None,
-            env: "Environment" = None,
-            **kwargs,
+            self, visible: bool = True, keep: bool = True, arg: Any = None, layer: float = 0, parent: "Component" = None, env: "Environment" = None, **kwargs
         ) -> None:
             ...
-
         def setup(self) -> None:
             """
             called immediately after initialization of a the Animate3dBase object.
-
+    
             by default this is a dummy method, but it can be overridden.
-
+    
             only keyword arguments will be passed
-
+    
             Example
             -------
                 class AnimateVehicle(sim.Animate3dBase):
                     def setup(self, length):
                         self.length = length
                         self.register_dynamic_attributes("length")
-
+    
                     ...
             """
-
         def show(self) -> None:
             """
             show (unremove)
-
+    
             It is possible to use this method if already shown
             """
-
         def remove(self) -> None:
             """
             removes the 3d animation oject
             """
-
         def is_removed(self) -> bool:
             ...
-
     class _Trajectory:
         def in_trajectory(self, t):
             ...
-
         def t0(self):
             ...
-
         def t1(self):
             ...
-
         def duration(self):
             ...
-
         def rendered_polygon(self, time_step=1):
             ...
-
         def __add__(self, other):
             ...
-
     class TrajectoryMerged(_Trajectory):
         """
         merge trajectories
-
+    
         Parameters
         ----------
         trajectories : iterable (list, tuple, ...)
             list trajectories to be merged
-
+    
         Returns
         -------
         merged trajectory : Trajectory
-
+    
         Notes
         -----
         It is arguably easier just to add or sum trajectories, like
-
-
+    
+    
             trajectory = trajectory1 + trajectory2 + trajectory3 or
-
+    
             trajectory = sum((trajectory, trajectory2, trajectory3))
         """
-
         def __init__(self, trajectories) -> None:
             ...
-
         def index(self, t):
             ...
-
         def __repr__(self):
             ...
-
         def x(self, t: float, _t0: float = None) -> float:
             """
             value of x
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate x
-
+    
             Returns
             -------
             evaluated x : float
             """
-
         def y(self, t: float, _t0: float = None) -> float:
             """
             value of y
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate y
-
+    
             Returns
             -------
             evaluated y : float
             """
-
         def angle(self, t: float, _t0: float = None) -> float:
             """
             value of angle (in degrees)
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate angle
-
+    
             Returns
             -------
             evaluated angle (in degrees) : float
             """
-
         def in_trajectory(self, t: float) -> bool:
             """
             is t in trajectory?
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate
-
+    
             Returns
             -------
             is t in trajectory? : bool
             """
-
         def t0(self) -> float:
             """
             start time of trajectory
-
+    
             Returns
             -------
             start time of trajectory : float
             """
-
         def t1(self) -> float:
             """
             end time of trajectory
-
+    
             Returns
             -------
             end time of trajectory : float
             """
-
         def duration(self) -> float:
             """
             duration of trajectory
-
+    
             Returns
             -------
             duration of trajectory (t1 - t0): float
             """
-
         def length(self, t: float = None, _t0: float = None) -> float:
             """
             length of traversed trajectory at time t or total length
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate length. If omitted, total length will be returned
-
+    
             Returns
             -------
             length : float
                 length of traversed trajectory at time t or
-
+    
                 total length if t omitted
             """
-
         def rendered_polygon(self, time_step: float = 1) -> List[Tuple[float, float]]:
             """
             rendered polygon
-
+    
             Parameters
             ----------
             time_step : float
                 defines at which point in time the trajectory has to be rendered
-
+    
                 default : 1
-
+    
             Returns
             -------
             polygon : list of x, y
                 rendered from t0 to t1 with time_step
-
+    
                 can be used directly in sim.AnimatePoints() or AnimatePolygon()
             """
-
     class TrajectoryStandstill(_Trajectory):
         """
         Standstill trajectory, to be used in Animatexxx through x, y and angle methods
-
+    
         Parameters
         ----------
         xy : tuple or list of 2 floats
             initial (and final) position. should be like x, y
-
+    
         orientation : float or callable
             orientation (angle) in degrees
-
+    
             a one parameter callable is also accepted (and will be called with 0)
-
+    
             default: 0
-
+    
         t0 : float
             time the trajectory should start
-
+    
             default: env.now()
-
+    
             if not the first in a merged trajectory or AnimateQueue, ignored
-
+    
         env : Environment
             environment where the trajectory is defined
-
+    
             if omitted, default_env will be used
         """
-
-        def __init__(
-            self,
-            xy: Iterable,
-            duration: float,
-            orientation: Union[Callable, float] = 0,
-            t0: float = None,
-            env: "Environment" = None,
-        ):
+        def __init__(self, xy: Iterable, duration: float, orientation: Union[Callable, float] = 0, t0: float = None, env: "Environment" = None):
             ...
-
         def x(self, t: float, _t0: float = None) -> float:
             """
             value of x
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate x
-
+    
             Returns
             -------
             evaluated x : float
             """
-
         def y(self, t: float, _t0: float = None) -> float:
             """
             value of y
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate y
-
+    
             Returns
             -------
             evaluated y : float
             """
-
         def angle(self, t: float, _t0: float = None) -> float:
             """
             value of angle (in degrees)
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate angle
-
+    
             Returns
             -------
             evaluated angle (in degrees) : float
             """
-
         def in_trajectory(self, t: float) -> bool:
             """
             is t in trajectory?
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate
-
+    
             Returns
             -------
             is t in trajectory? : bool
             """
-
         def t0(self) -> float:
             """
             start time of trajectory
-
+    
             Returns
             -------
             start time of trajectory : float
             """
-
         def t1(self) -> float:
             """
             end time of trajectory
-
+    
             Returns
             -------
             end time of trajectory : float
             """
-
         def duration(self) -> float:
             """
             duration of trajectory
-
+    
             Returns
             -------
             duration of trajectory (t1 - t0): float
             """
-
         def length(self, t: float = None, _t0: float = None) -> float:
             """
             length of traversed trajectory at time t or total length
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate length.
-
+    
             Returns
             -------
             length : float
                 always 0
-
+    
             """
-
         def rendered_polygon(self, time_step: float = 1) -> List[Tuple[float, float]]:
             """
             rendered polygon
-
+    
             Parameters
             ----------
             time_step : float
                 defines at which point in time the trajectory has to be rendered
-
+    
                 default : 1
-
+    
             Returns
             -------
             polygon : list of x, y
                 rendered from t0 to t1 with time_step
-
+    
                 can be used directly in sim.AnimatePoints() or AnimatePolygon()
             """
-
     class TrajectoryPolygon(_Trajectory):
         """
         Polygon trajectory, to be used in Animatexxx through x, y and angle methods
-
+    
         Parameters
         ----------
         polygon : iterable of floats
             should be like x0, y0, x1, y1, ...
-
+    
         t0 : float
             time the trajectory should start
-
+    
             default: env.now()
-
+    
             if not the first in a merged trajectory or AnimateQueue, ignored
-
+    
         vmax : float
             maximum speed, i.e. position units per time unit
-
+    
             default: 1
-
+    
         v0 : float
             velocity at start
-
+    
             default: vmax
-
+    
         v1 : float
             velocity at end
-
+    
             default: vmax
-
+    
         acc : float
             acceleration rate (position units / time units ** 2)
-
+    
             default: inf (i.e. no acceleration)
-
+    
         dec : float
             deceleration rate (position units / time units ** 2)
-
+    
             default: inf (i.e. no deceleration)
-
+    
         orientation : float
             default: gives angle in the direction of the movement when calling angle(t)
-
+    
             if a one parameter callable, the angle in the direction of the movement will be callled
-
+    
             if a float, this orientation will always be returned as angle(t)
-
+    
         spline : None or string
             if None (default) or '', polygon is used as such
-
+    
             if 'bezier' (or any string starting with 'b' or 'B', Bézier splining is used
-
+    
             if 'catmull_rom' (or any string starting with 'c' or 'C', Catmull-Rom splining is used
-
+    
         res : int
             resolution of spline (ignored when no splining is applied)
-
+    
         env : Environment
             environment where the trajectory is defined
-
+    
             if omitted, default_env will be used
-
+    
         Notes
         -----
         bezier and catmull_rom splines require numpy to be installed.
         """
-
         def __init__(
             self,
             polygon: Iterable,
@@ -11020,202 +13540,189 @@ class Environment:
             env: "Environment" = None,
         ) -> None:
             ...
-
         def __repr__(self):
             ...
-
         def indexes(self, t, _t0=None):
             ...
-
         def x(self, t: float, _t0: float = None) -> float:
             """
             value of x
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate x
-
+    
             Returns
             -------
             evaluated x : float
             """
-
         def y(self, t: float, _t0: float = None) -> float:
             """
             value of y
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate y
-
+    
             Returns
             -------
             evaluated y : float
             """
-
         def angle(self, t: float, _t0: float = None) -> float:
             """
             value of angle (in degrees)
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate angle
-
+    
             Returns
             -------
             evaluated angle (in degrees) : float
             """
-
         def in_trajectory(self, t: float) -> bool:
             """
             is t in trajectory?
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate
-
+    
             Returns
             -------
             is t in trajectory? : bool
             """
-
         def t0(self) -> float:
             """
             start time of trajectory
-
+    
             Returns
             -------
             start time of trajectory : float
             """
-
         def t1(self) -> float:
             """
             end time of trajectory
-
+    
             Returns
             -------
             end time of trajectory : float
             """
-
         def duration(self) -> float:
             """
             duration of trajectory
-
+    
             Returns
             -------
             duration of trajectory (t1 - t0): float
             """
-
         def length(self, t: float = None, _t0: float = None) -> float:
             """
             length of traversed trajectory at time t or total length
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate lenght. If omitted, total length will be returned
-
+    
             Returns
             -------
             length : float
                 length of traversed trajectory at time t or
-
+    
                 total length if t omitted
             """
-
         def rendered_polygon(self, time_step: float = 1) -> List[Tuple[float, float]]:
             """
             rendered polygon
-
+    
             Parameters
             ----------
             time_step : float
                 defines at which point in time the trajectory has to be rendered
-
+    
                 default : 1
-
+    
             Returns
             -------
             polygon : list of x, y
                 rendered from t0 to t1 with time_step
-
+    
                 can be used directly in sim.AnimatePoints() or AnimatePolygon()
             """
-
     class TrajectoryCircle(_Trajectory):
         """
         Circle (arc) trajectory, to be used in Animatexxx through x, y and angle methods
-
+    
         Parameters
         ----------
         radius : float
             radius of the circle or arc
-
+    
         x_center : float
             x-coordinate of the circle
-
+    
         y_center : float
             y-coordinate of the circle
-
+    
         angle0 : float
             start angle in degrees
-
+    
             default: 0
-
+    
         angle1 : float
             end angle in degrees
-
+    
             default: 360
-
+    
         t0 : float
             time the trajectory should start
-
+    
             default: env.now()
-
+    
             if not the first in a merged trajectory or AnimateQueue, ignored
-
+    
         vmax : float
             maximum speed, i.e. position units per time unit
-
+    
             default: 1
-
+    
         v0 : float
             velocity at start
-
+    
             default: vmax
-
+    
         v1 : float
             velocity at end
-
+    
             default: vmax
-
+    
         acc : float
             acceleration rate (position units / time units ** 2)
-
+    
             default: inf (i.e. no acceleration)
-
+    
         dec : float
             deceleration rate (position units / time units ** 2)
-
+    
             default: inf (i.e. no deceleration)
-
+    
         orientation : float
             default: gives angle in the direction of the movement when calling angle(t)
-
+    
             if a one parameter callable, the angle in the direction of the movement will be callled
-
+    
             if a float, this orientation will always be returned as angle(t)
-
+    
         env : Environment
             environment where the trajectory is defined
-
+    
             if omitted, default_env will be used
         """
-
         def __init__(
             self,
             radius: float,
@@ -11233,229 +13740,1898 @@ class Environment:
             env: "Environment" = None,
         ):
             ...
-
         def __repr__(self):
             ...
-
         def x(self, t: float, _t0: float = None) -> float:
             """
             value of x
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate x
-
+    
             Returns
             -------
             evaluated x : float
             """
-
         def y(self, t: float, _t0: float = None) -> float:
             """
             value of y
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate x
-
+    
             Returns
             -------
             evaluated y : float
             """
-
         def angle(self, t: float, _t0: float = None) -> float:
             """
             value of angle
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate x
-
+    
             Returns
             -------
             evaluated amgle : float
             """
-
         def in_trajectory(self, t: float) -> bool:
             """
             is t in trajectory?
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate
-
+    
             Returns
             -------
             is t in trajectory? : bool
             """
-
         def t0(self) -> float:
             """
             start time of trajectory
-
+    
             Returns
             -------
             start time of trajectory : float
             """
-
         def t1(self) -> float:
             """
             end time of trajectory
-
+    
             Returns
             -------
             end time of trajectory : float
             """
-
         def duration(self) -> float:
             """
             duration of trajectory
-
+    
             Returns
             -------
             duration of trajectory (t1 - t0): float
             """
-
         def length(self, t: Any = None, _t0: float = None) -> float:
             """
             length of traversed trajectory at time t or total length
-
+    
             Parameters
             ----------
             t : float
                 time at which to evaluate length. If omitted, total length will be returned
-
+    
             Returns
             -------
             length : float
                 length of traversed trajectory at time t or
-
+    
                 total length if t omitted
             """
-
         def rendered_polygon(self, time_step: float = 1) -> List[Tuple[float, float]]:
             """
             rendered polygon
-
+    
             Parameters
             ----------
             time_step : float
                 defines at which point in time the trajectory has to be rendered
-
+    
                 default : 1
-
+    
             Returns
             -------
             polygon : list of x, y
                 rendered from t0 to t1 with time_step
-
+    
                 can be used directly in sim.AnimatePoints() or AnimatePolygon()
             """
-
+    class Component:
+        """
+        Component object
+    
+        A salabim component is used as component (primarily for queueing)
+        or as a component with a process
+    
+        Usually, a component will be defined as a subclass of Component.
+    
+        Parameters
+        ----------
+        name : str
+            name of the component.
+    
+            if the name ends with a period (.),
+            auto serializing will be applied
+    
+            if the name end with a comma,
+            auto serializing starting at 1 will be applied
+    
+            if omitted, the name will be derived from the class
+            it is defined in (lowercased)
+    
+        at : float or distribution
+            schedule time
+    
+            if omitted, now is used
+    
+            if distribution, the distribution is sampled
+    
+        delay : float or distributiom
+            schedule with a delay
+    
+            if omitted, no delay
+    
+            if distribution, the distribution is sampled
+    
+        priority : float
+            priority
+    
+            default: 0
+    
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+    
+        urgent : bool
+            urgency indicator
+    
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority
+    
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority
+    
+        process : str
+            name of process to be started.
+    
+            if None (default), it will try to start self.process()
+    
+            if null string, no process will be started even if self.process() exists,
+            i.e. become a data component.
+    
+    
+        suppress_trace : bool
+            suppress_trace indicator
+    
+            if True, this component will be excluded from the trace
+    
+            If False (default), the component will be traced
+    
+            Can be queried or set later with the suppress_trace method.
+    
+        suppress_pause_at_step : bool
+            suppress_pause_at_step indicator
+    
+            if True, if this component becomes current, do not pause when stepping
+    
+            If False (default), the component will be paused when stepping
+    
+            Can be queried or set later with the suppress_pause_at_step method.
+    
+        skip_standby : bool
+            skip_standby indicator
+    
+            if True, after this component became current, do not activate standby components
+    
+            If False (default), after the component became current  activate standby components
+    
+            Can be queried or set later with the skip_standby method.
+    
+        mode : str preferred
+            mode
+    
+            will be used in trace and can be used in animations
+    
+            if omitted, the mode will be "".
+    
+            also mode_time will be set to now.
+    
+        cap_now : bool
+            indicator whether times (at, delay) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+    
+        env : Environment
+            environment where the component is defined
+    
+            if omitted, default_env will be used
+        """
+        def __init__(
+            self,
+            name: str = None,
+            at: Union[float, Callable] = None,
+            delay: Union[float, Callable] = None,
+            priority: float = None,
+            urgent: bool = None,
+            process: str = None,
+            suppress_trace: bool = False,
+            suppress_pause_at_step: bool = False,
+            skip_standby: bool = False,
+            mode: str = "",
+            cap_now: bool = None,
+            env: "Environment" = None,
+            **kwargs,
+        ):
+            ...
+        def animation_objects(self, id: Any) -> Tuple:
+            """
+            defines how to display a component in AnimateQueue
+    
+            Parameters
+            ----------
+            id : any
+                id as given by AnimateQueue. Note that by default this the reference to the AnimateQueue object.
+    
+            Returns
+            -------
+            List or tuple containg
+    
+                size_x : how much to displace the next component in x-direction, if applicable
+    
+                size_y : how much to displace the next component in y-direction, if applicable
+    
+                animation objects : instances of Animate class
+    
+                default behaviour:
+    
+                square of size 40 (displacements 50), with the sequence number centered.
+    
+            Note
+            ----
+            If you override this method, be sure to use the same header, either with or without the id parameter.
+    
+            """
+        def animation3d_objects(self, id: Any) -> Tuple:
+            """
+            defines how to display a component in Animate3dQueue
+    
+            Parameters
+            ----------
+            id : any
+                id as given by Animate3dQueue. Note that by default this the reference to the Animate3dQueue object.
+    
+            Returns
+            -------
+            List or tuple containg
+    
+                size_x : how much to displace the next component in x-direction, if applicable
+    
+                size_y : how much to displace the next component in y-direction, if applicable
+    
+                size_z : how much to displace the next component in z-direction, if applicable
+    
+                animation objects : instances of Animate3dBase class
+    
+                default behaviour:
+    
+                white 3dbox of size 8, placed on the z=0 plane (displacements 10).
+    
+            Note
+            ----
+            If you override this method, be sure to use the same header, either with or without the id parameter.
+    
+    
+            Note
+            ----
+            The animation object should support the x_offset, y_offset and z_offset attributes, in order to be able
+            to position the object correctly. All native salabim Animate3d classes are offset aware.
+            """
+        def _remove_from_aos(self, q):
+            ...
+        def setup(self) -> None:
+            """
+            called immediately after initialization of a component.
+    
+            by default this is a dummy method, but it can be overridden.
+    
+            only keyword arguments will be passed
+    
+            Example
+            -------
+                class Car(sim.Component):
+                    def setup(self, color):
+                        self.color = color
+    
+                    def process(self):
+                        ...
+    
+                redcar=Car(color="red")
+    
+                bluecar=Car(color="blue")
+            """
+        def __repr__(self):
+            ...
+        def register(self, registry: List) -> "Component":
+            """
+            registers the component in the registry
+    
+            Parameters
+            ----------
+            registry : list
+                list of (to be) registered objects
+    
+            Returns
+            -------
+            component (self) : Component
+    
+            Note
+            ----
+            Use Component.deregister if component does not longer need to be registered.
+            """
+        def deregister(self, registry: List) -> "Component":
+            """
+            deregisters the component in the registry
+    
+            Parameters
+            ----------
+            registry : list
+                list of registered components
+    
+            Returns
+            -------
+            component (self) : Component
+            """
+        def print_info(self, as_str: "bool" = False, file: TextIO = None) -> str:
+            """
+            prints information about the component
+    
+            Parameters
+            ----------
+            as_str: bool
+                if False (default), print the info
+                if True, return a string containing the info
+    
+            file: file
+                if None(default), all output is directed to stdout
+    
+                otherwise, the output is directed to the file
+    
+            Returns
+            -------
+            info (if as_str is True) : str
+            """
+        def _push(self, t, priority, urgent, return_value=None, switch=True):
+            ...
+        def _remove(self):
+            ...
+        def _check_fail(self):
+            ...
+        def _reschedule(self, scheduled_time, priority, urgent, caller, cap_now, extra="", s0=None, return_value=None):
+            ...
+        def activate(
+            self,
+            at: Union[float, Callable] = None,
+            delay: Union[Callable, float] = 0,
+            priority: float = 0,
+            urgent: bool = False,
+            process: str = None,
+            keep_request: bool = False,
+            keep_wait: bool = False,
+            mode: str = None,
+            cap_now: bool = None,
+            **kwargs,
+        ) -> None:
+            """
+            activate component
+    
+            Parameters
+            ----------
+            at : float or distribution
+                schedule time
+    
+                if omitted, now is used
+    
+                inf is allowed
+    
+                if distribution, the distribution is sampled
+    
+            delay : float or distribution
+                schedule with a delay
+    
+                if omitted, no delay
+    
+                if distribution, the distribution is sampled
+    
+            priority : float
+                priority
+    
+                default: 0
+    
+                if a component has the same time on the event list, this component is sorted accoring to
+                the priority.
+    
+            urgent : bool
+                urgency indicator
+    
+                if False (default), the component will be scheduled
+                behind all other components scheduled
+                for the same time and priority
+    
+                if True, the component will be scheduled
+                in front of all components scheduled
+                for the same time and priority
+    
+            process : str
+                name of process to be started.
+    
+                if None (default), process will not be changed
+    
+                if the component is a data component, the
+                generator function process will be used as the default process.
+    
+                note that the function *must* be a generator,
+                i.e. contains at least one yield.
+    
+            keep_request : bool
+                this affects only components that are requesting.
+    
+                if True, the requests will be kept and thus the status will remain requesting
+    
+                if False (the default), the request(s) will be canceled and the status will become scheduled
+    
+            keep_wait : bool
+                this affects only components that are waiting.
+    
+                if True, the waits will be kept and thus the status will remain waiting
+    
+                if False (the default), the wait(s) will be canceled and the status will become scheduled
+    
+            cap_now : bool
+                indicator whether times (at, delay) in the past are allowed. If, so now() will be used.
+                default: sys.default_cap_now(), usualy False
+    
+            mode : str preferred
+                mode
+    
+                will be used in the trace and can be used in animations
+    
+                if nothing specified, the mode will be unchanged.
+    
+                also mode_time will be set to now, if mode is set.
+    
+            Note
+            ----
+            if to be applied to the current component, use ``yield self.activate()``.
+    
+            if both at and delay are specified, the component becomes current at the sum
+            of the two values.
+            """
+        def hold(
+            self,
+            duration: Union[float, Callable] = None,
+            till: Union[float, Callable] = None,
+            priority: float = 0,
+            urgent: bool = False,
+            mode: str = None,
+            cap_now: bool = None,
+        ) -> None:
+            """
+            hold the component
+    
+            Parameters
+            ----------
+            duration : float or distribution
+                specifies the duration
+    
+                if omitted, 0 is used
+    
+                inf is allowed
+    
+                if distribution, the distribution is sampled
+    
+            till : float or distribution
+                specifies at what time the component will become current
+    
+                if omitted, now is used
+    
+                inf is allowed
+    
+                if distribution, the distribution is sampled
+    
+            priority : float
+                priority
+    
+                default: 0
+    
+                if a component has the same time on the event list, this component is sorted accoring to
+                the priority.
+    
+            urgent : bool
+                urgency indicator
+    
+                if False (default), the component will be scheduled
+                behind all other components scheduled
+                for the same time and priority
+    
+                if True, the component will be scheduled
+                in front of all components scheduled
+                for the same time and priority
+    
+            mode : str preferred
+                mode
+    
+                will be used in trace and can be used in animations
+    
+                if nothing specified, the mode will be unchanged.
+    
+                also mode_time will be set to now, if mode is set.
+    
+            cap_now : bool
+                indicator whether times (duration, till) in the past are allowed. If, so now() will be used.
+                default: sys.default_cap_now(), usualy False
+    
+            Note
+            ----
+            if to be used for the current component, use ``yield self.hold(...)``.
+    
+    
+            if both duration and till are specified, the component will become current at the sum of
+            these two.
+            """
+        def passivate(self, mode: str = None) -> None:
+            """
+            passivate the component
+    
+            Parameters
+            ----------
+            mode : str preferred
+                mode
+    
+                will be used in trace and can be used in animations
+    
+                if nothing is specified, the mode will be unchanged.
+    
+                also mode_time will be set to now, if mode is set.
+    
+            Note
+            ----
+            if to be used for the current component (nearly always the case), use ``yield self.passivate()``.
+            """
+        def interrupt(self, mode: str = None) -> None:
+            """
+            interrupt the component
+    
+            Parameters
+            ----------
+            mode : str preferred
+                mode
+    
+                will be used in trace and can be used in animations
+    
+                if nothing is specified, the mode will be unchanged.
+    
+                also mode_time will be set to now, if mode is set.
+    
+            Note
+            ----
+            Cannot be applied on the current component.
+    
+            Use resume() to resume
+            """
+        def resume(self, all: bool = False, mode: str = None, priority: float = 0, urgent: bool = False) -> None:
+            """
+            resumes an interrupted component
+    
+            Parameters
+            ----------
+            all : bool
+                if True, the component returns to the original status, regardless of the number of interrupt levels
+    
+                if False (default), the interrupt level will be decremented and if the level reaches 0,
+                the component will return to the original status.
+    
+            mode : str preferred
+                mode
+    
+                will be used in trace and can be used in animations
+    
+                if nothing is specified, the mode will be unchanged.
+    
+                also mode_time will be set to now, if mode is set.
+    
+            priority : float
+                priority
+    
+                default: 0
+    
+                if a component has the same time on the event list, this component is sorted accoring to
+                the priority.
+    
+    
+            urgent : bool
+                urgency indicator
+    
+                if False (default), the component will be scheduled
+                behind all other components scheduled
+                for the same time and priority
+    
+                if True, the component will be scheduled
+                in front of all components scheduled
+                for the same time and priority
+    
+            Note
+            ----
+            Can be only applied to interrupted components.
+    
+            """
+        def cancel(self, mode: str = None) -> None:
+            """
+            cancel component (makes the component data)
+    
+            Parameters
+            ----------
+            mode : str preferred
+                mode
+    
+                will be used in trace and can be used in animations
+    
+                if nothing specified, the mode will be unchanged.
+    
+                also mode_time will be set to now, if mode is set.
+    
+            Note
+            ----
+            if to be used for the current component, use ``yield self.cancel()``.
+            """
+        def standby(self, mode: str = None) -> None:
+            """
+            puts the component in standby mode
+    
+            Parameters
+            ----------
+            mode : str preferred
+                mode
+    
+                will be used in trace and can be used in animations
+    
+                if nothing specified, the mode will be unchanged.
+    
+                also mode_time will be set to now, if mode is set.
+    
+            Note
+            ----
+            Not allowed for data components or main.
+    
+            if to be used for the current component
+            (which will be nearly always the case),
+            use ``yield self.standby()``.
+            """
+        def from_store(
+            self,
+            store: Union["Store", Iterable],
+            filter: Callable = lambda c: True,
+            fail_priority: float = 0,
+            urgent: bool = True,
+            fail_at: float = None,
+            fail_delay: float = None,
+            mode: str = None,
+            cap_now: bool = None,
+            key: callable = None,
+        ) -> "Component":
+            """
+            get item from store(s)
+    
+            Parameters
+            ----------
+            store : store or iterable stores
+                store(s) to get item from
+    
+            filter : callable
+                only components that return True when applied to them will be considered
+    
+                should be a function with one parameter(component) and returning a bool
+    
+                default: lambda c: True (i.e. always return True)
+    
+            fail_priority : float
+                priority of the fail event
+    
+                default: 0
+    
+                if a component has the same time on the event list, this component is sorted according to
+                the priority.
+    
+            urgent : bool
+                urgency indicator
+    
+                if False (default), the component will be scheduled
+                behind all other components scheduled
+                for the same time and priority
+    
+                if True, the component will be scheduled
+                in front of all components scheduled
+                for the same time and priority
+    
+            fail_at : float or distribution
+                time out
+    
+                if the request is not honored before fail_at,
+                the request will be cancelled and the
+                parameter failed will be set.
+    
+                if not specified, the request will not time out.
+    
+                if distribution, the distribution is sampled
+    
+            fail_delay : float or distribution
+                time out
+    
+                if the request is not honored before now+fail_delay,
+                the request will be cancelled and the
+                parameter failed will be set.
+    
+                if not specified, the request will not time out.
+    
+                if distribution, the distribution is sampled
+    
+            mode : str preferred
+                mode
+    
+                will be used in trace and can be used in animations
+    
+                if nothing specified, the mode will be unchanged.
+    
+                also mode_time will be set to now, if mode is set.
+    
+            cap_now : bool
+                indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
+                default: sys.default_cap_now(), usualy False
+    
+            key : callable
+                should be a function with one parameter (a component) and return a key value, to be used
+                to compare components (most likely a number or string).
+    
+                The component with lowest key value (satisfying the filter condition) will be returned.
+    
+                If omitted, no sorting will be applied.
+    
+            Note
+            ----
+            Only allowed for current component
+    
+            Always use as
+            use ``item = yield self.from_store(...)``.
+    
+            The parameter failed will be reset by a calling request, wait, from_store or to_store
+            """
+        def to_store(
+            self,
+            store: Union["Store", Iterable],
+            item: "Component",
+            priority: float = 0,
+            fail_priority: float = 0,
+            urgent: bool = True,
+            fail_at: float = None,
+            fail_delay: float = None,
+            mode: str = None,
+            cap_now: bool = None,
+        ) -> "Component":
+            """
+            put item to store(s)
+    
+            Parameters
+            ----------
+            store : store or iterable stores
+                store(s) to put item to
+    
+            item: Component
+                component to put to store
+    
+            fail_priority : float
+                priority of the fail event
+    
+                default: 0
+    
+                if a component has the same time on the event list, this component is sorted according to
+                the priority.
+    
+            urgent : bool
+                urgency indicator
+    
+                if False (default), the component will be scheduled
+                behind all other components scheduled
+                for the same time and priority
+    
+                if True, the component will be scheduled
+                in front of all components scheduled
+                for the same time and priority
+    
+            fail_at : float or distribution
+                time out
+    
+                if the request is not honored before fail_at,
+                the request will be cancelled and the
+                parameter failed will be set.
+    
+                if not specified, the request will not time out.
+    
+                if distribution, the distribution is sampled
+    
+            fail_delay : float or distribution
+                time out
+    
+                if the request is not honored before now+fail_delay,
+                the request will be cancelled and the
+                parameter failed will be set.
+    
+                if not specified, the request will not time out.
+    
+                if distribution, the distribution is sampled
+    
+            mode : str preferred
+                mode
+    
+                will be used in trace and can be used in animations
+    
+                if nothing specified, the mode will be unchanged.
+    
+                also mode_time will be set to now, if mode is set.
+    
+            cap_now : bool
+                indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
+                default: sys.default_cap_now(), usualy False
+    
+            Note
+            ----
+            Only allowed for current component
+    
+            Always use as
+            use ``yield self.to_store(...)``.
+    
+            The parameter failed will be reset by a calling request, wait, from_store, to_store
+            """
+        def filter(self, value: callable):
+            """
+            updates the filter used in yield self.from_to
+    
+            Parameters
+            ----------
+            value : callable
+                new filter, which should be a function with one parameter(component) and returning a bool
+    
+            Note
+            ----
+            After applying the new filter, items (components) may leave or enter the store
+            """
+        def request(self, *args, **kwargs) -> None:
+            """
+            request from a resource or resources
+    
+            Parameters
+            ----------
+            args : sequence of items where each item can be:
+                - resource, where quantity=1, priority=tail of requesters queue
+                - tuples/list containing a resource, a quantity and optionally a priority.
+                    if the priority is not specified, the request
+                    for the resource be added to the tail of
+                    the requesters queue
+    
+    
+            priority : float
+                priority of the fail event
+    
+                default: 0
+    
+                if a component has the same time on the event list, this component is sorted according to
+                the priority.
+    
+            urgent : bool
+                urgency indicator
+    
+                if False (default), the component will be scheduled
+                behind all other components scheduled
+                for the same time and priority
+    
+                if True, the component will be scheduled
+                in front of all components scheduled
+                for the same time and priority
+    
+            fail_at : float or distribution
+                time out
+    
+                if the request is not honored before fail_at,
+                the request will be cancelled and the
+                parameter failed will be set.
+    
+                if not specified, the request will not time out.
+    
+                if distribution, the distribution is sampled
+    
+            fail_delay : float or distribution
+                time out
+    
+                if the request is not honored before now+fail_delay,
+                the request will be cancelled and the
+                parameter failed will be set.
+    
+                if not specified, the request will not time out.
+    
+                if distribution, the distribution is sampled
+    
+            oneof : bool
+                if oneof is True, just one of the requests has to be met (or condition),
+                where honoring follows the order given.
+    
+                if oneof is False (default), all requests have to be met to be honored
+    
+            mode : str preferred
+                mode
+    
+                will be used in trace and can be used in animations
+    
+                if nothing specified, the mode will be unchanged.
+    
+                also mode_time will be set to now, if mode is set.
+    
+            cap_now : bool
+                indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
+                default: sys.default_cap_now(), usualy False
+    
+            Note
+            ----
+            Not allowed for data components or main.
+    
+            If to be used for the current component
+            (which will be nearly always the case),
+            use ``yield self.request(...)``.
+    
+            If the same resource is specified more that once, the quantities are summed
+    
+    
+            The requested quantity may exceed the current capacity of a resource
+    
+    
+            The parameter failed will be reset by a calling request or wait
+    
+            Example
+            -------
+            ``yield self.request(r1)``
+    
+            --> requests 1 from r1
+    
+            ``yield self.request(r1,r2)``
+    
+            --> requests 1 from r1 and 1 from r2
+    
+            ``yield self.request(r1,(r2,2),(r3,3,100))``
+    
+            --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100
+    
+            ``yield self.request((r1,1),(r2,2))``
+    
+            --> requests 1 from r1, 2 from r2
+    
+            ``yield self.request(r1, r2, r3, oneoff=True)``
+    
+            --> requests 1 from r1, r2 or r3
+    
+            """
+        def isbumped(self, resource: "Resource" = None) -> bool:
+            """
+            check whether component is bumped from resource
+    
+            Parameters
+            ----------
+            resource : Resource
+                resource to be checked
+                if omitted, checks whether component belongs to any resource claimers
+    
+            Returns
+            -------
+            True if this component is not in the resource claimers : bool
+                False otherwise
+            """
+        def isclaiming(self, resource: "Resource" = None) -> bool:
+            """
+            check whether component is claiming from resource
+    
+            Parameters
+            ----------
+            resource : Resource
+                resource to be checked
+                if omitted, checks whether component is in any resource claimers
+    
+            Returns
+            -------
+            True if this component is in the resource claimers : bool
+                False otherwise
+            """
+        def get(self, *args, **kwargs) -> None:
+            """
+            equivalent to request
+            """
+        def put(self, *args, **kwargs) -> None:
+            """
+            equivalent to request, but anonymous quantities are negated
+            """
+        def honor_all(self):
+            ...
+        def honor_any(self):
+            ...
+        def _tryrequest(self):
+            ...
+        def _release(self, r, q=None, s0=None, bumped_by=None):
+            ...
+        def release(self, *args) -> None:
+            """
+            release a quantity from a resource or resources
+    
+            Parameters
+            ----------
+            args : sequence of items, where each items can be
+                - a resources, where quantity=current claimed quantity
+                - a tuple/list containing a resource and the quantity to be released
+    
+            Note
+            ----
+            It is not possible to release from an anonymous resource, this way.
+            Use Resource.release() in that case.
+    
+            Example
+            -------
+            yield self.request(r1,(r2,2),(r3,3,100))
+    
+            --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100
+    
+    
+            c1.release
+    
+            --> releases 1 from r1, 2 from r2 and 3 from r3
+    
+    
+            yield self.request(r1,(r2,2),(r3,3,100))
+    
+            c1.release((r2,1))
+    
+            --> releases 1 from r2
+    
+    
+            yield self.request(r1,(r2,2),(r3,3,100))
+    
+            c1.release((r2,1),r3)
+    
+            --> releases 2 from r2,and 3 from r3
+            """
+        def wait(self, *args, **kwargs) -> None:
+            """
+            wait for any or all of the given state values are met
+    
+            Parameters
+            ----------
+            args : sequence of items, where each item can be
+                - a state, where value=True, priority=tail of waiters queue)
+                - a tuple/list containing
+    
+                    state, a value and optionally a priority.
+    
+                    if the priority is not specified, this component will
+                    be added to the tail of
+                    the waiters queue
+    
+    
+            priority : float
+                priority of the fail event
+    
+                default: 0
+    
+                if a component has the same time on the event list, this component is sorted accoring to
+                the priority.
+    
+            urgent : bool
+                urgency indicator
+    
+                if False (default), the component will be scheduled
+                behind all other components scheduled
+                for the same time and priority
+    
+                if True, the component will be scheduled
+                in front of all components scheduled
+                for the same time and priority
+    
+            fail_at : float or distribution
+                time out
+    
+                if the wait is not honored before fail_at,
+                the wait will be cancelled and the
+                parameter failed will be set.
+    
+                if not specified, the wait will not time out.
+    
+                if distribution, the distribution is sampled
+    
+            fail_delay : float or distribution
+                time out
+    
+                if the wait is not honored before now+fail_delay,
+                the request will be cancelled and the
+                parameter failed will be set.
+    
+                if not specified, the wait will not time out.
+    
+                if distribution, the distribution is sampled
+    
+            all : bool
+                if False (default), continue, if any of the given state/values is met
+    
+                if True, continue if all of the given state/values are met
+    
+            mode : str preferred
+                mode
+    
+                will be used in trace and can be used in animations
+    
+                if nothing specified, the mode will be unchanged.
+    
+                also mode_time will be set to now, if mode is set.
+    
+            cap_now : bool
+                indicator whether times (fail_at, fail_duration) in the past are allowed. If, so now() will be used.
+                default: sys.default_cap_now(), usualy False
+    
+            Note
+            ----
+            Not allowed for data components or main.
+    
+            If to be used for the current component
+            (which will be nearly always the case),
+            use ``yield self.wait(...)``.
+    
+            It is allowed to wait for more than one value of a state
+    
+            the parameter failed will be reset by a calling wait
+    
+            If you want to check for all components to meet a value (and clause),
+            use Component.wait(..., all=True)
+    
+            The value may be specified in three different ways:
+    
+            * constant, that value is just compared to state.value()
+    
+              yield self.wait((light,"red"))
+            * an expression, containg one or more $-signs
+              the $ is replaced by state.value(), each time the condition is tested.
+    
+              self refers to the component under test, state refers to the state
+              under test.
+    
+              yield self.wait((light,'$ in ("red","yellow")'))
+    
+              yield self.wait((level,"$<30"))
+    
+            * a function. In that case the parameter should function that
+              should accept three arguments: the value, the component under test and the
+              state under test.
+    
+              usually the function will be a lambda function, but that's not
+              a requirement.
+    
+              yield self.wait((light,lambda t, comp, state: t in ("red","yellow")))
+    
+              yield self.wait((level,lambda t, comp, state: t < 30))
+    
+    
+            Example
+            -------
+            ``yield self.wait(s1)``
+    
+            --> waits for s1.value()==True
+    
+            ``yield self.wait(s1,s2)``
+    
+            --> waits for s1.value()==True or s2.value==True
+    
+            ``yield self.wait((s1,False,100),(s2,"on"),s3)``
+    
+            --> waits for s1.value()==False or s2.value=="on" or s3.value()==True
+    
+            s1 is at the tail of waiters, because of the set priority
+    
+            ``yield self.wait(s1,s2,all=True)``
+    
+            --> waits for s1.value()==True and s2.value==True
+    
+            """
+        def _trywait(self):
+            ...
+        def claimed_quantity(self, resource: "Resource" = None) -> float:
+            """
+            Parameters
+            ----------
+            resource : Resoure
+                resource to be queried
+    
+            Returns
+            -------
+            the claimed quantity from a resource : float or int
+                if the resource is not claimed, 0 will be returned
+            """
+        def claimed_resources(self) -> List:
+            """
+            Returns
+            -------
+            list of claimed resources : list
+            """
+        def requested_resources(self) -> List:
+            """
+            Returns
+            -------
+            list of requested resources : list
+            """
+        def requested_quantity(self, resource: "Resource" = None) -> float:
+            """
+            Parameters
+            ----------
+            resource : Resoure
+                resource to be queried
+    
+            Returns
+            -------
+            the requested (not yet honored) quantity from a resource : float or int
+                if there is no request for the resource, 0 will be returned
+            """
+        def failed(self) -> bool:
+            """
+            Returns
+            -------
+            True, if the latest request/wait has failed (either by timeout or external) : bool
+            False, otherwise
+            """
+        def name(self, value: str = None) -> str:
+            """
+            Parameters
+            ----------
+            value : str
+                new name of the component
+                if omitted, no change
+    
+            Returns
+            -------
+            Name of the component : str
+    
+            Note
+            ----
+            base_name and sequence_number are not affected if the name is changed
+            """
+        def base_name(self) -> str:
+            """
+            Returns
+            -------
+            base name of the component (the name used at initialization): str
+            """
+        def sequence_number(self) -> int:
+            """
+            Returns
+            -------
+            sequence_number of the component : int
+                (the sequence number at initialization)
+    
+                normally this will be the integer value of a serialized name,
+                but also non serialized names (without a dotcomma at the end)
+                will be numbered)
+            """
+        def running_process(self) -> str:
+            """
+            Returns
+            -------
+            name of the running process : str
+                if data component, None
+            """
+        def remove_animation_children(self) -> None:
+            """
+            removes animation children
+    
+            Note
+            ----
+            Normally, the animation_children are removed automatically upon termination of a component (when it terminates)
+            """
+        def suppress_trace(self, value: bool = None) -> bool:
+            """
+            Parameters
+            ----------
+            value: bool
+                new suppress_trace value
+    
+                if omitted, no change
+    
+            Returns
+            -------
+            suppress_trace : bool
+                components with the suppress_status of True, will be ignored in the trace
+            """
+        def suppress_pause_at_step(self, value: bool = None) -> bool:
+            """
+            Parameters
+            ----------
+            value: bool
+                new suppress_trace value
+    
+                if omitted, no change
+    
+            Returns
+            -------
+            suppress_pause_at_step : bool
+                components with the suppress_pause_at_step of True, will be ignored in a step
+            """
+        def skip_standby(self, value: bool = None) -> bool:
+            """
+            Parameters
+            ----------
+            value: bool
+                new skip_standby value
+    
+                if omitted, no change
+    
+            Returns
+            -------
+            skip_standby indicator : bool
+                components with the skip_standby indicator of True, will not activate standby components after
+                the component became current.
+            """
+        def set_mode(self, value: str = None) -> None:
+            """
+            Parameters
+            ----------
+            value: any, str recommended
+                new mode
+    
+                mode_time will be set to now
+                if omitted, no change
+            """
+        def _modetxt(self) -> str:
+            ...
+        def ispassive(self) -> bool:
+            """
+            Returns
+            -------
+            True if status is passive, False otherwise : bool
+    
+            Note
+            ----
+            Be sure to always include the parentheses, otherwise the result will be always True!
+            """
+        def iscurrent(self) -> bool:
+            """
+            Returns
+            -------
+            True if status is current, False otherwise : bool
+    
+            Note
+            ----
+            Be sure to always include the parentheses, otherwise the result will be always True!
+            """
+        def isrequesting(self):
+            """
+            Returns
+            -------
+            True if status is requesting, False otherwise : bool
+    
+            Note
+            ----
+            Be sure to always include the parentheses, otherwise the result will be always True!
+            """
+        def iswaiting(self) -> bool:
+            """
+            Returns
+            -------
+            True if status is waiting, False otherwise : bool
+    
+            Note
+            ----
+            Be sure to always include the parentheses, otherwise the result will be always True!
+            """
+        def isscheduled(self) -> bool:
+            """
+            Returns
+            -------
+            True if status is scheduled, False otherwise : bool
+    
+            Note
+            ----
+            Be sure to always include the parentheses, otherwise the result will be always True!
+            """
+        def isstandby(self) -> bool:
+            """
+            Returns
+            -------
+            True if status is standby, False otherwise : bool
+    
+            Note
+            ----
+            Be sure to always include the parentheses, otherwise the result will be always True
+            """
+        def isinterrupted(self) -> bool:
+            """
+            Returns
+            -------
+            True if status is interrupted, False otherwise : bool
+    
+            Note
+            ----
+            Be sure to always include the parentheses, otherwise the result will be always True
+            """
+        def isdata(self) -> bool:
+            """
+            Returns
+            -------
+            True if status is data, False otherwise : bool
+    
+            Note
+            ----
+            Be sure to always include the parentheses, otherwise the result will be always True!
+            """
+        def queues(self) -> Set:
+            """
+            Returns
+            -------
+            set of queues where the component belongs to : set
+            """
+        def count(self, q: "Queue" = None) -> int:
+            """
+            queue count
+    
+            Parameters
+            ----------
+            q : Queue
+                queue to check or
+    
+                if omitted, the number of queues where the component is in
+    
+            Returns
+            -------
+            1 if component is in q, 0 otherwise : int
+    
+    
+                if q is omitted, the number of queues where the component is in
+            """
+        def index(self, q: "Queue") -> int:
+            """
+            Parameters
+            ----------
+            q : Queue
+                queue to be queried
+    
+            Returns
+            -------
+            index of component in q : int
+                if component belongs to q
+    
+                -1 if component does not belong to q
+            """
+        def enter(self, q: "Queue") -> "Component":
+            """
+            enters a queue at the tail
+    
+            Parameters
+            ----------
+            q : Queue
+                queue to enter
+    
+            Note
+            ----
+            the priority will be set to
+            the priority of the tail component of the queue, if any
+            or 0 if queue is empty
+            """
+        def enter_at_head(self, q: "Queue") -> "Component":
+            """
+            enters a queue at the head
+    
+            Parameters
+            ----------
+            q : Queue
+                queue to enter
+    
+            Note
+            ----
+            the priority will be set to
+            the priority of the head component of the queue, if any
+            or 0 if queue is empty
+            """
+        def enter_in_front_of(self, q: "Queue", poscomponent: "Component") -> "Component":
+            """
+            enters a queue in front of a component
+    
+            Parameters
+            ----------
+            q : Queue
+                queue to enter
+    
+            poscomponent : Component
+                component to be entered in front of
+    
+            Note
+            ----
+            the priority will be set to the priority of poscomponent
+            """
+        def enter_behind(self, q: "Queue", poscomponent: "Component") -> "Component":
+            """
+            enters a queue behind a component
+    
+            Parameters
+            ----------
+            q : Queue
+                queue to enter
+    
+            poscomponent : Component
+                component to be entered behind
+    
+            Note
+            ----
+            the priority will be set to the priority of poscomponent
+            """
+        def enter_sorted(self, q: "Queue", priority: float) -> "Component":
+            """
+            enters a queue, according to the priority
+    
+            Parameters
+            ----------
+            q : Queue
+                queue to enter
+    
+            priority: type that can be compared with other priorities in the queue
+                priority in the queue
+    
+            Note
+            ----
+            The component is placed just before the first component with a priority > given priority
+            """
+        def leave(self, q: "Queue" = None) -> "Component":
+            """
+            leave queue
+    
+            Parameters
+            ----------
+            q : Queue
+                queue to leave
+    
+            Note
+            ----
+            statistics are updated accordingly
+            """
+        def priority(self, q: "Queue", priority: float = None) -> float:
+            """
+            gets/sets the priority of a component in a queue
+    
+            Parameters
+            ----------
+            q : Queue
+                queue where the component belongs to
+    
+            priority : type that can be compared with other priorities in the queue
+                priority in queue
+    
+                if omitted, no change
+    
+            Returns
+            -------
+            the priority of the component in the queue : float
+    
+            Note
+            ----
+            if you change the priority, the order of the queue may change
+            """
+        def successor(self, q: "Queue") -> "Component":
+            """
+            Parameters
+            ----------
+            q : Queue
+                queue where the component belongs to
+    
+            Returns
+            -------
+            the successor of the component in the queue: Component
+                if component is not at the tail.
+    
+                returns None if component is at the tail.
+            """
+        def predecessor(self, q: "Queue") -> "Component":
+            """
+            Parameters
+            ----------
+            q : Queue
+                queue where the component belongs to
+    
+            Returns : Component
+                predecessor of the component in the queue
+                if component is not at the head.
+    
+                returns None if component is at the head.
+            """
+        def enter_time(self, q: "Queue") -> float:
+            """
+            Parameters
+            ----------
+            q : Queue
+                queue where component belongs to
+    
+            Returns
+            -------
+            time the component entered the queue : float
+            """
+        def creation_time(self) -> float:
+            """
+            Returns
+            -------
+            time the component was created : float
+            """
+        def scheduled_time(self) -> float:
+            """
+            Returns
+            -------
+            time the component scheduled for, if it is scheduled : float
+                returns inf otherwise
+            """
+        def scheduled_priority(self) -> float:
+            """
+            Returns
+            -------
+            priority the component is scheduled with : float
+                returns None otherwise
+    
+            Note
+            ----
+            The method has to traverse the event list, so performance may be an issue.
+            """
+        def remaining_duration(self, value: float = None, priority: float = 0, urgent: bool = False) -> float:
+            """
+            Parameters
+            ----------
+            value : float
+                set the remaining_duration
+    
+                The action depends on the status where the component is in:
+    
+                - passive: the remaining duration is update according to the given value
+    
+                - standby and current: not allowed
+    
+                - scheduled: the component is rescheduled according to the given value
+    
+                - waiting or requesting: the fail_at is set according to the given value
+    
+                - interrupted: the remaining_duration is updated according to the given value
+    
+    
+            priority : float
+                priority
+    
+                default: 0
+    
+                if a component has the same time on the event list, this component is sorted accoring to
+                the priority.
+    
+            urgent : bool
+                urgency indicator
+    
+                if False (default), the component will be scheduled
+                behind all other components scheduled
+                for the same time and priority
+    
+                if True, the component will be scheduled
+                in front of all components scheduled
+                for the same time and priority
+    
+            Returns
+            -------
+            remaining duration : float
+                if passive, remaining time at time of passivate
+    
+                if scheduled, remaing time till scheduled time
+    
+                if requesting or waiting, time till fail_at time
+    
+                else: 0
+    
+            Note
+            ----
+            This method is useful for interrupting a process and then resuming it,
+            after some (breakdown) time
+            """
+        def mode_time(self) -> float:
+            """
+            Returns
+            -------
+            time the component got it's latest mode : float
+                For a new component this is
+                the time the component was created.
+    
+                this function is particularly useful for animations.
+            """
+        def interrupted_status(self) -> Any:
+            """
+            returns the original status of an interrupted component
+    
+            possible values are
+                - passive
+                - scheduled
+                - requesting
+                - waiting
+                - standby
+            """
+        def interrupt_level(self) -> int:
+            """
+            returns interrupt level of an interrupted component
+    
+            non interrupted components return 0
+            """
+        def _member(self, q):
+            ...
+        def _checknotinqueue(self, q):
+            ...
+        def _checkinqueue(self, q):
+            ...
+        def _checkisnotdata(self):
+            ...
+        def _checkisnotmain(self):
+            ...
+        def lineno_txt(self, add_at=False):
+            ...
+        def line_number(self) -> str:
+            """
+            current line number of the process
+    
+            Returns
+            -------
+            Current line number : str
+                for data components, "" will be returned
+            """
+        def to_store_requesters(self) -> "Queue":
+            """
+            get the queue holding all to_store requesting components
+    
+            Returns
+            -------
+            queue holding all to_store requesting components : Queue
+            """
+        def from_store_item(self) -> Optional["Component"]:
+            """
+            return item returned from a yield self.from_store(...) if valid
+    
+            Returns
+            -------
+            item returned : Component or None, if not valid
+            """
+        def from_store_store(self) -> Optional["Component"]:
+            """
+            return store where item was returned from a yield self.from_store(...) if valid
+    
+            Returns
+            -------
+            item returned : Component or None, if not valid
+            """
+        def to_store_store(self) -> Optional["Component"]:
+            """
+            return store where item was sent to with last yield self.to_store(...) if valid
+    
+            Returns
+            -------
+            item returned : Component or None, if not valid
+            """
     class Environment:
         """
         environment object
-
+    
         Parameters
         ----------
         trace : bool or file handle
             defines whether to trace or not
-
+    
             if this a file handle (open for write), the trace output will be sent to this file.
-
+    
             if omitted, False
-
+    
         random_seed : hashable object, usually int
             the seed for random, equivalent to random.seed()
-
+    
             if "*", a purely random value (based on the current time) will be used
             (not reproducable)
-
+    
             if the null string, no action on random is taken
-
+    
             if None (the default), 1234567 will be used.
-
+    
         time_unit : str
             Supported time_units:
-
+    
             "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds", "n/a"
-
+    
             default: "n/a"
-
+    
         datetime0: bool or datetime.datetime
             display time and durations as datetime.datetime/datetime.timedelta
-
+    
             if falsy (default), disabled
-
+    
             if True, the t=0 will correspond to 1 January 1970
-
+    
             if no time_unit is specified, but datetime0 is not falsy, time_unit will be set to seconds
-
+    
         name : str
             name of the environment
-
+    
             if the name ends with a period (.),
             auto serializing will be applied
-
+    
             if the name end with a comma,
             auto serializing starting at 1 will be applied
-
+    
             if omitted, the name will be derived from the class (lowercased)
             or "default environment" if isdefault_env is True.
-
+    
         print_trace_header : bool
             if True (default) print a (two line) header line as a legend
-
+    
             if False, do not print a header
-
+    
             note that the header is only printed if trace=True
-
+    
         isdefault_env : bool
             if True (default), this environment becomes the default environment
-
+    
             if False, this environment will not be the default environment
-
+    
             if omitted, this environment becomes the default environment
-
-
+    
+    
         set_numpy_random_seed : bool
             if True (default), numpy.random.seed() will be called with the given seed.
-
+    
             This is particularly useful when using External distributions.
-
+    
             If numpy is not installed, this parameter is ignored
-
+    
             if False, numpy.random.seed is not called.
-
+    
         do_reset : bool
             if True, reset the simulation environment
-
+    
             if False, do not reset the simulation environment
-
+    
             if None (default), reset the simulation environment when run under Pythonista, otherwise no reset
-
+    
         blind_animation : bool
             if False (default), animation will be performed as expected
-
+    
             if True, animations will run silently. This is useful to make videos when tkinter is not installed (installable).
             This is particularly useful when running a simulation on a server.
             Note that this will show a slight performance increase, when creating videos.
-
+    
         Note
         ----
         The trace may be switched on/off later with trace
-
+    
         The seed may be later set with random_seed()
-
+    
         Initially, the random stream will be seeded with the value 1234567.
         If required to be purely, not reproducable, values, use
         random_seed="*".
         """
-
         def __init__(
             self,
             trace: bool = False,
@@ -11469,206 +15645,171 @@ class Environment:
             retina: bool = False,
             do_reset: bool = None,
             blind_animation: bool = False,
+            yieldless: bool = None,
             *args,
             **kwargs,
         ):
             ...
-
         def setup(self) -> None:
             """
             called immediately after initialization of an environment.
-
+    
             by default this is a dummy method, but it can be overridden.
-
+    
             only keyword arguments are passed
             """
-
         def serialize(self) -> int:
             ...
-
         def __repr__(self):
             ...
-
+        def yieldless(self) -> bool:
+            """
+            yieldless status
+    
+            Returns
+            -------
+            yieldless status: bool
+    
+            Note
+            ----
+            It is not possible to change the yieldless status
+            """
         def animation_pre_tick(self, t: float) -> None:
             """
             called just before the animation object loop.
-
+    
             Default behaviour: just return
-
+    
             Parameters
             ----------
             t : float
                 Current (animation) time.
             """
-
         def animation_post_tick(self, t: float) -> None:
             """
             called just after the animation object loop.
-
+    
             Default behaviour: just return
-
+    
             Parameters
             ----------
             t : float
                 Current (animation) time.
             """
-
         def animation_pre_tick_sys(self, t: float) -> None:
             ...
-
         def animation3d_init(self):
             ...
-
         def _opengl_key_pressed(self, *args):
             ...
-
         def _opengl_key_pressed_special(self, *args):
             ...
-
         def camera_move(self, spec: str = "", lag: float = 1, offset: float = 0, enabled: bool = True):
             """
             Moves the camera according to the given spec, which is normally a collection of camera_print
             outputs.
-
+    
             Parameters
             ----------
             spec : str
                 output normally obtained from camera_auto_print lines
-
+    
             lag : float
                 lag time (for smooth camera movements) (default: 1))
-
+    
             offset : float
                 the duration (can be negative) given is added to the times given in spec. Default: 0
-
+    
             enabled : bool
                 if True (default), move camera according to spec/lag
-
+    
                 if False, freeze camera movement
             """
-
         def camera_rotate(self, event=None, delta_angle=None):
             ...
-
         def camera_zoom(self, event=None, factor_xy=None, factor_z=None):
             ...
-
         def camera_xy_center(self, event=None, x_dis=None, y_dis=None):
             ...
-
         def camera_xy_eye(self, event=None, x_dis=None, y_dis=None):
             ...
-
         def camera_field_of_view(self, event=None, factor=None):
             ...
-
         def camera_tilt(self, event=None, delta_angle=None):
             ...
-
         def camera_rotate_axis(self, event=None, delta_angle=None):
             ...
-
         def camera_print(self, event=None, props=None):
             ...
-
         def _bind(self, tkinter_event, func):
             ...
-
         def camera_auto_print(self, value: bool = None) -> bool:
             """
             queries or set camera_auto_print
-
+    
             Parameters
             ----------
             value : boolean
                 if None (default), no action
-
+    
                 if True, camera_print will be called on each camera control keypress
-
+    
                 if False, no automatic camera_print
-
+    
             Returns
             -------
             Current status : bool
-
+    
             Note
             ----
             The camera_auto_print functionality is useful to get the spec for camera_move()
             """
-
         def _camera_control(self):
             ...
-
         def show_camera_position(self, over3d: bool = None) -> None:
             """
             show camera position on the tkinter window or over3d window
-
+    
             The 7 camera settings will be shown in the top left corner.
-
+    
             Parameters
             ----------
             over3d : bool
                 if False (default), present on 2D screen
-
+    
                 if True, present on 3D overlay
             """
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the environment
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def step(self) -> None:
             """
             executes the next step of the future event list
-
+    
             for advanced use with animation / GUI loops
             """
-
         def _terminate(self, c):
             ...
-
         def _print_event_list(self, s: str = "") -> None:
             ...
-
         def on_closing(self):
             ...
-
-        def get_set_paused(self, value=None):
-            """
-            paused
-
-            Parameters
-            ----------
-            value : bool
-                new paused value
-
-                if not specified, no change
-
-            Returns
-            -------
-            paused status : bool
-
-            Note
-            ----
-            if changed, set_start_animation() will be issued as well
-            """
-
         def animation_parameters(
             self,
             animate: Union[bool, str] = None,
@@ -11708,1438 +15849,1351 @@ class Environment:
         ):
             """
             set animation parameters
-
+    
             Parameters
             ----------
             animate : bool
                 animate indicator
-
+    
                 new animate indicator
-
+    
                 if '?', animation will be set, possible
-
+    
                 if not specified, no change
-
+    
             animate3d : bool
                 animate3d indicator
-
+    
                 new animate3d indicator
-
+    
                 if '?', 3D-animation will be set, possible
-
+    
                 if not specified, no change
-
+    
             synced : bool
                 specifies whether animation is synced
-
+    
                 if omitted, no change. At init of the environment synced will be set to True
-
+    
             speed : float
                 speed
-
+    
                 specifies how much faster or slower than real time the animation will run.
                 e.g. if 2, 2 simulation time units will be displayed per second.
-
+    
             width : int
                 width of the animation in screen coordinates
-
+    
                 if omitted, no change. At init of the environment, the width will be
                 set to 1024 for non Pythonista and the current screen width for Pythonista.
-
+    
             height : int
                 height of the animation in screen coordinates
-
+    
                 if omitted, no change. At init of the environment, the height will be
                 set to 768 for non Pythonista and the current screen height for Pythonista.
-
+    
             position : tuple(x,y)
                 position of the animation window
-
+    
                 if omitted, no change. At init of the environment, the position will be
                 set to (0, 0)
-
+    
                 no effect for Pythonista
-
+    
             width3d : int
                 width of the 3d animation in screen coordinates
-
+    
                 if omitted, no change. At init of the environment, the 3d width will be
                 set to 1024.
-
+    
             height3d : int
                 height of the 3d animation in screen coordinates
-
+    
                 if omitted, no change. At init of the environment, the 3d height will be
                 set to 768.
-
+    
             position3d : tuple(x,y)
                 position of the 3d animation window
-
+    
                 At init of the environment, the position will be set to (0, 0)
-
+    
                 This has to be set before the 3d animation starts as the window can only be postioned at initialization
-
+    
             title : str
                 title of the canvas window
-
+    
                 if omitted, no change. At init of the environment, the title will be
                 set to salabim.
-
+    
                 if "", the title will be suppressed.
-
+    
             x0 : float
                 user x-coordinate of the lower left corner
-
+    
                 if omitted, no change. At init of the environment, x0 will be set to 0.
-
+    
             y0 : float
                 user y_coordinate of the lower left corner
-
+    
                 if omitted, no change. At init of the environment, y0 will be set to 0.
-
+    
             x1 : float
                 user x-coordinate of the lower right corner
-
+    
                 if omitted, no change. At init of the environment, x1 will be set to 1024
                 for non Pythonista and the current screen width for Pythonista.
-
+    
             background_color : colorspec
                 color of the background
-
+    
                 if omitted, no change. At init of the environment, this will be set to white.
-
+    
             foreground_color : colorspec
                 color of foreground (texts)
-
+    
                 if omitted and background_color is specified, either white of black will be used,
                 in order to get a good contrast with the background color.
-
+    
                 if omitted and background_color is also omitted, no change. At init of the
                 environment, this will be set to black.
-
+    
             background3d_color : colorspec
                 color of the 3d background
-
+    
                 if omitted, no change. At init of the environment, this will be set to black.
-
+    
             fps : float
                 number of frames per second
-
+    
             modelname : str
                 name of model to be shown in upper left corner,
                 along with text "a salabim model"
-
+    
                 if omitted, no change. At init of the environment, this will be set
                 to the null string, which implies suppression of this feature.
-
+    
             use_toplevel : bool
                 if salabim animation is used in parallel with
                 other modules using tkinter, it might be necessary to
                 initialize the root with tkinter.TopLevel().
                 In that case, set this parameter to True.
-
+    
                 if False (default), the root will be initialized with tkinter.Tk()
-
+    
             show_fps : bool
                 if True, show the number of frames per second
-
+    
                 if False, do not show the number of frames per second (default)
-
+    
             show_time : bool
                 if True, show the time (default)
-
+    
                 if False, do not show the time
-
+    
             show_menu_buttons : bool
                 if True, show the menu buttons (default)
-
+    
                 if False, do not show the menu buttons
-
+    
             maximum_number_of_bitmaps : int
                 maximum number of tkinter bitmaps (default 4000)
-
+    
             video : str
                 if video is not omitted, a video with the name video
                 will be created.
-
+    
                 Normally, use .mp4 as extension.
-
+    
                 If the extension is .gif or .png an animated gif / png file will be written, unless there
                 is a * in the filename
-
+    
                 If the extension is .gif, .jpg, .png, .bmp, .ico or .tiff and one * appears in the filename,
                 individual frames will be written with
                 a six digit sequence at the place of the asteriks in the file name.
                 If the video extension is not .gif, .jpg, .png, .bmp, .ico or .tiff, a codec may be added
                 by appending a plus sign and the four letter code name,
                 like "myvideo.avi+DIVX".
-
+    
                 If no codec is given, MJPG will be used for .avi files, otherwise .mp4v
-
+    
                 Under PyDroid only .avi files are supported.
-
+    
             video_repeat : int
                 number of times animated gif or png should be repeated
-
+    
                 0 means inifinite
-
+    
                 at init of the environment video_repeat is 1
-
+    
                 this only applies to gif and png files production.
-
+    
             video_pingpong : bool
                 if True, all frames will be added reversed at the end of the video (useful for smooth loops)
                 at init of the environment video_pingpong is False
-
+    
                 this only applies to gif and png files production.
-
+    
             audio : str
                 name of file to be played (mp3 or wav files)
-
+    
                 if the none string, the audio will be stopped
-
+    
                 default: no change
-
+    
                 for more information, see Environment.audio()
-
+    
             visible : bool
                 if True (start condition), the animation window will be visible
-
+    
                 if False, the animation window will be hidden ('withdrawn')
-
+    
             Note
             ----
             The y-coordinate of the upper right corner is determined automatically
             in such a way that the x and y scaling are the same.
-
+    
             """
-
         def video_close(self) -> None:
             """
             closes the current animation video recording, if any.
             """
-
         def _capture_image(self, mode="RGBA", video_mode="2d", include_topleft=True):
             ...
-
         def insert_frame(self, image: Any, number_of_frames: int = 1) -> None:
             """
             Insert image as frame(s) into video
-
+    
             Parameters
             ----------
             image : Pillow image, str or Path object
                 Image to be inserted
-
+    
             nuumber_of_frames: int
                 Number of 1/30 second long frames to be inserted
             """
-
         def _save_frame(self):
             ...
-
         def add_audio(self):
             ...
-
         def ffmpeg_execute(self, command):
             ...
-
         def uninstall_uios(self):
             ...
-
         def x0(self, value: float = None) -> float:
             """
             x coordinate of lower left corner of animation
-
+    
             Parameters
             ----------
             value : float
                 new x coordinate
-
+    
             Returns
             -------
             x coordinate of lower left corner of animation : float
             """
-
         def x1(self, value: float = None) -> float:
             """
             x coordinate of upper right corner of animation : float
-
+    
             Parameters
             ----------
             value : float
                 new x coordinate
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             x coordinate of upper right corner of animation : float
             """
-
         def y0(self, value: float = None) -> float:
             """
             y coordinate of lower left corner of animation
-
+    
             Parameters
             ----------
             value : float
                 new y coordinate
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             y coordinate of lower left corner of animation : float
             """
-
         def y1(self) -> float:
             """
             y coordinate of upper right corner of animation
-
+    
             Returns
             -------
             y coordinate of upper right corner of animation : float
-
+    
             Note
             ----
             It is not possible to set this value explicitely.
             """
-
         def scale(self) -> float:
             """
             scale of the animation, i.e. width / (x1 - x0)
-
+    
             Returns
             -------
             scale : float
-
+    
             Note
             ----
             It is not possible to set this value explicitely.
             """
-
         def user_to_screen_coordinates_x(self, userx: float) -> float:
             """
             converts a user x coordinate to a screen x coordinate
-
+    
             Parameters
             ----------
             userx : float
                 user x coordinate to be converted
-
+    
             Returns
             -------
             screen x coordinate : float
             """
-
         def user_to_screen_coordinates_y(self, usery: float) -> float:
             """
             converts a user x coordinate to a screen x coordinate
-
+    
             Parameters
             ----------
             usery : float
                 user y coordinate to be converted
-
+    
             Returns
             -------
             screen y coordinate : float
             """
-
         def user_to_screen_coordinates_size(self, usersize: float) -> float:
             """
             converts a user size to a value to be used with screen coordinates
-
+    
             Parameters
             ----------
             usersize : float
                 user size to be converted
-
+    
             Returns
             -------
             value corresponding with usersize in screen coordinates : float
             """
-
         def screen_to_user_coordinates_x(self, screenx: float) -> float:
             """
             converts a screen x coordinate to a user x coordinate
-
+    
             Parameters
             ----------
             screenx : float
                 screen x coordinate to be converted
-
+    
             Returns
             -------
             user x coordinate : float
             """
-
         def screen_to_user_coordinates_y(self, screeny: float) -> float:
             """
             converts a screen x coordinate to a user x coordinate
-
+    
             Parameters
             ----------
             screeny : float
                 screen y coordinate to be converted
-
+    
             Returns
             -------
             user y coordinate : float
             """
-
         def screen_to_user_coordinates_size(self, screensize: float) -> float:
             """
             converts a screen size to a value to be used with user coordinates
-
+    
             Parameters
             ----------
             screensize : float
                 screen size to be converted
-
+    
             Returns
             -------
             value corresponding with screensize in user coordinates : float
             """
-
         def width(self, value: int = None, adjust_x0_x1_y0: bool = False) -> int:
             """
             width of the animation in screen coordinates
-
+    
             Parameters
             ----------
             value : int
                 new width
-
+    
                 if not specified, no change
-
+    
             adjust_x0_x1_y0 : bool
                 if False (default), x0, x1 and y0 are not touched
-
+    
                 if True, x0 and y0 will be set to 0 and x1 will be set to the given width
-
+    
             Returns
             -------
             width of animation : int
             """
-
         def height(self, value: int = None) -> int:
             """
             height of the animation in screen coordinates
-
+    
             Parameters
             ----------
             value : int
                 new height
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             height of animation : int
             """
-
         def width3d(self, value: int = None) -> int:
             """
             width of the 3d animation in screen coordinates
-
+    
             Parameters
             ----------
             value : int
                 new 3d width
-
+    
                 if not specified, no change
-
-
+    
+    
             Returns
             -------
             width of 3d animation : int
             """
-
         def height3d(self, value: int = None) -> int:
             """
             height of the 3d animation in screen coordinates
-
+    
             Parameters
             ----------
             value : int
                 new 3d height
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             height of 3d animation : int
             """
-
         def visible(self, value: bool = None) -> bool:
             """
             controls visibility of the animation window
-
+    
             Parameters
             ----------
             value : bool
                 if True, the animation window will be visible
-
+    
                 if False, the animation window will be hidden ('withdrawn')
                 if None (default), no change
-
+    
             Returns
             -------
             current visibility : bool
             """
-
         def video_width(self, value: Union[int, str] = None):
             """
             width of the video animation in screen coordinates
-
+    
             Parameters
             ----------
             value : int
                 new width
-
+    
                 if not specified, no change
-
-
+    
+    
             Returns
             -------
             width of video animation : int
             """
-
         def video_height(self, value: Union[int, str] = None):
             """
             height of the video animation in screen coordinates
-
+    
             Parameters
             ----------
             value : int
                 new width
-
+    
                 if not specified, no change
-
-
+    
+    
             Returns
             -------
             height of video animation : int
             """
-
         def video_mode(self, value: str = None):
             """
             video_mode
-
+    
             Parameters
             ----------
             value : int
                 new video mode ("2d", "3d" or "screen")
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             video_mode : int
             """
-
         def position(self, value: Any = None):
             """
             position of the animation window
-
+    
             Parameters
             ----------
             value : tuple (x, y)
                 new position
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             position of animation window: tuple (x,y)
             """
-
         def position3d(self, value: Any = None):
             """
             position of the 3d animation window
-
+    
             Parameters
             ----------
             value : tuple (x, y)
                 new position
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             position of th 3d animation window: tuple (x,y)
-
+    
             Note
             ----
             This must be given before the 3d animation is started.
             """
-
         def title(self, value=None):
             """
             title of the canvas window
-
+    
             Parameters
             ----------
             value : str
                 new title
-
+    
                 if "", the title will be suppressed
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             title of canvas window : str
-
+    
             Note
             ----
             No effect for Pythonista
             """
-
         def background_color(self, value=None):
             """
             background_color of the animation
-
+    
             Parameters
             ----------
             value : colorspec
                 new background_color
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             background_color of animation : colorspec
             """
-
         def background3d_color(self, value: ColorType = None):
             """
             background3d_color of the animation
-
+    
             Parameters
             ----------
             value : colorspec
                 new background_color
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             background3d_color of animation : colorspec
             """
-
         def foreground_color(self, value: ColorType = None):
             """
             foreground_color of the animation
-
+    
             Parameters
             ----------
             value : colorspec
                 new foreground_color
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             foreground_color of animation : colorspec
             """
-
         def animate(self, value: Union[str, bool] = None):
             """
             animate indicator
-
+    
             Parameters
             ----------
             value : bool
                 new animate indicator
-
+    
                 if '?', animation will be set, if possible
                 if not specified, no change
-
+    
             Returns
             -------
             animate status : bool
-
+    
             Note
             ----
             When the run is not issued, no action will be taken.
             """
-
         def animate3d(self, value: bool = None):
             """
             animate3d indicator
-
+    
             Parameters
             ----------
             value : bool
                 new animate3d indicator
-
+    
                 if '?', 3D-animation will be set, if possible
                 if not specified, no change
-
+    
             Returns
             -------
             animate3d status : bool
-
+    
             Note
             ----
             When the animate is not issued, no action will be taken.
             """
-
         def full_screen(self):
             """
             sets the animation window to full screen.
-
+    
             Note
             ----
             This sets the title to "", so the title bar will be hidden
-
+    
             Note
             ----
             x0 and y0 will be set to 0, x1 will be set to the screen width
             """
-
         def modelname(self, value: str = None):
             """
             modelname
-
+    
             Parameters
             ----------
             value : str
                 new modelname
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             modelname : str
-
+    
             Note
             ----
             If modelname is the null string, nothing will be displayed.
             """
-
         def audio(self, filename: str):
             """
             Play audio during animation
-
+    
             Parameters
             ----------
             filename : str
                 name of file to be played (mp3 or wav files)
-
+    
                 if "", the audio will be stopped
-
+    
                 optionaly, a start time in seconds  may be given by appending the filename a > followed
                 by the start time, like 'mytune.mp3>12.5'
                 if not specified (None), no change
-
+    
             Returns
             -------
             filename being played ("" if nothing is being played): str
-
+    
             Note
             ----
             Only supported on Windows and Pythonista platforms. On other platforms, no effect.
-
+    
             Variable bit rate mp3 files may be played incorrectly on Windows platforms.
             Try and use fixed bit rates (e.g. 128 or 320 kbps)
             """
-
         def audio_speed(self, value: float = None):
             """
             Play audio during animation
-
+    
             Parameters
             ----------
             value : float
                 animation speed at which the audio should be played
-
+    
                 default: no change
-
+    
                 initially: 1
-
+    
             Returns
             -------
             speed being played: int
             """
-
         def animate_debug(self, value: bool = None):
             """
             Animate debug
-
+    
             Parameters
             ----------
             value : bool
                 animate_debug
-
+    
                 default: no change
-
+    
                 initially: False
-
+    
             Returns
             -------
             animate_debug : bool
             """
-
         def is_videoing(self) -> bool:
             """
             video recording status
-
+    
             returns
             -------
             video recording status : bool
-
+    
                 True, if video is being recorded
-
+    
                 False, otherwise
             """
-
         def video(self, value: Union[str, Iterable]) -> Any:
             """
             video name
-
+    
             Parameters
             ----------
             value : str, list or tuple
                 new video name
-
+    
                 for explanation see animation_parameters()
-
+    
             Note
             ----
             If video is the null string ro None, the video (if any) will be closed.
-
+    
             The call can be also used as a context manager, which automatically opens and
             closes a file. E.g. ::
-
+    
                 with video("test.mp4"):
                     env.run(100)
             """
-
         def video_repeat(self, value: int = None) -> int:
             """
             video repeat
-
+    
             Parameters
             ----------
             value : int
                 new video repeat
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             video repeat : int
-
+    
             Note
             ----
             Applies only to gif animation.
             """
-
         def video_pingpong(self, value: bool = None) -> bool:
             """
             video pingpong
-
+    
             Parameters
             ----------
             value : bool
                 new video pingpong
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             video pingpong : bool
-
+    
             Note
             ----
             Applies only to gif animation.
             """
-
         def fps(self, value: float = None) -> float:
             """
             fps
-
+    
             Parameters
             ----------
             value : float
                 new fps
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             fps : bool
             """
-
         def show_time(self, value: bool = None) -> bool:
             """
             show_time
-
+    
             Parameters
             ----------
             value : bool
                 new show_time
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             show_time : bool
             """
-
         def show_fps(self, value: bool = None) -> bool:
             """
             show_fps
-
+    
             Parameters
             ----------
             value : bool
                 new show_fps
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             show_fps : bool
             """
-
         def show_menu_buttons(self, value: bool = None) -> bool:
             """
             controls menu buttons
-
+    
             Parameters
             ----------
             value : bool
                 if True, menu buttons are shown
-
+    
                 if False, menu buttons are hidden
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             show menu button status : bool
             """
-
         def maximum_number_of_bitmaps(self, value: int = None) -> int:
             """
             maximum number of bitmaps (applies to animation with tkinter only)
-
+    
             Parameters
             ----------
             value : int
                 new maximum_number_of_bitmaps
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             maximum number of bitmaps : int
             """
-
         def synced(self, value: bool = None) -> bool:
             """
             synced
-
+    
             Parameters
             ----------
             value : bool
                 new synced
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             synced : bool
             """
-
         def speed(self, value: float = None) -> float:
             """
             speed
-
+    
             Parameters
             ----------
             value : float
                 new speed
-
+    
                 if not specified, no change
-
+    
             Returns
             -------
             speed : float
             """
-
         def peek(self) -> float:
             """
             returns the time of the next component to become current
-
+    
             if there are no more events, peek will return inf
-
+    
             Only for advance use with animation / GUI event loops
             """
-
         def main(self) -> "Component":
             """
             Returns
             -------
             the main component : Component
             """
-
         def now(self) -> float:
             """
             Returns
             -------
             the current simulation time : float
             """
-
         def t(self) -> float:
             """
             Returns
             -------
             the current simulation animation time : float
             """
-
         def reset_now(self, new_now: float = 0) -> None:
             """
             reset the current time
-
+    
             Parameters
             ----------
             new_now : float or distribution
                 now will be set to new_now
-
+    
                 default: 0
-
+    
                 if distribution, the distribution is sampled
-
+    
             Note
             ----
             Internally, salabim still works with the 'old' time. Only in the interface
             from and to the user program, a correction will be applied.
-
+    
             The registered time in monitors will be always is the 'old' time.
             This is only relevant when using the time value in Monitor.xt() or Monitor.tx().
             """
-
-        def trace(self, value: bool = None) -> bool:
+        def trace(self, value: Union[bool, "filehandle"] = None) -> bool:
             """
             trace status
-
+    
             Parameters
             ----------
-            value : bool of file handle
+            value : bool or file handle
                 new trace status
-
+    
                 defines whether to trace or not
-
+    
                 if this a file handle (open for write), the trace output will be sent to this file.
-
+    
                 if omitted, no change
-
+    
             Returns
             -------
             trace status : bool or file handle
-
+    
             Note
             ----
             If you want to test the status, always include
             parentheses, like
-
+    
                 ``if env.trace():``
             """
-
         def suppress_trace(self):
             """
             context manager to the trace temporarily
-
+    
             Note
             ----
             To be used as ::
-
+    
                 with env.suppress_trace():
                     ...
             """
-
         def suppress_trace_linenumbers(self, value: bool = None) -> bool:
             """
             indicates whether line numbers should be suppressed (False by default)
-
+    
             Parameters
             ----------
             value : bool
                 new suppress_trace_linenumbers status
-
+    
                 if omitted, no change
-
+    
             Returns
             -------
             suppress_trace_linenumbers status : bool
-
+    
             Note
             ----
             By default, suppress_trace_linenumbers is False, meaning that line numbers are shown in the trace.
             In order to improve performance, line numbers can be suppressed.
             """
-
         def suppress_trace_standby(self, value: bool = None) -> bool:
             """
             suppress_trace_standby status
-
+    
             Parameters
             ----------
             value : bool
                 new suppress_trace_standby status
-
+    
                 if omitted, no change
-
+    
             Returns
             -------
             suppress trace status : bool
-
+    
             Note
             ----
             By default, suppress_trace_standby is True, meaning that standby components are
             (apart from when they become non standby) suppressed from the trace.
-
+    
             If you set suppress_trace_standby to False, standby components are fully traced.
             """
-
+        def paused(self, value: bool = None) -> bool:
+            """
+            paused status
+    
+            Parameters
+            ----------
+            value : bool
+                new paused status
+    
+                defines whether to be paused or not
+    
+                if omitted, no change
+    
+            Returns
+            -------
+            paused status : bool
+    
+            Note
+            ----
+            If you want to test the status, always include
+            parentheses, like
+    
+                ``if env.paused():``
+            """
         def current_component(self) -> "Component":
             """
             Returns
             -------
             the current_component : Component
             """
-
-        def run(
-            self,
-            duration: float = None,
-            till: float = None,
-            priority: Any = inf,
-            urgent: bool = False,
-            cap_now: bool = None,
-        ):
+        def run(self, duration: float = None, till: float = None, priority: Any = inf, urgent: bool = False, cap_now: bool = None):
             """
             start execution of the simulation
-
+    
             Parameters
             ----------
             duration : float or distribution
                 schedule with a delay of duration
-
+    
                 if 0, now is used
-
+    
                 if distribution, the distribution is sampled
-
+    
             till : float or distribution
                 schedule time
-
+    
                 if omitted, inf is assumed. See also note below
-
+    
                 if distribution, the distribution is sampled
-
+    
             priority : float
                 priority
-
+    
                 default: inf
-
+    
                 if a component has the same time on the event list, main is sorted accoring to
                 the priority. The default value of inf makes that all components will finish before
                 the run is ended
-
+    
             urgent : bool
                 urgency indicator
-
+    
                 if False (default), main will be scheduled
                 behind all other components scheduled with the same time and priority
-
+    
                 if True, main will be scheduled
                 in front of all components scheduled
                 for the same time and priority
-
+    
             cap_now : bool
                 indicator whether times (till, duration) in the past are allowed. If, so now() will be used.
                 default: sys.default_cap_now(), usualy False
-
+    
             Note
             ----
             if neither till nor duration is specified, the main component will be reactivated at
             the time there are no more events on the eventlist, i.e. possibly not at inf.
-
+    
             if you want to run till inf (particularly when animating), issue run(sim.inf)
-
+    
             only issue run() from the main level
             """
-
         def do_simulate(self):
             ...
-
         def do_simulate_and_animate(self):
             ...
-
         def simulate_and_animate_loop(self):
             ...
-
         def snapshot(self, filename: str, video_mode: str = "2d") -> None:
             """
             Takes a snapshot of the current animated frame (at time = now()) and saves it to a file
-
+    
             Parameters
             ----------
             filename : str
                 file to save the current animated frame to.
-
-                The following formats are accepted: .png, .jpg, .bmp, .ico, .gif and .tiff.
+    
+                The following formats are accepted: .png, .jpg, .bmp, .ico, .gif, .webp and .tiff.
                 Other formats are not possible.
                 Note that, apart from .JPG files. the background may be semi transparent by setting
                 the alpha value to something else than 255.
-
+    
             video_mode : str
                 specifies what to save
-
+    
                 if "2d" (default), the tkinter window will be saved
-
+    
                 if "3d", the OpenGL window will be saved (provided animate3d is True)
-
+    
                 if "screen" the complete screen will be saved (no need to be in animate mode)
-
+    
                 no scaling will be applied.
             """
-
         def modelname_width(self):
             ...
-
         def an_modelname(self) -> None:
             """
             function to show the modelname
-
+    
             may be overridden to change the standard behaviour.
             """
-
         def an_menu_buttons(self) -> None:
             """
             function to initialize the menu buttons
-
+    
             may be overridden to change the standard behaviour.
             """
-
         def an_unsynced_buttons(self) -> None:
             """
             function to initialize the unsynced buttons
-
+    
             may be overridden to change the standard behaviour.
             """
-
         def an_synced_buttons(self) -> None:
             """
             function to initialize the synced buttons
-
+    
             may be overridden to change the standard behaviour.
             """
-
         def remove_topleft_buttons(self):
             ...
-
         def an_clocktext(self) -> None:
             """
             function to initialize the system clocktext
-
+    
             called by run(), if animation is True.
-
+    
             may be overridden to change the standard behaviour.
             """
-
         def an_half(self):
             ...
-
         def an_double(self):
             ...
-
         def an_go(self):
             ...
-
         def an_quit(self):
             ...
-
         def quit(self):
             ...
-
         def an_trace(self):
             ...
-
         def an_synced_on(self):
             ...
-
         def an_synced_off(self):
             ...
-
         def an_step(self):
             ...
-
         def an_single_step(self):
             ...
-
-        def an_menu_go(self):
+        def o_go(self):
             ...
-
         def an_menu(self):
             ...
-
         def clocktext(self, t):
             ...
-
         def tracetext(self, t):
             ...
-
         def syncedtext(self, t):
             ...
-
         def speedtext(self, t):
             ...
-
         def set_start_animation(self):
             ...
-
         def xy_anchor_to_x(self, xy_anchor, screen_coordinates, over3d=False, retina_scale=False):
             ...
-
         def xy_anchor_to_y(self, xy_anchor, screen_coordinates, over3d=False, retina_scale=False):
             ...
-
         def salabim_logo(self):
             ...
-
         def colorspec_to_tuple(self, colorspec: ColorType) -> Tuple:
             """
             translates a colorspec to a tuple
-
+    
             Parameters
             ----------
             colorspec: tuple, list or str
                 ``#rrggbb`` ==> alpha = 255 (rr, gg, bb in hex)
-
+    
                 ``#rrggbbaa`` ==> alpha = aa (rr, gg, bb, aa in hex)
-
+    
                 ``colorname`` ==> alpha = 255
-
+    
                 ``(colorname, alpha)``
-
+    
                 ``(r, g, b)`` ==> alpha = 255
-
+    
                 ``(r, g, b, alpha)``
-
+    
                 ``"fg"`` ==> foreground_color
-
+    
                 ``"bg"`` ==> background_color
-
+    
             Returns
             -------
             (r, g, b, a)
             """
-
         def colorinterpolate(self, t: float, t0: float, t1: float, v0: Any, v1: Any) -> Any:
             """
             does linear interpolation of colorspecs
-
+    
             Parameters
             ----------
             t : float
                 value to be interpolated from
-
+    
             t0: float
                 f(t0)=v0
-
+    
             t1: float
                 f(t1)=v1
-
+    
             v0: colorspec
                 f(t0)=v0
-
+    
             v1: colorspec
                 f(t1)=v1
-
+    
             Returns
             -------
             linear interpolation between v0 and v1 based on t between t0 and t : colorspec
-
+    
             Note
             ----
             Note that no extrapolation is done, so if t<t0 ==> v0  and t>t1 ==> v1
-
+    
             This function is heavily used during animation
             """
-
         def color_interp(self, x: float, xp: Iterable, fp: Iterable):
             """
             linear interpolation of a color
-
+    
             Parameters
             ----------
             x : float
                 target x-value
-
+    
             xp : list of float, tuples or lists
                 values on the x-axis
-
+    
             fp : list of colorspecs
                 values on the y-axis
-
+    
                 should be same length as xp
-
+    
             Returns
             -------
             interpolated color value : tuple
-
+    
             Notes
             -----
             If x < xp[0], fp[0] will be returned
-
+    
             If x > xp[-1], fp[-1] will be returned
-
+    
             """
-
         def colorspec_to_hex(self, colorspec, withalpha=True):
             ...
-
         def colorspec_to_gl_color(self, colorspec):
             ...
-
         def colorspec_to_gl_color_alpha(self, colorspec):
             ...
-
         def pythonistacolor(self, colorspec):
             ...
-
         def is_dark(self, colorspec: ColorType) -> bool:
             """
             Arguments
             ---------
             colorspec : colorspec
                 color to check
-
+    
             Returns
             -------
             : bool
                 True, if the colorspec is dark (rather black than white)
-
+    
                 False, if the colorspec is light (rather white than black
-
+    
                 if colorspec has alpha=0 (total transparent), the background_color will be tested
             """
-
         def getwidth(self, text, font, fontsize, screen_coordinates=False):
             ...
-
         def getheight(self, font, fontsize, screen_coordinates=False):
             ...
-
         def getfontsize_to_fit(self, text, width, font, screen_coordinates=False):
             ...
-
         def name(self, value: str = None) -> str:
             """
             Parameters
@@ -13147,883 +17201,827 @@ class Environment:
             value : str
                 new name of the environment
                 if omitted, no change
-
+    
             Returns
             -------
             Name of the environment : str
-
+    
             Note
             ----
             base_name and sequence_number are not affected if the name is changed
             """
-
         def base_name(self) -> str:
             """
             returns the base name of the environment (the name used at initialization)
             """
-
         def sequence_number(self) -> int:
             """
             Returns
             -------
             sequence_number of the environment : int
                 (the sequence number at initialization)
-
+    
                 normally this will be the integer value of a serialized name,
                 but also non serialized names (without a dot or a comma at the end)
                 will be numbered)
             """
-
         def get_time_unit(self) -> str:
             """
             gets time unit
-
+    
             Returns
             -------
             Current time unit dimension (default "n/a") : str
             """
-
         def years(self, t: float) -> float:
             """
             convert the given time in years to the current time unit
-
+    
             Parameters
             ----------
             t : float or distribution
                 time in years
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             time in years, converted to the current time_unit : float
             """
-
         def weeks(self, t: float) -> float:
             """
             convert the given time in weeks to the current time unit
-
+    
             Parameters
             ----------
             t : float or distribution
                 time in weeks
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             time in weeks, converted to the current time_unit : float
             """
-
         def days(self, t: float) -> float:
             """
             convert the given time in days to the current time unit
-
+    
             Parameters
             ----------
             t : float or distribution
                 time in days
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             time in days, converted to the current time_unit : float
             """
-
         def hours(self, t: float) -> float:
             """
             convert the given time in hours to the current time unit
-
+    
             Parameters
             ----------
             t : float or distribution
                 time in hours
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             time in hours, converted to the current time_unit : float
             """
-
         def minutes(self, t: float) -> float:
             """
             convert the given time in minutes to the current time unit
-
+    
             Parameters
             ----------
             t : float or distribution
                 time in minutes
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             time in minutes, converted to the current time_unit : float
             """
-
         def seconds(self, t: float) -> float:
             """
             convert the given time in seconds to the current time unit
-
+    
             Parameters
             ----------
             t : float or distribution
                 time in seconds
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             time in seconds, converted to the current time_unit : float
             """
-
         def milliseconds(self, t: float) -> float:
             """
             convert the given time in milliseconds to the current time unit
-
+    
             Parameters
             ----------
             t : float or distribution
                 time in milliseconds
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             time in milliseconds, converted to the current time_unit : float
             """
-
         def microseconds(self, t: float) -> float:
             """
             convert the given time in microseconds to the current time unit
-
+    
             Parameters
             ----------
             t : float or distribution
                 time in microseconds
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             time in microseconds, converted to the current time_unit : float
             """
-
         def to_time_unit(self, time_unit: str, t: float) -> float:
             """
             convert time t to the time_unit specified
-
+    
             Parameters
             ----------
             time_unit : str
                 Supported time_units:
-
+    
                 "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             t : float or distribution
                 time to be converted
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             Time t converted to the time_unit specified : float
             """
-
         def to_years(self, t: float) -> float:
             """
             convert time t to years
-
+    
             Parameters
             ----------
             t : float or distribution
                 time to be converted
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             Time t converted to years : float
             """
-
         def to_weeks(self, t: float) -> float:
             """
             convert time t to weeks
-
+    
             Parameters
             ----------
             t : float or distribution
                 time to be converted
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             Time t converted to weeks : float
             """
-
         def to_days(self, t: float) -> float:
             """
             convert time t to days
-
+    
             Parameters
             ----------
             t : float or distribution
                 time to be converted
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             Time t converted to days : float
             """
-
         def to_hours(self, t: float) -> float:
             """
             convert time t to hours
-
+    
             Parameters
             ----------
             t : float or distribution
                 time to be converted
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             Time t converted to hours : float
             """
-
         def to_minutes(self, t: float) -> float:
             """
             convert time t to minutes
-
+    
             Parameters
             ----------
             t : float or distribution
                 time to be converted
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             Time t converted to minutes : float
             """
-
         def to_seconds(self, t: float) -> float:
             """
             convert time t to seconds
-
+    
             Parameters
             ----------
             t : float or distribution
                 time to be converted
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             Time t converted to seconds : float
             """
-
         def to_milliseconds(self, t: float) -> float:
             """
             convert time t to milliseconds
-
+    
             Parameters
             ----------
             t : float or distribution
                 time to be converted
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             Time t converted to milliseconds : float
             """
-
         def to_microseconds(self, t: float) -> float:
             """
             convert time t to microseconds
-
+    
             Parameters
             ----------
             t : float or distribution
                 time to be converted
-
+    
                 if distribution, the distribution is sampled
-
+    
             Returns
             -------
             Time t converted to microseconds : float
             """
-
         def _check_time_unit_na(self):
             ...
-
         def print_trace_header(self) -> None:
             """
             print a (two line) header line as a legend
-
+    
             also the legend for line numbers will be printed
-
+    
             not that the header is only printed if trace=True
             """
-
         def _print_legend(self, ref):
             ...
-
         def _frame_to_lineno(self, frame, add_filename=False):
             ...
-
         def filename_lineno_to_str(self, filename, lineno):
             ...
-
-        def print_trace(
-            self,
-            s1: str = "",
-            s2: str = "",
-            s3: str = "",
-            s4: str = "",
-            s0: str = None,
-            _optional: bool = False,
-        ):
+        def print_trace(self, s1: str = "", s2: str = "", s3: str = "", s4: str = "", s0: str = None, _optional: bool = False):
             """
             prints a trace line
-
+    
             Parameters
             ----------
             s1 : str
                 part 1 (usually formatted  now), padded to 10 characters
-
+    
             s2 : str
                 part 2 (usually only used for the compoent that gets current), padded to 20 characters
-
+    
             s3 : str
                 part 3, padded to 35 characters
-
+    
             s4 : str
                 part 4
-
+    
             s0 : str
                 part 0. if omitted, the line number from where the call was given will be used at
                 the start of the line. Otherwise s0, left padded to 7 characters will be used at
                 the start of the line.
-
+    
             _optional : bool
                 for internal use only. Do not set this flag!
-
+    
             Note
             ----
             if self.trace is False, nothing is printed
-
+    
             if the current component's suppress_trace is True, nothing is printed
-
+    
             """
-
         def time_to_str(self, t: float) -> str:
             """
             Parameters
             ----------
             t : float
                 time to be converted to string in trace and animation
-
+    
             Returns
             -------
             t in required format : str
                 default: f"{t:10.3f}" if datetime0 is False
-
+    
                 or date in the format "Day YYYY-MM-DD hh:mm:dd" otherwise
-
+    
             Note
             ----
             May be overrridden. Make sure that the method always returns the same length!
             """
-
         def duration_to_str(self, duration: float) -> str:
             """
             Parameters
             ----------
             duration : float
                 duration to be converted to string in trace
-
+    
             Returns
             -------
             duration in required format : str
                 default: f"{duration:.3f}" if datetime0 is False
                 or duration in the format "hh:mm:dd" or "d hh:mm:ss"
-
+    
             Note
             ----
             May be overrridden.
             """
-
         def datetime_to_t(self, datetime: datetime.datetime) -> float:
             """
             Parameters
             ----------
             datetime : datetime.datetime
-
+    
             Returns
             -------
             datetime translated to simulation time in the current time_unit : float
-
+    
             Raises
             ------
             ValueError
                 if datetime0 is False
             """
-
         def timedelta_to_duration(self, timedelta: datetime.timedelta) -> float:
             """
             Parameters
             ----------
             timedelta : datetime.timedelta
-
+    
             Returns
             -------
             timedelta translated to simulation duration in the current time_unit : float
-
+    
             Raises
             ------
             ValueError
                 if datetime0 is False
             """
-
         def t_to_datetime(self, t: float) -> Any:
             """
             Parameters
             ----------
             t : float
                 time to convert
-
+    
             Returns
             -------
             t (in the current time unit) translated to the corresponding datetime : float
-
+    
             Raises
             ------
             ValueError
                 if datetime0 is False
             """
-
         def duration_to_timedelta(self, duration: float) -> datetime.timedelta:
             """
             Parameters
             ----------
             duration : float
-
+    
             Returns
             -------
             timedelta corresponding to duration : datetime.timedelta
-
+    
             Raises
             ------
             ValueError
                 if time unit is not set
             """
-
         def datetime0(self, datetime0: datetime.datetime = None) -> datetime.datetime:
             """
             Gets and/or sets datetime0
-
+    
             Parameters
             ----------
             datetime0: bool or datetime.datetime
                 if omitted, nothing will be set
-
+    
                 if falsy, disabled
-
+    
                 if True, the t=0 will correspond to 1 January 1970
-
+    
                 if no time_unit is specified, but datetime0 is not falsy, time_unit will be set to seconds
-
+    
             Returns
             -------
             current value of datetime0 : bool or datetime.datetime
             """
-
         def beep(self) -> None:
             """
             Beeps
-
+    
             Works only on Windows and iOS (Pythonista). For other platforms this is just a dummy method.
             """
-
+        def stop_ui(self):
+            ...
+        def start_ui(self, window_size: Tuple, window_position: Tuple, actions=None, user_handle_event=None):
+            ...
+        def ui_window(self) -> "Window":
+            ...
+        def set_pause_go_button(self):
+            ...
+        def _handle_ui_event(self):
+            ...
     class Animate2dBase(DynamicClass):
         def __init__(self, type, locals_, argument_default, attached_to=None, attach_text=True):
             ...
-
         def show(self):
             ...
-
         def remove(self):
             ...
-
         def is_removed(self):
             ...
-
         def make_pil_image(self, t):
             ...
-
     class AnimateClassic(Animate2dBase):
         def __init__(self, master, locals_):
             ...
-
         def text(self, t):
             ...
-
         def x(self, t):
             ...
-
         def y(self, t):
             ...
-
         def layer(self, t):
             ...
-
         def visible(self, t):
             ...
-
+        def flip_horizontal(self, t):
+            ...
+        def flip_vertical(self, t):
+            ...
+        def animation_start(self, t):
+            ...
+        def animation_speed(self, t):
+            ...
+        def animation_repeat(self, t):
+            ...
+        def animation_pingpong(self, t):
+            ...
+        def animation_from(self, t):
+            ...
+        def animation_to(self, t):
+            ...
         def keep(self, t):
             ...
-
         def xy_anchor(self, t):
             ...
-
         def offsetx(self, t):
             ...
-
         def offsety(self, t):
             ...
-
         def angle(self, t):
             ...
-
         def textcolor(self, t):
             ...
-
         def text_anchor(self, t):
             ...
-
         def fontsize(self, t):
             ...
-
         def font(self, t):
             ...
-
         def max_lines(self, t):
             ...
-
         def image(self, t):
             ...
-
         def width(self, t):
             ...
-
         def anchor(self, t):
             ...
-
         def alpha(self, t):
             ...
-
         def linewidth(self, t):
             ...
-
         def linecolor(self, t) -> ColorType:
             ...
-
         def fillcolor(self, t):
             ...
-
         def as_points(self, t):
             ...
-
         def spec(self, t):
             ...
-
         def radius(self, t):
             ...
-
         def radius1(self, t):
             ...
-
         def arc_angle0(self, t):
             ...
-
         def arc_angle1(self, t):
             ...
-
         def draw_arc(self, t):
             ...
-
     class Animate:
         """
         defines an animation object
-
+    
         Parameters
         ----------
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         layer : int
-             layer value
-
-             lower layer values are on top of higher layer values (default 0)
-
+            layer value
+    
+            lower layer values are on top of higher layer values (default 0)
+    
         keep : bool
             keep
-
+    
             if False, animation object is hidden after t1, shown otherwise
             (default True)
-
+    
         visible : bool
             visible
-
+    
             if False, animation object is not shown, shown otherwise
             (default True)
-
+    
         screen_coordinates : bool
             use screen_coordinates
-
+    
             normally, the scale parameters are use for positioning and scaling
             objects.
-
+    
             if True, screen_coordinates will be used instead.
-
+    
         xy_anchor : str
             specifies where x and y (i.e. x0, y0, x1 and y1) are relative to
-
+    
             possible values are (default: sw) ::
-
+    
                 nw    n    ne
-
                 w     c     e
-
                 sw    s    se
-
+    
             If null string, the given coordimates are used untranslated
-
+    
         t0 : float
             time of start of the animation (default: now)
-
+    
         x0 : float
             x-coordinate of the origin at time t0 (default 0)
-
+    
         y0 : float
             y-coordinate of the origin at time t0 (default 0)
-
+    
         offsetx0 : float
             offsets the x-coordinate of the object at time t0 (default 0)
-
+    
         offsety0 : float
             offsets the y-coordinate of the object at time t0 (default 0)
-
+    
         circle0 : float or tuple/list
-             the circle spec of the circle at time t0
-
-             - radius
-
-             - one item tuple/list containing the radius
-
-             - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
-             (see class AnimateCircle for details)
-
+            the circle spec of the circle at time t0
+    
+            - radius
+    
+            - one item tuple/list containing the radius
+    
+            - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
+    
+            (see class AnimateCircle for details)
+    
         line0 : list or tuple
             the line(s) (xa,ya,xb,yb,xc,yc, ...) at time t0
-
+    
         polygon0 : list or tuple
             the polygon (xa,ya,xb,yb,xc,yc, ...) at time t0
-
+    
             the last point will be auto connected to the start
-
+    
         rectangle0 : list or tuple
             the rectangle (xlowerleft,ylowerleft,xupperright,yupperright) at time t0
-
-
+    
         image : str, pathlib.Path or PIL image
             the image to be displayed
-
+    
             This may be either a filename or a PIL image
-
+    
         text : str, tuple or list
             the text to be displayed
-
+    
             if text is str, the text may contain linefeeds, which are shown as individual lines
-
+    
         max_lines : int
             the maximum of lines of text to be displayed
-
+    
             if positive, it refers to the first max_lines lines
-
+    
             if negative, it refers to the first -max_lines lines
-
+    
             if zero (default), all lines will be displayed
-
+    
         font : str or list/tuple
             font to be used for texts
-
+    
             Either a string or a list/tuple of fontnames.
             If not found, uses calibri or arial
-
+    
         anchor : str
             anchor position
-
+    
             specifies where to put images or texts relative to the anchor
             point
-
+    
             possible values are (default: c) ::
-
+    
                 nw    n    ne
-
                 w     c     e
-
                 sw    s    se
-
+    
         as_points : bool
-             if False (default), lines in line, rectangle and polygon are drawn
-
-             if True, only the end points are shown in line, rectangle and polygon
-
+            if False (default), lines in line, rectangle and polygon are drawn
+    
+            if True, only the end points are shown in line, rectangle and polygon
+    
         linewidth0 : float
             linewidth of the contour at time t0 (default 0 for polygon, rectangle and circle, 1 for line)
-
+    
             if as_point is True, the default size is 3
-
+    
         fillcolor0 : colorspec
             color of interior at time t0 (default foreground_color)
-
+    
             if as_points is True, fillcolor0 defaults to transparent
-
+    
         linecolor0 : colorspec
             color of the contour at time t0 (default foreground_color)
-
+    
         textcolor0 : colorspec
             color of the text at time 0 (default foreground_color)
-
+    
         angle0 : float
             angle of the polygon at time t0 (in degrees) (default 0)
-
+    
         alpha0 : float
             alpha of the image at time t0 (0-255) (default 255)
-
+    
         fontsize0 : float
             fontsize of text at time t0 (default 20)
-
+    
         width0 : float
            width of the image to be displayed at time t0
-
+    
            if omitted or None, no scaling
-
+    
         t1 : float
             time of end of the animation (default inf)
-
+    
             if keep=True, the animation will continue (frozen) after t1
-
+    
         x1 : float
             x-coordinate of the origin at time t1(default x0)
-
+    
         y1 : float
             y-coordinate of the origin at time t1 (default y0)
-
+    
         offsetx1 : float
             offsets the x-coordinate of the object at time t1 (default offsetx0)
-
+    
         offsety1 : float
             offsets the y-coordinate of the object at time t1 (default offsety0)
-
+    
         circle1 : float or tuple/list
-             the circle spec of the circle at time t1 (default: circle0)
-
-             - radius
-
-             - one item tuple/list containing the radius
-
-             - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
-             (see class AnimateCircle for details)
-
+            the circle spec of the circle at time t1 (default: circle0)
+    
+            - radius
+    
+            - one item tuple/list containing the radius
+    
+            - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
+    
+            (see class AnimateCircle for details)
+    
         line1 : tuple
             the line(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: line0)
-
+    
             should have the same number of elements as line0
-
+    
         polygon1 : tuple
             the polygon at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: polygon0)
-
+    
             should have the same number of elements as polygon0
-
+    
         rectangle1 : tuple
             the rectangle (xlowerleft,ylowerleft,xupperright,yupperright) at time t1
             (default: rectangle0)
-
+    
         linewidth1 : float
             linewidth of the contour at time t1 (default linewidth0)
-
+    
         fillcolor1 : colorspec
             color of interior at time t1 (default fillcolor0)
-
+    
         linecolor1 : colorspec
             color of the contour at time t1 (default linecolor0)
-
+    
         textcolor1 : colorspec
             color of text at time t1 (default textcolor0)
-
+    
         angle1 : float
             angle of the polygon at time t1 (in degrees) (default angle0)
-
+    
         alpha1 : float
             alpha of the image at time t1 (0-255) (default alpha0)
-
+    
         fontsize1 : float
             fontsize of text at time t1 (default: fontsize0)
-
+    
         width1 : float
            width of the image to be displayed at time t1 (default: width0)
-
-
+    
         over3d : bool
             if True, this object will be rendered to the OpenGL window
-
+    
             if False (default), the normal 2D plane will be used.
-
+    
         Note
         ----
         one (and only one) of the following parameters is required:
-
+    
              - circle0
              - image
              - line0
              - polygon0
              - rectangle0
              - text
-
+    
         colors may be specified as a
-
+    
             - valid colorname
             - hexname
             - tuple (R,G,B) or (R,G,B,A)
             - "fg" or "bg"
-
+    
         colornames may contain an additional alpha, like ``red#7f``
-
+    
         hexnames may be either 3 of 4 bytes long (``#rrggbb`` or ``#rrggbbaa``)
-
+    
         both colornames and hexnames may be given as a tuple with an
         additional alpha between 0 and 255,
         e.g. ``(255,0,255,128)``, ("red",127)`` or ``("#ff00ff",128)``
-
+    
         fg is the foreground color
-
+    
         bg is the background color
-
-
+    
+    
         Permitted parameters
-
+    
         ======================  ========= ========= ========= ========= ========= =========
         parameter               circle    image     line      polygon   rectangle text
         ======================  ========= ========= ========= ========= ========= =========
@@ -14056,7 +18054,6 @@ class Environment:
         width0,width1                     -
         ======================  ========= ========= ========= ========= ========= =========
         """
-
         def __init__(
             self,
             parent: "Component" = None,
@@ -14109,10 +18106,17 @@ class Environment:
             width1: float = None,
             xy_anchor: str = "",
             over3d: bool = None,
+            flip_horizontal: bool = False,
+            flip_vertical: bool = False,
+            animation_start: float = None,
+            animation_speed: float = 1,
+            animation_repeat: bool = False,
+            animation_pingpong: bool = False,
+            animation_from: float = 0,
+            animation_to: float = inf,
             env: "Environment" = None,
         ):
             ...
-
         def update(
             self,
             layer=None,
@@ -14163,731 +18167,720 @@ class Environment:
             alpha1=None,
             fontsize1=None,
             width1=None,
+            flip_horizontal=None,
+            flip_vertical=None,
+            animation_start=None,
+            animation_speed=None,
+            animation_repeat=None,
+            animation_pingpong=None,
+            animation_from=None,
+            animation_to=None,
         ):
             """
             updates an animation object
-
+    
             Parameters
             ----------
             layer : int
                 layer value
-
+    
                 lower layer values are on top of higher layer values (default see below)
-
+    
             keep : bool
                 keep
-
+    
                 if False, animation object is hidden after t1, shown otherwise
                 (default see below)
-
+    
             visible : bool
                 visible
-
+    
                 if False, animation object is not shown, shown otherwise
                 (default see below)
-
+    
             xy_anchor : str
                 specifies where x and y (i.e. x0, y0, x1 and y1) are relative to
-
+    
                 possible values are:
-
+    
                 ``nw    n    ne``
-
+    
                 ``w     c     e``
-
+    
                 ``sw    s    se``
-
+    
                 If null string, the given coordimates are used untranslated
-
+    
                 default see below
-
+    
             t0 : float
                 time of start of the animation (default: now)
-
+    
             x0 : float
                 x-coordinate of the origin at time t0 (default see below)
-
+    
             y0 : float
                 y-coordinate of the origin at time t0 (default see below)
-
+    
             offsetx0 : float
                 offsets the x-coordinate of the object at time t0 (default see below)
-
+    
             offsety0 : float
                 offsets the y-coordinate of the object at time t0 (default see below)
-
+    
             circle0 : float or tuple/list
                 the circle spec of the circle at time t0
-
+    
                 - radius
-
+    
                 - one item tuple/list containing the radius
-
+    
                 - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
                 (see class AnimateCircle for details)
-
+    
             line0 : tuple
                 the line(s) at time t0 (xa,ya,xb,yb,xc,yc, ...) (default see below)
-
+    
             polygon0 : tuple
                 the polygon at time t0 (xa,ya,xb,yb,xc,yc, ...)
-
+    
                 the last point will be auto connected to the start (default see below)
-
+    
             rectangle0 : tuple
                 the rectangle at time t0
-
+    
                 (xlowerleft,ylowerlef,xupperright,yupperright) (default see below)
-
+    
             points0 : tuple
                 the points(s) at time t0 (xa,ya,xb,yb,xc,yc, ...) (default see below)
-
+    
             image : str or PIL image
                 the image to be displayed
-
+    
                 This may be either a filename or a PIL image (default see below)
-
+    
             text : str
                 the text to be displayed (default see below)
-
+    
             font : str or list/tuple
                 font to be used for texts
-
+    
                 Either a string or a list/tuple of fontnames. (default see below)
                 If not found, uses calibri or arial
-
+    
             max_lines : int
                 the maximum of lines of text to be displayed
-
+    
                 if positive, it refers to the first max_lines lines
-
+    
                 if negative, it refers to the first -max_lines lines
-
+    
                 if zero (default), all lines will be displayed
-
+    
             anchor : str
                 anchor position
-
+    
                 specifies where to put images or texts relative to the anchor
                 point (default see below)
-
+    
                 possible values are (default: c):
-
+    
                 ``nw    n    ne``
-
+    
                 ``w     c     e``
-
+    
                 ``sw    s    se``
-
+    
             linewidth0 : float
                 linewidth of the contour at time t0 (default see below)
-
+    
             fillcolor0 : colorspec
                 color of interior/text at time t0 (default see below)
-
+    
             linecolor0 : colorspec
                 color of the contour at time t0 (default see below)
-
+    
             angle0 : float
                 angle of the polygon at time t0 (in degrees) (default see below)
-
+    
             fontsize0 : float
                 fontsize of text at time t0 (default see below)
-
+    
             width0 : float
                 width of the image to be displayed at time t0 (default see below)
-
+    
                 if None, the original width of the image will be used
-
+    
             t1 : float
                 time of end of the animation (default: inf)
-
+    
                 if keep=True, the animation will continue (frozen) after t1
-
+    
             x1 : float
                 x-coordinate of the origin at time t1 (default x0)
-
+    
             y1 : float
                 y-coordinate of the origin at time t1 (default y0)
-
+    
             offsetx1 : float
                 offsets the x-coordinate of the object at time t1 (default offsetx0)
-
+    
             offsety1 : float
                 offsets the y-coordinate of the object at time t1 (default offset0)
-
+    
             circle1 : float or tuple/ist
                 the circle spec of the circle at time t1
-
+    
                 - radius
-
+    
                 - one item tuple/list containing the radius
-
+    
                 - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
                 (see class AnimateCircle for details)
-
+    
             line1 : tuple
                 the line(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: line0)
-
+    
                 should have the same number of elements as line0
-
+    
             polygon1 : tuple
                 the polygon at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: polygon0)
-
+    
                 should have the same number of elements as polygon0
-
+    
             rectangle1 : tuple
                 the rectangle at time t (xlowerleft,ylowerleft,xupperright,yupperright)
                 (default: rectangle0)
-
-
+    
+    
             points1 : tuple
                 the points(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: points0)
-
+    
                 should have the same number of elements as points1
-
+    
             linewidth1 : float
                 linewidth of the contour at time t1 (default linewidth0)
-
+    
             fillcolor1 : colorspec
                 color of interior/text at time t1 (default fillcolor0)
-
+    
             linecolor1 : colorspec
                 color of the contour at time t1 (default linecolor0)
-
+    
             angle1 : float
                 angle of the polygon at time t1 (in degrees) (default angle0)
-
+    
             fontsize1 : float
                 fontsize of text at time t1 (default: fontsize0)
-
+    
             width1 : float
                width of the image to be displayed at time t1 (default: width0)
-
-
+    
+    
             Note
             ----
             The type of the animation cannot be changed with this method.
-
+    
             The default value of most of the parameters is the current value (at time now)
             """
-
         def show(self):
             ...
-
         def remove(self):
             """
             removes the animation object from the animation queue,
             so effectively ending this animation.
-
+    
             Note
             ----
             The animation object might be still updated, if required
             """
-
         def is_removed(self):
             ...
-
         def x(self, t=None):
             """
             x-position of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             x : float
                 default behaviour: linear interpolation between self.x0 and self.x1
             """
-
         def y(self, t=None):
             """
             y-position of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             y : float
                 default behaviour: linear interpolation between self.y0 and self.y1
             """
-
         def offsetx(self, t=None):
             """
             offsetx of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             offsetx : float
                 default behaviour: linear interpolation between self.offsetx0 and self.offsetx1
             """
-
         def offsety(self, t=None):
             """
             offsety of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             offsety : float
                 default behaviour: linear interpolation between self.offsety0 and self.offsety1
             """
-
         def angle(self, t=None):
             """
             angle of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             angle : float
                 default behaviour: linear interpolation between self.angle0 and self.angle1
             """
-
         def alpha(self, t=None):
             """
             alpha of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             alpha : float
                 default behaviour: linear interpolation between self.alpha0 and self.alpha1
             """
-
         def linewidth(self, t=None):
             """
             linewidth of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             linewidth : float
                 default behaviour: linear interpolation between self.linewidth0 and self.linewidth1
             """
-
         def linecolor(self, t=None):
             """
             linecolor of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             linecolor : colorspec
                 default behaviour: linear interpolation between self.linecolor0 and self.linecolor1
             """
-
         def fillcolor(self, t=None):
             """
             fillcolor of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             fillcolor : colorspec
                 default behaviour: linear interpolation between self.fillcolor0 and self.fillcolor1
             """
-
         def circle(self, t=None):
             """
             circle of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             circle : float or tuple/list
                 either
-
+    
                 - radius
-
+    
                 - one item tuple/list containing the radius
-
+    
                 - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
-
+    
                 (see class AnimateCircle for details)
-
+    
                 default behaviour: linear interpolation between self.circle0 and self.circle1
             """
-
         def textcolor(self, t=None):
             """
             textcolor of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             textcolor : colorspec
                 default behaviour: linear interpolation between self.textcolor0 and self.textcolor1
             """
-
         def line(self, t=None):
             """
             line of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             line : tuple
                 series of x- and y-coordinates (xa,ya,xb,yb,xc,yc, ...)
-
+    
                 default behaviour: linear interpolation between self.line0 and self.line1
             """
-
         def polygon(self, t=None):
             """
             polygon of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             polygon: tuple
                 series of x- and y-coordinates describing the polygon (xa,ya,xb,yb,xc,yc, ...)
-
+    
                 default behaviour: linear interpolation between self.polygon0 and self.polygon1
             """
-
         def rectangle(self, t=None):
             """
             rectangle of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             rectangle: tuple
                 (xlowerleft,ylowerlef,xupperright,yupperright)
-
+    
                 default behaviour: linear interpolation between self.rectangle0 and self.rectangle1
             """
-
         def points(self, t=None):
             """
             points of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             points : tuple
                 series of x- and y-coordinates (xa,ya,xb,yb,xc,yc, ...)
-
+    
                 default behaviour: linear interpolation between self.points0 and self.points1
             """
-
         def width(self, t=None):
             """
             width position of an animated image object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             width : float
                 default behaviour: linear interpolation between self.width0 and self.width1
-
+    
                 if None, the original width of the image will be used
             """
-
         def fontsize(self, t=None):
             """
             fontsize of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             fontsize : float
                 default behaviour: linear interpolation between self.fontsize0 and self.fontsize1
             """
-
         def as_points(self, t=None):
             """
             as_points of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             as_points : bool
                 default behaviour: self.as_points (text given at creation or update)
             """
-
         def text(self, t=None):
             """
             text of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             text : str
                 default behaviour: self.text0 (text given at creation or update)
             """
-
         def max_lines(self, t=None):
             """
             maximum number of lines to be displayed of text. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             max_lines : int
                 default behaviour: self.max_lines0 (max_lines given at creation or update)
             """
-
         def anchor(self, t=None):
             """
             anchor of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             anchor : str
                 default behaviour: self.anchor0 (anchor given at creation or update)
             """
-
         def text_anchor(self, t=None):
             """
             text_anchor of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             text_anchor : str
                 default behaviour: self.text_anchor0 (text_anchor given at creation or update)
             """
-
         def layer(self, t=None):
             """
             layer of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             layer : int or float
                 default behaviour: self.layer0 (layer given at creation or update)
             """
-
         def font(self, t=None):
             """
             font of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             font : str
                 default behaviour: self.font0 (font given at creation or update)
             """
-
         def xy_anchor(self, t=None):
             """
             xy_anchor attribute of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             xy_anchor : str
                 default behaviour: self.xy_anchor0 (xy_anchor given at creation or update)
             """
-
         def visible(self, t=None):
             """
             visible attribute of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             visible : bool
                 default behaviour: self.visible0 and t >= self.t0 (visible given at creation or update)
             """
-
+        def flip_horizontal(self, t=None):
+            ...
+        def flip_vertical(self, t=None):
+            ...
+        def animation_start(self, t=None):
+            ...
+        def animation_repeat(self, t=None):
+            ...
+        def animation_pingpong(self, t=None):
+            ...
+        def animation_speed(self, t=None):
+            ...
+        def animation_from(self, t=None):
+            ...
+        def animation_to(self, t=None):
+            ...
         def keep(self, t):
             """
             keep attribute of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             keep : bool
                 default behaviour: self.keep0 or t <= self.t1 (visible given at creation or update)
             """
-
         def image(self, t=None):
             """
             image of an animate object. May be overridden.
-
+    
             Parameters
             ----------
             t : float
                 current time
-
+    
             Returns
             -------
             image : PIL.Image.Image
                 default behaviour: self.image0 (image given at creation or update)
             """
-
         def settype(self, circle, line, polygon, rectangle, points, image, text):
             ...
-
         def remove_background(self, im):
             ...
-
     class AnimateEntry:
         """
         defines a button
-
+    
         Parameters
         ----------
         x : int
             x-coordinate of centre of the button in screen coordinates (default 0)
-
+    
         y : int
             y-coordinate of centre of the button in screen coordinates (default 0)
-
+    
         number_of_chars : int
             number of characters displayed in the entry field (default 20)
-
+    
         fillcolor : colorspec
             color of the entry background (default foreground_color)
-
+    
         color : colorspec
             color of the text (default background_color)
-
+    
         value : str
             initial value of the text of the entry (default null string)
-
-
+    
+    
         action :  function
             action to take when the Enter-key is pressed
-
+    
             the function should have no arguments
-
-
+    
+    
         xy_anchor : str
             specifies where x and y are relative to
-
+    
             possible values are (default: sw):
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         All measures are in screen coordinates
-
+    
         This class is not available under Pythonista.
         """
-
         def __init__(
             self,
             x: float = 0,
@@ -14901,103 +18894,97 @@ class Environment:
             xy_anchor: str = "sw",
         ):
             ...
-
         def install(self):
             ...
-
         def on_enter(self, ev):
             ...
-
         def get(self):
             """
             get the current value of the entry
-
+    
             Returns
             -------
             Current value of the entry : str
             """
-
         def remove(self):
             """
             removes the entry object.
-
+    
             the ui object is removed from the ui queue,
             so effectively ending this ui
             """
-
     class AnimateButton:
         """
         defines a button
-
+    
         Parameters
         ----------
         x : int
             x-coordinate of centre of the button in screen coordinates (default 0)
-
+    
         y : int
             y-coordinate of centre of the button in screen coordinates (default 0)
-
+    
         width : int
             width of button in screen coordinates (default 80)
-
+    
         height : int
             height of button in screen coordinates (default 30)
-
+    
         linewidth : int
             width of contour in screen coordinates (default 0=no contour)
-
+    
         fillcolor : colorspec
             color of the interior (foreground_color)
-
+    
         linecolor : colorspec
             color of contour (default foreground_color)
-
+    
         color : colorspec
             color of the text (default background_color)
-
+    
         text : str or function
             text of the button (default null string)
-
+    
             if text is an argumentless function, this will be called each time;
             the button is shown/updated
-
+    
         font : str
             font of the text (default Helvetica)
-
+    
         fontsize : int
             fontsize of the text (default 15)
-
+    
         action :  function
             action to take when button is pressed
-
+    
             executed when the button is pressed (default None)
             the function should have no arguments
-
-
+    
+    
         xy_anchor : str
             specifies where x and y are relative to
-
+    
             possible values are (default: sw):
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         All measures are in screen coordinates
-
+    
         On Pythonista, this functionality is emulated by salabim
         On other platforms, the tkinter functionality is used.
         """
-
         def __init__(
             self,
             x: float = 0,
@@ -15013,108 +19000,103 @@ class Environment:
             xy_anchor: str = "sw",
         ):
             ...
-
         def text(self):
             ...
-
         def install(self):
             ...
-
         def remove(self):
             """
             removes the button object.
-
+    
             the ui object is removed from the ui queue,
             so effectively ending this ui
             """
-
     class AnimateSlider:
         """
         defines a slider
-
+    
         Parameters
         ----------
         x : int
             x-coordinate of centre of the slider in screen coordinates (default 0)
-
+    
         y : int
             y-coordinate of centre of the slider in screen coordinates (default 0)
-
+    
         vmin : float
             minimum value of the slider (default 0)
-
+    
         vmax : float
             maximum value of the slider (default 0)
-
+    
         v : float
             initial value of the slider (default 0)
-
+    
             should be between vmin and vmax
-
+    
         resolution : float
             step size of value (default 1)
-
+    
         width : float
             width of slider in screen coordinates (default 100)
-
+    
         height : float
             height of slider in screen coordinates (default 20)
-
+    
         foreground_color : colorspec
             color of the foreground (default "fg")
-
+    
         background_color : colorspec
             color of the backgroundground (default "bg")
-
+    
         trough_color : colorspec
             color of the trough (default "lightgrey")
-
+    
         show_value : boolean
             if True (default), show values; if False don't show values
-
+    
         label : str
             label if the slider (default null string)
-
-
+    
+    
         font : str
              font of the text (default Helvetica)
-
+    
         fontsize : int
              fontsize of the text (default 12)
-
+    
         action : function
              function executed when the slider value is changed (default None)
-
+    
              the function should have one argument, being the new value
-
+    
              if None (default), no action
-
+    
         xy_anchor : str
             specifies where x and y are relative to
-
+    
             possible values are (default: sw):
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         The current value of the slider is the v attibute of the slider.
-
+    
         All measures are in screen coordinates
-
+    
         On Pythonista, this functionality is emulated by salabim
         On other platforms, the tkinter functionality is used.
         """
-
         def __init__(
             self,
             x: float = 0,
@@ -15140,152 +19122,146 @@ class Environment:
             layer: float = None,  # only for backward compatibility
         ):
             ...
-
         def v(self, value=None):
             """
             value
-
+    
             Parameters
             ----------
             value: float
                 new value
-
+    
                 if omitted, no change
-
+    
             Returns
             -------
             Current value of the slider : float
             """
-
         def label(self, text=None):
             ...
-
         def install(self):
             ...
-
         def remove(self):
             """
             removes the slider object
-
+    
             The ui object is removed from the ui queue,
             so effectively ending this ui
             """
-
     class AnimateQueue(DynamicClass):
         """
         Animates the component in a queue.
-
+    
         Parameters
         ----------
         queue : Queue
             queue it concerns
-
+    
         x : float
             x-position of the first component in the queue
-
+    
             default: 50
-
+    
         y : float
             y-position of the first component in the queue
-
+    
             default: 50
-
+    
         direction : str
             if "w", waiting line runs westwards (i.e. from right to left)
-
+    
             if "n", waiting line runs northeards (i.e. from bottom to top)
-
+    
             if "e", waiting line runs eastwards (i.e. from left to right) (default)
-
+    
             if "s", waiting line runs southwards (i.e. from top to bottom)
-
+    
         trajectory : Trajectory
             trajectory to be followed. Overrides any given directory
-
+    
         reverse : bool
             if False (default), display in normal order. If True, reversed.
-
+    
         max_length : int
             maximum number of components to be displayed
-
+    
         xy_anchor : str
             specifies where x and y are relative to
-
+    
             possible values are (default: sw):
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
         titlecolor : colorspec
             color of the title (default foreground color)
-
+    
         titlefont : font
             font of the title (default null string)
-
+    
         titlefontsize : int
             size of the font of the title (default 15)
-
+    
         title : str
             title to be shown above queue
-
+    
             default: name of the queue
-
+    
         titleoffsetx : float
             x-offset of the title relative to the start of the queue
-
+    
             default: 25 if direction is w, -25 otherwise
-
+    
         titleoffsety : float
             y-offset of the title relative to the start of the queue
-
+    
             default: -25 if direction is s, -25 otherwise
-
+    
         id : any
             the animation works by calling the animation_objects method of each component, optionally
             with id. By default, this is self, but can be overriden, particularly with the queue
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         visible : bool
             if False, nothing will be shown
-
+    
             (default True)
-
+    
         keep : bool
             if False, animation object will be taken from the animation objects. With show(), the animation can be reshown.
             (default True)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         Note
         ----
         All measures are in screen coordinates
-
-
+    
+    
         All parameters, apart from queue, id, arg and parent can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: title
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
         """
-
         def __init__(
             self,
             queue,
@@ -15311,109 +19287,103 @@ class Environment:
             visible=True,
         ):
             ...
-
         def update(self, t):
             ...
-
         def show(self):
             """
             show (unremove)
-
+    
             It is possible to use this method if already shown
             """
-
         def remove(self):
             ...
-
         def is_removed(self):
             ...
-
     class Animate3dQueue(DynamicClass):
         """
         Animates the component in a queue.
-
+    
         Parameters
         ----------
         queue : Queue
-
+    
         x : float
             x-position of the first component in the queue
-
+    
             default: 0
-
+    
         y : float
             y-position of the first component in the queue
-
+    
             default: 0
-
+    
         z : float
             z-position of the first component in the queue
-
+    
             default: 0
-
+    
         direction : str
             if "x+", waiting line runs in positive x direction (default)
-
+    
             if "x-", waiting line runs in negative x direction
-
+    
             if "y+", waiting line runs in positive y direction
-
+    
             if "y-", waiting line runs in negative y direction
-
+    
             if "z+", waiting line runs in positive z direction
-
+    
             if "z-", waiting line runs in negative z direction
-
-
+    
+    
         reverse : bool
             if False (default), display in normal order. If True, reversed.
-
+    
         max_length : int
             maximum number of components to be displayed
-
+    
         layer : int
             layer (default 0)
-
+    
         id : any
             the animation works by calling the animation_objects method of each component, optionally
             with id. By default, this is self, but can be overriden, particularly with the queue
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         visible : bool
             if False, nothing will be shown
-
+    
             (default True)
-
+    
         keep : bool
             if False, animation object will be taken from the animation objects. With show(), the animation can be reshown.
             (default True)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         Note
         ----
         All parameters, apart from queue, id, arg and parent can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: title
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
         """
-
         def __init__(
             self,
             queue: "Queue",
@@ -15431,226 +19401,212 @@ class Environment:
             keep: Union[bool, Callable] = True,
         ):
             ...
-
         def update(self, t):
             ...
-
         def queue(self):
             """
             Returns
             -------
             the queue this object refers to. Can be useful in Component.animation3d_objects: queue
             """
-
         def show(self):
             """
             show (unremove)
-
+    
             It is possible to use this method if already shown
             """
-
         def remove(self):
             ...
-
         def is_removed(self):
             ...
-
     class AnimateCombined:
         """
         Combines several Animate? objects
-
+    
         Parameters
         ----------
         animation_objects : iterable
             iterable of Animate2dBase, Animate3dBase or AnimateCombined objects
-
+    
         **kwargs : dict
             attributes to be set for objects in animation_objects
-
+    
         Notes
         -----
         When an attribute of an AnimateCombined is assigned, it will propagate to all members,
         provided it has already that attribute.
-
+    
         When an attribute of an AnimateCombined is queried, the value of the attribute
         of the first animation_object of the list that has such an attribute will be returned.
-
+    
         If the attribute does not exist in any animation_object of the list, an AttributeError will be raised.
-
-
-
+    
         It is possible to use animation_objects with ::
-
+    
             an = sim.AnimationCombined(car.animation_objects[2:])
             an = sim.AnimationCombined(car.animation3d_objects[3:])
         """
-
         def __init__(self, animation_objects: Iterable, **kwargs):
             ...
-
         def update(self, **kwargs):
             """
             Updated one or more attributes
-
+    
             Parameters
             ----------
             **kwargs : dict
                 attributes to be set
             """
-
         def __setattr__(self, key, value):
             ...
-
         def __getattr__(self, key):
             ...
-
         def append(self, item):
             """
             Add Animate2dBase, Animate3dBase or AnimateCombined object
-
+    
             Parameters
             ----------
             item : Animate2dBase, Animate3dBase or AnimateCombined
                 to be added
             """
-
         def remove(self):
             """
             remove all members from the animation
             """
-
         def show(self):
             """
             show all members in the animation
             """
-
         def is_removed(self):
             ...
-
         def __repr__(self):
             ...
-
     class AnimateText(Animate2dBase):
         """
         Displays a text
-
+    
         Parameters
         ----------
         text : str, tuple or list
             the text to be displayed
-
+    
             if text is str, the text may contain linefeeds, which are shown as individual lines
             if text is tuple or list, each item is displayed on a separate line
-
+    
         x : float
             position of anchor point (default 0)
-
+    
         y : float
             position of anchor point (default 0)
-
+    
         xy_anchor : str
             specifies where x and y are relative to
-
+    
             possible values are (default: sw) :
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
             If null string, the given coordimates are used untranslated
-
+    
         offsetx : float
             offsets the x-coordinate of the rectangle (default 0)
-
+    
         offsety : float
             offsets the y-coordinate of the rectangle (default 0)
-
+    
         angle : float
             angle of the text (in degrees)
-
+    
             default: 0
-
+    
         max_lines : int
             the maximum of lines of text to be displayed
-
+    
             if positive, it refers to the first max_lines lines
-
+    
             if negative, it refers to the last -max_lines lines
-
+    
             if zero (default), all lines will be displayed
-
+    
         font : str or list/tuple
             font to be used for texts
-
+    
             Either a string or a list/tuple of fontnames.
             If not found, uses calibri or arial
-
+    
         text_anchor : str
             anchor position of text
-
+    
             specifies where to texts relative to the rectangle
             point
-
+    
             possible values are (default: c):
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
         textcolor : colorspec
             color of the text (default foreground_color)
-
+    
         fontsize : float
             fontsize of text (default 15)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         screen_coordinates : bool
             use screen_coordinates
-
+    
             normally, the scale parameters are use for positioning and scaling
             objects.
-
+    
             if True, screen_coordinates will be used instead.
-
+    
+        layer : float
+            default: 0
+    
+            lower layer numbers are placed on top of higher layer numbers
+    
         over3d : bool
             if True, this object will be rendered to the OpenGL window
-
+    
             if False (default), the normal 2D plane will be used.
-
+    
         Note
         ----
         All measures are in screen coordinates
-
-
+    
+    
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: title
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-
+    
         """
-
         def __init__(
             self,
             text: Union[str, Iterable[str], Callable] = None,
@@ -15675,140 +19631,143 @@ class Environment:
             over3d: bool = None,
         ):
             ...
-
     class AnimateRectangle(Animate2dBase):
         """
         Displays a rectangle, optionally with a text
-
+    
         Parameters
         ----------
         spec : four item tuple or list
             should specify xlowerleft, ylowerleft, xupperright, yupperright
-
+    
         x : float
             position of anchor point (default 0)
-
+    
         y : float
             position of anchor point (default 0)
-
+    
         xy_anchor : str
             specifies where x and y are relative to
-
+    
             possible values are (default: sw) :
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
             If null string, the given coordimates are used untranslated
-
+    
         offsetx : float
             offsets the x-coordinate of the rectangle (default 0)
-
+    
         offsety : float
             offsets the y-coordinate of the rectangle (default 0)
-
+    
         linewidth : float
             linewidth of the contour
-
+    
             default 1
-
+    
         fillcolor : colorspec
             color of interior (default foreground_color)
-
+    
             default transparent
-
+    
         linecolor : colorspec
             color of the contour (default transparent)
-
+    
         angle : float
             angle of the rectangle (in degrees)
-
+    
             default: 0
-
+    
         as_points : bool
              if False (default), the contour lines are drawn
-
+    
              if True, only the corner points are shown
-
+    
         text : str, tuple or list
             the text to be displayed
-
+    
             if text is str, the text may contain linefeeds, which are shown as individual lines
-
+    
         max_lines : int
             the maximum of lines of text to be displayed
-
+    
             if positive, it refers to the first max_lines lines
-
+    
             if negative, it refers to the last -max_lines lines
-
+    
             if zero (default), all lines will be displayed
-
+    
         font : str or list/tuple
             font to be used for texts
-
+    
             Either a string or a list/tuple of fontnames.
             If not found, uses calibri or arial
-
+    
         text_anchor : str
             anchor position of text
-
+    
             specifies where to texts relative to the rectangle
             point
-
+    
             possible values are (default: c):
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
         textcolor : colorspec
             color of the text (default foreground_color)
-
+    
         text_offsetx : float
             extra x offset to the text_anchor point
-
+    
         text_offsety : float
             extra y offset to the text_anchor point
-
+    
         fontsize : float
             fontsize of text (default 15)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
+        layer : float
+            default: 0
+    
+            lower layer numbers are placed on top of higher layer numbers
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         Note
         ----
         All measures are in screen coordinates
-
-
+    
+    
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: title
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
         """
-
         def __init__(
             self,
             spec: Union[Iterable, Callable] = None,
@@ -15840,153 +19799,156 @@ class Environment:
             over3d: bool = None,
         ):
             ...
-
     class AnimatePolygon(Animate2dBase):
         """
         Displays a polygon, optionally with a text
-
+    
         Parameters
         ----------
         spec : tuple or list
             should specify x0, y0, x1, y1, ...
-
+    
         x : float
             position of anchor point (default 0)
-
+    
         y : float
             position of anchor point (default 0)
-
+    
         xy_anchor : str
             specifies where x and y are relative to
-
+    
             possible values are (default: sw) :
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
             If null string, the given coordimates are used untranslated
-
+    
         offsetx : float
             offsets the x-coordinate of the polygon (default 0)
-
+    
         offsety : float
             offsets the y-coordinate of the polygon (default 0)
-
+    
         linewidth : float
             linewidth of the contour
-
+    
             default 1
-
+    
         fillcolor : colorspec
             color of interior (default foreground_color)
-
+    
             default transparent
-
+    
         linecolor : colorspec
             color of the contour (default transparent)
-
+    
         angle : float
             angle of the polygon (in degrees)
-
+    
             default: 0
-
+    
         as_points : bool
              if False (default), the contour lines are drawn
-
+    
              if True, only the corner points are shown
-
+    
         text : str, tuple or list
             the text to be displayed
-
+    
             if text is str, the text may contain linefeeds, which are shown as individual lines
-
+    
         max_lines : int
             the maximum of lines of text to be displayed
-
+    
             if positive, it refers to the first max_lines lines
-
+    
             if negative, it refers to the last -max_lines lines
-
+    
             if zero (default), all lines will be displayed
-
+    
         font : str or list/tuple
             font to be used for texts
-
+    
             Either a string or a list/tuple of fontnames.
             If not found, uses calibri or arial
-
+    
         text_anchor : str
             anchor position of text
-
+    
             specifies where to texts relative to the polygon
             point
-
+    
             possible values are (default: c):
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
         textcolor : colorspec
             color of the text (default foreground_color)
-
+    
         text_offsetx : float
             extra x offset to the text_anchor point
-
+    
         text_offsety : float
             extra y offset to the text_anchor point
-
+    
         fontsize : float
             fontsize of text (default 15)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         screen_coordinates : bool
             use screen_coordinates
-
+    
             normally, the scale parameters are use for positioning and scaling
             objects.
-
+    
             if True, screen_coordinates will be used instead.
-
+    
+        layer : float
+            default: 0
+    
+            lower layer numbers are placed on top of higher layer numbers
+    
         over3d : bool
             if True, this object will be rendered to the OpenGL window
-
+    
             if False (default), the normal 2D plane will be used.
-
+    
         Note
         ----
         All measures are in screen coordinates
-
-
+    
+    
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: title
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
         """
-
         def __init__(
             self,
             spec: Union[Iterable, Callable] = None,
@@ -16018,148 +19980,151 @@ class Environment:
             over3d: bool = None,
         ):
             ...
-
     class AnimateLine(Animate2dBase):
         """
         Displays a line, optionally with a text
-
+    
         Parameters
         ----------
         spec : tuple or list
             should specify x0, y0, x1, y1, ...
-
+    
         x : float
             position of anchor point (default 0)
-
+    
         y : float
             position of anchor point (default 0)
-
+    
         xy_anchor : str
             specifies where x and y are relative to
-
+    
             possible values are (default: sw) :
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
             If null string, the given coordimates are used untranslated
-
+    
         offsetx : float
             offsets the x-coordinate of the line (default 0)
-
+    
         offsety : float
             offsets the y-coordinate of the line (default 0)
-
+    
         linewidth : float
             linewidth of the contour
-
+    
             default 1
-
+    
         linecolor : colorspec
             color of the contour (default foreground_color)
-
+    
         angle : float
             angle of the line (in degrees)
-
+    
             default: 0
-
+    
         as_points : bool
              if False (default), the contour lines are drawn
-
+    
              if True, only the corner points are shown
-
+    
         text : str, tuple or list
             the text to be displayed
-
+    
             if text is str, the text may contain linefeeds, which are shown as individual lines
-
+    
         max_lines : int
             the maximum of lines of text to be displayed
-
+    
             if positive, it refers to the first max_lines lines
-
+    
             if negative, it refers to the last -max_lines lines
-
+    
             if zero (default), all lines will be displayed
-
+    
         font : str or list/tuple
             font to be used for texts
-
+    
             Either a string or a list/tuple of fontnames.
             If not found, uses calibri or arial
-
+    
         text_anchor : str
             anchor position of text
-
+    
             specifies where to texts relative to the polygon
             point
-
+    
             possible values are (default: c):
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
         textcolor : colorspec
             color of the text (default foreground_color)
-
+    
         text_offsetx : float
             extra x offset to the text_anchor point
-
+    
         text_offsety : float
             extra y offset to the text_anchor point
-
+    
         fontsize : float
             fontsize of text (default 15)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
+        layer : float
+            default: 0
+    
+            lower layer numbers are placed on top of higher layer numbers
+    
         screen_coordinates : bool
             use screen_coordinates
-
+    
             normally, the scale parameters are use for positioning and scaling
             objects.
-
+    
             if True, screen_coordinates will be used instead.
-
+    
         over3d : bool
             if True, this object will be rendered to the OpenGL window
-
+    
             if False (default), the normal 2D plane will be used.
-
+    
         Note
         ----
         All measures are in screen coordinates
-
-
+    
+    
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: title
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
         """
-
         def __init__(
             self,
             spec: Union[Iterable, Callable] = None,
@@ -16191,148 +20156,151 @@ class Environment:
             over3d: bool = None,
         ):
             ...
-
     class AnimatePoints(Animate2dBase):
         """
         Displays a series of points, optionally with a text
-
+    
         Parameters
         ----------
         spec : tuple or list
             should specify x0, y0, x1, y1, ...
-
+    
         x : float
             position of anchor point (default 0)
-
+    
         y : float
             position of anchor point (default 0)
-
+    
         xy_anchor : str
             specifies where x and y are relative to
-
+    
             possible values are (default: sw) :
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
             If null string, the given coordimates are used untranslated
-
+    
         offsetx : float
             offsets the x-coordinate of the points (default 0)
-
+    
         offsety : float
             offsets the y-coordinate of the points (default 0)
-
+    
         linewidth : float
             width of the points
-
+    
             default 1
-
+    
         linecolor : colorspec
             color of the points (default foreground_color)
-
+    
         angle : float
             angle of the points (in degrees)
-
+    
             default: 0
-
+    
         as_points : bool
              if False, the contour lines are drawn
-
+    
              if True (default), only the corner points are shown
-
+    
         text : str, tuple or list
             the text to be displayed
-
+    
             if text is str, the text may contain linefeeds, which are shown as individual lines
-
+    
         max_lines : int
             the maximum of lines of text to be displayed
-
+    
             if positive, it refers to the first max_lines lines
-
+    
             if negative, it refers to the last -max_lines lines
-
+    
             if zero (default), all lines will be displayed
-
+    
         font : str or list/tuple
             font to be used for texts
-
+    
             Either a string or a list/tuple of fontnames.
             If not found, uses calibri or arial
-
+    
         text_anchor : str
             anchor position of text
-
+    
             specifies where to texts relative to the polygon
             point
-
+    
             possible values are (default: c):
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
         textcolor : colorspec
             color of the text (default foreground_color)
-
+    
         text_offsetx : float
             extra x offset to the text_anchor point
-
+    
         text_offsety : float
             extra y offset to the text_anchor point
-
+    
         fontsize : float
             fontsize of text (default 15)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         screen_coordinates : bool
             use screen_coordinates
-
+    
             normally, the scale parameters are use for positioning and scaling
             objects.
-
+    
             if True, screen_coordinates will be used instead.
-
+    
+        layer : float
+            default: 0
+    
+            lower layer numbers are placed on top of higher layer numbers
+    
         over3d : bool
             if True, this object will be rendered to the OpenGL window
-
+    
             if False (default), the normal 2D plane will be used.
-
+    
         Note
         ----
         All measures are in screen coordinates
-
-
+    
+    
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: title
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
         """
-
         def __init__(
             self,
             spec: Union[Iterable, Callable] = None,
@@ -16364,164 +20332,166 @@ class Environment:
             over3d: bool = None,
         ):
             ...
-
     class AnimateCircle(Animate2dBase):
         """
         Displays a (partial) circle or (partial) ellipse , optionally with a text
-
+    
         Parameters
         ----------
         radius : float
             radius of the circle
-
+    
         radius1 : float
             the 'height' of the ellipse. If None (default), a circle will be drawn
-
+    
         arc_angle0 : float
             start angle of the circle (default 0)
-
+    
         arc_angle1 : float
             end angle of the circle (default 360)
-
+    
             when arc_angle1 > arc_angle0 + 360, only 360 degrees will be shown
-
+    
         draw_arc : bool
             if False (default), no arcs will be drawn
             if True, the arcs from and to the center will be drawn
-
+    
         x : float
             position of anchor point (default 0)
-
+    
         y : float
             position of anchor point (default 0)
-
+    
         xy_anchor : str
             specifies where x and y are relative to
-
+    
             possible values are (default: sw) :
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
             If null string, the given coordimates are used untranslated
-
+    
             The positions corresponds to a full circle even if arc_angle0 and/or arc_angle1 are specified.
-
+    
         offsetx : float
             offsets the x-coordinate of the circle (default 0)
-
+    
         offsety : float
             offsets the y-coordinate of the circle (default 0)
-
+    
         linewidth : float
             linewidth of the contour
-
+    
             default 1
-
+    
         fillcolor : colorspec
             color of interior (default foreground_color)
-
-
+    
         linecolor : colorspec
             color of the contour (default transparent)
-
+    
         angle : float
             angle of the circle/ellipse and/or text (in degrees)
-
+    
             default: 0
-
+    
         text : str, tuple or list
             the text to be displayed
-
+    
             if text is str, the text may contain linefeeds, which are shown as individual lines
-
+    
         max_lines : int
             the maximum of lines of text to be displayed
-
+    
             if positive, it refers to the first max_lines lines
-
+    
             if negative, it refers to the last -max_lines lines
-
+    
             if zero (default), all lines will be displayed
-
+    
         font : str or list/tuple
             font to be used for texts
-
+    
             Either a string or a list/tuple of fontnames.
             If not found, uses calibri or arial
-
+    
         text_anchor : str
             anchor position of text
-
+    
             specifies where to texts relative to the polygon
             point
-
+    
             possible values are (default: c):
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
         textcolor : colorspec
             color of the text (default foreground_color)
-
+    
         text_offsetx : float
             extra x offset to the text_anchor point
-
+    
         text_offsety : float
             extra y offset to the text_anchor point
-
+    
         fontsize : float
             fontsize of text (default 15)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
+        layer : float
+            default: 0
+    
+            lower layer numbers are placed on top of higher layer numbers
+    
         screen_coordinates : bool
             use screen_coordinates
-
+    
             normally, the scale parameters are use for positioning and scaling
             objects.
-
+    
             if True, screen_coordinates will be used instead.
-
+    
         over3d : bool
             if True, this object will be rendered to the OpenGL window
-
+    
             if False (default), the normal 2D plane will be used.
-
+    
         Note
         ----
         All measures are in screen coordinates
-
-
+    
+    
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: title
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
         """
-
         def __init__(
             self,
             radius: Union[float, Callable] = None,
@@ -16557,190 +20527,192 @@ class Environment:
             over3d: bool = None,
         ):
             ...
-
     class AnimateImage(Animate2dBase):
         """
         Displays an image, optionally with a text
-
+    
         Parameters
         ----------
         image : str, pathlib.Path or PIL Image
             image to be displayed
-
+    
             if used as function or method or in direct assigmnent,
             the image should be a file containing an image or a PIL image
-
+    
         x : float
             position of anchor point (default 0)
-
+    
         y : float
             position of anchor point (default 0)
-
+    
         xy_anchor : str
             specifies where x and y are relative to
-
+    
             possible values are (default: sw) :
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
             If null string, the given coordimates are used untranslated
-
+    
         anchor : str
             specifies where the x and refer to
-
+    
             possible values are (default: sw) :
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
-
+    
+    
         offsetx : float
             offsets the x-coordinate of the circle (default 0)
-
+    
         offsety : float
             offsets the y-coordinate of the circle (default 0)
-
+    
         angle : float
             angle of the image (in degrees) (default 0)
-
+    
         alpha : float
             alpha of the image (0-255) (default 255)
-
+    
         width : float
            width of the image (default: None = no scaling)
-
-
+    
+    
         text : str, tuple or list
             the text to be displayed
-
+    
             if text is str, the text may contain linefeeds, which are shown as individual lines
-
+    
         max_lines : int
             the maximum of lines of text to be displayed
-
+    
             if positive, it refers to the first max_lines lines
-
+    
             if negative, it refers to the last -max_lines lines
-
+    
             if zero (default), all lines will be displayed
-
+    
         font : str or list/tuple
             font to be used for texts
-
+    
             Either a string or a list/tuple of fontnames.
             If not found, uses calibri or arial
-
+    
         text_anchor : str
             anchor position of text
-
+    
             specifies where to texts relative to the polygon
             point
-
+    
             possible values are (default: c):
-
+    
             ``nw    n    ne``
-
+    
             ``w     c     e``
-
+    
             ``sw    s    se``
-
+    
         textcolor : colorspec
             color of the text (default foreground_color)
-
+    
         text_offsetx : float
             extra x offset to the text_anchor point
-
+    
         text_offsety : float
             extra y offset to the text_anchor point
-
+    
         fontsize : float
             fontsize of text (default 15)
-
+    
         animation_start : float
             (simulation)time to start the animation
-
+    
             default: env.t()
-
+    
             When the image is not an animated GIF, no effect
-
+    
         animation_repeat : float
             if False (default), the animation will be shown only once
-
+    
             if True, the animation will be repeated
-
+    
             When the image is not an animated GIF, no effect
-
+    
         animation_speed : float
             time scale (relative to current speed) (default: 1)
-
+    
             When the image is not an animated GIF, no effect
-
+    
         animation_pingpong : bool
             if False (default), the animation will play forward only
-
+    
             if True, the animation will first play forward, then backward.
             Note that the backward loop might run slowly.
-
+    
         animation_from : float
             animate from this time (measured in seconds in the actual gif/webp video)
-
+    
             default: 0
-
+    
         animation_to : float
             animate to this time (measured in seconds in the actual gif/webp video)
-
+    
             default: inf (=end of video)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
+        layer : float
+            default: 0
+    
+            lower layer numbers are placed on top of higher layer numbers
+    
         screen_coordinates : bool
             use screen_coordinates
-
+    
             normally, the scale parameters are used for positioning and scaling
             objects.
-
+    
             if True, screen_coordinates will be used instead.
-
+    
         over3d : bool
             if True, this object will be rendered to the OpenGL window
-
+    
             if False (default), the normal 2D plane will be used.
-
+    
         Note
         ----
         All measures are in screen coordinates
-
-
+    
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: title
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
         """
-
         def __init__(
             self,
             image: Any = None,
@@ -16779,1933 +20751,169 @@ class Environment:
             over3d: bool = None,
         ):
             ...
-
         def duration(self):
             """
             Returns
             -------
             duration of spec (in seconds) : float
                 if image is not an animated gif, 0 will be returned
-
+    
                 does not take animation_pingpong, animation_from or animation_to into consideration
             """
-
-    class Component:
+    def AnimateGrid(spacing: float = 100, env: "Environment" = None, **kwargs):
         """
-        Component object
-
-        A salabim component is used as component (primarily for queueing)
-        or as a component with a process
-
-        Usually, a component will be defined as a subclass of Component.
-
+        Draws a grid with text labels
+    
         Parameters
         ----------
-        name : str
-            name of the component.
-
-            if the name ends with a period (.),
-            auto serializing will be applied
-
-            if the name end with a comma,
-            auto serializing starting at 1 will be applied
-
-            if omitted, the name will be derived from the class
-            it is defined in (lowercased)
-
-        at : float or distribution
-            schedule time
-
-            if omitted, now is used
-
-            if distribution, the distribution is sampled
-
-        delay : float or distributiom
-            schedule with a delay
-
-            if omitted, no delay
-
-            if distribution, the distribution is sampled
-
-        priority : float
-            priority
-
-            default: 0
-
-            if a component has the same time on the event list, this component is sorted accoring to
-            the priority.
-
-        urgent : bool
-            urgency indicator
-
-            if False (default), the component will be scheduled
-            behind all other components scheduled
-            for the same time and priority
-
-            if True, the component will be scheduled
-            in front of all components scheduled
-            for the same time and priority
-
-        process : str
-            name of process to be started.
-
-            if None (default), it will try to start self.process()
-
-            if null string, no process will be started even if self.process() exists,
-            i.e. become a data component.
-
-
-        suppress_trace : bool
-            suppress_trace indicator
-
-            if True, this component will be excluded from the trace
-
-            If False (default), the component will be traced
-
-            Can be queried or set later with the suppress_trace method.
-
-        suppress_pause_at_step : bool
-            suppress_pause_at_step indicator
-
-            if True, if this component becomes current, do not pause when stepping
-
-            If False (default), the component will be paused when stepping
-
-            Can be queried or set later with the suppress_pause_at_step method.
-
-        skip_standby : bool
-            skip_standby indicator
-
-            if True, after this component became current, do not activate standby components
-
-            If False (default), after the component became current  activate standby components
-
-            Can be queried or set later with the skip_standby method.
-
-        mode : str preferred
-            mode
-
-            will be used in trace and can be used in animations
-
-            if omitted, the mode will be "".
-
-            also mode_time will be set to now.
-
-        cap_now : bool
-            indicator whether times (at, delay) in the past are allowed. If, so now() will be used.
-            default: sys.default_cap_now(), usualy False
-
+        spacing : float
+            spacing of the grid lines in vertical and horizontal direction
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
+    
+        **kwargs : dict
+            extra parameters to be given to AnimateLine, like linecolor, textcolor, font, visible
         """
-
-        def __init__(
-            self,
-            name: str = None,
-            at: Union[float, Callable] = None,
-            delay: Union[float, Callable] = None,
-            priority: float = None,
-            urgent: bool = None,
-            process: str = None,
-            suppress_trace: bool = False,
-            suppress_pause_at_step: bool = False,
-            skip_standby: bool = False,
-            mode: str = "",
-            cap_now: bool = None,
-            env: "Environment" = None,
-            **kwargs,
-        ):
-            ...
-
-        def animation_objects(self, id: Any) -> Tuple:
-            """
-            defines how to display a component in AnimateQueue
-
-            Parameters
-            ----------
-            id : any
-                id as given by AnimateQueue. Note that by default this the reference to the AnimateQueue object.
-
-            Returns
-            -------
-            List or tuple containg
-
-                size_x : how much to displace the next component in x-direction, if applicable
-
-                size_y : how much to displace the next component in y-direction, if applicable
-
-                animation objects : instances of Animate class
-
-                default behaviour:
-
-                square of size 40 (displacements 50), with the sequence number centered.
-
-            Note
-            ----
-            If you override this method, be sure to use the same header, either with or without the id parameter.
-
-            """
-
-        def animation3d_objects(self, id: Any) -> Tuple:
-            """
-            defines how to display a component in Animate3dQueue
-
-            Parameters
-            ----------
-            id : any
-                id as given by Animate3dQueue. Note that by default this the reference to the Animate3dQueue object.
-
-            Returns
-            -------
-            List or tuple containg
-
-                size_x : how much to displace the next component in x-direction, if applicable
-
-                size_y : how much to displace the next component in y-direction, if applicable
-
-                size_z : how much to displace the next component in z-direction, if applicable
-
-                animation objects : instances of Animate3dBase class
-
-                default behaviour:
-
-                white 3dbox of size 8, placed on the z=0 plane (displacements 10).
-
-            Note
-            ----
-            If you override this method, be sure to use the same header, either with or without the id parameter.
-
-
-            Note
-            ----
-            The animation object should support the x_offset, y_offset and z_offset attributes, in order to be able
-            to position the object correctly. All native salabim Animate3d classes are offset aware.
-            """
-
-        def _remove_from_aos(self, q):
-            ...
-
-        def setup(self) -> None:
-            """
-            called immediately after initialization of a component.
-
-            by default this is a dummy method, but it can be overridden.
-
-            only keyword arguments will be passed
-
-            Example
-            -------
-                class Car(sim.Component):
-                    def setup(self, color):
-                        self.color = color
-
-                    def process(self):
-                        ...
-
-                redcar=Car(color="red")
-
-                bluecar=Car(color="blue")
-            """
-
-        def __repr__(self):
-            ...
-
-        def register(self, registry: List) -> "Component":
-            """
-            registers the component in the registry
-
-            Parameters
-            ----------
-            registry : list
-                list of (to be) registered objects
-
-            Returns
-            -------
-            component (self) : Component
-
-            Note
-            ----
-            Use Component.deregister if component does not longer need to be registered.
-            """
-
-        def deregister(self, registry: List) -> "Component":
-            """
-            deregisters the component in the registry
-
-            Parameters
-            ----------
-            registry : list
-                list of registered components
-
-            Returns
-            -------
-            component (self) : Component
-            """
-
-        def print_info(self, as_str: "bool" = False, file: TextIO = None) -> str:
-            """
-            prints information about the component
-
-            Parameters
-            ----------
-            as_str: bool
-                if False (default), print the info
-                if True, return a string containing the info
-
-            file: file
-                if None(default), all output is directed to stdout
-
-                otherwise, the output is directed to the file
-
-            Returns
-            -------
-            info (if as_str is True) : str
-            """
-
-        def _push(self, t, priority, urgent, return_value=None):
-            ...
-
-        def _remove(self):
-            ...
-
-        def _check_fail(self):
-            ...
-
-        def _reschedule(
-            self,
-            scheduled_time,
-            priority,
-            urgent,
-            caller,
-            cap_now,
-            extra="",
-            s0=None,
-            return_value=None,
-        ):
-            ...
-
-        def activate(
-            self,
-            at: Union[float, Callable] = None,
-            delay: Union[Callable, float] = 0,
-            priority: float = 0,
-            urgent: bool = False,
-            process: str = None,
-            keep_request: bool = False,
-            keep_wait: bool = False,
-            mode: str = None,
-            cap_now: bool = None,
-            **kwargs,
-        ) -> None:
-            """
-            activate component
-
-            Parameters
-            ----------
-            at : float or distribution
-                schedule time
-
-                if omitted, now is used
-
-                inf is allowed
-
-                if distribution, the distribution is sampled
-
-            delay : float or distribution
-                schedule with a delay
-
-                if omitted, no delay
-
-                if distribution, the distribution is sampled
-
-            priority : float
-                priority
-
-                default: 0
-
-                if a component has the same time on the event list, this component is sorted accoring to
-                the priority.
-
-            urgent : bool
-                urgency indicator
-
-                if False (default), the component will be scheduled
-                behind all other components scheduled
-                for the same time and priority
-
-                if True, the component will be scheduled
-                in front of all components scheduled
-                for the same time and priority
-
-            process : str
-                name of process to be started.
-
-                if None (default), process will not be changed
-
-                if the component is a data component, the
-                generator function process will be used as the default process.
-
-                note that the function *must* be a generator,
-                i.e. contains at least one yield.
-
-            keep_request : bool
-                this affects only components that are requesting.
-
-                if True, the requests will be kept and thus the status will remain requesting
-
-                if False (the default), the request(s) will be canceled and the status will become scheduled
-
-            keep_wait : bool
-                this affects only components that are waiting.
-
-                if True, the waits will be kept and thus the status will remain waiting
-
-                if False (the default), the wait(s) will be canceled and the status will become scheduled
-
-            cap_now : bool
-                indicator whether times (at, delay) in the past are allowed. If, so now() will be used.
-                default: sys.default_cap_now(), usualy False
-
-            mode : str preferred
-                mode
-
-                will be used in the trace and can be used in animations
-
-                if nothing specified, the mode will be unchanged.
-
-                also mode_time will be set to now, if mode is set.
-
-            Note
-            ----
-            if to be applied to the current component, use ``yield self.activate()``.
-
-            if both at and delay are specified, the component becomes current at the sum
-            of the two values.
-            """
-
-        def hold(
-            self,
-            duration: Union[float, Callable] = None,
-            till: Union[float, Callable] = None,
-            priority: float = 0,
-            urgent: bool = False,
-            mode: str = None,
-            cap_now: bool = None,
-        ) -> None:
-            """
-            hold the component
-
-            Parameters
-            ----------
-            duration : float or distribution
-                specifies the duration
-
-                if omitted, 0 is used
-
-                inf is allowed
-
-                if distribution, the distribution is sampled
-
-            till : float or distribution
-                specifies at what time the component will become current
-
-                if omitted, now is used
-
-                inf is allowed
-
-                if distribution, the distribution is sampled
-
-            priority : float
-                priority
-
-                default: 0
-
-                if a component has the same time on the event list, this component is sorted accoring to
-                the priority.
-
-            urgent : bool
-                urgency indicator
-
-                if False (default), the component will be scheduled
-                behind all other components scheduled
-                for the same time and priority
-
-                if True, the component will be scheduled
-                in front of all components scheduled
-                for the same time and priority
-
-            mode : str preferred
-                mode
-
-                will be used in trace and can be used in animations
-
-                if nothing specified, the mode will be unchanged.
-
-                also mode_time will be set to now, if mode is set.
-
-            cap_now : bool
-                indicator whether times (duration, till) in the past are allowed. If, so now() will be used.
-                default: sys.default_cap_now(), usualy False
-
-            Note
-            ----
-            if to be used for the current component, use ``yield self.hold(...)``.
-
-
-            if both duration and till are specified, the component will become current at the sum of
-            these two.
-            """
-
-        def passivate(self, mode: str = None) -> None:
-            """
-            passivate the component
-
-            Parameters
-            ----------
-            mode : str preferred
-                mode
-
-                will be used in trace and can be used in animations
-
-                if nothing is specified, the mode will be unchanged.
-
-                also mode_time will be set to now, if mode is set.
-
-            Note
-            ----
-            if to be used for the current component (nearly always the case), use ``yield self.passivate()``.
-            """
-
-        def interrupt(self, mode: str = None) -> None:
-            """
-            interrupt the component
-
-            Parameters
-            ----------
-            mode : str preferred
-                mode
-
-                will be used in trace and can be used in animations
-
-                if nothing is specified, the mode will be unchanged.
-
-                also mode_time will be set to now, if mode is set.
-
-            Note
-            ----
-            Cannot be applied on the current component.
-
-            Use resume() to resume
-            """
-
-        def resume(
-            self,
-            all: bool = False,
-            mode: str = None,
-            priority: float = 0,
-            urgent: bool = False,
-        ) -> None:
-            """
-            resumes an interrupted component
-
-            Parameters
-            ----------
-            all : bool
-                if True, the component returns to the original status, regardless of the number of interrupt levels
-
-                if False (default), the interrupt level will be decremented and if the level reaches 0,
-                the component will return to the original status.
-
-            mode : str preferred
-                mode
-
-                will be used in trace and can be used in animations
-
-                if nothing is specified, the mode will be unchanged.
-
-                also mode_time will be set to now, if mode is set.
-
-            priority : float
-                priority
-
-                default: 0
-
-                if a component has the same time on the event list, this component is sorted accoring to
-                the priority.
-
-
-            urgent : bool
-                urgency indicator
-
-                if False (default), the component will be scheduled
-                behind all other components scheduled
-                for the same time and priority
-
-                if True, the component will be scheduled
-                in front of all components scheduled
-                for the same time and priority
-
-            Note
-            ----
-            Can be only applied to interrupted components.
-
-            """
-
-        def cancel(self, mode: str = None) -> None:
-            """
-            cancel component (makes the component data)
-
-            Parameters
-            ----------
-            mode : str preferred
-                mode
-
-                will be used in trace and can be used in animations
-
-                if nothing specified, the mode will be unchanged.
-
-                also mode_time will be set to now, if mode is set.
-
-            Note
-            ----
-            if to be used for the current component, use ``yield self.cancel()``.
-            """
-
-        def standby(self, mode: str = None) -> None:
-            """
-            puts the component in standby mode
-
-            Parameters
-            ----------
-            mode : str preferred
-                mode
-
-                will be used in trace and can be used in animations
-
-                if nothing specified, the mode will be unchanged.
-
-                also mode_time will be set to now, if mode is set.
-
-            Note
-            ----
-            Not allowed for data components or main.
-
-            if to be used for the current component
-            (which will be nearly always the case),
-            use ``yield self.standby()``.
-            """
-
-        def from_store(
-            self,
-            store: Union["Store", Iterable],
-            filter: Callable = lambda c: True,
-            fail_priority: float = 0,
-            urgent: bool = True,
-            fail_at: float = None,
-            fail_delay: float = None,
-            mode: str = None,
-            cap_now: bool = None,
-        ) -> "Component":
-            """
-            get item from store(s)
-
-            Parameters
-            ----------
-            store : store or iterable stores
-                store(s) to get item from
-
-            filter : callable
-                only components that return True when applied to them will be considered
-
-                should be a function with one parameter(component) and returning a bool
-
-                default: lambda c: True (i.e. always return True)
-
-            fail_priority : float
-                priority of the fail event
-
-                default: 0
-
-                if a component has the same time on the event list, this component is sorted according to
-                the priority.
-
-            urgent : bool
-                urgency indicator
-
-                if False (default), the component will be scheduled
-                behind all other components scheduled
-                for the same time and priority
-
-                if True, the component will be scheduled
-                in front of all components scheduled
-                for the same time and priority
-
-            fail_at : float or distribution
-                time out
-
-                if the request is not honored before fail_at,
-                the request will be cancelled and the
-                parameter failed will be set.
-
-                if not specified, the request will not time out.
-
-                if distribution, the distribution is sampled
-
-            fail_delay : float or distribution
-                time out
-
-                if the request is not honored before now+fail_delay,
-                the request will be cancelled and the
-                parameter failed will be set.
-
-                if not specified, the request will not time out.
-
-                if distribution, the distribution is sampled
-
-            mode : str preferred
-                mode
-
-                will be used in trace and can be used in animations
-
-                if nothing specified, the mode will be unchanged.
-
-                also mode_time will be set to now, if mode is set.
-
-            cap_now : bool
-                indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
-                default: sys.default_cap_now(), usualy False
-
-            Note
-            ----
-            Only allowed for current component
-
-            Always use as
-            use ``item = yield self.from_store(...)``.
-
-            The parameter failed will be reset by a calling request, wait, from_store or to_store
-            """
-
-        def to_store(
-            self,
-            store: Union["Store", Iterable],
-            item: "Component",
-            priority: float = 0,
-            fail_priority: float = 0,
-            urgent: bool = True,
-            fail_at: float = None,
-            fail_delay: float = None,
-            mode: str = None,
-            cap_now: bool = None,
-        ) -> "Component":
-            """
-            put item to store(s)
-
-            Parameters
-            ----------
-            store : store or iterable stores
-                store(s) to put item to
-
-            item: Component
-                component to put to store
-
-            fail_priority : float
-                priority of the fail event
-
-                default: 0
-
-                if a component has the same time on the event list, this component is sorted according to
-                the priority.
-
-            urgent : bool
-                urgency indicator
-
-                if False (default), the component will be scheduled
-                behind all other components scheduled
-                for the same time and priority
-
-                if True, the component will be scheduled
-                in front of all components scheduled
-                for the same time and priority
-
-            fail_at : float or distribution
-                time out
-
-                if the request is not honored before fail_at,
-                the request will be cancelled and the
-                parameter failed will be set.
-
-                if not specified, the request will not time out.
-
-                if distribution, the distribution is sampled
-
-            fail_delay : float or distribution
-                time out
-
-                if the request is not honored before now+fail_delay,
-                the request will be cancelled and the
-                parameter failed will be set.
-
-                if not specified, the request will not time out.
-
-                if distribution, the distribution is sampled
-
-            mode : str preferred
-                mode
-
-                will be used in trace and can be used in animations
-
-                if nothing specified, the mode will be unchanged.
-
-                also mode_time will be set to now, if mode is set.
-
-            cap_now : bool
-                indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
-                default: sys.default_cap_now(), usualy False
-
-            Note
-            ----
-            Only allowed for current component
-
-            Always use as
-            use ``yield self.to_store(...)``.
-
-            The parameter failed will be reset by a calling request, wait, from_store, to_store
-            """
-
-        def filter(self, value: callable):
-            """
-            updates the filter used in yield self.from_to
-
-            Parameters
-            ----------
-            value : callable
-                new filter, which should be a function with one parameter(component) and returning a bool
-
-            Note
-            ----
-            After applying the new filter, items (components) may leave or enter the store
-            """
-
-        def request(self, *args, **kwargs) -> None:
-            """
-            request from a resource or resources
-
-            Parameters
-            ----------
-            args : sequence of items where each item can be:
-                - resource, where quantity=1, priority=tail of requesters queue
-                - tuples/list containing a resource, a quantity and optionally a priority.
-                    if the priority is not specified, the request
-                    for the resource be added to the tail of
-                    the requesters queue
-
-
-            priority : float
-                priority of the fail event
-
-                default: 0
-
-                if a component has the same time on the event list, this component is sorted according to
-                the priority.
-
-            urgent : bool
-                urgency indicator
-
-                if False (default), the component will be scheduled
-                behind all other components scheduled
-                for the same time and priority
-
-                if True, the component will be scheduled
-                in front of all components scheduled
-                for the same time and priority
-
-            fail_at : float or distribution
-                time out
-
-                if the request is not honored before fail_at,
-                the request will be cancelled and the
-                parameter failed will be set.
-
-                if not specified, the request will not time out.
-
-                if distribution, the distribution is sampled
-
-            fail_delay : float or distribution
-                time out
-
-                if the request is not honored before now+fail_delay,
-                the request will be cancelled and the
-                parameter failed will be set.
-
-                if not specified, the request will not time out.
-
-                if distribution, the distribution is sampled
-
-            oneof : bool
-                if oneof is True, just one of the requests has to be met (or condition),
-                where honoring follows the order given.
-
-                if oneof is False (default), all requests have to be met to be honored
-
-            mode : str preferred
-                mode
-
-                will be used in trace and can be used in animations
-
-                if nothing specified, the mode will be unchanged.
-
-                also mode_time will be set to now, if mode is set.
-
-            cap_now : bool
-                indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
-                default: sys.default_cap_now(), usualy False
-
-            Note
-            ----
-            Not allowed for data components or main.
-
-            If to be used for the current component
-            (which will be nearly always the case),
-            use ``yield self.request(...)``.
-
-            If the same resource is specified more that once, the quantities are summed
-
-
-            The requested quantity may exceed the current capacity of a resource
-
-
-            The parameter failed will be reset by a calling request or wait
-
-            Example
-            -------
-            ``yield self.request(r1)``
-
-            --> requests 1 from r1
-
-            ``yield self.request(r1,r2)``
-
-            --> requests 1 from r1 and 1 from r2
-
-            ``yield self.request(r1,(r2,2),(r3,3,100))``
-
-            --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100
-
-            ``yield self.request((r1,1),(r2,2))``
-
-            --> requests 1 from r1, 2 from r2
-
-            ``yield self.request(r1, r2, r3, oneoff=True)``
-
-            --> requests 1 from r1, r2 or r3
-
-            """
-
-        def isbumped(self, resource: "Resource" = None) -> bool:
-            """
-            check whether component is bumped from resource
-
-            Parameters
-            ----------
-            resource : Resource
-                resource to be checked
-                if omitted, checks whether component belongs to any resource claimers
-
-            Returns
-            -------
-            True if this component is not in the resource claimers : bool
-                False otherwise
-            """
-
-        def isclaiming(self, resource: "Resource" = None) -> bool:
-            """
-            check whether component is claiming from resource
-
-            Parameters
-            ----------
-            resource : Resource
-                resource to be checked
-                if omitted, checks whether component is in any resource claimers
-
-            Returns
-            -------
-            True if this component is in the resource claimers : bool
-                False otherwise
-            """
-
-        def get(self, *args, **kwargs) -> None:
-            """
-            equivalent to request
-            """
-
-        def put(self, *args, **kwargs) -> None:
-            """
-            equivalent to request, but anonymous quantities are negated
-            """
-
-        def honor_all(self):
-            ...
-
-        def honor_any(self):
-            ...
-
-        def _tryrequest(self):
-            ...
-
-        def _release(self, r, q=None, s0=None, bumped_by=None):
-            ...
-
-        def release(self, *args) -> None:
-            """
-            release a quantity from a resource or resources
-
-            Parameters
-            ----------
-            args : sequence of items, where each items can be
-                - a resources, where quantity=current claimed quantity
-                - a tuple/list containing a resource and the quantity to be released
-
-            Note
-            ----
-            It is not possible to release from an anonymous resource, this way.
-            Use Resource.release() in that case.
-
-            Example
-            -------
-            yield self.request(r1,(r2,2),(r3,3,100))
-
-            --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100
-
-
-            c1.release
-
-            --> releases 1 from r1, 2 from r2 and 3 from r3
-
-
-            yield self.request(r1,(r2,2),(r3,3,100))
-
-            c1.release((r2,1))
-
-            --> releases 1 from r2
-
-
-            yield self.request(r1,(r2,2),(r3,3,100))
-
-            c1.release((r2,1),r3)
-
-            --> releases 2 from r2,and 3 from r3
-            """
-
-        def wait(self, *args, **kwargs) -> None:
-            """
-            wait for any or all of the given state values are met
-
-            Parameters
-            ----------
-            args : sequence of items, where each item can be
-                - a state, where value=True, priority=tail of waiters queue)
-                - a tuple/list containing
-
-                    state, a value and optionally a priority.
-
-                    if the priority is not specified, this component will
-                    be added to the tail of
-                    the waiters queue
-
-
-            priority : float
-                priority of the fail event
-
-                default: 0
-
-                if a component has the same time on the event list, this component is sorted accoring to
-                the priority.
-
-            urgent : bool
-                urgency indicator
-
-                if False (default), the component will be scheduled
-                behind all other components scheduled
-                for the same time and priority
-
-                if True, the component will be scheduled
-                in front of all components scheduled
-                for the same time and priority
-
-            fail_at : float or distribution
-                time out
-
-                if the wait is not honored before fail_at,
-                the wait will be cancelled and the
-                parameter failed will be set.
-
-                if not specified, the wait will not time out.
-
-                if distribution, the distribution is sampled
-
-            fail_delay : float or distribution
-                time out
-
-                if the wait is not honored before now+fail_delay,
-                the request will be cancelled and the
-                parameter failed will be set.
-
-                if not specified, the wait will not time out.
-
-                if distribution, the distribution is sampled
-
-            all : bool
-                if False (default), continue, if any of the given state/values is met
-
-                if True, continue if all of the given state/values are met
-
-            mode : str preferred
-                mode
-
-                will be used in trace and can be used in animations
-
-                if nothing specified, the mode will be unchanged.
-
-                also mode_time will be set to now, if mode is set.
-
-            cap_now : bool
-                indicator whether times (fail_at, fail_duration) in the past are allowed. If, so now() will be used.
-                default: sys.default_cap_now(), usualy False
-
-            Note
-            ----
-            Not allowed for data components or main.
-
-            If to be used for the current component
-            (which will be nearly always the case),
-            use ``yield self.wait(...)``.
-
-            It is allowed to wait for more than one value of a state
-
-            the parameter failed will be reset by a calling wait
-
-            If you want to check for all components to meet a value (and clause),
-            use Component.wait(..., all=True)
-
-            The value may be specified in three different ways:
-
-            * constant, that value is just compared to state.value()
-
-              yield self.wait((light,"red"))
-            * an expression, containg one or more $-signs
-              the $ is replaced by state.value(), each time the condition is tested.
-
-              self refers to the component under test, state refers to the state
-              under test.
-
-              yield self.wait((light,'$ in ("red","yellow")'))
-
-              yield self.wait((level,"$<30"))
-
-            * a function. In that case the parameter should function that
-              should accept three arguments: the value, the component under test and the
-              state under test.
-
-              usually the function will be a lambda function, but that's not
-              a requirement.
-
-              yield self.wait((light,lambda t, comp, state: t in ("red","yellow")))
-
-              yield self.wait((level,lambda t, comp, state: t < 30))
-
-
-            Example
-            -------
-            ``yield self.wait(s1)``
-
-            --> waits for s1.value()==True
-
-            ``yield self.wait(s1,s2)``
-
-            --> waits for s1.value()==True or s2.value==True
-
-            ``yield self.wait((s1,False,100),(s2,"on"),s3)``
-
-            --> waits for s1.value()==False or s2.value=="on" or s3.value()==True
-
-            s1 is at the tail of waiters, because of the set priority
-
-            ``yield self.wait(s1,s2,all=True)``
-
-            --> waits for s1.value()==True and s2.value==True
-
-            """
-
-        def _trywait(self):
-            ...
-
-        def claimed_quantity(self, resource: "Resource" = None) -> float:
-            """
-            Parameters
-            ----------
-            resource : Resoure
-                resource to be queried
-
-            Returns
-            -------
-            the claimed quantity from a resource : float or int
-                if the resource is not claimed, 0 will be returned
-            """
-
-        def claimed_resources(self) -> List:
-            """
-            Returns
-            -------
-            list of claimed resources : list
-            """
-
-        def requested_resources(self) -> List:
-            """
-            Returns
-            -------
-            list of requested resources : list
-            """
-
-        def requested_quantity(self, resource: "Resource" = None) -> float:
-            """
-            Parameters
-            ----------
-            resource : Resoure
-                resource to be queried
-
-            Returns
-            -------
-            the requested (not yet honored) quantity from a resource : float or int
-                if there is no request for the resource, 0 will be returned
-            """
-
-        def failed(self) -> bool:
-            """
-            Returns
-            -------
-            True, if the latest request/wait has failed (either by timeout or external) : bool
-            False, otherwise
-            """
-
-        def name(self, value: str = None) -> str:
-            """
-            Parameters
-            ----------
-            value : str
-                new name of the component
-                if omitted, no change
-
-            Returns
-            -------
-            Name of the component : str
-
-            Note
-            ----
-            base_name and sequence_number are not affected if the name is changed
-            """
-
-        def base_name(self) -> str:
-            """
-            Returns
-            -------
-            base name of the component (the name used at initialization): str
-            """
-
-        def sequence_number(self) -> int:
-            """
-            Returns
-            -------
-            sequence_number of the component : int
-                (the sequence number at initialization)
-
-                normally this will be the integer value of a serialized name,
-                but also non serialized names (without a dotcomma at the end)
-                will be numbered)
-            """
-
-        def running_process(self) -> str:
-            """
-            Returns
-            -------
-            name of the running process : str
-                if data component, None
-            """
-
-        def remove_animation_children(self) -> None:
-            """
-            removes animation children
-
-            Note
-            ----
-            Normally, the animation_children are removed automatically upon termination of a component (when it terminates)
-            """
-
-        def suppress_trace(self, value: bool = None) -> bool:
-            """
-            Parameters
-            ----------
-            value: bool
-                new suppress_trace value
-
-                if omitted, no change
-
-            Returns
-            -------
-            suppress_trace : bool
-                components with the suppress_status of True, will be ignored in the trace
-            """
-
-        def suppress_pause_at_step(self, value: bool = None) -> bool:
-            """
-            Parameters
-            ----------
-            value: bool
-                new suppress_trace value
-
-                if omitted, no change
-
-            Returns
-            -------
-            suppress_pause_at_step : bool
-                components with the suppress_pause_at_step of True, will be ignored in a step
-            """
-
-        def skip_standby(self, value: bool = None) -> bool:
-            """
-            Parameters
-            ----------
-            value: bool
-                new skip_standby value
-
-                if omitted, no change
-
-            Returns
-            -------
-            skip_standby indicator : bool
-                components with the skip_standby indicator of True, will not activate standby components after
-                the component became current.
-            """
-
-        def set_mode(self, value: str = None) -> None:
-            """
-            Parameters
-            ----------
-            value: any, str recommended
-                new mode
-
-                mode_time will be set to now
-                if omitted, no change
-            """
-
-        def _modetxt(self) -> str:
-            ...
-
-        def ispassive(self) -> bool:
-            """
-            Returns
-            -------
-            True if status is passive, False otherwise : bool
-
-            Note
-            ----
-            Be sure to always include the parentheses, otherwise the result will be always True!
-            """
-
-        def iscurrent(self) -> bool:
-            """
-            Returns
-            -------
-            True if status is current, False otherwise : bool
-
-            Note
-            ----
-            Be sure to always include the parentheses, otherwise the result will be always True!
-            """
-
-        def isrequesting(self):
-            """
-            Returns
-            -------
-            True if status is requesting, False otherwise : bool
-
-            Note
-            ----
-            Be sure to always include the parentheses, otherwise the result will be always True!
-            """
-
-        def iswaiting(self) -> bool:
-            """
-            Returns
-            -------
-            True if status is waiting, False otherwise : bool
-
-            Note
-            ----
-            Be sure to always include the parentheses, otherwise the result will be always True!
-            """
-
-        def isscheduled(self) -> bool:
-            """
-            Returns
-            -------
-            True if status is scheduled, False otherwise : bool
-
-            Note
-            ----
-            Be sure to always include the parentheses, otherwise the result will be always True!
-            """
-
-        def isstandby(self) -> bool:
-            """
-            Returns
-            -------
-            True if status is standby, False otherwise : bool
-
-            Note
-            ----
-            Be sure to always include the parentheses, otherwise the result will be always True
-            """
-
-        def isinterrupted(self) -> bool:
-            """
-            Returns
-            -------
-            True if status is interrupted, False otherwise : bool
-
-            Note
-            ----
-            Be sure to always include the parentheses, otherwise the result will be always True
-            """
-
-        def isdata(self) -> bool:
-            """
-            Returns
-            -------
-            True if status is data, False otherwise : bool
-
-            Note
-            ----
-            Be sure to always include the parentheses, otherwise the result will be always True!
-            """
-
-        def queues(self) -> Set:
-            """
-            Returns
-            -------
-            set of queues where the component belongs to : set
-            """
-
-        def count(self, q: "Queue" = None) -> int:
-            """
-            queue count
-
-            Parameters
-            ----------
-            q : Queue
-                queue to check or
-
-                if omitted, the number of queues where the component is in
-
-            Returns
-            -------
-            1 if component is in q, 0 otherwise : int
-
-
-                if q is omitted, the number of queues where the component is in
-            """
-
-        def index(self, q: "Queue") -> int:
-            """
-            Parameters
-            ----------
-            q : Queue
-                queue to be queried
-
-            Returns
-            -------
-            index of component in q : int
-                if component belongs to q
-
-                -1 if component does not belong to q
-            """
-
-        def enter(self, q: "Queue") -> "Component":
-            """
-            enters a queue at the tail
-
-            Parameters
-            ----------
-            q : Queue
-                queue to enter
-
-            Note
-            ----
-            the priority will be set to
-            the priority of the tail component of the queue, if any
-            or 0 if queue is empty
-            """
-
-        def enter_at_head(self, q: "Queue") -> "Component":
-            """
-            enters a queue at the head
-
-            Parameters
-            ----------
-            q : Queue
-                queue to enter
-
-            Note
-            ----
-            the priority will be set to
-            the priority of the head component of the queue, if any
-            or 0 if queue is empty
-            """
-
-        def enter_in_front_of(self, q: "Queue", poscomponent: "Component") -> "Component":
-            """
-            enters a queue in front of a component
-
-            Parameters
-            ----------
-            q : Queue
-                queue to enter
-
-            poscomponent : Component
-                component to be entered in front of
-
-            Note
-            ----
-            the priority will be set to the priority of poscomponent
-            """
-
-        def enter_behind(self, q: "Queue", poscomponent: "Component") -> "Component":
-            """
-            enters a queue behind a component
-
-            Parameters
-            ----------
-            q : Queue
-                queue to enter
-
-            poscomponent : Component
-                component to be entered behind
-
-            Note
-            ----
-            the priority will be set to the priority of poscomponent
-            """
-
-        def enter_sorted(self, q: "Queue", priority: float) -> "Component":
-            """
-            enters a queue, according to the priority
-
-            Parameters
-            ----------
-            q : Queue
-                queue to enter
-
-            priority: type that can be compared with other priorities in the queue
-                priority in the queue
-
-            Note
-            ----
-            The component is placed just before the first component with a priority > given priority
-            """
-
-        def leave(self, q: "Queue" = None) -> "Component":
-            """
-            leave queue
-
-            Parameters
-            ----------
-            q : Queue
-                queue to leave
-
-            Note
-            ----
-            statistics are updated accordingly
-            """
-
-        def priority(self, q: "Queue", priority: float = None) -> float:
-            """
-            gets/sets the priority of a component in a queue
-
-            Parameters
-            ----------
-            q : Queue
-                queue where the component belongs to
-
-            priority : type that can be compared with other priorities in the queue
-                priority in queue
-
-                if omitted, no change
-
-            Returns
-            -------
-            the priority of the component in the queue : float
-
-            Note
-            ----
-            if you change the priority, the order of the queue may change
-            """
-
-        def successor(self, q: "Queue") -> "Component":
-            """
-            Parameters
-            ----------
-            q : Queue
-                queue where the component belongs to
-
-            Returns
-            -------
-            the successor of the component in the queue: Component
-                if component is not at the tail.
-
-                returns None if component is at the tail.
-            """
-
-        def predecessor(self, q: "Queue") -> "Component":
-            """
-            Parameters
-            ----------
-            q : Queue
-                queue where the component belongs to
-
-            Returns : Component
-                predecessor of the component in the queue
-                if component is not at the head.
-
-                returns None if component is at the head.
-            """
-
-        def enter_time(self, q: "Queue") -> float:
-            """
-            Parameters
-            ----------
-            q : Queue
-                queue where component belongs to
-
-            Returns
-            -------
-            time the component entered the queue : float
-            """
-
-        def creation_time(self) -> float:
-            """
-            Returns
-            -------
-            time the component was created : float
-            """
-
-        def scheduled_time(self) -> float:
-            """
-            Returns
-            -------
-            time the component scheduled for, if it is scheduled : float
-                returns inf otherwise
-            """
-
-        def scheduled_priority(self) -> float:
-            """
-            Returns
-            -------
-            priority the component is scheduled with : float
-                returns None otherwise
-
-            Note
-            ----
-            The method has to traverse the event list, so performance may be an issue.
-            """
-
-        def remaining_duration(self, value: float = None, priority: float = 0, urgent: bool = False) -> float:
-            """
-            Parameters
-            ----------
-            value : float
-                set the remaining_duration
-
-                The action depends on the status where the component is in:
-
-                - passive: the remaining duration is update according to the given value
-
-                - standby and current: not allowed
-
-                - scheduled: the component is rescheduled according to the given value
-
-                - waiting or requesting: the fail_at is set according to the given value
-
-                - interrupted: the remaining_duration is updated according to the given value
-
-
-            priority : float
-                priority
-
-                default: 0
-
-                if a component has the same time on the event list, this component is sorted accoring to
-                the priority.
-
-            urgent : bool
-                urgency indicator
-
-                if False (default), the component will be scheduled
-                behind all other components scheduled
-                for the same time and priority
-
-                if True, the component will be scheduled
-                in front of all components scheduled
-                for the same time and priority
-
-            Returns
-            -------
-            remaining duration : float
-                if passive, remaining time at time of passivate
-
-                if scheduled, remaing time till scheduled time
-
-                if requesting or waiting, time till fail_at time
-
-                else: 0
-
-            Note
-            ----
-            This method is useful for interrupting a process and then resuming it,
-            after some (breakdown) time
-            """
-
-        def mode_time(self) -> float:
-            """
-            Returns
-            -------
-            time the component got it's latest mode : float
-                For a new component this is
-                the time the component was created.
-
-                this function is particularly useful for animations.
-            """
-
-        def interrupted_status(self) -> Any:
-            """
-            returns the original status of an interrupted component
-
-            possible values are
-                - passive
-                - scheduled
-                - requesting
-                - waiting
-                - standby
-            """
-
-        def interrupt_level(self) -> int:
-            """
-            returns interrupt level of an interrupted component
-
-            non interrupted components return 0
-            """
-
-        def _member(self, q):
-            ...
-
-        def _checknotinqueue(self, q):
-            ...
-
-        def _checkinqueue(self, q):
-            ...
-
-        def _checkisnotdata(self):
-            ...
-
-        def _checkisnotmain(self):
-            ...
-
-        def lineno_txt(self, add_at=False):
-            ...
-
-        def line_number(self) -> str:
-            """
-            current line number of the process
-
-            Returns
-            -------
-            Current line number : str
-                for data components, "" will be returned
-            """
-
-        def to_store_requesters(self) -> "Queue":
-            """
-            get the queue holding all to_store requesting components
-
-            Returns
-            -------
-            queue holding all to_store requesting components : Queue
-            """
-
-        def from_store_item(self) -> Optional["Component"]:
-            """
-            return item returned from a yield self.from_store(...) if valid
-
-            Returns
-            -------
-            item returned : Component or None, if not valid
-            """
-
-        def from_store_store(self) -> Optional["Component"]:
-            """
-            return store where item was returned from a yield self.from_store(...) if valid
-
-            Returns
-            -------
-            item returned : Component or None, if not valid
-            """
-
-        def to_store_store(self) -> Optional["Component"]:
-            """
-            return store where item was sent to with last yield self.to_store(...) if valid
-
-            Returns
-            -------
-            item returned : Component or None, if not valid
-            """
-
     class ComponentGenerator(Component):
         """
         Component generator object
-
+    
         A component generator can be used to genetate components
-
+    
         There are two ways of generating components:
-
+    
         - according to a given inter arrival time (iat) value or distribution
         - random spread over a given time interval
-
+    
         Parameters
         ----------
         component_class : callable, usually a subclass of Component or Pdf or Cdf distribution
             the type of components to be generated
-
+    
             in case of a distribution, the Pdf or Cdf should return a callable
-
+    
         generator_name : str
             name of the component generator.
-
+    
             if the name ends with a period (.),
             auto serializing will be applied
-
+    
             if the name end with a comma,
             auto serializing starting at 1 will be applied
-
+    
             if omitted, the name will be derived from the name of the component_class, padded with '.generator'
-
+    
         at : float or distribution
             time where the generator starts time
-
+    
             if omitted, now is used
-
+    
             if distribution, the distribution is sampled
-
+    
         delay : float or distribution
             delay where the generator starts (at = now + delay)
-
+    
             if omitted, no delay
-
+    
             if distribution, the distribution is sampled
-
+    
         till : float or distribution
             time up to which components should be generated
-
+    
             if omitted, no end
-
+    
             if distribution, the distribution is sampled
-
+    
         duration : float or distribution
             duration to which components should be generated (till = now + duration)
-
+    
             if omitted, no end
-
+    
             if distribution, the distribution is sampled
-
+    
         number : int or distribution
             (maximum) number of components to be generated
-
+    
             if distribution, the distribution is sampled
-
+    
         iat : float or distribution
             inter arrival time (distribution).
-
+    
             if None (default), a random spread over the interval (at, till) will be used
-
-
+    
+    
         force_at : bool
             for iat generation:
-
+    
                 if False (default), the first component will be generated at time = at + sample from the iat
-
+    
                 if True, the first component will be generated at time = at
-
+    
             for random spread generation:
-
+    
                 if False (default), no force for time = at
-
+    
                 if True, force the first generation at time = at
-
-
+    
+    
         force_till : bool
             only possible for random spread generation:
-
+    
             if False (default), no force for time = till
-
+    
             if True, force the last generated component at time = till
-
-
+    
+    
         disturbance : callable (usually a distribution)
             for each component to be generated, the disturbance call (sampling) is added
             to the actual generation time.
-
+    
             disturbance may only be used together with iat. The force_at parameter is not
             allowed in that case.
-
+    
         suppress_trace : bool
             suppress_trace indicator
-
+    
             if True, the component generator events will be excluded from the trace
-
+    
             If False (default), the component generator will be traced
-
+    
             Can be queried or set later with the suppress_trace method.
-
+    
         suppress_pause_at_step : bool
             suppress_pause_at_step indicator
-
+    
             if True, if this component generator becomes current, do not pause when stepping
-
+    
             If False (default), the component generator will be paused when stepping
-
+    
             Can be queried or set later with the suppress_pause_at_step method.
-
+    
         equidistant : bool
             spread the arrival moments evenly over the defined duration
-
+    
             in this case, iat may not be specified and number=1 is not allowed.
-
+    
             force_at and force_till are ignored.
-
+    
         at_end : callable
             function called upon termination of the generator.
-
+    
             e.g. env.main().activate()
-
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         For iat distributions: if till/duration and number are specified, the generation stops whichever condition
         comes first.
         """
-
         def __init__(
             self,
             component_class: Type,
@@ -18727,52 +20935,50 @@ class Environment:
             **kwargs,
         ):
             ...
-
         def do_spread(self):
             ...
-
         def do_iat(self):
             ...
-
         def do_iat_disturbance(self):
             ...
-
+        def do_spread_yieldless(self):
+            ...
+        def do_iat_yieldless(self):
+            ...
+        def do_iat_disturbance_yieldless(self):
+            ...
         def do_finalize(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the component generator
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
     class Random(random.Random):
         """
         defines a randomstream, equivalent to random.Random()
-
+    
         Parameters
         ----------
         seed : any hashable
             default: None
         """
-
         def __init__(self, seed: Hashable = None):
             ...
-
     class _Distribution:
         def bounded_sample(
             self,
@@ -18788,173 +20994,150 @@ class Environment:
             ----------
             lowerbound : float
                 sample values < lowerbound will be rejected (at most 100 retries)
-
+    
                 if omitted, no lowerbound check
-
+    
             upperbound : float
                 sample values > upperbound will be rejected (at most 100 retries)
-
+    
                 if omitted, no upperbound check
-
+    
             fail_value : float
                 value to be used if. after number_of_tries retries, sample is still not within bounds
-
+    
                 default: lowerbound, if specified, otherwise upperbound
-
+    
             number_of_tries : int
                 number of tries before fail_value is returned
-
+    
                 default: 100
-
+    
             include_lowerbound : bool
                 if True (default), the lowerbound may be included.
                 if False, the lowerbound will be excluded.
-
+    
             include_upperbound : bool
                 if True (default), the upperbound may be included.
                 if False, the upperbound will be excluded.
-
+    
             Returns
             -------
             Bounded sample of a distribution : depending on distribution type (usually float)
-
+    
             Note
             ----
             If, after number_of_tries retries, the sampled value is still not within the given bounds,
             fail_value  will be returned
-
+    
             Samples that cannot be converted (only possible with Pdf and CumPdf) to float
             are assumed to be within the bounds.
             """
-
         def __call__(self, *args, **kwargs):
             ...
-
         def __pos__(self):
             ...
-
         def __neg__(self):
             ...
-
         def __add__(self, other):
             ...
-
         def __radd__(self, other):
             ...
-
         def __sub__(self, other):
             ...
-
         def __rsub__(self, other):
             ...
-
         def __mul__(self, other):
             ...
-
         def __rmul__(self, other):
             ...
-
         def __truediv__(self, other):
             ...
-
         def __rtruediv__(self, other):
             ...
-
         def __floordiv__(self, other):
             ...
-
         def __rfloordiv__(self, other):
             ...
-
         def __pow__(self, other):
             ...
-
         def __rpow__(self, other):
             ...
-
         def register_time_unit(self, time_unit, env):
             ...
-
     class Map(_Distribution):
         """
         Parameters
         ----------
         dis : distribution
             distribution to be mapped
-
+    
         function : function
             function to be applied on each sampled value
-
+    
         Examples
         --------
         d = sim.Map(sim.Normal(10,3), lambda x: x if x > 0 else 0)  # map negative samples to zero
         d = sim.Map(sim.Uniform(1,7), int)  # die simulator
         """
-
         def __init__(self, dis: "_Distribution", function: Callable):
             ...
-
         def sample(self) -> Any:
             ...
-
         def mean(self) -> float:
             ...
-
         def __repr__(self):
             ...
-
     class Bounded(_Distribution):
         """
         Parameters
         ----------
         dis : distribution
             distribution to be bounded
-
+    
         lowerbound : float
             sample values < lowerbound will be rejected (at most 100 retries)
-
+    
             if omitted, no lowerbound check
-
+    
         upperbound : float
             sample values > upperbound will be rejected (at most 100 retries)
-
+    
             if omitted, no upperbound check
-
+    
         fail_value : float
             value to be used if. after number_of_tries retries, sample is still not within bounds
-
+    
             default: lowerbound, if specified, otherwise upperbound
-
+    
         number_of_tries : int
             number of tries before fail_value is returned
-
+    
             default: 100
-
+    
         include_lowerbound : bool
             if True (default), the lowerbound may be included.
             if False, the lowerbound will be excluded.
-
+    
         include_upperbound : bool
             if True (default), the upperbound may be included.
             if False, the upperbound will be excluded.
-
+    
         time_unit : str
             specifies the time unit of the lowerbound or upperbound
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         Note
         ----
         If, after number_of_tries retries, the sampled value is still not within the given bounds,
         fail_value  will be returned
-
+    
         Samples that cannot be converted to float (only possible with Pdf and CumPdf)
         are assumed to be within the bounds.
         """
-
         def __init__(
             self,
             dis,
@@ -18968,10 +21151,8 @@ class Environment:
             env: "Environment" = None,
         ):
             ...
-
         def sample(self) -> float:
             ...
-
         def mean(self) -> float:
             """
             Returns
@@ -18979,178 +21160,161 @@ class Environment:
             Mean of the expression of bounded distribution : float
                 unless no bounds are specified, returns nan
             """
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the expression of distribution(s)
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
     class Exponential(_Distribution):
         """
         exponential distribution
-
+    
         Parameters
         ----------
         mean : float
             mean of the distribtion (beta)
-
+    
             if omitted, the rate is used
-
+    
             must be >0
-
+    
         time_unit : str
             specifies the time unit
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         rate : float
             rate of the distribution (lambda)
-
+    
             if omitted, the mean is used
-
+    
             must be >0
-
+    
         randomstream: randomstream
             randomstream to be used
-
+    
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
-
+    
         env : Environment
             environment where the distribution is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         Either mean or rate has to be specified, not both
         """
-
-        def __init__(
-            self,
-            mean: float = None,
-            time_unit: str = None,
-            rate: float = None,
-            randomstream: Any = None,
-            env: "Environment" = None,
-        ):
+        def __init__(self, mean: float = None, time_unit: str = None, rate: float = None, randomstream: Any = None, env: "Environment" = None):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self) -> float:
             """
             Returns
             -------
             Sample of the distribution : float
             """
-
         def mean(self) -> float:
             """
             Returns
             -------
             Mean of the distribution : float
             """
-
     class Normal(_Distribution):
         """
         normal distribution
-
+    
         Parameters
         ----------
         mean : float
             mean of the distribution
-
+    
         standard_deviation : float
             standard deviation of the distribution
-
+    
             if omitted, coefficient_of_variation, is used to specify the variation
             if neither standard_devation nor coefficient_of_variation is given, 0 is used,
             thus effectively a contant distribution
-
+    
             must be >=0
-
+    
         coefficient_of_variation : float
             coefficient of variation of the distribution
-
+    
             if omitted, standard_deviation is used to specify variation
-
+    
             the resulting standard_deviation must be >=0
-
+    
         use_gauss : bool
             if False (default), use the random.normalvariate method
-
+    
             if True, use the random.gauss method
-
+    
             the documentation for random states that the gauss method should be slightly faster,
             although that statement is doubtful.
-
+    
         time_unit : str
             specifies the time unit
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         randomstream: randomstream
             randomstream to be used
-
+    
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
-
+    
         env : Environment
             environment where the distribution is defined
-
+    
             if omitted, default_env will be used
         """
-
         def __init__(
             self,
             mean: float,
@@ -19162,1012 +21326,877 @@ class Environment:
             env: "Environment" = None,
         ):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self) -> float:
             """
             Returns
             -------
             Sample of the distribution : float
             """
-
         def mean(self) -> float:
             """
             Returns
             -------
             Mean of the distribution : float
             """
-
     class IntUniform(_Distribution):
         """
         integer uniform distribution, i.e. sample integer values between lowerbound and upperbound (inclusive)
-
+    
         Parameters
         ----------
         lowerbound : int
             lowerbound of the distribution
-
+    
         upperbound : int
             upperbound of the distribution
-
+    
             if omitted, lowerbound will be used
-
+    
             must be >= lowerbound
-
+    
         time_unit : str
             specifies the time unit. the sampled integer value will be multiplied by the appropriate factor
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         randomstream: randomstream
             randomstream to be used
-
+    
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
-
+    
         env : Environment
             environment where the distribution is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         In contrast to range, the upperbound is included.
-
+    
         Example
         -------
         die = sim.IntUniform(1,6)
         for _ in range(10):
             print (die())
-
+    
         This will print 10 throws of a die.
         """
-
-        def __init__(
-            self,
-            lowerbound: int,
-            upperbound: int = None,
-            randomstream: Any = None,
-            time_unit: str = None,
-            env: "Environment" = None,
-        ):
+        def __init__(self, lowerbound: int, upperbound: int = None, randomstream: Any = None, time_unit: str = None, env: "Environment" = None):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self) -> float:
             """
             Returns
             -------
             Sample of the distribution: int
             """
-
         def mean(self) -> float:
             """
             Returns
             -------
             Mean of the distribution : float
             """
-
     class Uniform(_Distribution):
         """
         uniform distribution
-
+    
         Parameters
         ----------
         lowerbound : float
             lowerbound of the distribution
-
+    
         upperbound : float
             upperbound of the distribution
-
+    
             if omitted, lowerbound will be used
-
+    
             must be >= lowerbound
-
+    
         time_unit : str
             specifies the time unit
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         randomstream: randomstream
             randomstream to be used
-
+    
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
-
+    
         env : Environment
             environment where the distribution is defined
-
+    
             if omitted, default_env will be used
         """
-
-        def __init__(
-            self,
-            lowerbound: float,
-            upperbound: float = None,
-            time_unit: str = None,
-            randomstream: Any = None,
-            env: "Environment" = None,
-        ):
+        def __init__(self, lowerbound: float, upperbound: float = None, time_unit: str = None, randomstream: Any = None, env: "Environment" = None):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self) -> float:
             """
             Returns
             -------
             Sample of the distribution: float
             """
-
         def mean(self) -> float:
             """
             Returns
             -------
             Mean of the distribution : float
             """
-
     class Triangular(_Distribution):
         """
         triangular distribution
-
+    
         Parameters
         ----------
         low : float
             lowerbound of the distribution
-
+    
         high : float
             upperbound of the distribution
-
+    
             if omitted, low will be used, thus effectively a constant distribution
-
+    
             high must be >= low
-
+    
         mode : float
             mode of the distribution
-
+    
             if omitted, the average of low and high will be used, thus a symmetric triangular distribution
-
+    
             mode must be between low and high
-
+    
         time_unit : str
             specifies the time unit
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         randomstream: randomstream
             randomstream to be used
-
+    
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
-
+    
         env : Environment
             environment where the distribution is defined
-
+    
             if omitted, default_env will be used
         """
-
-        def __init__(
-            self,
-            low: float,
-            high: float = None,
-            mode: float = None,
-            time_unit: str = None,
-            randomstream: Any = None,
-            env: "Environment" = None,
-        ):
+        def __init__(self, low: float, high: float = None, mode: float = None, time_unit: str = None, randomstream: Any = None, env: "Environment" = None):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self) -> float:
             """
             Returns
             -------
             Sample of the distribtion : float
             """
-
         def mean(self) -> float:
             """
             Returns
             -------
             Mean of the distribution : float
             """
-
     class Constant(_Distribution):
         """
         constant distribution
-
+    
         Parameters
         ----------
         value : float
             value to be returned in sample
-
+    
         time_unit : str
             specifies the time unit
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         randomstream: randomstream
             randomstream to be used
-
+    
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
-
+    
             Note that this is only for compatibility with other distributions
-
+    
         env : Environment
             environment where the distribution is defined
-
+    
             if omitted, default_env will be used
         """
-
-        def __init__(
-            self,
-            value: float,
-            time_unit: str = None,
-            randomstream: Any = None,
-            env: "Environment" = None,
-        ):
+        def __init__(self, value: float, time_unit: str = None, randomstream: Any = None, env: "Environment" = None):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self) -> float:
             """
             Returns
             -------
             sample of the distribution (= the specified constant) : float
             """
-
         def mean(self) -> float:
             """
             Returns
             -------
             mean of the distribution (= the specified constant) : float
             """
-
     class Poisson(_Distribution):
         """
         Poisson distribution
-
+    
         Parameters
         ----------
         mean: float
             mean (lambda) of the distribution
-
+    
         randomstream: randomstream
             randomstream to be used
-
+    
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
-
+    
         Note
         ----
         The run time of this function increases when mean (lambda) increases.
-
+    
         It is not recommended to use mean (lambda) > 100
         """
-
         def __init__(self, mean: float, randomstream: Any = None, prefer_numpy: bool = False):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample_fallback(self):
             ...
-
         def sample(self) -> int:
             """
             Returns
             -------
             Sample of the distribution : int
             """
-
         def mean(self) -> float:
             """
             Returns
             -------
             Mean of the distribution : float
             """
-
     class Weibull(_Distribution):
         """
         weibull distribution
-
+    
         Parameters
         ----------
         scale: float
             scale of the distribution (alpha or k)
-
+    
         shape: float
             shape of the distribution (beta or lambda)
-
+    
             should be >0
-
+    
         time_unit : str
             specifies the time unit
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         randomstream: randomstream
             randomstream to be used
-
+    
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
-
+    
         env : Environment
             environment where the distribution is defined
-
+    
             if omitted, default_env will be used
         """
-
-        def __init__(
-            self,
-            scale: float,
-            shape: float,
-            time_unit: str = None,
-            randomstream: Any = None,
-            env: "Environment" = None,
-        ):
+        def __init__(self, scale: float, shape: float, time_unit: str = None, randomstream: Any = None, env: "Environment" = None):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self) -> float:
             """
             Returns
             -------
             Sample of the distribution : float
             """
-
         def mean(self) -> float:
             """
             Returns
             -------
             Mean of the distribution : float
             """
-
     class Gamma(_Distribution):
         """
         gamma distribution
-
+    
         Parameters
         ----------
         shape: float
             shape of the distribution (k)
-
+    
             should be >0
-
+    
         scale: float
             scale of the distribution (teta)
-
+    
             should be >0
-
+    
         time_unit : str
             specifies the time unit
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         rate : float
             rate of the distribution (beta)
-
+    
             should be >0
-
+    
         randomstream: randomstream
             randomstream to be used
-
+    
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
-
-
+    
+    
         env : Environment
             environment where the distribution is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         Either scale or rate has to be specified, not both.
         """
-
-        def __init__(
-            self,
-            shape: float,
-            scale: float = None,
-            time_unit: str = None,
-            rate=None,
-            randomstream: Any = None,
-            env: "Environment" = None,
-        ):
+        def __init__(self, shape: float, scale: float = None, time_unit: str = None, rate=None, randomstream: Any = None, env: "Environment" = None):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self) -> float:
             """
             Returns
             -------
             Sample of the distribution : float
             """
-
         def mean(self) -> float:
             """
             Returns
             -------
             Mean of the distribution : float
             """
-
     class Beta(_Distribution):
         """
         beta distribution
-
+    
         Parameters
         ----------
         alpha: float
             alpha shape of the distribution
-
+    
             should be >0
-
+    
         beta: float
             beta shape of the distribution
-
+    
             should be >0
-
+    
         randomstream: randomstream
             randomstream to be used
-
+    
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
         """
-
         def __init__(self, alpha: float, beta: float, randomstream: Any = None):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self) -> float:
             """
             Returns
             -------
             Sample of the distribution : float
             """
-
         def mean(self) -> float:
             """
             Returns
             -------
             Mean of the distribution : float
             """
-
     class Erlang(_Distribution):
         """
         erlang distribution
-
+    
         Parameters
         ----------
         shape: int
             shape of the distribution (k)
-
+    
             should be >0
-
+    
         rate: float
             rate parameter (lambda)
-
+    
             if omitted, the scale is used
-
+    
             should be >0
-
+    
         time_unit : str
             specifies the time unit
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         scale: float
             scale of the distribution (mu)
-
+    
             if omitted, the rate is used
-
+    
             should be >0
-
+    
         randomstream: randomstream
             randomstream to be used
-
+    
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
-
+    
         env : Environment
             environment where the distribution is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         Either rate or scale has to be specified, not both.
         """
-
-        def __init__(
-            self,
-            shape: float,
-            rate: float = None,
-            time_unit: str = None,
-            scale: float = None,
-            randomstream: Any = None,
-            env: "Environment" = None,
-        ):
+        def __init__(self, shape: float, rate: float = None, time_unit: str = None, scale: float = None, randomstream: Any = None, env: "Environment" = None):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self) -> float:
             """
             Returns
             -------
             Sample of the distribution : float
             """
-
         def mean(self) -> float:
             """
             Returns
             -------
             Mean of the distribution : float
             """
-
     class Cdf(_Distribution):
         """
         Cumulative distribution function
-
+    
         Parameters
         ----------
         spec : list or tuple
             list with x-values and corresponding cumulative density
             (x1,c1,x2,c2, ...xn,cn)
-
+    
             Requirements:
-
+    
                 x1<=x2<= ...<=xn
-
+    
                 c1<=c2<=cn
-
+    
                 c1=0
-
+    
                 cn>0
-
+    
                 all cumulative densities are auto scaled according to cn,
                 so no need to set cn to 1 or 100.
-
+    
         time_unit : str
             specifies the time unit
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         randomstream: randomstream
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it defines a new stream with the specified seed
-
+    
         env : Environment
             environment where the distribution is defined
-
+    
             if omitted, default_env will be used
         """
-
-        def __init__(
-            self,
-            spec: Iterable,
-            time_unit: str = None,
-            randomstream: Any = None,
-            env: "Environment" = None,
-        ):
+        def __init__(self, spec: Iterable, time_unit: str = None, randomstream: Any = None, env: "Environment" = None):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self) -> float:
             """
             Returns
             -------
             Sample of the distribution : float
             """
-
         def mean(self) -> float:
             """
             Returns
             -------
             Mean of the distribution : float
             """
-
     class Pdf(_Distribution):
         """
         Probability distribution function
-
+    
         Parameters
         ----------
         spec : list, tuple or dict
             either
-
+    
             -   if no probabilities specified:
-
+    
                 list/tuple with x-values and corresponding probability
                 dict where the keys are re x-values and the values are probabilities
                 (x0, p0, x1, p1, ...xn,pn)
-
+    
             -   if probabilities is specified:
-
+    
                 list with x-values
-
+    
         probabilities : iterable or float
             if omitted, spec contains the probabilities
-
+    
             the iterable (p0, p1, ...pn) contains the probabilities of the corresponding
             x-values from spec.
-
+    
             alternatively, if a float is given (e.g. 1), all x-values
             have equal probability. The value is not important.
-
+    
         time_unit : str
             specifies the time unit
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         randomstream : randomstream
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
-
+    
         env : Environment
             environment where the distribution is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         p0+p1=...+pn>0
-
+    
         all densities are auto scaled according to the sum of p0 to pn,
         so no need to have p0 to pn add up to 1 or 100.
-
+    
         The x-values can be any type.
-
+    
         If it is a salabim distribution, not the distribution,
         but a sample will be returned when calling sample.
         """
-
-        def __init__(
-            self,
-            spec: Union[Iterable, Dict],
-            probabilities=None,
-            time_unit: str = None,
-            randomstream: Any = None,
-            env: "Environment" = None,
-        ):
+        def __init__(self, spec: Union[Iterable, Dict], probabilities=None, time_unit: str = None, randomstream: Any = None, env: "Environment" = None):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self, n: int = None) -> Any:
             """
             Parameters
             ----------
             n : number of samples : int
                 if not specified, specifies just return one sample, as usual
-
+    
                 if specified, return a list of n sampled values from the distribution without replacement.
                 This requires that all probabilities are equal.
-
+    
                 If n > number of values in the Pdf distribution, n is assumed to be the number of values
                 in the distribution.
-
+    
                 If a sampled value is a distribution, a sample from that distribution will be returned.
-
+    
             Returns
             -------
             Sample of the distribution : any (usually float) or list
                 In case n is specified, returns a list of n values
-
+    
             """
-
         def mean(self) -> float:
             """
             Returns
@@ -20176,104 +22205,93 @@ class Environment:
                 if the mean can't be calculated (if not all x-values are scalars or distributions),
                 nan will be returned.
             """
-
     class CumPdf(_Distribution):
         """
         Cumulative Probability distribution function
-
+    
         Parameters
         ----------
         spec : list or tuple
             either
-
+    
             -   if no cumprobabilities specified:
-
+    
                 list with x-values and corresponding cumulative probability
                 (x0, p0, x1, p1, ...xn,pn)
-
+    
             -   if cumprobabilities is specified:
-
+    
                 list with x-values
-
+    
         cumprobabilities : list, tuple or float
             if omitted, spec contains the probabilities
-
+    
             the list (p0, p1, ...pn) contains the cumulative probabilities of the corresponding
             x-values from spec.
-
-
+    
+    
         time_unit : str
             specifies the time unit
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         randomstream : randomstream
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
-
+    
         env : Environment
             environment where the distribution is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         p0<=p1<=..pn>0
-
+    
         all densities are auto scaled according to pn,
         so no need to have pn be 1 or 100.
-
+    
         The x-values can be any type.
-
+    
         If it is a salabim distribution, not the distribution,
         but a sample will be returned when calling sample.
         """
-
         def __init__(
-            self,
-            spec: Iterable,
-            cumprobabilities: Union[float, Iterable] = None,
-            time_unit: str = None,
-            randomstream: Any = None,
-            env: "Environment" = None,
+            self, spec: Iterable, cumprobabilities: Union[float, Iterable] = None, time_unit: str = None, randomstream: Any = None, env: "Environment" = None
         ):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self) -> Any:
             """
             Returns
             -------
             Sample of the distribution : any (usually float)
             """
-
         def mean(self) -> float:
             """
             Returns
@@ -20282,55 +22300,51 @@ class Environment:
                 if the mean can't be calculated (if not all x-values are scalars or distributions),
                 nan will be returned.
             """
-
     class External(_Distribution):
         """
         External distribution function
-
+    
         This distribution allows distributions from other modules, notably random, numpy.random and scipy.stats
         to be used as were they salabim distributions.
-
+    
         Parameters
         ----------
         dis : external distribution
             either
-
+    
             -   random.xxx
-
+    
             -   numpy.random.xxx
-
+    
             -   scipy.stats.xxx
-
+    
         *args : any
             positional arguments to be passed to the dis distribution
-
+    
         **kwargs : any
             keyword arguments to be passed to the dis distribution
-
+    
         time_unit : str
             specifies the time unit
-
+    
             must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             default : no conversion
-
-
+    
+    
         env : Environment
             environment where the distribution is defined
-
+    
             if omitted, default_env will be used
         """
-
         def __init__(self, dis: Any, *args, **kwargs):
             ...
-
         def sample(self) -> Any:
             """
             Returns
             -------
             Sample of the distribution via external distribution method : any (usually float)
             """
-
         def mean(self) -> float:
             """
             Returns
@@ -20338,34 +22352,31 @@ class Environment:
             mean of the distribution : float
                 only available for scipy.stats distribution. Otherwise nan will be returned.
             """
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
     class Distribution(_Distribution):
         """
         Generate a distribution from a string
-
+    
         Parameters
         ----------
         spec : str
@@ -20378,132 +22389,121 @@ class Environment:
               resulting in a Uniform(c1,c2)
             - string containing three floats, separated by commas (c1,c2,c3),
               resulting in a Triangular(c1,c2,c3)
-
+    
         time_unit : str
             Supported time_units:
-
+    
             "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
-
+    
             if spec has a time_unit as well, this parameter is ignored
-
+    
         randomstream : randomstream
             if omitted, random will be used
-
+    
             if used as random.Random(12299)
             it assigns a new stream with the specified seed
-
-
+    
+    
         Note
         ----
         The randomstream in the specifying string is ignored.
-
+    
         It is possible to use expressions in the specification, as long these
         are valid within the context of the salabim module, which usually implies
         a global variable of the salabim package.
-
+    
         Examples
         --------
         Uniform(13)  ==> Uniform(13)
-
+    
         Uni(12,15)   ==> Uniform(12,15)
-
+    
         UNIF(12,15)  ==> Uniform(12,15)
-
+    
         N(12,3)      ==> Normal(12,3)
-
+    
         Tri(10,20).  ==> Triangular(10,20,15)
-
+    
         10.          ==> Constant(10)
-
+    
         12,15        ==> Uniform(12,15)
-
+    
         (12,15)      ==> Uniform(12,15)
-
+    
         Exp(a)       ==> Exponential(100), provided sim.a=100
-
+    
         E(2)         ==> Exponential(2)
         Er(2,3)      ==> Erlang(2,3)
         """
-
-        def __init__(
-            self,
-            spec: str,
-            randomstream: Any = None,
-            time_unit: str = None,
-        ):
+        def __init__(self, spec: str, randomstream: Any = None, time_unit: str = None):
             ...
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints information about the distribution
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def sample(self) -> Any:
             """
             Returns
             -------
             Sample of the  distribution : any (usually float)
             """
-
         def mean(self) -> float:
             """
             Returns
             -------
             Mean of the distribution : float
             """
-
     class State:
         """
         State
-
+    
         Parameters
         ----------
         name : str
             name of the state
-
+    
             if the name ends with a period (.),
             auto serializing will be applied
-
+    
             if the name end with a comma,
             auto serializing starting at 1 will be applied
-
+    
             if omitted, the name will be derived from the class
             it is defined in (lowercased)
-
+    
         value : any, preferably printable
             initial value of the state
-
+    
             if omitted, False
-
+    
         monitor : bool
             if True (default) , the waiters queue and the value are monitored
-
+    
             if False, monitoring is disabled.
-
+    
         type : str
             specifies how the state values are monitored. Using a
             int, uint of float type results in less memory usage and better
             performance. Note that you should avoid the number not to use
             as this is used to indicate 'off'
-
+    
             -  "any" (default) stores values in a list. This allows for
                non numeric values. In calculations the values are
                forced to a numeric value (0 if not possible) do not use -inf
@@ -20517,200 +22517,173 @@ class Environment:
             -  "int64" integer >= -9223372036854775807 <= 9223372036854775807 8 bytes do not use -9223372036854775808
             -  "uint64" integer >= 0 <= 18446744073709551614 8 bytes do not use 18446744073709551615
             -  "float" float 8 bytes do not use -inf
-
+    
         env : Environment
             environment to be used
-
+    
             if omitted, default_env is used
         """
-
-        def __init__(
-            self,
-            name: str = None,
-            value: Any = False,
-            type: str = "any",
-            monitor: bool = True,
-            env: "Environment" = None,
-            *args,
-            **kwargs,
-        ):
+        def __init__(self, name: str = None, value: Any = False, type: str = "any", monitor: bool = True, env: "Environment" = None, *args, **kwargs):
             ...
-
         def setup(self) -> None:
             """
             called immediately after initialization of a state.
-
+    
             by default this is a dummy method, but it can be overridden.
-
+    
             only keyword arguments will be passed
             """
-
         def register(self, registry: List) -> "State":
             """
             registers the state in the registry
-
+    
             Parameters
             ----------
             registry : list
                 list of (to be) registered objetcs
-
+    
             Returns
             -------
             state (self) : State
-
+    
             Note
             ----
             Use State.deregister if state does not longer need to be registered.
             """
-
         def deregister(self, registry: List) -> "State":
             """
             deregisters the state in the registry
-
+    
             Parameters
             ----------
             registry : list
                 list of registered states
-
+    
             Returns
             -------
             state (self) : State
             """
-
         def __repr__(self):
             ...
-
-        def print_histograms(
-            self,
-            exclude: Iterable = (),
-            as_str: bool = False,
-            file: TextIO = None,
-            graph_scale: float = None,
-        ) -> str:
+        def print_histograms(self, exclude: Iterable = (), as_str: bool = False, file: TextIO = None, graph_scale: float = None) -> str:
             """
             print histograms of the waiters queue and the value monitor
-
+    
             Parameters
             ----------
             exclude : tuple or list
                 specifies which queues or monitors to exclude
-
+    
                 default: ()
-
+    
             as_str: bool
                 if False (default), print the histograms
                 if True, return a string containing the histograms
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             graph_scale : float
                 Scale in the graphical representation of the % and cum% (default=80)
-
+    
             Returns
             -------
             histograms (if as_str is True) : str
             """
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints info about the state
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def __call__(self):
             ...
-
         def get(self) -> Any:
             """
             get value of the state
-
+    
             Returns
             -------
             value of the state : any
                 Instead of this method, the state can also be called directly, like
-
-
+    
+    
                 level = sim.State("level")
-
+    
                 ...
-
+    
                 print(level())
-
+    
                 print(level.get())  # identical
-
+    
             """
-
         def set(self, value: Any = True):
             """
             set the value of the state
-
+    
             Parameters
             ----------
             value : any (preferably printable)
                 if omitted, True
-
+    
                 if there is a change, the waiters queue will be checked
                 to see whether there are waiting components to be honored
-
+    
             Note
             ----
             This method is identical to reset, except the default value is True.
             """
-
         def reset(self, value: Any = False):
             """
             reset the value of the state
-
+    
             Parameters
             ----------
             value : any (preferably printable)
                 if omitted, False
-
+    
                 if there is a change, the waiters queue will be checked
                 to see whether there are waiting components to be honored
-
+    
             Note
             ----
             This method is identical to set, except the default value is False.
             """
-
         def trigger(self, value: Any = True, value_after: Any = None, max: Union[float, int] = inf):
             """
             triggers the value of the state
-
+    
             Parameters
             ----------
             value : any (preferably printable)
                 if omitted, True
-
-
+    
+    
             value_after : any (preferably printable)
                 after the trigger, this will be the new value.
-
+    
                 if omitted, return to the the before the trigger.
-
+    
             max : int
                 maximum number of components to be honored for the trigger value
-
+    
                 default: inf
-
+    
             Note
             ----
                 The value of the state will be set to value, then at most
@@ -20718,62 +22691,56 @@ class Environment:
                 the value will be set to value_after and again checked for possible
                 honors.
             """
-
         def _trywait(self, max=inf):
             ...
-
         def monitor(self, value: bool = None) -> None:
             """
             enables/disables the state monitors and value monitor
-
+    
             Parameters
             ----------
             value : bool
                 if True, monitoring will be on.
-
+    
                 if False, monitoring is disabled
-
+    
                 if not specified, no change
-
+    
             Note
             ----
             it is possible to individually control requesters().monitor(),
                 value.monitor()
             """
-
         def all_monitors(self) -> Tuple["Monitor"]:
             """
             returns all monitors belonging to the state
-
+    
             Returns
             -------
             all monitors : tuple of monitors
             """
-
         def reset_monitors(self, monitor: bool = None, stats_only: bool = None) -> None:
             """
             resets the monitor for the state's value and the monitors of the waiters queue
-
+    
             Parameters
             ----------
             monitor : bool
                 if True, monitoring will be on.
-
+    
                 if False, monitoring is disabled
-
+    
                 if omitted, no change of monitoring state
-
+    
             stats_only : bool
                 if True, only statistics will be collected (using less memory, but also less functionality)
-
+    
                 if False, full functionality
-
+    
                 if omittted, no change of stats_only
             """
-
         def _get_value(self):
             ...
-
         def name(self, value: str = None) -> str:
             """
             Parameters
@@ -20781,123 +22748,117 @@ class Environment:
             value : str
                 new name of the state
                 if omitted, no change
-
+    
             Returns
             -------
             Name of the state : str
-
+    
             Note
             ----
             base_name and sequence_number are not affected if the name is changed
-
+    
             All derived named are updated as well.
             """
-
         def base_name(self) -> str:
             """
             Returns
             -------
             base name of the state (the name used at initialization): str
             """
-
         def sequence_number(self) -> int:
             """
             Returns
             -------
             sequence_number of the state : int
                 (the sequence number at initialization)
-
+    
                 normally this will be the integer value of a serialized name,
                 but also non serialized names (without a dot or a comma at the end)
                 will be numbered)
             """
-
         def print_statistics(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints a summary of statistics of the state
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the statistics
                 if True, return a string containing the statistics
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             statistics (if as_str is True) : str
             """
-
         def waiters(self) -> Queue:
             """
             Returns
             -------
             queue containing all components waiting for this state : Queue
             """
-
     class Resource:
         """
         Resource
-
+    
         Parameters
         ----------
         name : str
             name of the resource
-
+    
             if the name ends with a period (.),
             auto serializing will be applied
-
+    
             if the name end with a comma,
             auto serializing starting at 1 will be applied
-
+    
             if omitted, the name will be derived from the class
             it is defined in (lowercased)
-
+    
         capacity : float
             capacity of the resource
-
+    
             if omitted, 1
-
+    
         initial_claimed_quantity : float
             initial claimed quantity. Only allowed to be non zero for anonymous resources
-
+    
             if omitted, 0
-
+    
         anonymous : bool
             anonymous specifier
-
+    
             if True, claims are not related to any component. This is useful
             if the resource is actually just a level.
-
+    
             if False, claims belong to a component.
-
+    
         prememptive : bool
             if True, components with a lower priority will be bumped out of the claimers queue if possible
             if False (default), no bumping
-
+    
         honor_only_first : bool
             if True, only the first component of requesters will be honoured (default: False)
-
+    
         honor_only_highest_priority : bool
             if True, only component with the priority of the first requester will be honoured (default: False)
             Note: only respected if honor_only_first is False
-
+    
         monitor : bool
             if True (default), the requesters queue, the claimers queue,
             the capacity, the available_quantity and the claimed_quantity are monitored
-
+    
             if False, monitoring is disabled.
-
+    
         env : Environment
             environment to be used
-
+    
             if omitted, default_env is used
         """
-
         def __init__(
             self,
             name: str = None,
@@ -20913,52 +22874,48 @@ class Environment:
             **kwargs,
         ):
             ...
-
         def ispreemptive(self) -> bool:
             """
             Returns
             -------
             True if preemptive, False otherwise : bool
             """
-
         def setup(self):
             """
             called immediately after initialization of a resource.
-
+    
             by default this is a dummy method, but it can be overridden.
-
+    
             only keyword arguments are passed
             """
-
         def all_monitors(self) -> Tuple["Monitor"]:
             """
             returns all mononitors belonging to the resource
-
+    
             Returns
             -------
             all monitors : tuple of monitors
             """
-
         def reset_monitors(self, monitor: bool = None, stats_only: bool = None) -> None:
             """
             resets the resource monitors
-
+    
             Parameters
             ----------
             monitor : bool
                 if True, monitoring will be on.
-
+    
                 if False, monitoring is disabled
-
+    
                 if omitted, no change of monitoring state
-
+    
             stats_only : bool
                 if True, only statistics will be collected (using less memory, but also less functionality)
-
+    
                 if False, full functionality
-
+    
                 if omittted, no change of stats_only
-
+    
             Note
             ----
                 it is possible to reset individual monitoring with
@@ -20969,165 +22926,148 @@ class Environment:
                 claimed_quantity.reset() or
                 occupancy.reset()
             """
-
         def print_statistics(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints a summary of statistics of a resource
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the statistics
                 if True, return a string containing the statistics
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             statistics (if as_str is True) : str
             """
-
-        def print_histograms(
-            self,
-            exclude=(),
-            as_str: bool = False,
-            file: TextIO = None,
-            graph_scale: float = None,
-        ) -> str:
+        def print_histograms(self, exclude=(), as_str: bool = False, file: TextIO = None, graph_scale: float = None) -> str:
             """
             prints histograms of the requesters and claimers queue as well as
             the capacity, available_quantity and claimed_quantity timstamped monitors of the resource
-
+    
             Parameters
             ----------
             exclude : tuple or list
                 specifies which queues or monitors to exclude
-
+    
                 default: ()
-
+    
             as_str: bool
                 if False (default), print the histograms
                 if True, return a string containing the histograms
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             graph_scale : float
                 Scale in the graphical representation of the % and cum% (default=80)
-
+    
             Returns
             -------
             histograms (if as_str is True) : str
             """
-
         def monitor(self, value: bool) -> None:
             """
             enables/disables the resource monitors
-
+    
             Parameters
             ----------
             value : bool
                 if True, monitoring is enabled
-
+    
                 if False, monitoring is disabled
-
-
+    
+    
             Note
             ----
             it is possible to individually control monitoring with claimers().monitor()
             and requesters().monitor(), capacity.monitor(), available_quantity.monitor),
             claimed_quantity.monitor() or occupancy.monitor()
             """
-
         def register(self, registry: List) -> "Resource":
             """
             registers the resource in the registry
-
+    
             Parameters
             ----------
             registry : list
                 list of (to be) registered objects
-
+    
             Returns
             -------
             resource (self) : Resource
-
+    
             Note
             ----
             Use Resource.deregister if resource does not longer need to be registered.
             """
-
         def deregister(self, registry: List) -> "Resource":
             """
             deregisters the resource in the registry
-
+    
             Parameters
             ----------
             registry : list
                 list of registered components
-
+    
             Returns
             -------
             resource (self) : Resource
             """
-
         def __repr__(self):
             ...
-
         def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
             """
             prints info about the resource
-
+    
             Parameters
             ----------
             as_str: bool
                 if False (default), print the info
                 if True, return a string containing the info
-
+    
             file: file
                 if None(default), all output is directed to stdout
-
+    
                 otherwise, the output is directed to the file
-
+    
             Returns
             -------
             info (if as_str is True) : str
             """
-
         def _tryrequest(self):
             ...
-
         def release(self, quantity: float = None) -> None:
             """
             releases all claims or a specified quantity
-
+    
             Parameters
             ----------
             quantity : float
                 quantity to be released
-
+    
                 if not specified, the resource will be emptied completely
-
+    
                 for non-anonymous resources, all components claiming from this resource
                 will be released.
-
+    
             Note
             ----
             quantity may not be specified for a non-anonymous resoure
             """
-
         def requesters(self) -> Queue:
             """
             Return
             ------
             queue containing all components with not yet honored requests: Queue
             """
-
         def claimers(self) -> Queue:
             """
             Returns
@@ -21135,19 +23075,17 @@ class Environment:
             queue with all components claiming from the resource: Queue
                 will be an empty queue for an anonymous resource
             """
-
         def set_capacity(self, cap: float) -> None:
             """
             Parameters
             ----------
             cap : float or int
                 capacity of the resource
-
+    
                 this may lead to honoring one or more requests.
-
+    
                 if omitted, no change
             """
-
         def name(self, value: str = None) -> str:
             """
             Parameters
@@ -21155,518 +23093,448 @@ class Environment:
             value : str
                 new name of the resource
                 if omitted, no change
-
+    
             Returns
             -------
             Name of the resource : str
-
+    
             Note
             ----
             base_name and sequence_number are not affected if the name is changed
-
+    
             All derived named are updated as well.
             """
-
         def base_name(self) -> str:
             """
             Returns
             -------
             base name of the resource (the name used at initialization): str
             """
-
         def sequence_number(self) -> int:
             """
             Returns
             -------
             sequence_number of the resource : int
                 (the sequence number at initialization)
-
+    
                 normally this will be the integer value of a serialized name,
                 but also non serialized names (without a dot or a comma at the end)
                 will be numbered)
             """
-
     class PeriodMonitor:
         """
         defines a number of period monitors for a given monitor.
-
+    
         Parameters
         ----------
         parent_monitor : Monitor
             parent_monitor to be divided into several period monitors for given time periods.
-
+    
         periods : list or tuple of floats
             specifies the length of the period intervals.
-
+    
             default: 24 * [1], meaning periods 0-1, 1-2, ..., 23-24
-
+    
             the periods do not have to be all the same.
-
+    
         period_monitor_names : list or tuple of string
             specifies the names of the period monitors.
             It is required that the length of period equals the length of period_monitor_names.
             By default the names are composed of the name of the parent monitor
-
+    
         Note
         ----
         The period monitors can be accessed by indexing the instance of PeriodMonitor.
         """
-
         def new_tally(self, x, weight=1):
             ...
-
         def new_reset(self, monitor=None, stats_only=None):
             ...
-
         def __getitem__(self, i):
             ...
-
         def remove(self):
             """
             removes the period monitor
             """
-
-        def __init__(
-            self,
-            parent_monitor: "Monitor",
-            periods: Iterable = None,
-            period_monitor_names: Iterable = None,
-            env: "Environment" = None,
-        ):
+        def __init__(self, parent_monitor: "Monitor", periods: Iterable = None, period_monitor_names: Iterable = None, env: "Environment" = None):
             ...
-
     class AudioClip:
         def send(command):
             ...
-
         def get_error(error):
             ...
-
         def directsend(*args):
             ...
-
         def __init__(self, filename):
             ...
-
         def volume(self, level):
             ...
-
         def play(self, start=None, end=None):
             ...
-
         def isplaying(self):
             ...
-
         def _mode(self):
             ...
-
         def pause(self):
             ...
-
         def unpause(self):
             ...
-
         def ispaused(self):
             ...
-
         def stop(self):
             ...
-
     def audio_duration(filename: str) -> float:
         """
         duration of a audio file (usually mp3)
-
+    
         Parameters
         ----------
         filename : str
             must be a valid audio file (usually mp3)
-
+    
         Returns
         -------
         duration in seconds : float
-
+    
         Note
         ----
         Only supported on Windows and Pythonista. On other platform returns 0
         """
-
     class AudioSegment:
         def __init__(self, start, t0, filename, duration):
             ...
-
     def colornames() -> Dict:
         """
         available colornames
-
+    
         Returns
         -------
         dict with name of color as key, #rrggbb or #rrggbbaa as value : dict
         """
-
     def salabim_logo_red_white_200():
         ...
-
     def salabim_logo_red_black_200():
         ...
-
     def hex_to_rgb(v):
         ...
-
     def spec_to_image_width(spec):
         ...
-
-    def interpolate(
-        t: float,
-        t0: float,
-        t1: float,
-        v0: Union[float, Iterable],
-        v1: Union[float, Iterable],
-    ) -> Union[float, Tuple]:
+    def interpolate(t: float, t0: float, t1: float, v0: Union[float, Iterable], v1: Union[float, Iterable]) -> Union[float, Tuple]:
         """
         does linear interpolation
-
+    
         Parameters
         ----------
         t : float
             value to be interpolated from
-
+    
         t0: float
             f(t0)=v0
-
+    
         t1: float
             f(t1)=v1
-
+    
         v0: float, list or tuple
             f(t0)=v0
-
+    
         v1: float, list or tuple
             f(t1)=v1
-
+    
             if list or tuple, len(v0) should equal len(v1)
-
+    
         Returns
         -------
         linear interpolation between v0 and v1 based on t between t0 and t1 : float or tuple
-
+    
         Note
         ----
         Note that no extrapolation is done, so if t<t0 ==> v0  and t>t1 ==> v1
-
+    
         This function is heavily used during animation.
         """
-
     def searchsorted(a: Iterable, v: float, side: str = "left") -> int:
         """
         search sorted
-
+    
         Parameters
         ----------
         a : iterable
             iterable to be searched in, must be non descending
-
+    
         v : float
             value to be searched for
-
+    
         side : string
             If 'left' (default) the index of the first suitable location found is given.
             If 'right', return the last such index.
             If there is no suitable index, return either 0 or N (where N is the length of a).
-
+    
         Returns
         -------
         Index where v should be inserted to maintain order : int
-
+    
         Note
         ----
         If numpy is installed, uses numpy.searchstarted
         """
-
     def arange(start: float, stop: float, step: float = 1) -> Iterable:
         """
         arange (like numpy)
-
+    
         Parameters
         ----------
         start : float
             start value
-
+    
         stop: : float
             stop value
-
+    
         step : float
             default: 1
-
+    
         Returns
         -------
         Iterable
-
+    
         Note
         ----
         If numpy is installed, uses numpy.arange
         """
-
-    def linspace(start: float, stop: float, num: int, endpoint: bool = True) -> Iterable:
+    def linspace(start: float, stop: float, num: int = 50, endpoint: bool = True) -> Iterable:
         """
         like numpy.linspace, but returns a list
-
+    
         Parameters
         ----------
         start : float
             start of the space
-
+    
         stop : float
             stop of the space
-
+    
         num : int
             number of points in the space
-
+    
+            default: 50
+    
         endpoint : bool
             if True (default), stop is last point in the space
-
+    
             if False, space ends before stop
         """
-
-    def interp(
-        x: float,
-        xp: Iterable,
-        fp: Iterable,
-        left: float = None,
-        right: float = None,
-    ) -> Any:
+    def interp(x: float, xp: Iterable, fp: Iterable, left: float = None, right: float = None) -> Any:
         """
         linear interpolatation
-
+    
         Parameters
         ----------
         x : float
             target x-value
-
+    
         xp : list of float, tuples or lists
             values on the x-axis
-
+    
         fp : list of float, tuples of lists
             values on the y-axis
-
+    
             should be same length as  p
-
+    
         Returns
         -------
         interpolated value : float, tuple or list
-
+    
         Notes
         -----
         If x < xp[0], fp[0] will be returned
-
+    
         If x > xp[-1], fp[-1] will be returned
-
-
+    
+    
         This function is similar to the numpy interp function.
         """
-
     def screen_width() -> int:
         """
         returns
         -------
         width of the screen (in pixels) : int
         """
-
     def screen_height() -> int:
         """
         returns
         -------
         height of the screen (in pixels) : int
         """
-
     def pad(txt, n):
         ...
-
     def rpad(txt, n):
         ...
-
     def fn(x, length, d):
         ...
-
     def type_to_typecode_off(type):
         ...
-
     def do_force_numeric(arg):
         ...
-
     def deep_flatten(arg):
         ...
-
     def merge_blanks(*arg) -> str:
         """
         merges all non blank elements of l, separated by a blank
-
+    
         Parameters
         ----------
         *arg : elements to be merged : str
-
+    
         Returns
         -------
         string with merged elements of arg : str
         """
-
     def normalize(s):
         ...
-
     def object_to_str(object, quoted=False):
         ...
-
     def return_or_print(result, as_str, file) -> str:
         ...
-
     def de_none(lst):
         ...
-
     def statuses() -> Tuple:
         """
         tuple of all statuses a component can be in, in alphabetical order.
         """
-
-    def random_seed(
-        seed: Hashable = None,
-        randomstream: Any = None,
-        set_numpy_random_seed: bool = True,
-    ):
+    def random_seed(seed: Hashable = None, randomstream: Any = None, set_numpy_random_seed: bool = True):
         """
         Reseeds a randomstream
-
+    
         Parameters
         ----------
         seed : hashable object, usually int
             the seed for random, equivalent to random.seed()
-
+    
             if "*", a purely random value (based on the current time) will be used
             (not reproducable)
-
+    
             if the null string, no action on random is taken
-
+    
             if None (the default), 1234567 will be used.
-
+    
         set_numpy_random_seed : bool
             if True (default), numpy.random.seed() will be called with the given seed.
-
+    
             This is particularly useful when using External distributions.
-
+    
             If numpy is not installed, this parameter is ignored
-
+    
             if False, numpy.random.seed is not called.
-
+    
         randomstream: randomstream
             randomstream to be used
-
+    
             if omitted, random will be used
-
+    
         """
-
     def resize_with_pad(im, target_width, target_height):
         """
         Resize PIL image keeping ratio and using black background.
         """
-
     class Animate3dObj(Animate3dBase):
         """
         Creates a 3D animation object from an .obj file
-
+    
         Parameters
         ----------
         filename : str or Path
             obj file to be read (default extension .obj)
-
+    
             if there are .mtl or .jpg required by this file, they should be available
-
+    
         x : float
             x position (default 0)
-
+    
         y : float
             y position (default 0)
-
+    
         z : float
             z position (default 0)
-
+    
         x_angle : float
             angle along x axis (default: 0)
-
+    
         y_angle : float
             angle along y axis (default: 0)
-
+    
         z_angle : float
             angle along z axis (default: 0)
-
+    
         x_translate : float
             translation in x direction (default: 0)
-
+    
         y_translate : float
             translation in y direction (default: 0)
-
+    
         z_translate : float
             translation in z direction (default: 0)
-
+    
         x_scale : float
             scaling in x direction (default: 1)
-
+    
         y_translate : float
             translation in y direction (default: 1)
-
+    
         z_translate : float
             translation in z direction (default: 1)
-
+    
         show_warnings : bool
             as pywavefront does not support all obj commands, reading the file sometimes leads
             to (many) warning log messages
-
+    
             with this flag, they can be turned off (the deafult)
-
+    
         visible : bool
             visible
-
+    
             if False, animation object is not shown, shown otherwise
             (default True)
-
+    
         layer : int
             layer value
-
+    
             lower layer values are displayed later in the frame (default 0)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: my_x
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-
-
+    
+    
         Note
         ----
         This method requires the pywavefront and pyglet module to be installed
         """
-
         def __init__(
             self,
             filename: Union[str, Callable],
@@ -21691,78 +23559,75 @@ class Environment:
             **kwargs,
         ):
             ...
-
         def draw(self, t):
             ...
-
     class Animate3dRectangle(Animate3dBase):
         """
         Creates a 3D rectangle
-
+    
         Parameters
         ----------
         x0 : float
             lower left x position (default 0)
-
+    
         y0 : float
             lower left y position (default 0)
-
+    
         x1 : float
             upper right x position (default 1)
-
+    
         y1 : float
             upper right y position (default 1)
-
+    
         z : float
             z position of rectangle (default 0)
-
+    
         color : colorspec
             color of the rectangle (default "white")
-
+    
         visible : bool
             visible
-
+    
             if False, animation object is not shown, shown otherwise
             (default True)
-
+    
         layer : int
              layer value
-
+    
              lower layer values are displayed later in the frame (default 0)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: my_x
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-
+    
         """
-
         def __init__(
             self,
             x0: Union[float, Callable] = 0,
@@ -21779,81 +23644,78 @@ class Environment:
             **kwargs,
         ):
             ...
-
         def draw(self, t):
             ...
-
     class Animate3dLine(Animate3dBase):
         """
         Creates a 3D line
-
+    
         Parameters
         ----------
         x0 : float
             x coordinate of start point (default 0)
-
+    
         y0 : float
             y coordinate of start point (default 0)
-
+    
         z0 : float
             z coordinate of start point (default 0)
-
+    
         x1 : float
             x coordinate of end point (default 0)
-
+    
         y1 : float
             y coordinate of end point (default 0)
-
+    
         z1 : float
             z coordinate of end point (default 0)
-
+    
         color : colorspec
             color of the line (default "white")
-
+    
         visible : bool
             visible
-
+    
             if False, animation object is not shown, shown otherwise
             (default True)
-
+    
         layer : int
              layer value
-
+    
              lower layer values are displayed later in the frame (default 0)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: my_x
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-
+    
         """
-
         def __init__(
             self,
             x0: Union[float, Callable] = 0,
@@ -21871,72 +23733,69 @@ class Environment:
             **kwargs,
         ):
             ...
-
         def draw(self, t):
             ...
-
     class Animate3dGrid(Animate3dBase):
         """
         Creates a 3D grid
-
+    
         Parameters
         ----------
         x_range : iterable
             x coordinates of grid lines (default [0])
-
+    
         y_range : iterable
             y coordinates of grid lines (default [0])
-
+    
         z_range : iterable
             z coordinates of grid lines (default [0])
-
+    
         color : colorspec
             color of the line (default "white")
-
+    
         visible : bool
             visible
-
+    
             if False, animation object is not shown, shown otherwise
             (default True)
-
+    
         layer : int
              layer value
-
+    
              lower layer values are displayed later in the frame (default 0)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: my_x
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-
+    
         """
-
         def __init__(
             self,
             x_range: Union[Iterable[float], Callable] = [0],
@@ -21951,116 +23810,113 @@ class Environment:
             **kwargs,
         ):
             ...
-
         def draw(self, t):
             ...
-
     class Animate3dBox(Animate3dBase):
         """
         Creates a 3D box
-
+    
         Parameters
         ----------
         x_len : float
             length of the box in x direction (deffult 1)
-
+    
         y_len : float
             length of the box in y direction (default 1)
-
+    
         z_len : float
             length of the box in z direction (default 1)
-
+    
         x : float
             x position of the box (default 0)
-
+    
         y : float
             y position of the box (default 0)
-
+    
         z : float
             z position of the box (default 0)
-
+    
         z_angle : float
             angle around the z-axis (default 0)
-
+    
         x_ref : int
             if -1, the x parameter refers to the 'end' of the box
-
+    
             if  0, the x parameter refers to the center of the box (default)
-
+    
             if  1, the x parameter refers to the 'start' of the box
-
+    
         y_ref : int
             if -1, the y parameter refers to the 'end' of the box
-
+    
             if  0, the y parameter refers to the center of the box (default)
-
+    
             if  1, the y parameter refers to the 'start' of the box
-
+    
         z_ref : int
             if -1, the z parameter refers to the 'end' of the box
-
+    
             if  0, the z parameter refers to the center of the box (default)
-
+    
             if  1, the z parameter refers to the 'start' of the box
-
+    
         color : colorspec
             color of the box (default "white")
-
+    
             if the color is "" (or the alpha is 0), the sides will not be colored at all
-
+    
         edge_color : colorspec
             color of the edges of the (default "")
-
+    
             if the color is "" (or the alpha is 0), the edges will not be drawn at all
-
+    
         shaded : bool
             if False (default), all sides will be colored with color
             if True, the various sides will have a sligtly different darkness, thus resulting in a pseudo shaded object
-
+    
         visible : bool
             visible
-
+    
             if False, animation object is not shown, shown otherwise
             (default True)
-
+    
         layer : int
              layer value
-
+    
              lower layer values are displayed later in the frame (default 0)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: my_x
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-
+    
         """
-
         def __init__(
             self,
             x_len: Union[float, Callable] = 1,
@@ -22084,108 +23940,105 @@ class Environment:
             **kwargs,
         ):
             ...
-
         def draw(self, t):
             ...
-
     class Animate3dBar(Animate3dBase):
         """
         Creates a 3D bar between two given points
-
+    
         Parameters
         ----------
         x0 : float
             x coordinate of start point (default 0)
-
+    
         y0 : float
             y coordinate of start point (default 0)
-
+    
         z0 : float
             z coordinate of start point (default 0)
-
+    
         x1 : float
             x coordinate of end point (default 0)
-
+    
         y1 : float
             y coordinate of end point (default 0)
-
+    
         z1 : float
             z coordinate of end point (default 0)
-
+    
         color : colorspec
             color of the bar (default "white")
-
+    
             if the color is "" (or the alpha is 0), the sides will not be colored at all
-
+    
         edge_color : colorspec
             color of the edges of the (default "")
-
+    
             if the color is "" (or the alpha is 0), the edges will not be drawn at all
-
+    
         shaded : bool
             if False (default), all sides will be colored with color
             if True, the various sides will have a sligtly different darkness, thus resulting in a pseudo shaded object
-
+    
         bar_width : float
             width of the bar (default 1)
-
+    
         bar_width_2 : float
             if not specified both sides will have equal width (bar_width)
-
+    
             if specified, the bar will have width bar_width and bar_width_2
-
+    
         rotation_angle : float
             rotation of the bar in degrees (default 0)
-
+    
         show_lids : bool
             if True (default), show the 'lids'
-
+    
             if False, it's a hollow bar
-
+    
         visible : bool
             visible
-
+    
             if False, animation object is not shown, shown otherwise
             (default True)
-
+    
         layer : int
              layer value
-
+    
              lower layer values are displayed later in the frame (default 0)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: my_x
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-
+    
         """
-
         def __init__(
             self,
             x0: Union[float, Callable] = 0,
@@ -22209,96 +24062,93 @@ class Environment:
             **kwargs,
         ):
             ...
-
         def draw(self, t):
             ...
-
     class Animate3dCylinder(Animate3dBase):
         """
         Creates a 3D cylinder between two given points
-
+    
         Parameters
         ----------
         x0 : float
             x coordinate of start point (default 0)
-
+    
         y0 : float
             y coordinate of start point (default 0)
-
+    
         z0 : float
             z coordinate of start point (default 0)
-
+    
         x1 : float
             x coordinate of end point (default 0)
-
+    
         y1 : float
             y coordinate of end point (default 0)
-
+    
         z1 : float
             z coordinate of end point (default 0)
-
+    
         color : colorspec
             color of the cylinder (default "white")
-
+    
         radius : float
             radius of the cylinder (default 1)
-
+    
         number_of_sides : int
             number of sides of the cylinder (default 8)
-
+    
             must be >= 3
-
+    
         rotation_angle : float
             rotation of the bar in degrees (default 0)
-
+    
         show_lids : bool
             if True (default), the lids will be drawn
             if False, tyhe cylinder will be open at both sides
-
+    
         visible : bool
             visible
-
+    
             if False, animation object is not shown, shown otherwise
             (default True)
-
+    
         layer : int
              layer value
-
+    
              lower layer values are displayed later in the frame (default 0)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: my_x
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-
+    
         """
-
         def __init__(
             self,
             x0: Union[float, Callable] = 0,
@@ -22320,75 +24170,72 @@ class Environment:
             **kwargs,
         ):
             ...
-
         def draw(self, t):
             ...
-
     class Animate3dSphere(Animate3dBase):
         """
         Creates a 3D box
-
+    
         Parameters
         ----------
         radius : float
             radius of the sphere
-
+    
         x : float
             x position of the box (default 0)
-
+    
         y : float
             y position of the box (default 0)
-
+    
         z : float
             z position of the box (default 0)
-
+    
         color : colorspec
             color of the sphere (default "white")
-
+    
         visible : bool
             visible
-
+    
             if False, animation object is not shown, shown otherwise
             (default True)
-
+    
         layer : int
              layer value
-
+    
              lower layer values are displayed later in the frame (default 0)
-
+    
         arg : any
             this is used when a parameter is a function with two parameters, as the first argument or
             if a parameter is a method as the instance
-
+    
             default: self (instance itself)
-
+    
         parent : Component
             component where this animation object belongs to (default None)
-
+    
             if given, the animation object will be removed
             automatically when the parent component is no longer accessible
-
+    
         env : Environment
             environment where the component is defined
-
+    
             if omitted, default_env will be used
-
+    
         Note
         ----
         All parameters, apart from parent, arg and env can be specified as:
-
+    
         - a scalar, like 10
-
+    
         - a function with zero arguments, like lambda: my_x
-
+    
         - a function with one argument, being the time t, like lambda t: t + 10
-
+    
         - a function with two parameters, being arg (as given) and the time, like lambda comp, t: comp.state
-
+    
         - a method instance arg for time t, like self.state, actually leading to arg.state(t) to be called
-
+    
         """
-
         def __init__(
             self,
             radius: Union[float, Callable] = 1,
@@ -22406,10 +24253,8 @@ class Environment:
             **kwargs,
         ):
             ...
-
         def draw(self, t):
             ...
-
     def draw_bar3d(
         x0=0,
         y0=0,
@@ -22429,7 +24274,7 @@ class Environment:
     ):
         """
         draws a 3d bar (should be added to the event loop by encapsulating with Animate3dBase)
-
+    
         Parameters
         ----------
         x0 : int, optional
@@ -22463,23 +24308,10 @@ class Environment:
         show_lids : bool, optional
             [description], by default True
         """
-
-    def draw_cylinder3d(
-        x0=0,
-        y0=0,
-        z0=0,
-        x1=1,
-        y1=1,
-        z1=1,
-        gl_color=(1, 1, 1),
-        radius=1,
-        number_of_sides=8,
-        rotation_angle=0,
-        show_lids=True,
-    ):
+    def draw_cylinder3d(x0=0, y0=0, z0=0, x1=1, y1=1, z1=1, gl_color=(1, 1, 1), radius=1, number_of_sides=8, rotation_angle=0, show_lids=True):
         """
         draws a 3d cylinder (should be added to the event loop by encapsulating with Animate3dBase)
-
+    
         Parameters
         ----------
         x0 : int, optional
@@ -22505,11 +24337,10 @@ class Environment:
         show_lids : bool, optional
             [description], by default True
         """
-
     def draw_line3d(x0=0, y0=0, z0=0, x1=1, y1=1, z1=1, gl_color=(1, 1, 1)):
         """
         draws a 3d line (should be added to the event loop by encapsulating with Animate3dBase)
-
+    
         Parameters
         ----------
         x0 : int, optional
@@ -22527,11 +24358,10 @@ class Environment:
         gl_color : tuple, optional
             [description], by default (1, 1, 1)
         """
-
     def draw_rectangle3d(x0=0, y0=0, z=0, x1=1, y1=1, gl_color=(1, 1, 1)):
         """
         draws a 3d rectangle (should be added to the event loop by encapsulating with Animate3dBase)
-
+    
         Parameters
         ----------
         x0 : int, optional
@@ -22547,7 +24377,6 @@ class Environment:
         gl_color : tuple, optional
             [description], by default (1, 1, 1)
         """
-
     def draw_box3d(
         x_len=1,
         y_len=1,
@@ -22570,7 +24399,7 @@ class Environment:
     ):
         """
         draws a 3d box (should be added to the event loop by encapsulating with Animate3dBase)
-
+    
         Parameters
         ----------
         x_len : int, optional
@@ -22610,267 +24439,232 @@ class Environment:
         _show_lids : bool, optional
             [description], by default True
         """
-
-    def draw_sphere3d(
-        x=0,
-        y=0,
-        z=0,
-        radius=1,
-        number_of_slices=32,
-        number_of_stacks=None,
-        gl_color=(1, 1, 1),
-    ):
+    def draw_sphere3d(x=0, y=0, z=0, radius=1, number_of_slices=32, number_of_stacks=None, gl_color=(1, 1, 1)):
         """
         draws a 3d spere (should be added to the event loop by encapsulating with Animate3dBase)
-
+    
         Parameters
         ----------
         radius : float, optional
         """
-
     def fonts():
         ...
-
     def standardfonts():
         ...
-
     def getfont(fontname, fontsize):
         ...
-
     def show_fonts() -> None:
         """
         show (print) all available fonts on this machine
         """
-
     def show_colornames() -> None:
         """
         show (print) all available color names and their value.
         """
-
     def arrow_polygon(size: float) -> Tuple:
         """
         creates a polygon tuple with a centered arrow for use with sim.Animate
-
+    
         Parameters
         ----------
         size : float
             length of the arrow
         """
-
     def centered_rectangle(width: float, height: float) -> Tuple:
         """
         creates a rectangle tuple with a centered rectangle for use with sim.Animate
-
+    
         Parameters
         ----------
         width : float
             width of the rectangle
-
+    
         height : float
             height of the rectangle
         """
-
     def regular_polygon(radius: float = 1, number_of_sides: int = 3, initial_angle: float = 0) -> List:
         """
         creates a polygon tuple with a regular polygon (within a circle) for use with sim.Animate
-
+    
         Parameters
         ----------
         radius : float
             radius of the corner points of the polygon
-
+    
             default : 1
-
+    
         number_of_sides : int
             number of sides (corners)
-
+    
             must be >= 3
-
+    
             default : 3
-
+    
         initial_angle : float
             angle of the first corner point, relative to the origin
-
+    
             default : 0
         """
-
     def can_animate(try_only: bool = True) -> bool:
         """
         Tests whether animation is supported.
-
+    
         Parameters
         ----------
         try_only : bool
             if True (default), the function does not raise an error when the required modules cannot be imported
-
+    
             if False, the function will only return if the required modules could be imported.
-
+    
         Returns
         -------
         True, if required modules could be imported, False otherwise : bool
         """
-
     def can_animate3d(try_only: bool = True) -> bool:
         """
         Tests whether 3d animation is supported.
-
+    
         Parameters
         ----------
         try_only : bool
             if True (default), the function does not raise an error when the required modules cannot be imported
-
+    
             if False, the function will only return if the required modules could be imported.
-
+    
         Returns
         -------
         True, if required modules were imported, False otherwise : bool
         """
-
     def can_video(try_only: bool = True) -> bool:
         """
         Tests whether video is supported.
-
+    
         Parameters
         ----------
         try_only : bool
             if True (default), the function does not raise an error when the required modules cannot be imported
-
+    
             if False, the function will only return if the required modules could be imported.
-
+    
         Returns
         -------
         True, if required modules could be imported, False otherwise : bool
         """
-
     def has_numpy() -> bool:
         """
         Tests whether numpy is installed. If so, the global numpy is set accordingly.
         If not, the global numpy is set to False.
-
+    
         Returns
         -------
         True, if numpy is installed. False otherwise.
         """
-
     def video_duration(spec: Union["PIL.Image.Image", str]) -> float:
         """
         returns the duration of an image specification
-
+    
         Parameters
         ----------
         spec : str or PIL.Image.Image
-
+    
         Returns
         -------
         Length of file/URL specified : float
-
+    
         If not animated, 0 will be returned
         """
-
     class ImageContainer:
         """
         based on https://gist.github.com/BigglesZX/4016539
         """
-
         def __new__(cls, spec):
             ...
-
         def init(self, spec):
             ...
-
         def duration(self):
             ...
-
         def get_image(self, t, repeat, pingpong, t_from, t_to):
             ...
-
     def default_env() -> "Environment":
         """
         Returns
         -------
         default environment : Environment
         """
-
     @contextlib.contextmanager
     def over3d(val: bool = True):
         """
         context manager to change temporarily default_over3d
-
+    
         Parameters
         ----------
         val : bool
             temporary value of default_over3d
-
+    
             default: True
-
+    
         Notes
         -----
         Use as ::
-
+    
             with over3d():
                 an = AnimateText('test')
         """
-
     def default_over3d(val: bool = None):
         """
         Set default_over3d
-
+    
         Parameters
         ----------
         val : bool
             if not None, set the default_over3d to val
-
+    
         Returns
         -------
         Current (new) value of default_over3d
         """
-
     @contextlib.contextmanager
     def cap_now(val: bool = True):
         """
         context manager to change temporarily default_cap_now
-
+    
         Parameters
         ----------
         val : bool
             temporary value of default_cap_now
-
+    
             default: True
-
+    
         Notes
         -----
         Use as ::
-
+    
             with cap_now():
                 an = AnimateText('test')
         """
-
     def default_cap_now(val: bool = None) -> bool:
         """
         Set default_cap_now
-
+    
         Parameters
         ----------
         val : bool
             if not None, set the default_cap_now to val
-
+    
         Returns
         -------
         Current (new) value of default_cap_now
         """
-
     def reset() -> None:
         """
         resets global variables
-
+    
         used internally at import of salabim
-
+    
         might be useful for REPLs or for Pythonista
         """
-
     def set_environment_aliases():
         ...
-
     # ENVIRONMENT ANNOTATION END
 
     _nameserialize = {}
@@ -22893,6 +24687,20 @@ class Environment:
     def __repr__(self):
         return object_to_str(self) + " (" + self.name() + ")"
 
+    def yieldless(self) -> bool:
+        """
+        yieldless status
+
+        Returns
+        -------
+        yieldless status: bool
+
+        Note
+        ----
+        It is not possible to change the yieldless status
+        """
+        return self._yieldless
+
     def animation_pre_tick(self, t: float) -> None:
         """
         called just before the animation object loop.
@@ -22904,7 +24712,8 @@ class Environment:
         t : float
             Current (animation) time.
         """
-        return
+        if self._ui:
+            self._handle_ui_event()
 
     def animation_post_tick(self, t: float) -> None:
         """
@@ -22917,7 +24726,6 @@ class Environment:
         t : float
             Current (animation) time.
         """
-        return
 
     def animation_pre_tick_sys(self, t: float) -> None:
         for ao in self.sys_objects.copy():  # copy required as ao's may be removed due to keep
@@ -23007,11 +24815,7 @@ class Environment:
                 build_times[prop].append(offset)
 
             for prop in props:
-                setattr(
-                    self.view,
-                    prop,
-                    lambda arg, t, prop=prop: interp(t, times[prop], values[prop]),
-                )  # default argument prop is evaluated at start!
+                setattr(self.view, prop, lambda arg, t, prop=prop: interp(t, times[prop], values[prop]))  # default argument prop is evaluated at start!
 
             for line in spec.split("\n"):
                 line = line.strip()
@@ -23041,15 +24845,7 @@ class Environment:
                         values[prop].append(pending_value)
                         times[prop].append(pending_time)
 
-                    values[prop].append(
-                        interpolate(
-                            time,
-                            times[prop][-1],
-                            pending_time,
-                            values[prop][-1],
-                            pending_value,
-                        )
-                    )
+                    values[prop].append(interpolate(time, times[prop][-1], pending_time, values[prop][-1], pending_value))
                     times[prop].append(time)
                     pending_value = value
                     pending_time = time + lag
@@ -23197,37 +24993,22 @@ class Environment:
         self._bind("<Right>", functools.partial(self.camera_rotate, delta_angle=+1))
 
         self._bind("<Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=0.9))
-        self._bind(
-            "<Down>",
-            functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1 / 0.9),
-        )
+        self._bind("<Down>", functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1 / 0.9))
 
         self._bind("z", functools.partial(self.camera_zoom, factor_xy=1, factor_z=0.9))
         self._bind("Z", functools.partial(self.camera_zoom, factor_xy=1, factor_z=1 / 0.9))
 
         self._bind("<Shift-Up>", functools.partial(self.camera_zoom, factor_xy=0.9, factor_z=1))
-        self._bind(
-            "<Shift-Down>",
-            functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1),
-        )
+        self._bind("<Shift-Down>", functools.partial(self.camera_zoom, factor_xy=1 / 0.9, factor_z=1))
 
         self._bind("<Alt-Left>", functools.partial(self.camera_xy_eye, x_dis=-10, y_dis=0))
         self._bind("<Alt-Right>", functools.partial(self.camera_xy_eye, x_dis=10, y_dis=0))
         self._bind("<Alt-Down>", functools.partial(self.camera_xy_eye, x_dis=0, y_dis=-10))
         self._bind("<Alt-Up>", functools.partial(self.camera_xy_eye, x_dis=0, y_dis=10))
 
-        self._bind(
-            "<Control-Left>",
-            functools.partial(self.camera_xy_center, x_dis=-10, y_dis=0),
-        )
-        self._bind(
-            "<Control-Right>",
-            functools.partial(self.camera_xy_center, x_dis=10, y_dis=0),
-        )
-        self._bind(
-            "<Control-Down>",
-            functools.partial(self.camera_xy_center, x_dis=0, y_dis=-10),
-        )
+        self._bind("<Control-Left>", functools.partial(self.camera_xy_center, x_dis=-10, y_dis=0))
+        self._bind("<Control-Right>", functools.partial(self.camera_xy_center, x_dis=10, y_dis=0))
+        self._bind("<Control-Down>", functools.partial(self.camera_xy_center, x_dis=0, y_dis=-10))
         self._bind("<Control-Up>", functools.partial(self.camera_xy_center, x_dis=0, y_dis=10))
 
         self._bind("o", functools.partial(self.camera_field_of_view, factor=0.9))
@@ -23258,14 +25039,7 @@ class Environment:
             over3d = default_over3d()
         top = self.height3d() - 40 if over3d else self.height() - 90
         for i, prop in enumerate("x_eye y_eye z_eye x_center y_center z_center field_of_view_y".split()):
-            ao = AnimateRectangle(
-                spec=(0, 0, 75, 35),
-                fillcolor="30%gray",
-                x=5 + i * 80,
-                y=top,
-                screen_coordinates=True,
-                over3d=over3d,
-            )
+            ao = AnimateRectangle(spec=(0, 0, 75, 35), fillcolor="30%gray", x=5 + i * 80, y=top, screen_coordinates=True, over3d=over3d)
             ao = AnimateText(
                 text=lambda arg, t: f"{arg.label}",
                 x=5 + i * 80 + 70,
@@ -23323,6 +25097,14 @@ class Environment:
 
         for advanced use with animation / GUI loops
         """
+        if self._ui:
+            if self._pause_at_each_step:
+                animate = self._ui_window["-ANIMATE-"].get()
+                self.animate(True)
+                self.paused(True)
+                self._ui_window["-ANIMATE-"].update(animate)
+
+            self._handle_ui_event()
         try:
             if not self._current_component._skip_standby:
                 if len(self.env._pendingstandbylist) > 0:
@@ -23339,20 +25121,26 @@ class Environment:
                                 s0=c.lineno_txt(),
                                 _optional=self._suppress_trace_standby,
                             )
-                        try:
-                            next(c._process)
+                        if self.env._yieldless:
+                            c._glet.switch()
+                            if c._glet.dead:
+                                self._terminate(c)
                             return
-                        except TypeError:
-                            c._process(**c._process_kwargs)
-                            self._terminate(c)
-                            return
-                        except StopIteration:
-                            self._terminate(c)
-                            return
+                        else:
+                            try:
+                                next(c._process)
+                                return
+                            except TypeError:
+                                c._process(**c._process_kwargs)
+                                self._terminate(c)
+                                return
+                            except StopIteration:
+                                self._terminate(c)
+                                return
 
             if len(self.env._standbylist) > 0:
                 self._pendingstandbylist = list(self.env._standbylist)
-                self._standbylist = []
+                self.env._standbylist = []
 
             if self._event_list:
                 (t, priority, seq, c, return_value) = heapq.heappop(self._event_list)
@@ -23372,53 +25160,56 @@ class Environment:
             c._scheduled_time = inf
             if self._trace:
                 if c.overridden_lineno:
-                    self.print_trace(
-                        self.time_to_str(self._now - self._offset),
-                        c.name(),
-                        "current",
-                        s0=c.overridden_lineno,
-                    )
+                    self.print_trace(self.time_to_str(self._now - self._offset), c.name(), "current", s0=c.overridden_lineno)
                 else:
-                    self.print_trace(
-                        self.time_to_str(self._now - self._offset),
-                        c.name(),
-                        "current",
-                        s0=c.lineno_txt(),
-                    )
+                    self.print_trace(self.time_to_str(self._now - self._offset), c.name(), "current", s0=c.lineno_txt())
             if c == self._main:
                 self.running = False
                 return
             c._check_fail()
-            if c._process_isgenerator:
-                try:
-                    try:
-                        c._process.send(return_value)
-                    except TypeError:
-                        c._process.send(None)
-                except StopIteration:
+            if self.env._yieldless:
+                c._glet.switch()
+                if c._glet.dead:
                     self._terminate(c)
             else:
-                c._process(**c._process_kwargs)
-                self._terminate(c)
+                if c._process_isgenerator:
+                    try:
+                        try:
+                            c._process.send(return_value)
+                        except TypeError as e:
+                            if "just-started" in str(e):  # only do this for just started generators
+                                c._process.send(None)
+                            else:
+                                raise e
+                    except StopIteration:
+                        self._terminate(c)
+                else:
+                    c._process(**c._process_kwargs)
+
+                    self._terminate(c)
         except Exception as e:
             if self._animate:
                 self.an_quit()
             raise e
 
     def _terminate(self, c):
-        if c._process_isgenerator:
-            if self._trace and not self._suppress_trace_linenumbers:
-                gi_code = c._process.gi_code
-                gs = inspect.getsourcelines(gi_code)
-                s0 = c.overridden_lineno or self.filename_lineno_to_str(gi_code.co_filename, len(gs[0]) + gs[1] - 1) + "+"
-            else:
-                s0 = None
+        if self.env._yieldless:
+            s0 = ""
         else:
-            if self._trace and not self._suppress_trace_linenumbers:
-                gs = inspect.getsourcelines(c._process)
-                s0 = c.overridden_lineno or self.filename_lineno_to_str(c._process.__code__.co_filename, len(gs[0]) + gs[1] - 1) + "+"
+            if c._process_isgenerator:
+                if self._trace and not self._suppress_trace_linenumbers:
+                    gi_code = c._process.gi_code
+                    gs = inspect.getsourcelines(gi_code)
+                    s0 = c.overridden_lineno or self.filename_lineno_to_str(gi_code.co_filename, len(gs[0]) + gs[1] - 1) + "+"
+                else:
+                    s0 = None
             else:
-                s0 = None
+                if self._trace and not self._suppress_trace_linenumbers:
+                    gs = inspect.getsourcelines(c._process)
+                    s0 = c.overridden_lineno or self.filename_lineno_to_str(c._process.__code__.co_filename, len(gs[0]) + gs[1] - 1) + "+"
+                else:
+                    s0 = None
+
         for r in list(c._claims):
             c._release(r, s0=s0)
         if self._trace:
@@ -23434,43 +25225,10 @@ class Environment:
     def _print_event_list(self, s: str = "") -> None:
         print("eventlist ", s)
         for t, priority, sequence, comp, return_value in self._event_list:
-            print(
-                "    ",
-                self.time_to_str(t),
-                comp.name(),
-                "priority",
-                priority,
-                "return_value",
-                return_value,
-            )
+            print("    ", self.time_to_str(t), comp.name(), "priority", priority, "return_value", return_value)
 
     def on_closing(self):
         self.an_quit()
-
-    def get_set_paused(self, value=None):
-        """
-        paused
-
-        Parameters
-        ----------
-        value : bool
-            new paused value
-
-            if not specified, no change
-
-        Returns
-        -------
-        paused status : bool
-
-        Note
-        ----
-        if changed, set_start_animation() will be issued as well
-        """
-        if value is not None:
-            if bool(value) != self.paused:
-                self.paused = bool(value)
-                self.set_start_animation()
-        return self.paused
 
     def animation_parameters(
         self,
@@ -23736,6 +25494,8 @@ class Environment:
 
         if synced is not None:
             self._synced = synced
+            if self._ui:
+                self._ui_window["-SYNCED-"].update(synced)
             self.set_start_animation()
 
         if width is not None:
@@ -23912,6 +25672,8 @@ class Environment:
             if animate != self._animate:
                 frame_changed = True
                 self._animate = animate
+                if self._ui:
+                    self._ui_window["-ANIMATE-"].update(animate)
 
         self._scale = self._width / (self._x1 - self._x0)
         self._y1 = self._y0 + self._height / self._scale
@@ -23978,15 +25740,7 @@ class Environment:
                     elif extension == ".png" and not ("*" in video_path.stem):
                         self._video_out = "png"
                         self._images = []
-                    elif extension.lower() in (
-                        ".jpg",
-                        ".png",
-                        ".bmp",
-                        ".ico",
-                        ".tiff",
-                        ".gif",
-                        ".webp",
-                    ):
+                    elif extension.lower() in (".jpg", ".png", ".bmp", ".ico", ".tiff", ".gif", ".webp"):
                         if "*" in video_path.stem:
                             if video.count("*") > 1:
                                 raise ValueError("more than one * found in " + video)
@@ -24013,12 +25767,7 @@ class Environment:
                         if video_path.is_file():
                             video_path.unlink()
                         self._video_name_temp = tempfile.NamedTemporaryFile(suffix=extension, delete=False).name
-                        self._video_out = cv2.VideoWriter(
-                            self._video_name_temp,
-                            fourcc,
-                            self._fps,
-                            (self._video_width_real, self._video_height_real),
-                        )
+                        self._video_out = cv2.VideoWriter(self._video_name_temp, fourcc, self._fps, (self._video_width_real, self._video_height_real))
                         self.frame_number = 0
                         self.audio_segments = []
                         if self._audio is not None:
@@ -24055,7 +25804,7 @@ class Environment:
 
                     g.animation_env = self
                     self._t = self._now  # for the call to set_start_animation
-                    self.paused = False
+                    self._paused = False
                     self.set_start_animation()
 
                     if Pythonista:
@@ -24090,7 +25839,7 @@ class Environment:
 
                     self.uninstall_uios()  # this causes all ui objects to be (re)installed
 
-                    if self._show_menu_buttons:
+                    if self._show_menu_buttons and not self._ui:
                         self.an_menu_buttons()
         if visible is not None:
             if Pythonista:
@@ -24112,12 +25861,7 @@ class Environment:
                     if Pythonista:
                         import images2gif  # type: ignore
 
-                        images2gif.writeGif(
-                            self._video_name,
-                            self._images,
-                            duration=1 / self._real_fps,
-                            repeat=self._video_repeat,
-                        )
+                        images2gif.writeGif(self._video_name, self._images, duration=1 / self._real_fps, repeat=self._video_repeat)
                     else:
                         if self._video_repeat == 1:  # in case of repeat == 1, loop should not be specified (otherwise, it might show twice)
                             self._images[0].save(
@@ -24147,11 +25891,7 @@ class Environment:
                 for image in self._images:
                     with io.BytesIO() as png_file:
                         image.save(png_file, "PNG", optimize=True)
-                        this_apng.append(
-                            _APNG.PNG.from_bytes(png_file.getvalue()),
-                            delay=1,
-                            delay_den=int(self.fps()),
-                        )
+                        this_apng.append(_APNG.PNG.from_bytes(png_file.getvalue()), delay=1, delay_den=int(self.fps()))
                 this_apng.save(self._video_name)
                 del self._images
 
@@ -24189,14 +25929,7 @@ class Environment:
             for ao in an_objects:
                 ao.make_pil_image(self.t())
                 if ao._image_visible and (include_topleft or not ao.getattr("in_topleft", False)):
-                    image.paste(
-                        ao._image,
-                        (
-                            int(ao._image_x),
-                            int(self._height - ao._image_y - ao._image.size[1]),
-                        ),
-                        ao._image,
-                    )
+                    image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image)
 
         return image.convert(mode)
 
@@ -24262,10 +25995,7 @@ class Environment:
                         + " .start = "
                         + str(audio_segment.start)
                     )
-                end = min(
-                    audio_segment.duration,
-                    audio_segment.t1 - audio_segment.t0 + audio_segment.start,
-                )
+                end = min(audio_segment.duration, audio_segment.t1 - audio_segment.t0 + audio_segment.start)
                 if end > audio_segment.start:
                     if audio_segment.t0 - last_t > 0:
                         command = (
@@ -24305,21 +26035,7 @@ class Environment:
                     with open(tempdir + "\\temp.txt", "r") as f:
                         print(f.read())
 
-                command = (
-                    "-i",
-                    temp_filename,
-                    "-f",
-                    "concat",
-                    "-i",
-                    tempdir + "\\temp.txt",
-                    "-map",
-                    "0:v",
-                    "-map",
-                    "1:a",
-                    "-c",
-                    "copy",
-                    self._video_name_temp,
-                )
+                command = ("-i", temp_filename, "-f", "concat", "-i", tempdir + "\\temp.txt", "-map", "0:v", "-map", "1:a", "-c", "copy", self._video_name_temp)
                 self.ffmpeg_execute(command)
 
     def ffmpeg_execute(self, command):
@@ -25260,24 +26976,19 @@ class Environment:
         self._offset = self._now - new_now
 
         if self._trace:
-            self.print_trace(
-                "",
-                "",
-                f"now reset to {new_now:0.3f}",
-                f"(all times are reduced by {(self._offset - offset_before):0.3f})",
-            )
+            self.print_trace("", "", f"now reset to {new_now:0.3f}", f"(all times are reduced by {(self._offset - offset_before):0.3f})")
 
         if self._datetime0:
             self._datetime0 += datetime.timedelta(seconds=self.to_seconds(self._offset - offset_before))
             self.print_trace("", "", "", f"(t=0 ==> to {self.time_to_str(0)})")
 
-    def trace(self, value: bool = None) -> bool:
+    def trace(self, value: Union[bool, "filehandle"] = None) -> bool:
         """
         trace status
 
         Parameters
         ----------
-        value : bool of file handle
+        value : bool or file handle
             new trace status
 
             defines whether to trace or not
@@ -25300,6 +27011,8 @@ class Environment:
         if value is not None:
             self._trace = value
             self._buffered_trace = False
+            if self._ui:
+                self._ui_window["-TRACE-"].update(value)
         return self._trace
 
     @contextlib.contextmanager
@@ -25370,6 +27083,43 @@ class Environment:
             self._buffered_trace = False
         return self._suppress_trace_standby
 
+    def paused(self, value: bool = None) -> bool:
+        """
+        paused status
+
+        Parameters
+        ----------
+        value : bool
+            new paused status
+
+            defines whether to be paused or not
+
+            if omitted, no change
+
+        Returns
+        -------
+        paused status : bool
+
+        Note
+        ----
+        If you want to test the status, always include
+        parentheses, like
+
+            ``if env.paused():``
+        """
+
+        if value is not None:
+            self._paused = bool(value)
+            if self._ui:
+                self.set_pause_go_button()
+                if not self.animate():
+                    if value:
+                        self.animate(True)
+                        self._paused = True  # ***
+                        self.env._ui_window["-ANIMATE-"].update(False)  # this is required as the self.animate() also sets the value
+
+        return self._paused
+
     def current_component(self) -> "Component":
         """
         Returns
@@ -25378,14 +27128,7 @@ class Environment:
         """
         return self._current_component
 
-    def run(
-        self,
-        duration: float = None,
-        till: float = None,
-        priority: Any = inf,
-        urgent: bool = False,
-        cap_now: bool = None,
-    ):
+    def run(self, duration: float = None, till: float = None, priority: Any = inf, urgent: bool = False, cap_now: bool = None):
         """
         start execution of the simulation
 
@@ -25458,12 +27201,19 @@ class Environment:
                 scheduled_time = till + self.env._offset
             else:
                 raise ValueError("both duration and till specified")
+        if self._yieldless:
+            self._main.status._value = scheduled
+            self._main._reschedule(scheduled_time, priority, urgent, "run", cap_now, extra=extra)
+            self.running = False
+            self.env._glet.switch()  # for proper handling of no events left run (?)
+            self.running = True
+            self.env._glet.switch()
+        else:
+            self._main.frame = _get_caller_frame()
+            self._main.status._value = scheduled
+            self._main._reschedule(scheduled_time, priority, urgent, "run", cap_now, extra=extra)
+            self.running = True
 
-        self._main.frame = _get_caller_frame()
-        self._main.status._value = scheduled
-        self._main._reschedule(scheduled_time, priority, urgent, "run", cap_now, extra=extra)
-
-        self.running = True
         while self.running:
             if self._animate and not self._blind_animation:
                 self.do_simulate_and_animate()
@@ -25516,7 +27266,7 @@ class Environment:
                 if self._video:
                     self._t = self.video_t
                 else:
-                    if self.paused:
+                    if self._paused:
                         self._t = self.animation_start_time
                     else:
                         self._t = self.animation_start_time + ((time.time() - self.animation_start_clocktime) * self._speed)
@@ -25527,12 +27277,8 @@ class Environment:
                         if self.root is not None:
                             self.root.quit()
                         return
-                    if self.paused:
-                        self._t = self.animation_start_time = self._now
-                        break
-
             else:
-                if self._step_pressed or (not self.paused):
+                if self._step_pressed or (not self._paused):
                     self.step()
 
                     if not self._current_component._suppress_pause_at_step:
@@ -25544,7 +27290,7 @@ class Environment:
                     self.root.quit()
                 return
 
-            if not self.paused:
+            if not self._paused:
                 self.frametimes.append(time.time())
 
             t = self.t()
@@ -25564,23 +27310,11 @@ class Environment:
                         if len(g.canvas_objects) >= self._maximum_number_of_bitmaps:
                             if overflow_image is None:
                                 overflow_image = Image.new("RGBA", (self._width, self._height), (0, 0, 0, 0))
-                            overflow_image.paste(
-                                ao._image,
-                                (
-                                    int(ao._image_x),
-                                    int(self._height - ao._image_y - ao._image.size[1]),
-                                ),
-                                ao._image,
-                            )
+                            overflow_image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image)
                             ao.canvas_object = None
                         else:
                             ao.im = ImageTk.PhotoImage(ao._image)
-                            co1 = g.canvas.create_image(
-                                ao._image_x,
-                                self._height - ao._image_y,
-                                image=ao.im,
-                                anchor=tkinter.SW,
-                            )
+                            co1 = g.canvas.create_image(ao._image_x, self._height - ao._image_y, image=ao.im, anchor=tkinter.SW)
                             g.canvas_objects.append(co1)
                             ao.canvas_object = co1
 
@@ -25591,19 +27325,14 @@ class Environment:
                                 g.canvas.itemconfig(ao.canvas_object, image=ao.im)
 
                             if (ao._image_x != ao._image_x_prev) or (ao._image_y != ao._image_y_prev):
-                                g.canvas.coords(
-                                    ao.canvas_object,
-                                    (ao._image_x, self._height - ao._image_y),
-                                )
+                                g.canvas.coords(ao.canvas_object, (ao._image_x, self._height - ao._image_y))
 
                         else:
                             ao.im = ImageTk.PhotoImage(ao._image)
                             ao.canvas_object = co
                             g.canvas.itemconfig(ao.canvas_object, image=ao.im)
-                            g.canvas.coords(
-                                ao.canvas_object,
-                                (ao._image_x, self._height - ao._image_y),
-                            )
+                            g.canvas.coords(ao.canvas_object, (ao._image_x, self._height - ao._image_y))
+
                     co = next(canvas_objects_iter, None)
                 else:
                     ao.canvas_object = None
@@ -25622,10 +27351,7 @@ class Environment:
 
             if self._animate3d:
                 self._exclude_from_animation = "*"  # makes that both video and non video over2d animation objects are shown
-                an_objects3d = sorted(
-                    self.an_objects3d,
-                    key=lambda obj: (obj.layer(self._t), obj.sequence),
-                )
+                an_objects3d = sorted(self.an_objects3d, key=lambda obj: (obj.layer(self._t), obj.sequence))
                 for an in an_objects3d:
                     if an.keep(t):
                         if an.visible(t):
@@ -25653,7 +27379,7 @@ class Environment:
                         uio.button.config(text=thistext)
 
             if self._video:
-                if not self.paused:
+                if not self._paused:
                     self._save_frame()
                     self.video_t += self._speed / self._real_fps
                     self.frame_number += 1
@@ -25675,7 +27401,7 @@ class Environment:
         filename : str
             file to save the current animated frame to.
 
-            The following formats are accepted: .png, .jpg, .bmp, .ico, .gif and .tiff.
+            The following formats are accepted: .png, .jpg, .bmp, .ico, .gif, .webp and .tiff.
             Other formats are not possible.
             Note that, apart from .JPG files. the background may be semi transparent by setting
             the alpha value to something else than 255.
@@ -25711,10 +27437,7 @@ class Environment:
 
     def modelname_width(self):
         if Environment.cached_modelname_width[0] != self._modelname:
-            Environment.cached_modelname_width = [
-                self._modelname,
-                self.env.getwidth(self._modelname + " : a ", font="", fontsize=18),
-            ]
+            Environment.cached_modelname_width = [self._modelname, self.env.getwidth(self._modelname + " : a ", font="", fontsize=18)]
         return Environment.cached_modelname_width[1]
 
     def an_modelname(self) -> None:
@@ -25774,17 +27497,7 @@ class Environment:
             fillcolor = "blue"
             color = "white"
 
-        uio = AnimateButton(
-            x=38,
-            y=-21,
-            text="Menu",
-            width=50,
-            action=self.env.an_menu,
-            env=self,
-            fillcolor=fillcolor,
-            color=color,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38, y=-21, text="Menu", width=50, action=self.env.an_menu, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
 
         uio.in_topleft = True
 
@@ -25801,50 +27514,16 @@ class Environment:
         else:
             fillcolor = "green"
             color = "white"
-        uio = AnimateButton(
-            x=38,
-            y=-21,
-            text="Go",
-            width=50,
-            action=self.env.an_go,
-            env=self,
-            fillcolor=fillcolor,
-            color=color,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38, y=-21, text="Go", width=50, action=self.env.an_go, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 1 * 60,
-            y=-21,
-            text="Step",
-            width=50,
-            action=self.env.an_step,
-            env=self,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38 + 1 * 60, y=-21, text="Step", width=50, action=self.env.an_step, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 3 * 60,
-            y=-21,
-            text="Synced",
-            width=50,
-            action=self.env.an_synced_on,
-            env=self,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38 + 3 * 60, y=-21, text="Synced", width=50, action=self.env.an_synced_on, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 4 * 60,
-            y=-21,
-            text="Trace",
-            width=50,
-            action=self.env.an_trace,
-            env=self,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38 + 4 * 60, y=-21, text="Trace", width=50, action=self.env.an_trace, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
         if self.colorspec_to_tuple("bg")[:-1] == self.colorspec_to_tuple("red")[:-1]:
@@ -25854,41 +27533,13 @@ class Environment:
             fillcolor = "red"
             color = "white"
 
-        uio = AnimateButton(
-            x=38 + 5 * 60,
-            y=-21,
-            text="Stop",
-            width=50,
-            action=self.env.an_quit,
-            env=self,
-            fillcolor=fillcolor,
-            color=color,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38 + 5 * 60, y=-21, text="Stop", width=50, action=self.env.an_quit, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
         uio.in_topleft = True
 
-        ao = AnimateText(
-            x=38 + 3 * 60,
-            y=-35,
-            text=self.syncedtext,
-            text_anchor="N",
-            fontsize=15,
-            font="",
-            screen_coordinates=True,
-            xy_anchor="nw",
-        )
+        ao = AnimateText(x=38 + 3 * 60, y=-35, text=self.syncedtext, text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw")
         ao.in_topleft = True
 
-        ao = AnimateText(
-            x=38 + 4 * 60,
-            y=-35,
-            text=self.tracetext,
-            text_anchor="N",
-            fontsize=15,
-            font="",
-            screen_coordinates=True,
-            xy_anchor="nw",
-        )
+        ao = AnimateText(x=38 + 4 * 60, y=-35, text=self.tracetext, text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw")
         ao.in_topleft = True
 
     def an_synced_buttons(self) -> None:
@@ -25905,61 +27556,19 @@ class Environment:
             fillcolor = "green"
             color = "white"
 
-        uio = AnimateButton(
-            x=38,
-            y=-21,
-            text="Go",
-            width=50,
-            action=self.env.an_go,
-            env=self,
-            fillcolor=fillcolor,
-            color=color,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38, y=-21, text="Go", width=50, action=self.env.an_go, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 1 * 60,
-            y=-21,
-            text="/2",
-            width=50,
-            action=self.env.an_half,
-            env=self,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38 + 1 * 60, y=-21, text="/2", width=50, action=self.env.an_half, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 2 * 60,
-            y=-21,
-            text="*2",
-            width=50,
-            action=self.env.an_double,
-            env=self,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38 + 2 * 60, y=-21, text="*2", width=50, action=self.env.an_double, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 3 * 60,
-            y=-21,
-            text="Synced",
-            width=50,
-            action=self.env.an_synced_off,
-            env=self,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38 + 3 * 60, y=-21, text="Synced", width=50, action=self.env.an_synced_off, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(
-            x=38 + 4 * 60,
-            y=-21,
-            text="Trace",
-            width=50,
-            action=self.env.an_trace,
-            env=self,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38 + 4 * 60, y=-21, text="Trace", width=50, action=self.env.an_trace, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
         if self.colorspec_to_tuple("bg") == self.colorspec_to_tuple("red"):
@@ -25968,54 +27577,18 @@ class Environment:
         else:
             fillcolor = "red"
             color = "white"
-        uio = AnimateButton(
-            x=38 + 5 * 60,
-            y=-21,
-            text="Stop",
-            width=50,
-            action=self.env.an_quit,
-            env=self,
-            fillcolor=fillcolor,
-            color=color,
-            xy_anchor="nw",
-        )
+        uio = AnimateButton(x=38 + 5 * 60, y=-21, text="Stop", width=50, action=self.env.an_quit, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
         uio.in_topleft = True
 
         ao = AnimateText(
-            x=38 + 1.5 * 60,
-            y=-35,
-            text=self.speedtext,
-            textcolor="fg",
-            text_anchor="N",
-            fontsize=15,
-            font="",
-            screen_coordinates=True,
-            xy_anchor="nw",
+            x=38 + 1.5 * 60, y=-35, text=self.speedtext, textcolor="fg", text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw"
         )
         ao.in_topleft = True
 
-        ao = AnimateText(
-            x=38 + 3 * 60,
-            y=-35,
-            text=self.syncedtext,
-            text_anchor="N",
-            fontsize=15,
-            font="",
-            screen_coordinates=True,
-            xy_anchor="nw",
-        )
+        ao = AnimateText(x=38 + 3 * 60, y=-35, text=self.syncedtext, text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw")
         ao.in_topleft = True
 
-        ao = AnimateText(
-            x=38 + 4 * 60,
-            y=-35,
-            text=self.tracetext,
-            text_anchor="N",
-            fontsize=15,
-            font="",
-            screen_coordinates=True,
-            xy_anchor="nw",
-        )
+        ao = AnimateText(x=38 + 4 * 60, y=-35, text=self.tracetext, text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw")
         ao.in_topleft = True
 
     def remove_topleft_buttons(self):
@@ -26046,6 +27619,7 @@ class Environment:
             screen_coordinates=True,
             xy_anchor="ne",
             env=self,
+            visible=lambda: not self._ui,
         )
         ao.text = self.clocktext
 
@@ -26058,7 +27632,7 @@ class Environment:
         self.set_start_animation()
 
     def an_go(self):
-        self.paused = False
+        self.paused(False)
         if self._synced:
             self.set_start_animation()
         else:
@@ -26081,6 +27655,10 @@ class Environment:
         if Pythonista:
             if g.animation_scene is not None:
                 g.animation_scene.view.close()
+        try:
+            self.stop_ui()
+        except AttributeError:  # in case start_ui is not (yet) called
+            ...
 
     def an_trace(self):
         self._trace = not self._trace
@@ -26099,18 +27677,18 @@ class Environment:
     def an_single_step(self):
         self._step_pressed = True
         self.step()
-        self.paused = True
+        self.paused(True)
         self._t = self._now
         self.set_start_animation()
 
-    def an_menu_go(self):
-        if self.paused:
+    def o_go(self):
+        if self._paused:
             self.an_go()
         else:
             self.an_menu()
 
     def an_menu(self):
-        self.paused = True
+        self.paused(True)
         self.set_start_animation()
         if self._synced:
             self.an_synced_buttons()
@@ -26119,7 +27697,7 @@ class Environment:
 
     def clocktext(self, t):
         s = ""
-        if self._synced and (not self.paused) and self._show_fps:
+        if self._synced and (not self._paused) and self._show_fps:
             if len(self.frametimes) >= 2:
                 fps = (len(self.frametimes) - 1) / (self.frametimes[-1] - self.frametimes[0])
             else:
@@ -26155,7 +27733,7 @@ class Environment:
             start_time = self._t - self._audio.t0 + self._audio.start
             if Pythonista:
                 if self._animate and self._synced and (not self._video):
-                    if self.paused:
+                    if self._paused:
                         self._audio.player.pause()
                     else:
                         if self._speed == self._audio_speed:
@@ -26163,7 +27741,7 @@ class Environment:
                             self._audio.player.play()
             if Windows:
                 if self._animate and self._synced and (not self._video):
-                    if self.paused:
+                    if self._paused:
                         self._audio.pause()
                     else:
                         if self._speed == self._audio_speed:
@@ -26273,19 +27851,9 @@ class Environment:
         else:
             if (colorspec != "") and (colorspec[0]) == "#":
                 if len(colorspec) == 7:
-                    return (
-                        int(colorspec[1:3], 16),
-                        int(colorspec[3:5], 16),
-                        int(colorspec[5:7], 16),
-                        255,
-                    )
+                    return (int(colorspec[1:3], 16), int(colorspec[3:5], 16), int(colorspec[5:7], 16), 255)
                 elif len(colorspec) == 9:
-                    return (
-                        int(colorspec[1:3], 16),
-                        int(colorspec[3:5], 16),
-                        int(colorspec[5:7], 16),
-                        int(colorspec[7:9], 16),
-                    )
+                    return (int(colorspec[1:3], 16), int(colorspec[3:5], 16), int(colorspec[5:7], 16), int(colorspec[7:9], 16))
             else:
                 s = colorspec.split("#")
                 if len(s) == 2:
@@ -26388,10 +27956,7 @@ class Environment:
 
     def colorspec_to_gl_color_alpha(self, colorspec):
         color_tuple = self.colorspec_to_tuple(colorspec)
-        return (
-            (color_tuple[0] / 255, color_tuple[1] / 255, color_tuple[2] / 255),
-            color_tuple[3],
-        )
+        return ((color_tuple[0] / 255, color_tuple[1] / 255, color_tuple[2] / 255), color_tuple[3])
 
     def pythonistacolor(self, colorspec):
         c = self.colorspec_to_tuple(colorspec)
@@ -26845,13 +28410,7 @@ class Environment:
         not that the header is only printed if trace=True
         """
         len_s1 = len(self.time_to_str(0))
-        self.print_trace(
-            (len_s1 - 4) * " " + "time",
-            "current component",
-            "action",
-            "information",
-            "line#",
-        )
+        self.print_trace((len_s1 - 4) * " " + "time", "current component", "action", "information", "line#")
         self.print_trace(len_s1 * "-", 20 * "-", 35 * "-", 48 * "-", 6 * "-")
         for ref in range(len(self._source_files)):
             for fullfilename, iref in self._source_files.items():
@@ -26890,15 +28449,7 @@ class Environment:
             self._print_legend(ref)
         return rpad(pre + str(lineno), 5)
 
-    def print_trace(
-        self,
-        s1: str = "",
-        s2: str = "",
-        s3: str = "",
-        s4: str = "",
-        s0: str = None,
-        _optional: bool = False,
-    ):
+    def print_trace(self, s1: str = "", s2: str = "", s3: str = "", s4: str = "", s0: str = None, _optional: bool = False):
         """
         prints a trace line
 
@@ -27142,10 +28693,7 @@ class Environment:
             try:
                 import winsound
 
-                winsound.Playaudio(
-                    os.environ["WINDIR"] + r"\media\Windows Ding.wav",
-                    winsound.SND_FILENAME | winsound.SND_ASYNC,
-                )
+                winsound.Playaudio(os.environ["WINDIR"] + r"\media\Windows Ding.wav", winsound.SND_FILENAME | winsound.SND_ASYNC)
             except Exception:
                 pass
 
@@ -27157,6 +28705,199 @@ class Environment:
                 sound.play_effect("game:Beep", pitch=0.3)
             except Exception:
                 pass
+
+    # start of PySimpleGUI UI
+    def stop_ui(self):
+        if self._ui:
+            animate = self.animate()
+            self.pauser.cancel()
+            self._ui = False
+            self._ui_window.close()
+            self.animate(animate)
+            self._ui = False
+
+    def start_ui(self, window_size: Tuple, window_position: Tuple, actions=None, user_handle_event=None):
+        global sg
+
+        try:
+            import PySimpleGUI as sg
+        except ImportError:
+            raise ImportError("PySimpleGUI required for ui. Install with pip install PySimpleGUI")
+
+        self.animation_parameters(use_toplevel=True)
+        self.pauser = _Pauser(at=inf)
+        self._ui = True
+        if actions is None:
+            actions = []
+        if user_handle_event is None:
+            self.user_handle_event = lambda env, window, event, values: None
+        else:
+            self.user_handle_event = user_handle_event
+
+        frame0 = [
+            [sg.Text("", key="-TIME-", metadata=[1, 2])],
+            [sg.Button("Pause", key="-PAUSE-GO-", metadata=[1, 2]), sg.Button("Stop", key="-STOP-", button_color=("white", "firebrick3"), metadata=[1, 2])],
+            [
+                sg.Checkbox("Pause at each step", False, key="-PAUSE-AT-EACH-STEP-", enable_events=True, metadata=[1, 2]),
+                sg.Text("Pause at", key="-PAUSE-AT-TEXT-"),
+                sg.Input("", key="-PAUSE-AT-", size=(4, 10)),
+                sg.Text("Pause each", key="-PAUSE-EACH-TEXT-"),
+                sg.Input("", key="-PAUSE-EACH-", size=(4, 10)),
+                sg.Input("", key="-PAUSE-EACH-", size=(4, 10)),
+            ],
+            [
+                sg.Button("Speed/2", key="-SPEED/2-", metadata=[1]),
+                sg.Button("Speed*2", key="-SPEED*2-", metadata=[1]),
+                sg.Text("Speed", key="-SPEED-TEXT-"),
+                sg.Input("", key="-SPEED-", size=(4, 10)),
+            ],
+            [sg.Checkbox("Trace", self.trace(), key="-TRACE-", metadata=[1, 2], enable_events=True)],
+            [sg.Checkbox("Synced", self.synced(), key="-SYNCED-", metadata=[1], enable_events=True)],
+            [sg.Checkbox("Animate", True, key="-ANIMATE-", metadata=[1, 2], enable_events=True)],
+        ]
+        if actions:
+            frame0.append([sg.HorizontalSeparator()])
+            frame0.extend(actions)
+        layout = [[sg.Frame("salabim", frame0, pad=((0, 0), (20, 0)))]]
+
+        self._last_animate = "?"
+        self._last_paused = "?"
+        self._ui_window = sg.Window("salabim control", layout, size=window_size, location=window_position)
+        self._ui_window.finalize()
+
+        self.pause_at = inf
+        self._pause_at_each_step = False
+        self.set_start_animation()
+
+    def ui_window(self) -> "Window":
+        return self._ui_window
+
+    def set_pause_go_button(self):
+        self._ui_window["-PAUSE-GO-"].Update("Go" if self._paused else "Pause")
+
+    def _handle_ui_event(self):
+        if self._last_animate != self._animate or self._last_paused != self._paused:
+            for key in self._ui_window.key_dict:
+                field = self._ui_window[key]
+                if type(field) != sg.PySimpleGUI.HorizontalSeparator:
+                    if self._paused:
+                        field.update(visible=True)
+                    else:
+                        if self._animate:
+                            field.update(visible=field.metadata is not None and 1 in field.metadata)
+                        else:
+                            field.update(visible=field.metadata is not None and 2 in field.metadata)
+            self._last_animate = self._animate
+            self._last_paused = self._paused
+            self.set_pause_go_button()
+
+        event, values = self._ui_window.read(timeout=0)
+
+        t = self.pauser.scheduled_time()
+        s = [self.clocktext(self.t())]
+        if t != inf and not self._paused:
+            s.append(f" | Pause at {self.clocktext(t)}")
+        if self.animate():
+            s.append(f" | Speed={self.speed():.3f}")
+
+        if values["-SPEED-"] == "":
+            self._ui_window["-SPEED-"].update(str(self.speed()))
+
+        self._ui_window["-TIME-"].Update("".join(s))
+
+        if event in ("__TIMEOUT__", sg.WIN_CLOSED, "Exit"):
+            return
+
+        if event == "-STOP-":
+            ch = sg.popup_yes_no(f"{chr(160):>50}", "", title="Stop?")  # chr(160) is a non breaking blank, equivalent to "\0xA0")
+            if ch == "Yes":
+                sys.exit()
+
+        if event == "-PAUSE-GO-":
+            if not self.animate():
+                animate = values["-ANIMATE-"]
+                self.animate(True)
+                self.paused(False)
+                self._ui_window["-ANIMATE-"].update(animate)  # this is required as the self.animate() also sets the value
+
+            self.set_start_animation()
+            if self._paused:
+                pause_at_str = values["-PAUSE-AT-"]
+                if pause_at_str != "":
+                    self.pause_at = float(pause_at_str)
+                else:
+                    self.pause_at = inf
+
+                pause_each_str = values["-PAUSE-EACH-"]
+                if pause_each_str.strip() != "":
+                    pause_each = float(pause_each_str)
+                    t = (self.t() // pause_each + 1) * pause_each
+                    self.pause_at = min(self.pause_at, t)
+                if self.pause_at > self.t():
+                    self.animate(values["-ANIMATE-"])
+                    self.paused(False)
+                    if self.pauser.scheduled_time() != self.pause_at:
+                        self.pauser.activate(at=self.pause_at)
+                else:
+                    sg.popup(f"Pause at should be > {self.env.t():.3f}")
+            else:
+                self.paused(True)
+                self._ui_window[event].Update("Pause")
+
+            new_speed = float(values["-SPEED-"])
+            if new_speed != self.speed():
+                self.speed(new_speed)
+                self.set_start_animation()
+
+        if event == "-SPEED*2-":
+            self.speed(self.speed() * 2)
+            self._ui_window["-SPEED-"].update(str(self.speed()))
+            self.set_start_animation()
+
+        if event == "-SPEED/2-":
+            self.speed(self.speed() / 2)
+            self._ui_window["-SPEED-"].update(str(self.speed()))
+            self.set_start_animation()
+
+        if event == "-SYNCED-":
+            self.synced(values["-SYNCED-"])
+
+        if event == "-PAUSE-AT-EACH-STEP-":
+            self._pause_at_each_step = values["-PAUSE-AT-EACH-STEP-"]
+
+        if event == "-TRACE-":
+            self.trace(values["-TRACE-"])
+
+        if event == "-ANIMATE-":
+            if values["-ANIMATE-"]:
+                self.animate(True)
+                self.paused(True)
+            else:
+                _AnimateOff(urgent=True)
+
+        self.user_handle_event(env=self, window=self._ui_window, event=event, values=values)
+
+
+class _Pauser(Component):
+    def process(self):
+        event, values = self.env._ui_window.read(timeout=0)
+        animate = values["-ANIMATE-"]
+        self.env.animate(True)
+        self.env.paused(True)
+        self.env.set_pause_go_button()
+        if values["-PAUSE-AT-"] != "" and self.env._now >= float(values["-PAUSE-AT-"]):
+            self.env._ui_window["-PAUSE-AT-"].Update("")
+        self.env._ui_window["-ANIMATE-"].update(animate)  # this is required as the self.animate() also sets the value
+
+
+class _AnimateOff(Component):
+    def process(self):
+        self.env.animate(False)
+        self._last_animate = None
+        self.env._handle_ui_event()
+
+
+# end of PySimpleGUI UI
 
 
 class Animate2dBase(DynamicClass):
@@ -27182,11 +28923,7 @@ class Animate2dBase(DynamicClass):
         self.attached_to = attached_to
         if attached_to:
             for name in attached_to._dynamics:
-                setattr(
-                    self,
-                    name,
-                    lambda arg, t, name=name: getattr(self.attached_to, name)(t),
-                )
+                setattr(self, name, lambda arg, t, name=name: getattr(self.attached_to, name)(t))
                 self.register_dynamic_attributes(name)
 
         else:
@@ -27210,13 +28947,7 @@ class Animate2dBase(DynamicClass):
             self.caller = "?. use env.animate_debug(True) to get the originating Animate location"
 
         if attach_text:
-            self.depending_object = Animate2dBase(
-                type="text",
-                locals_=locals_,
-                argument_default={},
-                attached_to=self,
-                attach_text=False,
-            )
+            self.depending_object = Animate2dBase(type="text", locals_=locals_, argument_default={}, attached_to=self, attach_text=False)
         else:
             self.depending_object = None
         if not self.attached_to:
@@ -27279,16 +29010,8 @@ class Animate2dBase(DynamicClass):
                 y = self.y(t)
                 xy_anchor = self.xy_anchor(t)
                 if xy_anchor:
-                    x += self.env.xy_anchor_to_x(
-                        xy_anchor,
-                        screen_coordinates=self.screen_coordinates,
-                        over3d=self.over3d,
-                    )
-                    y += self.env.xy_anchor_to_y(
-                        xy_anchor,
-                        screen_coordinates=self.screen_coordinates,
-                        over3d=self.over3d,
-                    )
+                    x += self.env.xy_anchor_to_x(xy_anchor, screen_coordinates=self.screen_coordinates, over3d=self.over3d)
+                    y += self.env.xy_anchor_to_y(xy_anchor, screen_coordinates=self.screen_coordinates, over3d=self.over3d)
 
                 offsetx = self.offsetx(t)
                 offsety = self.offsety(t)
@@ -27321,39 +29044,16 @@ class Animate2dBase(DynamicClass):
                         as_points = self.as_points(t)
 
                         rectangle = tuple(de_none(self.spec(t)))
-                        self._image_ident = (
-                            tuple(rectangle),
-                            linewidth,
-                            linecolor,
-                            fillcolor,
-                            as_points,
-                            angle,
-                            self.screen_coordinates,
-                        )
+                        self._image_ident = (tuple(rectangle), linewidth, linecolor, fillcolor, as_points, angle, self.screen_coordinates)
                     elif self.type == "line":
                         as_points = self.as_points(t)
                         line = tuple(de_none(self.spec(t)))
                         fillcolor = (0, 0, 0, 0)
-                        self._image_ident = (
-                            tuple(line),
-                            linewidth,
-                            linecolor,
-                            as_points,
-                            angle,
-                            self.screen_coordinates,
-                        )
+                        self._image_ident = (tuple(line), linewidth, linecolor, as_points, angle, self.screen_coordinates)
                     elif self.type == "polygon":
                         as_points = self.as_points(t)
                         polygon = tuple(de_none(self.spec(t)))
-                        self._image_ident = (
-                            tuple(polygon),
-                            linewidth,
-                            linecolor,
-                            fillcolor,
-                            as_points,
-                            angle,
-                            self.screen_coordinates,
-                        )
+                        self._image_ident = (tuple(polygon), linewidth, linecolor, fillcolor, as_points, angle, self.screen_coordinates)
                     elif self.type == "circle":
                         as_points = False
                         radius0 = self.radius(t)
@@ -27409,15 +29109,7 @@ class Animate2dBase(DynamicClass):
                             if self.screen_coordinates:
                                 nsteps = int(math.sqrt(max(radius0, radius1)) * 6)
                             else:
-                                nsteps = int(
-                                    math.sqrt(
-                                        max(
-                                            radius0 * self.env._scale,
-                                            radius1 * self.env._scale,
-                                        )
-                                    )
-                                    * 6
-                                )
+                                nsteps = int(math.sqrt(max(radius0 * self.env._scale, radius1 * self.env._scale)) * 6)
                             tarc_angle = 360 / nsteps
                             p = [0, 0]
 
@@ -27482,54 +29174,25 @@ class Animate2dBase(DynamicClass):
                         rscaled = tuple(rscaled)  # to make it hashable
 
                         if as_points:
-                            self._image = Image.new(
-                                "RGBA",
-                                (
-                                    int(maxrx - minrx + 2 * linewidth),
-                                    int(maxry - minry + 2 * linewidth),
-                                ),
-                                (0, 0, 0, 0),
-                            )
+                            self._image = Image.new("RGBA", (int(maxrx - minrx + 2 * linewidth), int(maxry - minry + 2 * linewidth)), (0, 0, 0, 0))
                             point_image = Image.new("RGBA", (int(linewidth), int(linewidth)), linecolor)
 
                             for i in range(0, len(r), 2):
                                 rx = rscaled[i]
                                 ry = rscaled[i + 1]
-                                self._image.paste(
-                                    point_image,
-                                    (
-                                        int(rx - 0.5 * linewidth),
-                                        int(ry - 0.5 * linewidth),
-                                    ),
-                                    point_image,
-                                )
+                                self._image.paste(point_image, (int(rx - 0.5 * linewidth), int(ry - 0.5 * linewidth)), point_image)
 
                         else:
-                            self._image = Image.new(
-                                "RGBA",
-                                (
-                                    int(maxrx - minrx + 2 * linewidth),
-                                    int(maxry - minry + 2 * linewidth),
-                                ),
-                                (0, 0, 0, 0),
-                            )
+                            self._image = Image.new("RGBA", (int(maxrx - minrx + 2 * linewidth), int(maxry - minry + 2 * linewidth)), (0, 0, 0, 0))
                             draw = ImageDraw.Draw(self._image)
                             if fillcolor[3] != 0:
                                 draw.polygon(rscaled, fill=fillcolor)
                             if (round(linewidth) > 0) and (linecolor[3] != 0):
                                 if self.type == "circle" and not draw_arc:
-                                    draw.line(
-                                        rscaled[2:-2],
-                                        fill=linecolor,
-                                        width=int(linewidth),
-                                    )
+                                    draw.line(rscaled[2:-2], fill=linecolor, width=int(linewidth))
                                     # get rid of the first and last point (=center)
                                 else:
-                                    draw.line(
-                                        rscaled,
-                                        fill=linecolor,
-                                        width=int(round(linewidth)),
-                                    )
+                                    draw.line(rscaled, fill=linecolor, width=int(round(linewidth)))
                             del draw
                         self.minrx = minrx
                         self.minry = minry
@@ -27608,12 +29271,7 @@ class Animate2dBase(DynamicClass):
                                 for x in range(self.imwidth):
                                     for y in range(self.imheight):
                                         c = pix[x, y]
-                                        pix[x, y] = (
-                                            c[0],
-                                            c[1],
-                                            c[2],
-                                            int(c[3] * alpha / 255),
-                                        )
+                                        pix[x, y] = (c[0], c[1], c[2], int(c[3] * alpha / 255))
                         self._image = im1.rotate(angle, expand=1)
                     anchor_to_dis = {
                         "ne": (-0.5, -0.5),
@@ -27688,14 +29346,7 @@ class Animate2dBase(DynamicClass):
                             qx = (x - self.env._x0) * self.env._scale
                             qy = (y - self.env._y0) * self.env._scale
                     max_lines = self.max_lines(t)
-                    self._image_ident = (
-                        text,
-                        fontname,
-                        fontsize,
-                        angle,
-                        textcolor,
-                        max_lines,
-                    )
+                    self._image_ident = (text, fontname, fontsize, angle, textcolor, max_lines)
                     if self._image_ident != self._image_ident_prev:
                         font, heightA = getfont(fontname, fontsize)
 
@@ -27718,22 +29369,13 @@ class Animate2dBase(DynamicClass):
                         number_of_lines = len(lines)
                         lineheight = font.getsize("Ap")[1]
                         totheight = number_of_lines * lineheight
-                        im = Image.new(
-                            "RGBA",
-                            (int(totwidth + 0.1 * fontsize), int(totheight)),
-                            (0, 0, 0, 0),
-                        )
+                        im = Image.new("RGBA", (int(totwidth + 0.1 * fontsize), int(totheight)), (0, 0, 0, 0))
                         imwidth, imheight = im.size
                         draw = ImageDraw.Draw(im)
                         pos = 0
                         for line, width in zip(lines, widths):
                             if line:
-                                draw.text(
-                                    xy=(0.1 * fontsize, pos),
-                                    text=line,
-                                    font=font,
-                                    fill=textcolor,
-                                )
+                                draw.text(xy=(0.1 * fontsize, pos), text=line, font=font, fill=textcolor)
 
                             pos += lineheight
                         # this code is to correct a bug in the rendering of text,
@@ -27750,12 +29392,7 @@ class Animate2dBase(DynamicClass):
                                 pix = im.load()
                                 for y in range(imheight):
                                     for x in range(imwidth):
-                                        pix[x, y] = (
-                                            textcolor[0],
-                                            textcolor[1],
-                                            textcolor[2],
-                                            pix[x, y][3],
-                                        )
+                                        pix[x, y] = (textcolor[0], textcolor[1], textcolor[2], pix[x, y][3])
 
                         # end of code to correct bug
 
@@ -27830,6 +29467,30 @@ class AnimateClassic(Animate2dBase):
 
     def visible(self, t):
         return self.master.visible(t)
+
+    def flip_horizontal(self, t):
+        return self.master.flip_horizontal(t)
+
+    def flip_vertical(self, t):
+        return self.master.flip_vertical(t)
+
+    def animation_start(self, t):
+        return self.master.animation_start(t)
+
+    def animation_speed(self, t):
+        return self.master.animation_speed(t)
+
+    def animation_repeat(self, t):
+        return self.master.animation_repeat(t)
+
+    def animation_pingpong(self, t):
+        return self.master.animation_pingpong(t)
+
+    def animation_from(self, t):
+        return self.master.animation_from(t)
+
+    def animation_to(self, t):
+        return self.master.animation_to(t)
 
     def keep(self, t):
         return self.master.keep(t)
@@ -27942,9 +29603,9 @@ class Animate:
         automatically when the parent component is no longer accessible
 
     layer : int
-         layer value
+        layer value
 
-         lower layer values are on top of higher layer values (default 0)
+        lower layer values are on top of higher layer values (default 0)
 
     keep : bool
         keep
@@ -27972,9 +29633,7 @@ class Animate:
         possible values are (default: sw) ::
 
             nw    n    ne
-
             w     c     e
-
             sw    s    se
 
         If null string, the given coordimates are used untranslated
@@ -27995,14 +29654,15 @@ class Animate:
         offsets the y-coordinate of the object at time t0 (default 0)
 
     circle0 : float or tuple/list
-         the circle spec of the circle at time t0
+        the circle spec of the circle at time t0
 
-         - radius
+        - radius
 
-         - one item tuple/list containing the radius
+        - one item tuple/list containing the radius
 
-         - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
-         (see class AnimateCircle for details)
+        - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
+
+        (see class AnimateCircle for details)
 
     line0 : list or tuple
         the line(s) (xa,ya,xb,yb,xc,yc, ...) at time t0
@@ -28014,7 +29674,6 @@ class Animate:
 
     rectangle0 : list or tuple
         the rectangle (xlowerleft,ylowerleft,xupperright,yupperright) at time t0
-
 
     image : str, pathlib.Path or PIL image
         the image to be displayed
@@ -28050,15 +29709,13 @@ class Animate:
         possible values are (default: c) ::
 
             nw    n    ne
-
             w     c     e
-
             sw    s    se
 
     as_points : bool
-         if False (default), lines in line, rectangle and polygon are drawn
+        if False (default), lines in line, rectangle and polygon are drawn
 
-         if True, only the end points are shown in line, rectangle and polygon
+        if True, only the end points are shown in line, rectangle and polygon
 
     linewidth0 : float
         linewidth of the contour at time t0 (default 0 for polygon, rectangle and circle, 1 for line)
@@ -28108,14 +29765,15 @@ class Animate:
         offsets the y-coordinate of the object at time t1 (default offsety0)
 
     circle1 : float or tuple/list
-         the circle spec of the circle at time t1 (default: circle0)
+        the circle spec of the circle at time t1 (default: circle0)
 
-         - radius
+        - radius
 
-         - one item tuple/list containing the radius
+        - one item tuple/list containing the radius
 
-         - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
-         (see class AnimateCircle for details)
+        - five items tuple/list cntaining radius, radius1, arc_angle0, arc_angle1 and draw_arc
+
+        (see class AnimateCircle for details)
 
     line1 : tuple
         the line(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: line0)
@@ -28154,7 +29812,6 @@ class Animate:
 
     width1 : float
        width of the image to be displayed at time t1 (default: width0)
-
 
     over3d : bool
         if True, this object will be rendered to the OpenGL window
@@ -28279,6 +29936,14 @@ class Animate:
         width1: float = None,
         xy_anchor: str = "",
         over3d: bool = None,
+        flip_horizontal: bool = False,
+        flip_vertical: bool = False,
+        animation_start: float = None,
+        animation_speed: float = 1,
+        animation_repeat: bool = False,
+        animation_pingpong: bool = False,
+        animation_from: float = 0,
+        animation_to: float = inf,
         env: "Environment" = None,
     ):
         self.env = g.default_env if env is None else env
@@ -28395,6 +30060,18 @@ class Animate:
 
         arg = None  # just to make Animate2dBase happy
 
+        self.flip_horizontal0 = flip_horizontal
+        self.flip_vertical0 = flip_vertical
+        if animation_start is None:
+            self.animation_start0 = self.env._now
+        else:
+            self.animation_start0 = animation_start
+        self.animation_speed0 = animation_speed
+        self.animation_repeat0 = animation_repeat
+        self.animation_pingpong0 = animation_pingpong
+        self.animation_from0 = animation_from
+        self.animation_to0 = animation_to
+
         self.animation_object = AnimateClassic(master=self, locals_=locals())
 
     def update(
@@ -28447,6 +30124,14 @@ class Animate:
         alpha1=None,
         fontsize1=None,
         width1=None,
+        flip_horizontal=None,
+        flip_vertical=None,
+        animation_start=None,
+        animation_speed=None,
+        animation_repeat=None,
+        animation_pingpong=None,
+        animation_from=None,
+        animation_to=None,
     ):
         """
         updates an animation object
@@ -28732,6 +30417,22 @@ class Animate:
         self.xy_anchor1 = self.xy_anchor0 if xy_anchor1 is None else xy_anchor1
 
         self.t1 = inf if t1 is None else t1
+        if flip_horizontal is not None:
+            self.flip_horizontal0 = flip_horizontal
+        if flip_vertical is not None:
+            self.flip_vertical0 = flip_vertical
+        if animation_start is not None:
+            self.animation_start0 = animation_start
+        if animation_speed is not None:
+            self.animation_speed0 = animation_speed
+        if animation_repeat is not None:
+            self.animation_repeat0 = animation_repeat
+        if animation_pingpong is not None:
+            self.animation_pingpong0 = animation_pingpong
+        if animation_from is not None:
+            self.animation_from0 = animation_from
+        if animation_to is not None:
+            self.animation_to0 = animation_to
 
     def show(self):
         self.animation_object.show()
@@ -28796,13 +30497,7 @@ class Animate:
         offsetx : float
             default behaviour: linear interpolation between self.offsetx0 and self.offsetx1
         """
-        return interpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.offsetx0,
-            self.offsetx1,
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.offsetx0, self.offsetx1)
 
     def offsety(self, t=None):
         """
@@ -28818,13 +30513,7 @@ class Animate:
         offsety : float
             default behaviour: linear interpolation between self.offsety0 and self.offsety1
         """
-        return interpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.offsety0,
-            self.offsety1,
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.offsety0, self.offsety1)
 
     def angle(self, t=None):
         """
@@ -28840,13 +30529,7 @@ class Animate:
         angle : float
             default behaviour: linear interpolation between self.angle0 and self.angle1
         """
-        return interpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.angle0,
-            self.angle1,
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.angle0, self.angle1)
 
     def alpha(self, t=None):
         """
@@ -28862,13 +30545,7 @@ class Animate:
         alpha : float
             default behaviour: linear interpolation between self.alpha0 and self.alpha1
         """
-        return interpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.alpha0,
-            self.alpha1,
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.alpha0, self.alpha1)
 
     def linewidth(self, t=None):
         """
@@ -28884,13 +30561,7 @@ class Animate:
         linewidth : float
             default behaviour: linear interpolation between self.linewidth0 and self.linewidth1
         """
-        return interpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.linewidth0,
-            self.linewidth1,
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.linewidth0, self.linewidth1)
 
     def linecolor(self, t=None):
         """
@@ -28906,13 +30577,7 @@ class Animate:
         linecolor : colorspec
             default behaviour: linear interpolation between self.linecolor0 and self.linecolor1
         """
-        return self.env.colorinterpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.linecolor0,
-            self.linecolor1,
-        )
+        return self.env.colorinterpolate((self.env._now if t is None else t), self.t0, self.t1, self.linecolor0, self.linecolor1)
 
     def fillcolor(self, t=None):
         """
@@ -28928,13 +30593,7 @@ class Animate:
         fillcolor : colorspec
             default behaviour: linear interpolation between self.fillcolor0 and self.fillcolor1
         """
-        return self.env.colorinterpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.fillcolor0,
-            self.fillcolor1,
-        )
+        return self.env.colorinterpolate((self.env._now if t is None else t), self.t0, self.t1, self.fillcolor0, self.fillcolor1)
 
     def circle(self, t=None):
         """
@@ -28960,13 +30619,7 @@ class Animate:
 
             default behaviour: linear interpolation between self.circle0 and self.circle1
         """
-        return interpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.circle0,
-            self.circle1,
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.circle0, self.circle1)
 
     def textcolor(self, t=None):
         """
@@ -28982,13 +30635,7 @@ class Animate:
         textcolor : colorspec
             default behaviour: linear interpolation between self.textcolor0 and self.textcolor1
         """
-        return self.env.colorinterpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.textcolor0,
-            self.textcolor1,
-        )
+        return self.env.colorinterpolate((self.env._now if t is None else t), self.t0, self.t1, self.textcolor0, self.textcolor1)
 
     def line(self, t=None):
         """
@@ -29006,13 +30653,7 @@ class Animate:
 
             default behaviour: linear interpolation between self.line0 and self.line1
         """
-        return interpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.line0,
-            self.line1,
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.line0, self.line1)
 
     def polygon(self, t=None):
         """
@@ -29030,13 +30671,7 @@ class Animate:
 
             default behaviour: linear interpolation between self.polygon0 and self.polygon1
         """
-        return interpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.polygon0,
-            self.polygon1,
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.polygon0, self.polygon1)
 
     def rectangle(self, t=None):
         """
@@ -29054,13 +30689,7 @@ class Animate:
 
             default behaviour: linear interpolation between self.rectangle0 and self.rectangle1
         """
-        return interpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.rectangle0,
-            self.rectangle1,
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.rectangle0, self.rectangle1)
 
     def points(self, t=None):
         """
@@ -29078,13 +30707,7 @@ class Animate:
 
             default behaviour: linear interpolation between self.points0 and self.points1
         """
-        return interpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.points0,
-            self.points1,
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.points0, self.points1)
 
     def width(self, t=None):
         """
@@ -29127,13 +30750,7 @@ class Animate:
         fontsize : float
             default behaviour: linear interpolation between self.fontsize0 and self.fontsize1
         """
-        return interpolate(
-            (self.env._now if t is None else t),
-            self.t0,
-            self.t1,
-            self.fontsize0,
-            self.fontsize1,
-        )
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, self.fontsize0, self.fontsize1)
 
     def as_points(self, t=None):
         """
@@ -29280,6 +30897,30 @@ class Animate:
             default behaviour: self.visible0 and t >= self.t0 (visible given at creation or update)
         """
         return self.visible0 and t >= self.t0
+
+    def flip_horizontal(self, t=None):
+        return self.flip_horizontal0
+
+    def flip_vertical(self, t=None):
+        return self.flip_vertical0
+
+    def animation_start(self, t=None):
+        return self.env._now
+
+    def animation_repeat(self, t=None):
+        return False
+
+    def animation_pingpong(self, t=None):
+        return False
+
+    def animation_speed(self, t=None):
+        return 1
+
+    def animation_from(self, t=None):
+        return 0
+
+    def animation_to(self, t=None):
+        return inf
 
     def keep(self, t):
         """
@@ -29608,12 +31249,7 @@ class AnimateButton:
                 my_font = tkinter.font.Font(size=int(self.fontsize * 0.7))
                 my_width = int(1.85 * self.width / self.fontsize)
 
-            self.button = tkinter.Button(
-                self.env.root,
-                text=self.lasttext,
-                command=self.action,
-                anchor=tkinter.CENTER,
-            )
+            self.button = tkinter.Button(self.env.root, text=self.lasttext, command=self.action, anchor=tkinter.CENTER)
             self.button.configure(
                 font=my_font,
                 width=my_width,
@@ -29621,12 +31257,7 @@ class AnimateButton:
                 background=self.env.colorspec_to_hex(self.fillcolor, False),
                 relief=tkinter.FLAT,
             )
-            self.button_window = g.canvas.create_window(
-                x + self.width,
-                self.env._height - y - self.height,
-                anchor=tkinter.NE,
-                window=self.button,
-            )
+            self.button_window = g.canvas.create_window(x + self.width, self.env._height - y - self.height, anchor=tkinter.NE, window=self.button)
         self.installed = True
 
     def remove(self):
@@ -30422,8 +32053,6 @@ class AnimateCombined:
 
     If the attribute does not exist in any animation_object of the list, an AttributeError will be raised.
 
-
-
     It is possible to use animation_objects with ::
 
         an = sim.AnimationCombined(car.animation_objects[2:])
@@ -30594,6 +32223,11 @@ class AnimateText(Animate2dBase):
         objects.
 
         if True, screen_coordinates will be used instead.
+
+    layer : float
+        default: 0
+
+        lower layer numbers are placed on top of higher layer numbers
 
     over3d : bool
         if True, this object will be rendered to the OpenGL window
@@ -30774,6 +32408,11 @@ class AnimateRectangle(Animate2dBase):
         if a parameter is a method as the instance
 
         default: self (instance itself)
+
+    layer : float
+        default: 0
+
+        lower layer numbers are placed on top of higher layer numbers
 
     parent : Component
         component where this animation object belongs to (default None)
@@ -30984,6 +32623,11 @@ class AnimatePolygon(Animate2dBase):
 
         if True, screen_coordinates will be used instead.
 
+    layer : float
+        default: 0
+
+        lower layer numbers are placed on top of higher layer numbers
+
     over3d : bool
         if True, this object will be rendered to the OpenGL window
 
@@ -31177,6 +32821,11 @@ class AnimateLine(Animate2dBase):
 
         if given, the animation object will be removed
         automatically when the parent component is no longer accessible
+
+    layer : float
+        default: 0
+
+        lower layer numbers are placed on top of higher layer numbers
 
     screen_coordinates : bool
         use screen_coordinates
@@ -31390,6 +33039,11 @@ class AnimatePoints(Animate2dBase):
 
         if True, screen_coordinates will be used instead.
 
+    layer : float
+        default: 0
+
+        lower layer numbers are placed on top of higher layer numbers
+
     over3d : bool
         if True, this object will be rendered to the OpenGL window
 
@@ -31535,7 +33189,6 @@ class AnimateCircle(Animate2dBase):
     fillcolor : colorspec
         color of interior (default foreground_color)
 
-
     linecolor : colorspec
         color of the contour (default transparent)
 
@@ -31601,6 +33254,11 @@ class AnimateCircle(Animate2dBase):
 
         if given, the animation object will be removed
         automatically when the parent component is no longer accessible
+
+    layer : float
+        default: 0
+
+        lower layer numbers are placed on top of higher layer numbers
 
     screen_coordinates : bool
         use screen_coordinates
@@ -31853,6 +33511,11 @@ class AnimateImage(Animate2dBase):
         if given, the animation object will be removed
         automatically when the parent component is no longer accessible
 
+    layer : float
+        default: 0
+
+        lower layer numbers are placed on top of higher layer numbers
+
     screen_coordinates : bool
         use screen_coordinates
 
@@ -31869,7 +33532,6 @@ class AnimateImage(Animate2dBase):
     Note
     ----
     All measures are in screen coordinates
-
 
     All parameters, apart from parent, arg and env can be specified as:
 
@@ -31974,3016 +33636,31 @@ class AnimateImage(Animate2dBase):
         return image_container._duration
 
 
-class Component:
+def AnimateGrid(spacing: float = 100, env: "Environment" = None, **kwargs):
     """
-    Component object
-
-    A salabim component is used as component (primarily for queueing)
-    or as a component with a process
-
-    Usually, a component will be defined as a subclass of Component.
+    Draws a grid with text labels
 
     Parameters
     ----------
-    name : str
-        name of the component.
-
-        if the name ends with a period (.),
-        auto serializing will be applied
-
-        if the name end with a comma,
-        auto serializing starting at 1 will be applied
-
-        if omitted, the name will be derived from the class
-        it is defined in (lowercased)
-
-    at : float or distribution
-        schedule time
-
-        if omitted, now is used
-
-        if distribution, the distribution is sampled
-
-    delay : float or distributiom
-        schedule with a delay
-
-        if omitted, no delay
-
-        if distribution, the distribution is sampled
-
-    priority : float
-        priority
-
-        default: 0
-
-        if a component has the same time on the event list, this component is sorted accoring to
-        the priority.
-
-    urgent : bool
-        urgency indicator
-
-        if False (default), the component will be scheduled
-        behind all other components scheduled
-        for the same time and priority
-
-        if True, the component will be scheduled
-        in front of all components scheduled
-        for the same time and priority
-
-    process : str
-        name of process to be started.
-
-        if None (default), it will try to start self.process()
-
-        if null string, no process will be started even if self.process() exists,
-        i.e. become a data component.
-
-
-    suppress_trace : bool
-        suppress_trace indicator
-
-        if True, this component will be excluded from the trace
-
-        If False (default), the component will be traced
-
-        Can be queried or set later with the suppress_trace method.
-
-    suppress_pause_at_step : bool
-        suppress_pause_at_step indicator
-
-        if True, if this component becomes current, do not pause when stepping
-
-        If False (default), the component will be paused when stepping
-
-        Can be queried or set later with the suppress_pause_at_step method.
-
-    skip_standby : bool
-        skip_standby indicator
-
-        if True, after this component became current, do not activate standby components
-
-        If False (default), after the component became current  activate standby components
-
-        Can be queried or set later with the skip_standby method.
-
-    mode : str preferred
-        mode
-
-        will be used in trace and can be used in animations
-
-        if omitted, the mode will be "".
-
-        also mode_time will be set to now.
-
-    cap_now : bool
-        indicator whether times (at, delay) in the past are allowed. If, so now() will be used.
-        default: sys.default_cap_now(), usualy False
+    spacing : float
+        spacing of the grid lines in vertical and horizontal direction
 
     env : Environment
         environment where the component is defined
 
         if omitted, default_env will be used
+
+    **kwargs : dict
+        extra parameters to be given to AnimateLine, like linecolor, textcolor, font, visible
     """
+    if env is None:
+        env = g.default_env
 
-    def __init__(
-        self,
-        name: str = None,
-        at: Union[float, Callable] = None,
-        delay: Union[float, Callable] = None,
-        priority: float = None,
-        urgent: bool = None,
-        process: str = None,
-        suppress_trace: bool = False,
-        suppress_pause_at_step: bool = False,
-        skip_standby: bool = False,
-        mode: str = "",
-        cap_now: bool = None,
-        env: "Environment" = None,
-        **kwargs,
-    ):
-        if env is None:
-            self.env = g.default_env
-        else:
-            self.env = env
-        _set_name(name, self.env._nameserializeComponent, self)
-        self._qmembers = {}
-        self._process = None
-        self.status = _StatusMonitor(name=self.name() + ".status", level=True, initial_tally=data, env=self.env)
-        self._requests = collections.OrderedDict()
-        self._claims = collections.OrderedDict()
-        self._waits = []
-        self._from_stores = []
-        self._to_stores = []
-        self._on_event_list = False
-        self._scheduled_time = inf
-        self._failed = False
-        self._skip_standby = skip_standby
-        self._creation_time = self.env._now
-        self._suppress_trace = suppress_trace
-        self._suppress_pause_at_step = suppress_pause_at_step
-        self.mode = _ModeMonitor(name=self.name() + ".mode", level=True, initial_tally=mode, env=self.env)
-        self._mode_time = self.env._now
-        self._aos = {}
-        self._animation_children = set()
+    for y in arange(0, env.height() + 1, spacing):
+        AnimateLine(spec=(0, 0, env.width(), 0), x=0, y=y, text=str(y), text_anchor="sw", env=env, **kwargs)
 
-        if process is None:
-            if hasattr(self, "process"):
-                p = self.process
-                process_name = "process"
-            else:
-                p = None
-        else:
-            if process == "":
-                p = None
-            else:
-                try:
-                    p = getattr(self, process)
-                    process_name = process
-                except AttributeError:
-                    raise AttributeError("self." + process + " does not exist")
-        if p is None:
-            if at is not None:
-                raise TypeError("at is not allowed for a data component")
-            if delay is not None:
-                raise TypeError("delay is not allowed for a data component")
-            if urgent is not None:
-                raise TypeError("urgent is not allowed for a data component")
-            if priority is not None:
-                raise TypeError("priority is not allowed for a data component")
-            if self.env._trace:
-                if self._name == "main":
-                    self.env.print_trace("", "", self.name() + " create", self._modetxt())
-                else:
-                    self.env.print_trace("", "", self.name() + " create data component", self._modetxt())
-        else:
-            self.env.print_trace("", "", self.name() + " create", self._modetxt())
-
-            kwargs_p = {}
-            if kwargs:
-                parameters = inspect.signature(p).parameters
-
-                for kwarg in list(kwargs):
-                    if kwarg in parameters:
-                        kwargs_p[kwarg] = kwargs[kwarg]
-                        del kwargs[kwarg]  # here kwargs consumes the used arguments
-
-            if inspect.isgeneratorfunction(p):
-                self._process = p(**kwargs_p)
-                self._process_isgenerator = True
-            else:
-                self._process = p
-                self._process_isgenerator = False
-                self._process_kwargs = kwargs_p
-
-            extra = "process=" + process_name
-
-            urgent = bool(urgent)
-            if priority is None:
-                priority = 0
-
-            if delay is None:
-                delay = 0.0
-            elif callable(delay):
-                delay = delay()
-
-            if at is None:
-                scheduled_time = self.env._now + delay
-            else:
-                if callable(at):
-                    at = at()
-                scheduled_time = at + self.env._offset + delay
-            self.status._value = scheduled
-            self._reschedule(scheduled_time, priority, urgent, "activate", cap_now, extra=extra)
-        self.setup(**kwargs)
-
-    overridden_lineno = None
-
-    def animation_objects(self, id: Any) -> Tuple:
-        """
-        defines how to display a component in AnimateQueue
-
-        Parameters
-        ----------
-        id : any
-            id as given by AnimateQueue. Note that by default this the reference to the AnimateQueue object.
-
-        Returns
-        -------
-        List or tuple containg
-
-            size_x : how much to displace the next component in x-direction, if applicable
-
-            size_y : how much to displace the next component in y-direction, if applicable
-
-            animation objects : instances of Animate class
-
-            default behaviour:
-
-            square of size 40 (displacements 50), with the sequence number centered.
-
-        Note
-        ----
-        If you override this method, be sure to use the same header, either with or without the id parameter.
-
-        """
-        size_x = 50
-        size_y = 50
-        ao0 = AnimateRectangle(
-            text=str(self.sequence_number()),
-            textcolor="bg",
-            spec=(-20, -20, 20, 20),
-            linewidth=0,
-            fillcolor="fg",
-        )
-        return (size_x, size_y, ao0)
-
-    def animation3d_objects(self, id: Any) -> Tuple:
-        """
-        defines how to display a component in Animate3dQueue
-
-        Parameters
-        ----------
-        id : any
-            id as given by Animate3dQueue. Note that by default this the reference to the Animate3dQueue object.
-
-        Returns
-        -------
-        List or tuple containg
-
-            size_x : how much to displace the next component in x-direction, if applicable
-
-            size_y : how much to displace the next component in y-direction, if applicable
-
-            size_z : how much to displace the next component in z-direction, if applicable
-
-            animation objects : instances of Animate3dBase class
-
-            default behaviour:
-
-            white 3dbox of size 8, placed on the z=0 plane (displacements 10).
-
-        Note
-        ----
-        If you override this method, be sure to use the same header, either with or without the id parameter.
-
-
-        Note
-        ----
-        The animation object should support the x_offset, y_offset and z_offset attributes, in order to be able
-        to position the object correctly. All native salabim Animate3d classes are offset aware.
-        """
-        size_x = 10
-        size_y = 10
-        size_z = 10
-        ao0 = Animate3dBox(
-            x_len=8,
-            y_len=8,
-            z_len=8,
-            x_ref=0,
-            y_ref=0,
-            z_ref=1,
-            color="white",
-            shaded=True,
-        )
-        return (size_x, size_y, size_z, ao0)
-
-    def _remove_from_aos(self, q):
-        if q in self._aos:
-            for ao in self._aos[q][2:]:
-                ao.remove()
-            del self._aos[q]
-
-    def setup(self) -> None:
-        """
-        called immediately after initialization of a component.
-
-        by default this is a dummy method, but it can be overridden.
-
-        only keyword arguments will be passed
-
-        Example
-        -------
-            class Car(sim.Component):
-                def setup(self, color):
-                    self.color = color
-
-                def process(self):
-                    ...
-
-            redcar=Car(color="red")
-
-            bluecar=Car(color="blue")
-        """
-        pass
-
-    def __repr__(self):
-        return object_to_str(self) + " (" + self.name() + ")"
-
-    def register(self, registry: List) -> "Component":
-        """
-        registers the component in the registry
-
-        Parameters
-        ----------
-        registry : list
-            list of (to be) registered objects
-
-        Returns
-        -------
-        component (self) : Component
-
-        Note
-        ----
-        Use Component.deregister if component does not longer need to be registered.
-        """
-        if not isinstance(registry, list):
-            raise TypeError("registry not list")
-        if self in registry:
-            raise ValueError(self.name() + " already in registry")
-        registry.append(self)
-        return self
-
-    def deregister(self, registry: List) -> "Component":
-        """
-        deregisters the component in the registry
-
-        Parameters
-        ----------
-        registry : list
-            list of registered components
-
-        Returns
-        -------
-        component (self) : Component
-        """
-        if not isinstance(registry, list):
-            raise TypeError("registry not list")
-        if self not in registry:
-            raise ValueError(self.name() + " not in registry")
-        registry.remove(self)
-        return self
-
-    def print_info(self, as_str: "bool" = False, file: TextIO = None) -> str:
-        """
-        prints information about the component
-
-        Parameters
-        ----------
-        as_str: bool
-            if False (default), print the info
-            if True, return a string containing the info
-
-        file: file
-            if None(default), all output is directed to stdout
-
-            otherwise, the output is directed to the file
-
-        Returns
-        -------
-        info (if as_str is True) : str
-        """
-        result = []
-        result.append(object_to_str(self) + " " + hex(id(self)))
-        result.append("  name=" + self.name())
-        result.append("  class=" + str(type(self)).split(".")[-1].split("'")[0])
-        result.append("  suppress_trace=" + str(self._suppress_trace))
-        result.append("  suppress_pause_at_step=" + str(self._suppress_pause_at_step))
-        result.append("  status=" + self.status())
-        result.append("  mode=" + self.mode())
-        result.append("  mode_time=" + self.env.time_to_str(self.mode_time()))
-        result.append("  creation_time=" + self.env.time_to_str(self.creation_time()))
-        result.append("  scheduled_time=" + self.env.time_to_str(self.scheduled_time()))
-        if len(self._qmembers) > 0:
-            result.append("  member of queue(s):")
-            for q in sorted(self._qmembers, key=lambda obj: obj.name().lower()):
-                result.append(
-                    "    "
-                    + pad(q.name(), 20)
-                    + " enter_time="
-                    + self.env.time_to_str(self._qmembers[q].enter_time - self.env._offset)
-                    + " priority="
-                    + str(self._qmembers[q].priority)
-                )
-        if len(self._requests) > 0:
-            result.append("  requesting resource(s):")
-
-            for r in sorted(list(self._requests), key=lambda obj: obj.name().lower()):
-                result.append("    " + pad(r.name(), 20) + " quantity=" + str(self._requests[r]))
-        if len(self._claims) > 0:
-            result.append("  claiming resource(s):")
-
-            for r in sorted(list(self._claims), key=lambda obj: obj.name().lower()):
-                result.append("    " + pad(r.name(), 20) + " quantity=" + str(self._claims[r]))
-        if len(self._waits) > 0:
-            if self._wait_all:
-                result.append("  waiting for all of state(s):")
-            else:
-                result.append("  waiting for any of state(s):")
-            for s, value, _ in self._waits:
-                result.append("    " + pad(s.name(), 20) + " value=" + str(value))
-        return return_or_print(result, as_str, file)
-
-    def _push(self, t, priority, urgent, return_value=None):
-        self.env._seq += 1
-        if urgent:
-            seq = -self.env._seq
-        else:
-            seq = self.env._seq
-        self._on_event_list = True
-        heapq.heappush(self.env._event_list, (t, priority, seq, self, return_value))
-
-    def _remove(self):
-        if self._on_event_list:
-            for i in range(len(self.env._event_list)):
-                if self.env._event_list[i][3] == self:
-                    self.env._event_list[i] = self.env._event_list[0]
-                    self.env._event_list.pop(0)
-                    heapq.heapify(self.env._event_list)
-                    self._on_event_list = False
-                    return
-            raise Exception("remove error", self.name())
-        if self.status == standby:
-            if self in self.env._standby_list:
-                self.env._standby_list(self).remove(self)
-            if self in self.env._pending_standby_list:
-                self.env._pending_standby_list(self).remove(self)
-
-    def _check_fail(self):
-        if self._requests:
-            if self.env._trace:
-                self.env.print_trace("", "", self.name(), "request failed")
-            for r in list(self._requests):
-                self.leave(r._requesters)
-                if r._requesters._length == 0:
-                    r._minq = inf
-            self._requests = collections.OrderedDict()
-            self._failed = True
-
-        if self._waits:
-            if self.env._trace:
-                self.env.print_trace("", "", self.name(), "wait failed")
-            for state, _, _ in self._waits:
-                if self in state._waiters:  # there might be more values for this state
-                    self.leave(state._waiters)
-            self._waits = []
-            self._failed = True
-
-        if self._from_stores:
-            if self.env._trace:
-                self.env.print_trace("", "", self.name(), "from_store failed")
-            for store in list(self._from_stores):
-                self.leave(store._from_store_requesters)
-            self._from_stores = []
-            self._failed = True
-
-        if self._to_stores:
-            if self.env._trace:
-                self.env.print_trace("", "", self.name(), "to_store failed")
-            for store in list(self._to_stores):
-                self.leave(store._to_store_requesters)
-            self._to_stores = []
-            self._failed = True
-
-    def _reschedule(
-        self,
-        scheduled_time,
-        priority,
-        urgent,
-        caller,
-        cap_now,
-        extra="",
-        s0=None,
-        return_value=None,
-    ):
-        if scheduled_time < self.env._now:
-            if cap_now is None:
-                cap_now = g._default_cap_now
-            if cap_now:
-                scheduled_time = self.env._now
-            else:
-                raise ValueError(f"scheduled time ({scheduled_time:0.3f}) before now ({self.env._now:0.3f})")
-        self._scheduled_time = scheduled_time
-        if scheduled_time != inf:
-            self._push(scheduled_time, priority, urgent, return_value)
-        if self.env._trace:
-            if extra == "*":
-                scheduled_time_str = "ends on no events left  "
-                extra = " "
-            else:
-                scheduled_time_str = "scheduled for " + self.env.time_to_str(scheduled_time - self.env._offset).strip()
-            if (scheduled_time == self.env._now) or (scheduled_time == inf):
-                delta = ""
-            else:
-                delta = f" +{self.env.duration_to_str(scheduled_time - self.env._now)}"
-            lineno = self.lineno_txt(add_at=True)
-            self.env.print_trace(
-                "",
-                "",
-                self.name() + " " + caller + delta,
-                merge_blanks(
-                    scheduled_time_str + _prioritytxt(priority) + _urgenttxt(urgent) + lineno,
-                    self._modetxt(),
-                    extra,
-                ),
-                s0=s0,
-            )
-
-    def activate(
-        self,
-        at: Union[float, Callable] = None,
-        delay: Union[Callable, float] = 0,
-        priority: float = 0,
-        urgent: bool = False,
-        process: str = None,
-        keep_request: bool = False,
-        keep_wait: bool = False,
-        mode: str = None,
-        cap_now: bool = None,
-        **kwargs,
-    ) -> None:
-        """
-        activate component
-
-        Parameters
-        ----------
-        at : float or distribution
-            schedule time
-
-            if omitted, now is used
-
-            inf is allowed
-
-            if distribution, the distribution is sampled
-
-        delay : float or distribution
-            schedule with a delay
-
-            if omitted, no delay
-
-            if distribution, the distribution is sampled
-
-        priority : float
-            priority
-
-            default: 0
-
-            if a component has the same time on the event list, this component is sorted accoring to
-            the priority.
-
-        urgent : bool
-            urgency indicator
-
-            if False (default), the component will be scheduled
-            behind all other components scheduled
-            for the same time and priority
-
-            if True, the component will be scheduled
-            in front of all components scheduled
-            for the same time and priority
-
-        process : str
-            name of process to be started.
-
-            if None (default), process will not be changed
-
-            if the component is a data component, the
-            generator function process will be used as the default process.
-
-            note that the function *must* be a generator,
-            i.e. contains at least one yield.
-
-        keep_request : bool
-            this affects only components that are requesting.
-
-            if True, the requests will be kept and thus the status will remain requesting
-
-            if False (the default), the request(s) will be canceled and the status will become scheduled
-
-        keep_wait : bool
-            this affects only components that are waiting.
-
-            if True, the waits will be kept and thus the status will remain waiting
-
-            if False (the default), the wait(s) will be canceled and the status will become scheduled
-
-        cap_now : bool
-            indicator whether times (at, delay) in the past are allowed. If, so now() will be used.
-            default: sys.default_cap_now(), usualy False
-
-        mode : str preferred
-            mode
-
-            will be used in the trace and can be used in animations
-
-            if nothing specified, the mode will be unchanged.
-
-            also mode_time will be set to now, if mode is set.
-
-        Note
-        ----
-        if to be applied to the current component, use ``yield self.activate()``.
-
-        if both at and delay are specified, the component becomes current at the sum
-        of the two values.
-        """
-        p = None
-        if process is None:
-            if self.status.value == data:
-                if hasattr(self, "process"):
-                    p = self.process
-                    process_name = "process"
-                else:
-                    raise AttributeError("no process for data component")
-        else:
-            try:
-                p = getattr(self, process)
-                process_name = process
-            except AttributeError:
-                raise AttributeError("self." + process + " does not exist")
-
-        if p is None:
-            extra = ""
-        else:
-            if kwargs:
-                parameters = inspect.signature(p).parameters
-
-                for kwarg in kwargs:
-                    if kwarg not in parameters:
-                        raise TypeError("unexpected keyword argument '" + kwarg + "'")
-
-            if inspect.isgeneratorfunction(p):
-                self._process = p(**kwargs)
-                self._process_isgenerator = True
-            else:
-                self._process = p
-                self._process_isgenerator = False
-                self._process_kwargs = kwargs
-
-            extra = "process=" + process_name
-
-        if self.status.value != current:
-            self._remove()
-            if p is None:
-                if not (keep_request or keep_wait):
-                    self._check_fail()
-            else:
-                self._check_fail()
-
-        self.set_mode(mode)
-
-        if callable(delay):
-            delay = delay()
-
-        if at is None:
-            scheduled_time = self.env._now + delay
-        else:
-            if callable(at):
-                at = at()
-            scheduled_time = at + self.env._offset + delay
-
-        self.status._value = scheduled
-        self._reschedule(scheduled_time, priority, urgent, "activate", cap_now, extra=extra)
-
-    def hold(
-        self,
-        duration: Union[float, Callable] = None,
-        till: Union[float, Callable] = None,
-        priority: float = 0,
-        urgent: bool = False,
-        mode: str = None,
-        cap_now: bool = None,
-    ) -> None:
-        """
-        hold the component
-
-        Parameters
-        ----------
-        duration : float or distribution
-            specifies the duration
-
-            if omitted, 0 is used
-
-            inf is allowed
-
-            if distribution, the distribution is sampled
-
-        till : float or distribution
-            specifies at what time the component will become current
-
-            if omitted, now is used
-
-            inf is allowed
-
-            if distribution, the distribution is sampled
-
-        priority : float
-            priority
-
-            default: 0
-
-            if a component has the same time on the event list, this component is sorted accoring to
-            the priority.
-
-        urgent : bool
-            urgency indicator
-
-            if False (default), the component will be scheduled
-            behind all other components scheduled
-            for the same time and priority
-
-            if True, the component will be scheduled
-            in front of all components scheduled
-            for the same time and priority
-
-        mode : str preferred
-            mode
-
-            will be used in trace and can be used in animations
-
-            if nothing specified, the mode will be unchanged.
-
-            also mode_time will be set to now, if mode is set.
-
-        cap_now : bool
-            indicator whether times (duration, till) in the past are allowed. If, so now() will be used.
-            default: sys.default_cap_now(), usualy False
-
-        Note
-        ----
-        if to be used for the current component, use ``yield self.hold(...)``.
-
-
-        if both duration and till are specified, the component will become current at the sum of
-        these two.
-        """
-        if self.status.value != passive:
-            if self.status != current:
-                self._checkisnotdata()
-                self._remove()
-                self._check_fail()
-
-        self.set_mode(mode)
-
-        if till is None:
-            if duration is None:
-                scheduled_time = self.env._now
-            else:
-                if callable(duration):
-                    duration = duration()
-                scheduled_time = self.env._now + duration
-        else:
-            if duration is None:
-                if callable(till):
-                    till = till()
-                scheduled_time = till + self.env._offset
-            else:
-                raise ValueError("both duration and till specified")
-        self.status._value = scheduled
-        self._reschedule(scheduled_time, priority, urgent, "hold", cap_now)
-
-    def passivate(self, mode: str = None) -> None:
-        """
-        passivate the component
-
-        Parameters
-        ----------
-        mode : str preferred
-            mode
-
-            will be used in trace and can be used in animations
-
-            if nothing is specified, the mode will be unchanged.
-
-            also mode_time will be set to now, if mode is set.
-
-        Note
-        ----
-        if to be used for the current component (nearly always the case), use ``yield self.passivate()``.
-        """
-        if self.status.value == current:
-            self._remaining_duration = 0.0
-        else:
-            self._checkisnotdata()
-            self._remove()
-            self._check_fail()
-            self._remaining_duration = self._scheduled_time - self.env._now
-        self._scheduled_time = inf
-
-        self.set_mode(mode)
-        if self.env._trace:
-            lineno = self.lineno_txt(add_at=True)
-            self.env.print_trace(
-                "",
-                "",
-                self.name() + " passivate",
-                merge_blanks(lineno, self._modetxt()),
-            )
-        self.status._value = passive
-
-    def interrupt(self, mode: str = None) -> None:
-        """
-        interrupt the component
-
-        Parameters
-        ----------
-        mode : str preferred
-            mode
-
-            will be used in trace and can be used in animations
-
-            if nothing is specified, the mode will be unchanged.
-
-            also mode_time will be set to now, if mode is set.
-
-        Note
-        ----
-        Cannot be applied on the current component.
-
-        Use resume() to resume
-        """
-        if self.status.value == current:
-            raise ValueError(self.name() + " current component cannot be interrupted")
-        else:
-            self.set_mode(mode)
-            if self.status.value == interrupted:
-                self._interrupt_level += 1
-                extra = "." + str(self._interrupt_level)
-            else:
-                self._checkisnotdata()
-                self._remove()
-                self._remaining_duration = self._scheduled_time - self.env._now
-                self._interrupted_status = self.status.value
-                self._interrupt_level = 1
-                self.status._value = interrupted
-                extra = ""
-            lineno = self.lineno_txt(add_at=True)
-            self.env.print_trace(
-                "",
-                "",
-                self.name() + " interrupt" + extra,
-                merge_blanks(lineno, self._modetxt()),
-            )
-
-    def resume(
-        self,
-        all: bool = False,
-        mode: str = None,
-        priority: float = 0,
-        urgent: bool = False,
-    ) -> None:
-        """
-        resumes an interrupted component
-
-        Parameters
-        ----------
-        all : bool
-            if True, the component returns to the original status, regardless of the number of interrupt levels
-
-            if False (default), the interrupt level will be decremented and if the level reaches 0,
-            the component will return to the original status.
-
-        mode : str preferred
-            mode
-
-            will be used in trace and can be used in animations
-
-            if nothing is specified, the mode will be unchanged.
-
-            also mode_time will be set to now, if mode is set.
-
-        priority : float
-            priority
-
-            default: 0
-
-            if a component has the same time on the event list, this component is sorted accoring to
-            the priority.
-
-
-        urgent : bool
-            urgency indicator
-
-            if False (default), the component will be scheduled
-            behind all other components scheduled
-            for the same time and priority
-
-            if True, the component will be scheduled
-            in front of all components scheduled
-            for the same time and priority
-
-        Note
-        ----
-        Can be only applied to interrupted components.
-
-        """
-        if self.status.value == interrupted:
-            self.set_mode(mode)
-            self._interrupt_level -= 1
-            if self._interrupt_level and (not all):
-                self.env.print_trace(
-                    "",
-                    "",
-                    self.name() + " resume (interrupted." + str(self._interrupt_level) + ")",
-                    merge_blanks(self._modetxt()),
-                )
-            else:
-                self.status._value = self._interrupted_status
-                lineno = self.lineno_txt(add_at=True)
-                self.env.print_trace(
-                    "",
-                    "",
-                    self.name() + " resume (" + self.status() + ")",
-                    merge_blanks(lineno, self._modetxt()),
-                )
-                if self.status.value == passive:
-                    self.env.print_trace(
-                        "",
-                        "",
-                        self.name() + " passivate",
-                        merge_blanks(lineno, self._modetxt()),
-                    )
-                elif self.status.value == standby:
-                    self._scheduled_time = self.env._now
-                    self.env._standbylist.append(self)
-                    self.env.print_trace(
-                        "",
-                        "",
-                        self.name() + " standby",
-                        merge_blanks(lineno, self._modetxt()),
-                    )
-                elif self.status.value in (scheduled, waiting, requesting):
-                    if self.status.value == waiting:
-                        if self._waits:
-                            if self._trywait():
-                                return
-                            reason = "wait"
-                    elif self.status.value == requesting:
-                        if self._tryrequest():
-                            return
-                        reason = "request"
-                    elif self.status.value == scheduled:
-                        reason = "hold"
-                    self._reschedule(
-                        self.env._now + self._remaining_duration,
-                        priority,
-                        urgent,
-                        reason,
-                        False,
-                    )
-                else:
-                    raise Exception(
-                        self.name() + " unexpected interrupted_status",
-                        self.status.value(),
-                    )
-        else:
-            raise ValueError(self.name() + " not interrupted")
-
-    def cancel(self, mode: str = None) -> None:
-        """
-        cancel component (makes the component data)
-
-        Parameters
-        ----------
-        mode : str preferred
-            mode
-
-            will be used in trace and can be used in animations
-
-            if nothing specified, the mode will be unchanged.
-
-            also mode_time will be set to now, if mode is set.
-
-        Note
-        ----
-        if to be used for the current component, use ``yield self.cancel()``.
-        """
-        if self.status.value != current:
-            self._checkisnotdata()
-            self._remove()
-            self._check_fail()
-        self._process = None
-        self._scheduled_time = inf
-        self.set_mode(mode)
-        if self.env._trace:
-            self.env.print_trace("", "", "cancel " + self.name() + " " + self._modetxt())
-        self.status._value = data
-
-    def standby(self, mode: str = None) -> None:
-        """
-        puts the component in standby mode
-
-        Parameters
-        ----------
-        mode : str preferred
-            mode
-
-            will be used in trace and can be used in animations
-
-            if nothing specified, the mode will be unchanged.
-
-            also mode_time will be set to now, if mode is set.
-
-        Note
-        ----
-        Not allowed for data components or main.
-
-        if to be used for the current component
-        (which will be nearly always the case),
-        use ``yield self.standby()``.
-        """
-        if self.status.value != current:
-            self._checkisnotdata()
-            self._checkisnotmain()
-            self._remove()
-            self._check_fail()
-        self._scheduled_time = self.env._now
-        self.env._standbylist.append(self)
-        self.set_mode(mode)
-        if self.env._trace:
-            if self.env._buffered_trace:
-                self.env._buffered_trace = False
-            else:
-                lineno = self.lineno_txt(add_at=True)
-                self.env.print_trace("", "", "standby", merge_blanks(lineno, self._modetxt()))
-        self.status._value = standby
-
-    def from_store(
-        self,
-        store: Union["Store", Iterable],
-        filter: Callable = lambda c: True,
-        fail_priority: float = 0,
-        urgent: bool = True,
-        fail_at: float = None,
-        fail_delay: float = None,
-        mode: str = None,
-        cap_now: bool = None,
-    ) -> "Component":
-        """
-        get item from store(s)
-
-        Parameters
-        ----------
-        store : store or iterable stores
-            store(s) to get item from
-
-        filter : callable
-            only components that return True when applied to them will be considered
-
-            should be a function with one parameter(component) and returning a bool
-
-            default: lambda c: True (i.e. always return True)
-
-        fail_priority : float
-            priority of the fail event
-
-            default: 0
-
-            if a component has the same time on the event list, this component is sorted according to
-            the priority.
-
-        urgent : bool
-            urgency indicator
-
-            if False (default), the component will be scheduled
-            behind all other components scheduled
-            for the same time and priority
-
-            if True, the component will be scheduled
-            in front of all components scheduled
-            for the same time and priority
-
-        fail_at : float or distribution
-            time out
-
-            if the request is not honored before fail_at,
-            the request will be cancelled and the
-            parameter failed will be set.
-
-            if not specified, the request will not time out.
-
-            if distribution, the distribution is sampled
-
-        fail_delay : float or distribution
-            time out
-
-            if the request is not honored before now+fail_delay,
-            the request will be cancelled and the
-            parameter failed will be set.
-
-            if not specified, the request will not time out.
-
-            if distribution, the distribution is sampled
-
-        mode : str preferred
-            mode
-
-            will be used in trace and can be used in animations
-
-            if nothing specified, the mode will be unchanged.
-
-            also mode_time will be set to now, if mode is set.
-
-        cap_now : bool
-            indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
-            default: sys.default_cap_now(), usualy False
-
-        Note
-        ----
-        Only allowed for current component
-
-        Always use as
-        use ``item = yield self.from_store(...)``.
-
-        The parameter failed will be reset by a calling request, wait, from_store or to_store
-        """
-        if isinstance(store, Store):
-            from_stores = [store]
-        else:
-            from_stores = list(store)
-            if len(set(from_stores)) != len(from_stores):
-                raise ValueError("one or more stores specified more than once")
-            if len(from_stores) == 0:
-                raise ValueError("no stores specified")
-
-        if self.status.value != current:
-            self._checkisnotdata()
-            self._checkisnotmain()
-            self._remove()
-            self._check_fail()
-
-        if fail_at is None:
-            if fail_delay is None:
-                scheduled_time = inf
-            else:
-                if fail_delay == inf:
-                    scheduled_time = inf
-                else:
-                    if callable(fail_delay):
-                        fail_delay = fail_delay()
-                    scheduled_time = self.env._now + fail_delay
-        else:
-            if fail_delay is None:
-                if callable(fail_at):
-                    fail_at = fail_at()
-                scheduled_time = fail_at + self.env._offset
-            else:
-                raise ValueError("both fail_at and fail_delay specified")
-
-        self.set_mode(mode)
-
-        self._failed = False
-
-        if self.env._trace:
-            self.env.print_trace(
-                "",
-                "",
-                self.name(),
-                f"from_store ({', '.join(store._name for store in from_stores)})",
-            )
-        for store in from_stores:
-            for c in store:
-                if filter(c):
-                    c.leave(store)
-                    self._from_store_item = c
-                    self._from_store_store = store
-                    self._remove()
-                    self.status._value = scheduled
-                    self._reschedule(
-                        self.env._now,
-                        0,
-                        False,
-                        f"from_store ({store.name()}) honor with {c.name()}",
-                        False,
-                        s0=self.env.last_s0,
-                        return_value=c,
-                    )
-                    return
-        self._from_stores = from_stores
-        for store in from_stores:
-            self.enter(store._from_store_requesters)
-        self.status._value = requesting
-        self._from_store_item = None
-        self._from_store_filter = filter
-
-        self._reschedule(scheduled_time, fail_priority, urgent, "request from_store", cap_now)
-
-    def to_store(
-        self,
-        store: Union["Store", Iterable],
-        item: "Component",
-        priority: float = 0,
-        fail_priority: float = 0,
-        urgent: bool = True,
-        fail_at: float = None,
-        fail_delay: float = None,
-        mode: str = None,
-        cap_now: bool = None,
-    ) -> "Component":
-        """
-        put item to store(s)
-
-        Parameters
-        ----------
-        store : store or iterable stores
-            store(s) to put item to
-
-        item: Component
-            component to put to store
-
-        fail_priority : float
-            priority of the fail event
-
-            default: 0
-
-            if a component has the same time on the event list, this component is sorted according to
-            the priority.
-
-        urgent : bool
-            urgency indicator
-
-            if False (default), the component will be scheduled
-            behind all other components scheduled
-            for the same time and priority
-
-            if True, the component will be scheduled
-            in front of all components scheduled
-            for the same time and priority
-
-        fail_at : float or distribution
-            time out
-
-            if the request is not honored before fail_at,
-            the request will be cancelled and the
-            parameter failed will be set.
-
-            if not specified, the request will not time out.
-
-            if distribution, the distribution is sampled
-
-        fail_delay : float or distribution
-            time out
-
-            if the request is not honored before now+fail_delay,
-            the request will be cancelled and the
-            parameter failed will be set.
-
-            if not specified, the request will not time out.
-
-            if distribution, the distribution is sampled
-
-        mode : str preferred
-            mode
-
-            will be used in trace and can be used in animations
-
-            if nothing specified, the mode will be unchanged.
-
-            also mode_time will be set to now, if mode is set.
-
-        cap_now : bool
-            indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
-            default: sys.default_cap_now(), usualy False
-
-        Note
-        ----
-        Only allowed for current component
-
-        Always use as
-        use ``yield self.to_store(...)``.
-
-        The parameter failed will be reset by a calling request, wait, from_store, to_store
-        """
-        if isinstance(store, Store):
-            to_stores = [store]
-        else:
-            to_stores = list(store)
-            if len(set(to_stores)) != len(to_stores):
-                raise ValueError("one or more stores specified more than once")
-            if len(to_stores) == 0:
-                raise ValueError("no stores specified")
-
-        if self.status.value != current:
-            self._checkisnotdata()
-            self._checkisnotmain()
-            self._remove()
-            self._check_fail()
-
-        if fail_at is None:
-            if fail_delay is None:
-                scheduled_time = inf
-            else:
-                if fail_delay == inf:
-                    scheduled_time = inf
-                else:
-                    if callable(fail_delay):
-                        fail_delay = fail_delay()
-                    scheduled_time = self.env._now + fail_delay
-        else:
-            if fail_delay is None:
-                if callable(fail_at):
-                    fail_at = fail_at()
-                scheduled_time = fail_at + self.env._offset
-            else:
-                raise ValueError("both fail_at and fail_delay specified")
-
-        self.set_mode(mode)
-
-        self._failed = False
-
-        if self.env._trace:
-            self.env.print_trace(
-                "",
-                "",
-                self.name(),
-                f"{item._name} to_store ({', '.join(store._name for store in to_stores)})",
-            )
-        for store in to_stores:
-            q = store
-            if q.available_quantity() > 0:
-                item.enter_sorted(q, priority)
-                self._to_store_item = None
-                self._to_store_store = store
-                self._remove()
-                self.status._value = scheduled
-                self._reschedule(
-                    self.env._now,
-                    0,
-                    False,
-                    f"to_store ({store.name()}) honor with {item.name()}",
-                    False,
-                    s0=self.env.last_s0,
-                )
-                return
-
-        for store in to_stores:
-            self.enter(store._to_store_requesters)
-
-        self.status._value = requesting
-        self._to_store_item = item
-        self._to_store_priority = priority
-        self._to_stores = to_stores
-
-        if self._to_store_item:
-            self._reschedule(scheduled_time, fail_priority, urgent, "request to_store", cap_now)
-
-    def filter(self, value: callable):
-        """
-        updates the filter used in yield self.from_to
-
-        Parameters
-        ----------
-        value : callable
-            new filter, which should be a function with one parameter(component) and returning a bool
-
-        Note
-        ----
-        After applying the new filter, items (components) may leave or enter the store
-        """
-        self._from_store_filter = value
-        for store in self._from_stores:
-            store.rescan()
-
-    def request(self, *args, **kwargs) -> None:
-        """
-        request from a resource or resources
-
-        Parameters
-        ----------
-        args : sequence of items where each item can be:
-            - resource, where quantity=1, priority=tail of requesters queue
-            - tuples/list containing a resource, a quantity and optionally a priority.
-                if the priority is not specified, the request
-                for the resource be added to the tail of
-                the requesters queue
-
-
-        priority : float
-            priority of the fail event
-
-            default: 0
-
-            if a component has the same time on the event list, this component is sorted according to
-            the priority.
-
-        urgent : bool
-            urgency indicator
-
-            if False (default), the component will be scheduled
-            behind all other components scheduled
-            for the same time and priority
-
-            if True, the component will be scheduled
-            in front of all components scheduled
-            for the same time and priority
-
-        fail_at : float or distribution
-            time out
-
-            if the request is not honored before fail_at,
-            the request will be cancelled and the
-            parameter failed will be set.
-
-            if not specified, the request will not time out.
-
-            if distribution, the distribution is sampled
-
-        fail_delay : float or distribution
-            time out
-
-            if the request is not honored before now+fail_delay,
-            the request will be cancelled and the
-            parameter failed will be set.
-
-            if not specified, the request will not time out.
-
-            if distribution, the distribution is sampled
-
-        oneof : bool
-            if oneof is True, just one of the requests has to be met (or condition),
-            where honoring follows the order given.
-
-            if oneof is False (default), all requests have to be met to be honored
-
-        mode : str preferred
-            mode
-
-            will be used in trace and can be used in animations
-
-            if nothing specified, the mode will be unchanged.
-
-            also mode_time will be set to now, if mode is set.
-
-        cap_now : bool
-            indicator whether times (fail_at, fail_delay) in the past are allowed. If, so now() will be used.
-            default: sys.default_cap_now(), usualy False
-
-        Note
-        ----
-        Not allowed for data components or main.
-
-        If to be used for the current component
-        (which will be nearly always the case),
-        use ``yield self.request(...)``.
-
-        If the same resource is specified more that once, the quantities are summed
-
-
-        The requested quantity may exceed the current capacity of a resource
-
-
-        The parameter failed will be reset by a calling request or wait
-
-        Example
-        -------
-        ``yield self.request(r1)``
-
-        --> requests 1 from r1
-
-        ``yield self.request(r1,r2)``
-
-        --> requests 1 from r1 and 1 from r2
-
-        ``yield self.request(r1,(r2,2),(r3,3,100))``
-
-        --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100
-
-        ``yield self.request((r1,1),(r2,2))``
-
-        --> requests 1 from r1, 2 from r2
-
-        ``yield self.request(r1, r2, r3, oneoff=True)``
-
-        --> requests 1 from r1, r2 or r3
-
-        """
-        fail_at = kwargs.pop("fail_at", None)
-        fail_delay = kwargs.pop("fail_delay", None)
-        mode = kwargs.pop("mode", None)
-        urgent = kwargs.pop("urgent", False)
-        schedule_priority = kwargs.pop("priority", 0)
-        cap_now = kwargs.pop("cap_now", None)
-
-        self.oneof_request = kwargs.pop("oneof", False)
-        called_from = kwargs.pop("called_from", "request")
-        if kwargs:
-            raise TypeError(called_from + "() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
-
-        if self.status.value != current:
-            self._checkisnotdata()
-            self._checkisnotmain()
-            self._remove()
-            self._check_fail()
-        if fail_at is None:
-            if fail_delay is None:
-                scheduled_time = inf
-            else:
-                if fail_delay == inf:
-                    scheduled_time = inf
-                else:
-                    if callable(fail_delay):
-                        fail_delay = fail_delay()
-                    scheduled_time = self.env._now + fail_delay
-        else:
-            if fail_delay is None:
-                if callable(fail_at):
-                    fail_at = fail_at()
-                scheduled_time = fail_at + self.env._offset
-            else:
-                raise ValueError("both fail_at and fail_delay specified")
-
-        self.set_mode(mode)
-
-        self._failed = False
-        for arg in args:
-            q = 1
-            priority = inf
-            if isinstance(arg, Resource):
-                r = arg
-            elif isinstance(arg, (tuple, list)):
-                r = arg[0]
-                if len(arg) >= 2:
-                    q = arg[1]
-                if len(arg) >= 3:
-                    priority = arg[2]
-            else:
-                raise TypeError("incorrect specifier", arg)
-
-            if r._preemptive:
-                if len(args) > 1:
-                    raise ValueError("preemptive resources do not support multiple resource requests")
-
-            if called_from == "put":
-                q = -q
-
-            if q < 0 and not r._anonymous:
-                raise ValueError("quantity " + str(q) + " <0")
-            if r in self._requests:
-                self._requests[r] += q  # is same resource is specified several times, just add them up
-            else:
-                self._requests[r] = q
-            if called_from == "request":
-                req_text = "request " + str(q) + " from "
-            elif called_from == "put":
-                req_text = "put (request) " + str(-q) + " to "
-            elif called_from == "get":
-                req_text = "get (request) " + str(q) + " from "
-
-            addstring = ""
-            addstring += " priority=" + str(priority)
-
-            if self.oneof_request:
-                addstring += " (oneof)"
-
-            self.enter_sorted(r._requesters, priority)
-            if self.env._trace:
-                self.env.print_trace("", "", self.name(), req_text + r.name() + addstring)
-
-            if r._preemptive:
-                av = r.available_quantity()
-                this_claimers = r.claimers()
-                bump_candidates = []
-                for c in reversed(r.claimers()):
-                    if av >= q:
-                        break
-                    if priority >= c.priority(this_claimers):
-                        break
-                    av += c.claimed_quantity(this_claimers)
-                    bump_candidates.append(c)
-                if av >= 0:
-                    for c in bump_candidates:
-                        c._release(r, bumped_by=self)
-                        c.activate()
-        for r, q in self._requests.items():
-            if q < r._minq:
-                r._minq = q
-
-        self._tryrequest()
-
-        if self._requests:
-            self.status._value = requesting
-            self._reschedule(scheduled_time, schedule_priority, urgent, "request", cap_now)
-
-    def isbumped(self, resource: "Resource" = None) -> bool:
-        """
-        check whether component is bumped from resource
-
-        Parameters
-        ----------
-        resource : Resource
-            resource to be checked
-            if omitted, checks whether component belongs to any resource claimers
-
-        Returns
-        -------
-        True if this component is not in the resource claimers : bool
-            False otherwise
-        """
-        return not self.isclaiming(resource)
-
-    def isclaiming(self, resource: "Resource" = None) -> bool:
-        """
-        check whether component is claiming from resource
-
-        Parameters
-        ----------
-        resource : Resource
-            resource to be checked
-            if omitted, checks whether component is in any resource claimers
-
-        Returns
-        -------
-        True if this component is in the resource claimers : bool
-            False otherwise
-        """
-        if resource is None:
-            for q in self._qmembers:
-                if hasattr(q, "_isclaimers"):
-                    return True
-            return False
-        else:
-            return self in resource.claimers()
-
-    def get(self, *args, **kwargs) -> None:
-        """
-        equivalent to request
-        """
-        return self.request(*args, called_from="get", **kwargs)
-
-    def put(self, *args, **kwargs) -> None:
-        """
-        equivalent to request, but anonymous quantities are negated
-        """
-        return self.request(*args, called_from="put", **kwargs)
-
-    def honor_all(self):
-        for r in self._requests:
-            if r._honor_only_first and r._requesters[0] != self:
-                return []
-            self_prio = self.priority(r._requesters)
-            if r._honor_only_highest_priority and self_prio != r._requesters._head.successor.priority:
-                return []
-            if self._requests[r] > 0:
-                if self._requests[r] > (r._capacity - r._claimed_quantity + 1e-8):
-                    return []
-            else:
-                if -self._requests[r] > r._claimed_quantity + 1e-8:
-                    return []
-        return list(self._requests.keys())
-
-    def honor_any(self):
-        for r in self._requests:
-            if r._honor_only_first and r._requesters[0] != self:
-                continue
-            self_prio = self.priority(r._requesters)
-            if r._honor_only_highest_priority and self_prio != r._requesters._head.successor.priority:
-                continue
-
-            if self._requests[r] > 0:
-                if self._requests[r] <= (r._capacity - r._claimed_quantity + 1e-8):
-                    return [r]
-            else:
-                if -self._requests[r] <= r._claimed_quantity + 1e-8:
-                    return [r]
-        return []
-
-    def _tryrequest(self):
-        # this is Component._tryrequest
-        if self.status.value == interrupted:
-            return False
-
-        if self.oneof_request:
-            r_honor = self.honor_any()
-        else:
-            r_honor = self.honor_all()
-
-        if r_honor:
-            anonymous_resources = []
-            for r in list(self._requests):
-                if r._anonymous:
-                    anonymous_resources.append(r)
-                if r in r_honor:
-                    r._claimed_quantity += self._requests[r]
-                    this_prio = self.priority(r._requesters)
-                    if r._anonymous:
-                        prio_trace = ""
-                    else:
-                        if r in self._claims:
-                            self._claims[r] += self._requests[r]
-                        else:
-                            self._claims[r] = self._requests[r]
-                        mx = self._member(r._claimers)
-                        if mx is None:
-                            self.enter_sorted(r._claimers, this_prio)
-                        prio_trace = " priority=" + str(this_prio)
-                    r.claimed_quantity.tally(r._claimed_quantity)
-                    r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
-                    r.available_quantity.tally(r._capacity - r._claimed_quantity)
-                    if self.env._trace:
-                        self.env.print_trace(
-                            "",
-                            "",
-                            self.name(),
-                            "claim " + str(r._claimed_quantity) + " from " + r.name() + prio_trace,
-                        )
-                self.leave(r._requesters)
-                if r._requesters._length == 0:
-                    r._minq = inf
-
-            self._requests = collections.OrderedDict()
-            self._remove()
-            honoredstr = r_honor[0].name() + (len(r_honor) > 1) * " ++"
-            self.status._value = scheduled
-            self._reschedule(
-                self.env._now,
-                0,
-                False,
-                "request honor " + honoredstr,
-                False,
-                s0=self.env.last_s0,
-            )
-            for r in anonymous_resources:
-                r._tryrequest()
-            return True
-        else:
-            return False
-
-    def _release(self, r, q=None, s0=None, bumped_by=None):
-        if r not in self._claims:
-            raise ValueError(self.name() + " not claiming from resource " + r.name())
-        if q is None:
-            q = self._claims[r]
-        if q > self._claims[r]:
-            q = self._claims[r]
-        r._claimed_quantity -= q
-        self._claims[r] -= q
-        if self._claims[r] < 1e-8:
-            self.leave(r._claimers)
-            if r._claimers._length == 0:
-                r._claimed_quantity = 0  # to avoid rounding problems
-            del self._claims[r]
-        r.claimed_quantity.tally(r._claimed_quantity)
-        r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
-        r.available_quantity.tally(r._capacity - r._claimed_quantity)
-        extra = " bumped by " + bumped_by.name() if bumped_by else ""
-        if self.env._trace:
-            if bumped_by:
-                self.env.print_trace(
-                    "",
-                    "",
-                    self.name(),
-                    "bumped from " + r.name() + " by " + bumped_by.name() + " (release " + str(q) + ")",
-                    s0=s0,
-                )
-            else:
-                self.env.print_trace(
-                    "",
-                    "",
-                    self.name(),
-                    "release " + str(q) + " from " + r.name() + extra,
-                    s0=s0,
-                )
-        if not bumped_by:
-            r._tryrequest()
-
-    def release(self, *args) -> None:
-        """
-        release a quantity from a resource or resources
-
-        Parameters
-        ----------
-        args : sequence of items, where each items can be
-            - a resources, where quantity=current claimed quantity
-            - a tuple/list containing a resource and the quantity to be released
-
-        Note
-        ----
-        It is not possible to release from an anonymous resource, this way.
-        Use Resource.release() in that case.
-
-        Example
-        -------
-        yield self.request(r1,(r2,2),(r3,3,100))
-
-        --> requests 1 from r1, 2 from r2 and 3 from r3 with priority 100
-
-
-        c1.release
-
-        --> releases 1 from r1, 2 from r2 and 3 from r3
-
-
-        yield self.request(r1,(r2,2),(r3,3,100))
-
-        c1.release((r2,1))
-
-        --> releases 1 from r2
-
-
-        yield self.request(r1,(r2,2),(r3,3,100))
-
-        c1.release((r2,1),r3)
-
-        --> releases 2 from r2,and 3 from r3
-        """
-        if args:
-            for arg in args:
-                q = None
-                if isinstance(arg, Resource):
-                    r = arg
-                elif isinstance(arg, (tuple, list)):
-                    r = arg[0]
-                    if len(arg) >= 2:
-                        q = arg[1]
-                else:
-                    raise TypeError("incorrect specifier" + arg)
-                if r._anonymous:
-                    raise ValueError("not possible to release anonymous resources " + r.name())
-                self._release(r, q)
-        else:
-            for r in list(self._claims):
-                self._release(r)
-
-    def wait(self, *args, **kwargs) -> None:
-        """
-        wait for any or all of the given state values are met
-
-        Parameters
-        ----------
-        args : sequence of items, where each item can be
-            - a state, where value=True, priority=tail of waiters queue)
-            - a tuple/list containing
-
-                state, a value and optionally a priority.
-
-                if the priority is not specified, this component will
-                be added to the tail of
-                the waiters queue
-
-
-        priority : float
-            priority of the fail event
-
-            default: 0
-
-            if a component has the same time on the event list, this component is sorted accoring to
-            the priority.
-
-        urgent : bool
-            urgency indicator
-
-            if False (default), the component will be scheduled
-            behind all other components scheduled
-            for the same time and priority
-
-            if True, the component will be scheduled
-            in front of all components scheduled
-            for the same time and priority
-
-        fail_at : float or distribution
-            time out
-
-            if the wait is not honored before fail_at,
-            the wait will be cancelled and the
-            parameter failed will be set.
-
-            if not specified, the wait will not time out.
-
-            if distribution, the distribution is sampled
-
-        fail_delay : float or distribution
-            time out
-
-            if the wait is not honored before now+fail_delay,
-            the request will be cancelled and the
-            parameter failed will be set.
-
-            if not specified, the wait will not time out.
-
-            if distribution, the distribution is sampled
-
-        all : bool
-            if False (default), continue, if any of the given state/values is met
-
-            if True, continue if all of the given state/values are met
-
-        mode : str preferred
-            mode
-
-            will be used in trace and can be used in animations
-
-            if nothing specified, the mode will be unchanged.
-
-            also mode_time will be set to now, if mode is set.
-
-        cap_now : bool
-            indicator whether times (fail_at, fail_duration) in the past are allowed. If, so now() will be used.
-            default: sys.default_cap_now(), usualy False
-
-        Note
-        ----
-        Not allowed for data components or main.
-
-        If to be used for the current component
-        (which will be nearly always the case),
-        use ``yield self.wait(...)``.
-
-        It is allowed to wait for more than one value of a state
-
-        the parameter failed will be reset by a calling wait
-
-        If you want to check for all components to meet a value (and clause),
-        use Component.wait(..., all=True)
-
-        The value may be specified in three different ways:
-
-        * constant, that value is just compared to state.value()
-
-          yield self.wait((light,"red"))
-        * an expression, containg one or more $-signs
-          the $ is replaced by state.value(), each time the condition is tested.
-
-          self refers to the component under test, state refers to the state
-          under test.
-
-          yield self.wait((light,'$ in ("red","yellow")'))
-
-          yield self.wait((level,"$<30"))
-
-        * a function. In that case the parameter should function that
-          should accept three arguments: the value, the component under test and the
-          state under test.
-
-          usually the function will be a lambda function, but that's not
-          a requirement.
-
-          yield self.wait((light,lambda t, comp, state: t in ("red","yellow")))
-
-          yield self.wait((level,lambda t, comp, state: t < 30))
-
-
-        Example
-        -------
-        ``yield self.wait(s1)``
-
-        --> waits for s1.value()==True
-
-        ``yield self.wait(s1,s2)``
-
-        --> waits for s1.value()==True or s2.value==True
-
-        ``yield self.wait((s1,False,100),(s2,"on"),s3)``
-
-        --> waits for s1.value()==False or s2.value=="on" or s3.value()==True
-
-        s1 is at the tail of waiters, because of the set priority
-
-        ``yield self.wait(s1,s2,all=True)``
-
-        --> waits for s1.value()==True and s2.value==True
-
-        """
-        fail_at = kwargs.pop("fail_at", None)
-        fail_delay = kwargs.pop("fail_delay", None)
-        all = kwargs.pop("all", False)
-        mode = kwargs.pop("mode", None)
-        urgent = kwargs.pop("urgent", False)
-        schedule_priority = kwargs.pop("priority", 0)
-        cap_now = kwargs.pop("cap_now", None)
-
-        if kwargs:
-            raise TypeError("wait() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
-
-        if self.status.value != current:
-            self._checkisnotdata()
-            self._checkisnotmain()
-            self._remove()
-            self._check_fail()
-
-        self._wait_all = all
-        self._failed = False
-
-        if fail_at is None:
-            if fail_delay is None:
-                scheduled_time = inf
-            else:
-                if fail_delay == inf:
-                    scheduled_time = inf
-                else:
-                    if callable(fail_delay):
-                        fail_delay = fail_delay()
-                    scheduled_time = self.env._now + fail_delay
-        else:
-            if fail_delay is None:
-                if callable(fail_at):
-                    fail_at = fail_at()
-                scheduled_time = fail_at + self.env._offset
-            else:
-                raise ValueError("both fail_at and fail_delay specified")
-
-        self.set_mode(mode)
-
-        for arg in args:
-            value = True
-            priority = None
-            if isinstance(arg, State):
-                state = arg
-            elif isinstance(arg, (tuple, list)):
-                state = arg[0]
-                if not isinstance(state, State):
-                    raise TypeError("incorrect specifier", arg)
-                if len(arg) >= 2:
-                    value = arg[1]
-                if len(arg) >= 3:
-                    priority = arg[2]
-                if len(arg) >= 4:
-                    raise TypeError("incorrect specifier", arg)
-            else:
-                raise TypeError("incorrect specifier", arg)
-
-            for statex, _, _ in self._waits:
-                if statex == state:
-                    break
-            else:
-                if priority is None:
-                    self.enter(state._waiters)
-                else:
-                    self.enter_sorted(state._waiters, priority)
-            if inspect.isfunction(value):
-                self._waits.append((state, value, 2))
-            elif "$" in str(value):
-                self._waits.append((state, value, 1))
-            else:
-                self._waits.append((state, value, 0))
-
-        if not self._waits:
-            raise TypeError("no states specified")
-        self._trywait()
-
-        if self._waits:
-            self.status._value = waiting
-            self._reschedule(scheduled_time, schedule_priority, urgent, "wait", cap_now)
-
-    def _trywait(self):
-        if self.status.value == interrupted:
-            return False
-        if self._wait_all:
-            honored = True
-            for state, value, valuetype in self._waits:
-                if valuetype == 0:
-                    if value != state._value:
-                        honored = False
-                        break
-                elif valuetype == 1:
-                    if eval(value.replace("$", "state._value")):
-                        honored = False
-                        break
-                elif valuetype == 2:
-                    if not value(state._value, self, state):
-                        honored = False
-                        break
-
-        else:
-            honored = False
-            for state, value, valuetype in self._waits:
-                if valuetype == 0:
-                    if value == state._value:
-                        honored = True
-                        break
-                elif valuetype == 1:
-                    if eval(value.replace("$", str(state._value))):
-                        honored = True
-                        break
-                elif valuetype == 2:
-                    if value(state._value, self, state):
-                        honored = True
-                        break
-
-        if honored:
-            for s, _, _ in self._waits:
-                if self in s._waiters:  # there might be more values for this state
-                    self.leave(s._waiters)
-            self._waits = []
-            self._remove()
-            self.status._value = scheduled
-            self._reschedule(self.env._now, 0, False, "wait honor", False, s0=self.env.last_s0)
-
-        return honored
-
-    def claimed_quantity(self, resource: "Resource" = None) -> float:
-        """
-        Parameters
-        ----------
-        resource : Resoure
-            resource to be queried
-
-        Returns
-        -------
-        the claimed quantity from a resource : float or int
-            if the resource is not claimed, 0 will be returned
-        """
-        return self._claims.get(resource, 0)
-
-    def claimed_resources(self) -> List:
-        """
-        Returns
-        -------
-        list of claimed resources : list
-        """
-        return list(self._claims)
-
-    def requested_resources(self) -> List:
-        """
-        Returns
-        -------
-        list of requested resources : list
-        """
-        return list(self._requests)
-
-    def requested_quantity(self, resource: "Resource" = None) -> float:
-        """
-        Parameters
-        ----------
-        resource : Resoure
-            resource to be queried
-
-        Returns
-        -------
-        the requested (not yet honored) quantity from a resource : float or int
-            if there is no request for the resource, 0 will be returned
-        """
-        return self._requests.get(resource, 0)
-
-    def failed(self) -> bool:
-        """
-        Returns
-        -------
-        True, if the latest request/wait has failed (either by timeout or external) : bool
-        False, otherwise
-        """
-        return self._failed
-
-    def name(self, value: str = None) -> str:
-        """
-        Parameters
-        ----------
-        value : str
-            new name of the component
-            if omitted, no change
-
-        Returns
-        -------
-        Name of the component : str
-
-        Note
-        ----
-        base_name and sequence_number are not affected if the name is changed
-        """
-        if value is not None:
-            self._name = value
-        return self._name
-
-    def base_name(self) -> str:
-        """
-        Returns
-        -------
-        base name of the component (the name used at initialization): str
-        """
-        return self._base_name
-
-    def sequence_number(self) -> int:
-        """
-        Returns
-        -------
-        sequence_number of the component : int
-            (the sequence number at initialization)
-
-            normally this will be the integer value of a serialized name,
-            but also non serialized names (without a dotcomma at the end)
-            will be numbered)
-        """
-        return self._sequence_number
-
-    def running_process(self) -> str:
-        """
-        Returns
-        -------
-        name of the running process : str
-            if data component, None
-        """
-        if self._process is None:
-            return None
-        else:
-            return self._process.__name__
-
-    def remove_animation_children(self) -> None:
-        """
-        removes animation children
-
-        Note
-        ----
-        Normally, the animation_children are removed automatically upon termination of a component (when it terminates)
-        """
-        for ao in self._animation_children:
-            ao.remove()
-        self._animation_children = set()
-
-    def suppress_trace(self, value: bool = None) -> bool:
-        """
-        Parameters
-        ----------
-        value: bool
-            new suppress_trace value
-
-            if omitted, no change
-
-        Returns
-        -------
-        suppress_trace : bool
-            components with the suppress_status of True, will be ignored in the trace
-        """
-        if value is not None:
-            self._suppress_trace = value
-        return self._suppress_trace
-
-    def suppress_pause_at_step(self, value: bool = None) -> bool:
-        """
-        Parameters
-        ----------
-        value: bool
-            new suppress_trace value
-
-            if omitted, no change
-
-        Returns
-        -------
-        suppress_pause_at_step : bool
-            components with the suppress_pause_at_step of True, will be ignored in a step
-        """
-        if value is not None:
-            self._suppress_pause_at_step = value
-        return self._suppress_pause_at_step
-
-    def skip_standby(self, value: bool = None) -> bool:
-        """
-        Parameters
-        ----------
-        value: bool
-            new skip_standby value
-
-            if omitted, no change
-
-        Returns
-        -------
-        skip_standby indicator : bool
-            components with the skip_standby indicator of True, will not activate standby components after
-            the component became current.
-        """
-        if value is not None:
-            self._skip_standby = value
-        return self._skip_standby
-
-    def set_mode(self, value: str = None) -> None:
-        """
-        Parameters
-        ----------
-        value: any, str recommended
-            new mode
-
-            mode_time will be set to now
-            if omitted, no change
-        """
-        if value is not None:
-            self._mode_time = self.env._now
-            self.mode.tally(value)
-
-    def _modetxt(self) -> str:
-        if self.mode() == "":
-            return ""
-        else:
-            return "mode=" + str(self.mode())
-
-    def ispassive(self) -> bool:
-        """
-        Returns
-        -------
-        True if status is passive, False otherwise : bool
-
-        Note
-        ----
-        Be sure to always include the parentheses, otherwise the result will be always True!
-        """
-        return self.status.value == passive
-
-    def iscurrent(self) -> bool:
-        """
-        Returns
-        -------
-        True if status is current, False otherwise : bool
-
-        Note
-        ----
-        Be sure to always include the parentheses, otherwise the result will be always True!
-        """
-        return self.status.value == current
-
-    def isrequesting(self):
-        """
-        Returns
-        -------
-        True if status is requesting, False otherwise : bool
-
-        Note
-        ----
-        Be sure to always include the parentheses, otherwise the result will be always True!
-        """
-        return self.status.value == requesting
-
-    def iswaiting(self) -> bool:
-        """
-        Returns
-        -------
-        True if status is waiting, False otherwise : bool
-
-        Note
-        ----
-        Be sure to always include the parentheses, otherwise the result will be always True!
-        """
-        return self.status.value == waiting
-
-    def isscheduled(self) -> bool:
-        """
-        Returns
-        -------
-        True if status is scheduled, False otherwise : bool
-
-        Note
-        ----
-        Be sure to always include the parentheses, otherwise the result will be always True!
-        """
-        return self.status.value == scheduled
-
-    def isstandby(self) -> bool:
-        """
-        Returns
-        -------
-        True if status is standby, False otherwise : bool
-
-        Note
-        ----
-        Be sure to always include the parentheses, otherwise the result will be always True
-        """
-        return self.status.value == standby
-
-    def isinterrupted(self) -> bool:
-        """
-        Returns
-        -------
-        True if status is interrupted, False otherwise : bool
-
-        Note
-        ----
-        Be sure to always include the parentheses, otherwise the result will be always True
-        """
-        return self.status.value == interrupted
-
-    def isdata(self) -> bool:
-        """
-        Returns
-        -------
-        True if status is data, False otherwise : bool
-
-        Note
-        ----
-        Be sure to always include the parentheses, otherwise the result will be always True!
-        """
-        return self.status.value == data
-
-    def queues(self) -> Set:
-        """
-        Returns
-        -------
-        set of queues where the component belongs to : set
-        """
-        return set(self._qmembers)
-
-    def count(self, q: "Queue" = None) -> int:
-        """
-        queue count
-
-        Parameters
-        ----------
-        q : Queue
-            queue to check or
-
-            if omitted, the number of queues where the component is in
-
-        Returns
-        -------
-        1 if component is in q, 0 otherwise : int
-
-
-            if q is omitted, the number of queues where the component is in
-        """
-        if q is None:
-            return len(self._qmembers)
-        else:
-            return 1 if self in q else 0
-
-    def index(self, q: "Queue") -> int:
-        """
-        Parameters
-        ----------
-        q : Queue
-            queue to be queried
-
-        Returns
-        -------
-        index of component in q : int
-            if component belongs to q
-
-            -1 if component does not belong to q
-        """
-        m1 = self._member(q)
-        if m1 is None:
-            return -1
-        else:
-            mx = q._head.successor
-            index = 0
-            while mx != m1:
-                mx = mx.successor
-                index += 1
-            return index
-
-    def enter(self, q: "Queue") -> "Component":
-        """
-        enters a queue at the tail
-
-        Parameters
-        ----------
-        q : Queue
-            queue to enter
-
-        Note
-        ----
-        the priority will be set to
-        the priority of the tail component of the queue, if any
-        or 0 if queue is empty
-        """
-        self._checknotinqueue(q)
-        priority = q._tail.predecessor.priority
-        Qmember().insert_in_front_of(q._tail, self, q, priority)
-        return self
-
-    def enter_at_head(self, q: "Queue") -> "Component":
-        """
-        enters a queue at the head
-
-        Parameters
-        ----------
-        q : Queue
-            queue to enter
-
-        Note
-        ----
-        the priority will be set to
-        the priority of the head component of the queue, if any
-        or 0 if queue is empty
-        """
-
-        self._checknotinqueue(q)
-        priority = q._head.successor.priority
-        Qmember().insert_in_front_of(q._head.successor, self, q, priority)
-        return self
-
-    def enter_in_front_of(self, q: "Queue", poscomponent: "Component") -> "Component":
-        """
-        enters a queue in front of a component
-
-        Parameters
-        ----------
-        q : Queue
-            queue to enter
-
-        poscomponent : Component
-            component to be entered in front of
-
-        Note
-        ----
-        the priority will be set to the priority of poscomponent
-        """
-
-        self._checknotinqueue(q)
-        m2 = poscomponent._checkinqueue(q)
-        priority = m2.priority
-        Qmember().insert_in_front_of(m2, self, q, priority)
-        return self
-
-    def enter_behind(self, q: "Queue", poscomponent: "Component") -> "Component":
-        """
-        enters a queue behind a component
-
-        Parameters
-        ----------
-        q : Queue
-            queue to enter
-
-        poscomponent : Component
-            component to be entered behind
-
-        Note
-        ----
-        the priority will be set to the priority of poscomponent
-        """
-
-        self._checknotinqueue(q)
-        m1 = poscomponent._checkinqueue(q)
-        priority = m1.priority
-        Qmember().insert_in_front_of(m1.successor, self, q, priority)
-        return self
-
-    def enter_sorted(self, q: "Queue", priority: float) -> "Component":
-        """
-        enters a queue, according to the priority
-
-        Parameters
-        ----------
-        q : Queue
-            queue to enter
-
-        priority: type that can be compared with other priorities in the queue
-            priority in the queue
-
-        Note
-        ----
-        The component is placed just before the first component with a priority > given priority
-        """
-        self._checknotinqueue(q)
-        if q._length >= 1 and priority < q._head.successor.priority:  # direct enter component that's smaller than the rest
-            m2 = q._head.successor
-        else:
-            m2 = q._tail
-            while (m2.predecessor != q._head) and (m2.predecessor.priority > priority):
-                m2 = m2.predecessor
-        Qmember().insert_in_front_of(m2, self, q, priority)
-        return self
-
-    def leave(self, q: "Queue" = None) -> "Component":
-        """
-        leave queue
-
-        Parameters
-        ----------
-        q : Queue
-            queue to leave
-
-        Note
-        ----
-        statistics are updated accordingly
-        """
-        if q is None:
-            for q in list(self._qmembers):
-                if not q._isinternal:
-                    self.leave(q)
-            return self
-
-        mx = self._checkinqueue(q)
-        m1 = mx.predecessor
-        m2 = mx.successor
-        m1.successor = m2
-        m2.predecessor = m1
-        mx.component = None
-        # signal for components method that member is not in the queue
-        q._length -= 1
-        del self._qmembers[q]
-        if self.env._trace:
-            if not q._isinternal:
-                self.env.print_trace("", "", self.name(), "leave " + q.name())
-        length_of_stay = self.env._now - mx.enter_time
-        q.length_of_stay.tally(length_of_stay)
-        q.length.tally(q._length)
-        q.available_quantity.tally(q.capacity._tally - q._length)
-        q.number_of_departures += 1
-
-        if isinstance(q, Store):
-            store = q
-            available_quantity = q.capacity._tally - q._length
-            if available_quantity > 0:
-                if len(store._to_store_requesters) > 0:
-                    requester = store._to_store_requesters[0]
-                    with self.env.suppress_trace():
-                        requester._to_store_item.enter_sorted(q, requester._to_store_priority)
-                    for store0 in requester._to_stores:
-                        requester.leave(store0._to_store_requesters)
-                    requester._to_stores = []
-                    requester._remove()
-                    requester.status._value = scheduled
-                    requester._reschedule(
-                        requester.env._now,
-                        0,
-                        False,
-                        f"to_store ({store.name()}) honor ",
-                        False,
-                        s0=requester.env.last_s0,
-                    )
-                    requester._to_store_item = None
-                    requester._to_store_store = self
-        return self
-
-    def priority(self, q: "Queue", priority: float = None) -> float:
-        """
-        gets/sets the priority of a component in a queue
-
-        Parameters
-        ----------
-        q : Queue
-            queue where the component belongs to
-
-        priority : type that can be compared with other priorities in the queue
-            priority in queue
-
-            if omitted, no change
-
-        Returns
-        -------
-        the priority of the component in the queue : float
-
-        Note
-        ----
-        if you change the priority, the order of the queue may change
-        """
-
-        mx = self._checkinqueue(q)
-        if priority is not None:
-            if priority != mx.priority:
-                # leave.sort is not possible, because statistics will be affected
-                mx.predecessor.successor = mx.successor
-                mx.successor.predecessor = mx.predecessor
-
-                m2 = q._head.successor
-                while (m2 != q._tail) and (m2.priority <= priority):
-                    m2 = m2.successor
-
-                m1 = m2.predecessor
-                m1.successor = mx
-                m2.predecessor = mx
-                mx.predecessor = m1
-                mx.successor = m2
-                mx.priority = priority
-                for iter in q._iter_touched:
-                    q._iter_touched[iter] = True
-        return mx.priority
-
-    def successor(self, q: "Queue") -> "Component":
-        """
-        Parameters
-        ----------
-        q : Queue
-            queue where the component belongs to
-
-        Returns
-        -------
-        the successor of the component in the queue: Component
-            if component is not at the tail.
-
-            returns None if component is at the tail.
-        """
-
-        mx = self._checkinqueue(q)
-        return mx.successor.component
-
-    def predecessor(self, q: "Queue") -> "Component":
-        """
-        Parameters
-        ----------
-        q : Queue
-            queue where the component belongs to
-
-        Returns : Component
-            predecessor of the component in the queue
-            if component is not at the head.
-
-            returns None if component is at the head.
-        """
-
-        mx = self._checkinqueue(q)
-        return mx.predecessor.component
-
-    def enter_time(self, q: "Queue") -> float:
-        """
-        Parameters
-        ----------
-        q : Queue
-            queue where component belongs to
-
-        Returns
-        -------
-        time the component entered the queue : float
-        """
-        mx = self._checkinqueue(q)
-        return mx.enter_time - self.env._offset
-
-    def creation_time(self) -> float:
-        """
-        Returns
-        -------
-        time the component was created : float
-        """
-        return self._creation_time - self.env._offset
-
-    def scheduled_time(self) -> float:
-        """
-        Returns
-        -------
-        time the component scheduled for, if it is scheduled : float
-            returns inf otherwise
-        """
-        return self._scheduled_time - self.env._offset
-
-    def scheduled_priority(self) -> float:
-        """
-        Returns
-        -------
-        priority the component is scheduled with : float
-            returns None otherwise
-
-        Note
-        ----
-        The method has to traverse the event list, so performance may be an issue.
-        """
-        for t, priority, seq, component, return_value in self.env._event_list:
-            if component is self:
-                return priority
-        return None
-
-    def remaining_duration(self, value: float = None, priority: float = 0, urgent: bool = False) -> float:
-        """
-        Parameters
-        ----------
-        value : float
-            set the remaining_duration
-
-            The action depends on the status where the component is in:
-
-            - passive: the remaining duration is update according to the given value
-
-            - standby and current: not allowed
-
-            - scheduled: the component is rescheduled according to the given value
-
-            - waiting or requesting: the fail_at is set according to the given value
-
-            - interrupted: the remaining_duration is updated according to the given value
-
-
-        priority : float
-            priority
-
-            default: 0
-
-            if a component has the same time on the event list, this component is sorted accoring to
-            the priority.
-
-        urgent : bool
-            urgency indicator
-
-            if False (default), the component will be scheduled
-            behind all other components scheduled
-            for the same time and priority
-
-            if True, the component will be scheduled
-            in front of all components scheduled
-            for the same time and priority
-
-        Returns
-        -------
-        remaining duration : float
-            if passive, remaining time at time of passivate
-
-            if scheduled, remaing time till scheduled time
-
-            if requesting or waiting, time till fail_at time
-
-            else: 0
-
-        Note
-        ----
-        This method is useful for interrupting a process and then resuming it,
-        after some (breakdown) time
-        """
-        if value is not None:
-            if self.status.value in (passive, interrupted):
-                self._remaining_duration = value
-            elif self.status.value == current:
-                raise ValueError("setting remaining_duration not allowed for current component (" + self.name() + ")")
-            elif self.status.value == standby:
-                raise ValueError("setting remaining_duration not allowed for standby component (" + self.name() + ")")
-            else:
-                self._remove()
-                self._reschedule(
-                    value + self.env._now,
-                    priority,
-                    urgent,
-                    "set remaining_duration",
-                    False,
-                    extra="",
-                )
-
-        if self.status.value in (passive, interrupted):
-            return self._remaining_duration
-        elif self.status.value in (scheduled, waiting, requesting):
-            return self._scheduled_time - self.env._now
-        else:
-            return 0
-
-    def mode_time(self) -> float:
-        """
-        Returns
-        -------
-        time the component got it's latest mode : float
-            For a new component this is
-            the time the component was created.
-
-            this function is particularly useful for animations.
-        """
-        return self._mode_time - self.env._offset
-
-    def interrupted_status(self) -> Any:
-        """
-        returns the original status of an interrupted component
-
-        possible values are
-            - passive
-            - scheduled
-            - requesting
-            - waiting
-            - standby
-        """
-        if self.status.value != interrupted:
-            raise ValueError(self.name() + "not interrupted")
-
-        return self._interrupted_status
-
-    def interrupt_level(self) -> int:
-        """
-        returns interrupt level of an interrupted component
-
-        non interrupted components return 0
-        """
-        if self.status.value == interrupted:
-            return self._interrupt_level
-        else:
-            return 0
-
-    def _member(self, q):
-        return self._qmembers.get(q, None)
-
-    def _checknotinqueue(self, q):
-        mx = self._member(q)
-        if mx is None:
-            pass
-        else:
-            raise ValueError(self.name() + " is already member of " + q.name())
-
-    def _checkinqueue(self, q):
-        mx = self._member(q)
-        if mx is None:
-            raise ValueError(self.name() + " is not member of " + q.name())
-        else:
-            return mx
-
-    def _checkisnotdata(self):
-        if self.status.value == data:
-            raise ValueError(self.name() + " data component not allowed")
-
-    def _checkisnotmain(self):
-        if self == self.env._main:
-            raise ValueError(self.name() + " main component not allowed")
-
-    def lineno_txt(self, add_at=False):
-        if self.env._suppress_trace_linenumbers:
-            return ""
-        if self.overridden_lineno:
-            return ""
-
-        plus = "+"
-        if self == self.env._main:
-            frame = self.frame
-        else:
-            if self.isdata():
-                return "N/A"
-            if self._process_isgenerator:
-                frame = self._process.gi_frame
-                if frame.f_lasti == -1:  # checks whether generator is created
-                    plus = " "
-            else:
-                gs = inspect.getsourcelines(self._process)
-                s0 = self.env.filename_lineno_to_str(self._process.__code__.co_filename, gs[1]) + " "
-                return f"{'@' if add_at else ''}{s0}"
-        return f"{'@' if add_at else ''}{self.env._frame_to_lineno(frame)}{plus}"
-
-    def line_number(self) -> str:
-        """
-        current line number of the process
-
-        Returns
-        -------
-        Current line number : str
-            for data components, "" will be returned
-        """
-        save_suppress_trace_linenumbers = self.env._suppress_trace_linenumbers
-        self.env._suppress_trace_linenumbers = False
-        s = self.lineno_txt().strip()
-        self.env._suppress_trace_linenumbers = save_suppress_trace_linenumbers
-        return s
-
-    def to_store_requesters(self) -> "Queue":
-        """
-        get the queue holding all to_store requesting components
-
-        Returns
-        -------
-        queue holding all to_store requesting components : Queue
-        """
-        return self._to_store_requesters
-
-    def from_store_item(self) -> Optional["Component"]:
-        """
-        return item returned from a yield self.from_store(...) if valid
-
-        Returns
-        -------
-        item returned : Component or None, if not valid
-        """
-        try:
-            return self._from_store_item
-        except AttributeError:
-            return None
-
-    def from_store_store(self) -> Optional["Component"]:
-        """
-        return store where item was returned from a yield self.from_store(...) if valid
-
-        Returns
-        -------
-        item returned : Component or None, if not valid
-        """
-        try:
-            return self._from_store_store
-        except AttributeError:
-            return None
-
-    def to_store_store(self) -> Optional["Component"]:
-        """
-        return store where item was sent to with last yield self.to_store(...) if valid
-
-        Returns
-        -------
-        item returned : Component or None, if not valid
-        """
-        try:
-            return self._to_store_store
-        except AttributeError:
-            return None
+    for x in arange(0, env.width() + 1, spacing):
+        AnimateLine(spec=(0, 0, 0, env.height()), x=x, y=0, text=str(x), text_anchor="se", env=env, **kwargs)
 
 
 class ComponentGenerator(Component):
@@ -35223,7 +33900,7 @@ class ComponentGenerator(Component):
                         samples = [interpolate(sample, min_sample, max_sample, v_at, v_till) for sample in samples]
                 self.intervals = [t1 - t0 for t0, t1 in zip([0] + samples, samples)]
                 at = 0  # self.intervals.pop(0)
-                process = "do_spread"
+                process = "do_spread_yieldless" if env._yieldless else "do_spread"
             else:
                 if equidistant:
                     force_till = False  # just to prevent errors further on
@@ -35254,19 +33931,12 @@ class ComponentGenerator(Component):
                     process = "do_finalize"
                 else:
                     if self.disturbance:
-                        process = "do_iat_disturbance"
+                        process = "do_iat_disturbance_yieldless" if env._yieldless else "do_iat_disturbance"
                     else:
-                        process = "do_iat"
+                        process = "do_iat_yieldless" if env._yieldless else "do_iat"
         self.kwargs = kwargs
 
-        super().__init__(
-            name=generator_name,
-            env=env,
-            process=process,
-            at=at,
-            suppress_trace=suppress_trace,
-            suppress_pause_at_step=suppress_pause_at_step,
-        )
+        super().__init__(name=generator_name, env=env, process=process, at=at, suppress_trace=suppress_trace, suppress_pause_at_step=suppress_pause_at_step)
 
     def do_spread(self):
         for interval in self.intervals:
@@ -35340,6 +34010,78 @@ class ComponentGenerator(Component):
 
             yield self.hold(till=t)
 
+    def do_spread_yieldless(self):
+        for interval in self.intervals:
+            self.hold(interval)
+            save_default_env = g.default_env
+            g.default_env = self.env
+            if isinstance(self.component_class, _Distribution):
+                self.component_class()(**self.kwargs)
+            else:
+                self.component_class(**self.kwargs)
+            g.default_env = save_default_env
+
+        self.env.print_trace("", "", "all components generated")
+        self.at_end()
+
+    def do_iat_yieldless(self):
+        n = 0
+        while True:
+            save_default_env = g.default_env
+            g.default_env = self.env
+            if isinstance(self.component_class, _Distribution):
+                self.component_class()(**self.kwargs)
+            else:
+                self.component_class(**self.kwargs)
+            g.default_env = save_default_env
+            n += 1
+            if n >= self.number:
+                self.env.print_trace("", "", f"{n} components generated")
+                self.at_end()
+                return
+            if callable(self.iat):
+                t = self.env._now + self.iat()
+            else:
+                t = self.env._now + self.iat
+            if t > self.till:
+                self.activate(process="do_finalize", at=self.till)
+
+            self.hold(till=t)
+
+    def do_iat_disturbance_yieldless(self):
+        n = 0
+        while True:
+            save_default_env = g.default_env
+            g.default_env = self.env
+            if callable(self.iat):
+                iat = self.iat()
+            else:
+                iat = self.iat
+            g.default_env = save_default_env
+
+            if callable(self.disturbance):
+                disturbance = self.disturbance()
+            else:
+                disturbance = self.disturbance
+            if self.force_at:
+                at = self.env._now + disturbance
+            else:
+                at = self.env._now + iat + disturbance
+            if at > self.till:
+                self.activate(process="do_finalize", at=self.till)
+            if isinstance(self.component_class, _Distribution):
+                component_class = self.component_class()
+            else:
+                component_class = self.component_class
+            component_class(at=at, **self.kwargs)
+            n += 1
+            if n >= self.number:
+                self.env.print_trace("", "", str(n) + " components generated")
+                return
+            t = self.env._now + iat
+
+            self.hold(till=t)
+
     def do_finalize(self):
         self.env.print_trace("", "", "till reached")
         self.at_end()
@@ -35390,10 +34132,7 @@ class _BlindVideoMaker(Component):
 
                 self.env._exclude_from_animation = "*"  # makes that both video and non video over2d animation objects are shown
 
-                an_objects3d = sorted(
-                    self.env.an_objects3d,
-                    key=lambda obj: (obj.layer(self.env._t), obj.sequence),
-                )
+                an_objects3d = sorted(self.env.an_objects3d, key=lambda obj: (obj.layer(self.env._t), obj.sequence))
                 for an in an_objects3d:
                     if an.keep(self.env._t):
                         if an.visible(self.env._t):
@@ -35475,15 +34214,7 @@ class _Distribution:
         Samples that cannot be converted (only possible with Pdf and CumPdf) to float
         are assumed to be within the bounds.
         """
-        return Bounded(
-            self,
-            lowerbound,
-            upperbound,
-            fail_value,
-            number_of_retries,
-            include_lowerbound,
-            include_upperbound,
-        ).sample()
+        return Bounded(self, lowerbound, upperbound, fail_value, number_of_retries, include_lowerbound, include_upperbound).sample()
 
     def __call__(self, *args, **kwargs):
         return self.sample(*args, **kwargs)
@@ -35853,14 +34584,7 @@ class Exponential(_Distribution):
     Either mean or rate has to be specified, not both
     """
 
-    def __init__(
-        self,
-        mean: float = None,
-        time_unit: str = None,
-        rate: float = None,
-        randomstream: Any = None,
-        env: "Environment" = None,
-    ):
+    def __init__(self, mean: float = None, time_unit: str = None, rate: float = None, randomstream: Any = None, env: "Environment" = None):
         self.register_time_unit(time_unit, env)
         if mean is None:
             if rate is None:
@@ -36122,14 +34846,7 @@ class IntUniform(_Distribution):
     This will print 10 throws of a die.
     """
 
-    def __init__(
-        self,
-        lowerbound: int,
-        upperbound: int = None,
-        randomstream: Any = None,
-        time_unit: str = None,
-        env: "Environment" = None,
-    ):
+    def __init__(self, lowerbound: int, upperbound: int = None, randomstream: Any = None, time_unit: str = None, env: "Environment" = None):
         self.register_time_unit(time_unit, env)
         self._lowerbound = lowerbound
         if upperbound is None:
@@ -36234,14 +34951,7 @@ class Uniform(_Distribution):
         if omitted, default_env will be used
     """
 
-    def __init__(
-        self,
-        lowerbound: float,
-        upperbound: float = None,
-        time_unit: str = None,
-        randomstream: Any = None,
-        env: "Environment" = None,
-    ):
+    def __init__(self, lowerbound: float, upperbound: float = None, time_unit: str = None, randomstream: Any = None, env: "Environment" = None):
         self.register_time_unit(time_unit, env)
         self._lowerbound = lowerbound
         if upperbound is None:
@@ -36348,15 +35058,7 @@ class Triangular(_Distribution):
         if omitted, default_env will be used
     """
 
-    def __init__(
-        self,
-        low: float,
-        high: float = None,
-        mode: float = None,
-        time_unit: str = None,
-        randomstream: Any = None,
-        env: "Environment" = None,
-    ):
+    def __init__(self, low: float, high: float = None, mode: float = None, time_unit: str = None, randomstream: Any = None, env: "Environment" = None):
         self.register_time_unit(time_unit, env)
         self._low = low
         if high is None:
@@ -36460,13 +35162,7 @@ class Constant(_Distribution):
         if omitted, default_env will be used
     """
 
-    def __init__(
-        self,
-        value: float,
-        time_unit: str = None,
-        randomstream: Any = None,
-        env: "Environment" = None,
-    ):
+    def __init__(self, value: float, time_unit: str = None, randomstream: Any = None, env: "Environment" = None):
         self.register_time_unit(time_unit, env)
         self._value = value
         if randomstream is None:
@@ -36667,14 +35363,7 @@ class Weibull(_Distribution):
         if omitted, default_env will be used
     """
 
-    def __init__(
-        self,
-        scale: float,
-        shape: float,
-        time_unit: str = None,
-        randomstream: Any = None,
-        env: "Environment" = None,
-    ):
+    def __init__(self, scale: float, shape: float, time_unit: str = None, randomstream: Any = None, env: "Environment" = None):
         self.register_time_unit(time_unit, env)
         self._scale = scale
         if shape <= 0:
@@ -36782,15 +35471,7 @@ class Gamma(_Distribution):
     Either scale or rate has to be specified, not both.
     """
 
-    def __init__(
-        self,
-        shape: float,
-        scale: float = None,
-        time_unit: str = None,
-        rate=None,
-        randomstream: Any = None,
-        env: "Environment" = None,
-    ):
+    def __init__(self, shape: float, scale: float = None, time_unit: str = None, rate=None, randomstream: Any = None, env: "Environment" = None):
         self.register_time_unit(time_unit, env)
         if shape <= 0:
             raise ValueError("shape<=0")
@@ -37003,15 +35684,7 @@ class Erlang(_Distribution):
     Either rate or scale has to be specified, not both.
     """
 
-    def __init__(
-        self,
-        shape: float,
-        rate: float = None,
-        time_unit: str = None,
-        scale: float = None,
-        randomstream: Any = None,
-        env: "Environment" = None,
-    ):
+    def __init__(self, shape: float, rate: float = None, time_unit: str = None, scale: float = None, randomstream: Any = None, env: "Environment" = None):
         self.register_time_unit(time_unit, env)
         if int(shape) != shape:
             raise TypeError("shape not integer")
@@ -37131,13 +35804,7 @@ class Cdf(_Distribution):
         if omitted, default_env will be used
     """
 
-    def __init__(
-        self,
-        spec: Iterable,
-        time_unit: str = None,
-        randomstream: Any = None,
-        env: "Environment" = None,
-    ):
+    def __init__(self, spec: Iterable, time_unit: str = None, randomstream: Any = None, env: "Environment" = None):
         self.register_time_unit(time_unit, env)
         self._x = []
         self._cum = []
@@ -37282,14 +35949,7 @@ class Pdf(_Distribution):
     but a sample will be returned when calling sample.
     """
 
-    def __init__(
-        self,
-        spec: Union[Iterable, Dict],
-        probabilities=None,
-        time_unit: str = None,
-        randomstream: Any = None,
-        env: "Environment" = None,
-    ):
+    def __init__(self, spec: Union[Iterable, Dict], probabilities=None, time_unit: str = None, randomstream: Any = None, env: "Environment" = None):
         self.register_time_unit(time_unit, env)
         self._x = []
         self._cum = []
@@ -37489,12 +36149,7 @@ class CumPdf(_Distribution):
     """
 
     def __init__(
-        self,
-        spec: Iterable,
-        cumprobabilities: Union[float, Iterable] = None,
-        time_unit: str = None,
-        randomstream: Any = None,
-        env: "Environment" = None,
+        self, spec: Iterable, cumprobabilities: Union[float, Iterable] = None, time_unit: str = None, randomstream: Any = None, env: "Environment" = None
     ):
         self.register_time_unit(time_unit, env)
         self._x = []
@@ -37800,12 +36455,7 @@ class Distribution(_Distribution):
     Er(2,3)      ==> Erlang(2,3)
     """
 
-    def __init__(
-        self,
-        spec: str,
-        randomstream: Any = None,
-        time_unit: str = None,
-    ):
+    def __init__(self, spec: str, randomstream: Any = None, time_unit: str = None):
         spec_orig = spec
 
         sp = spec.split("(")
@@ -37977,16 +36627,7 @@ class State:
         if omitted, default_env is used
     """
 
-    def __init__(
-        self,
-        name: str = None,
-        value: Any = False,
-        type: str = "any",
-        monitor: bool = True,
-        env: "Environment" = None,
-        *args,
-        **kwargs,
-    ):
+    def __init__(self, name: str = None, value: Any = False, type: str = "any", monitor: bool = True, env: "Environment" = None, *args, **kwargs):
         if env is None:
             self.env = g.default_env
         else:
@@ -37996,14 +36637,7 @@ class State:
         with self.env.suppress_trace():
             self._waiters = Queue(name="waiters of " + self.name(), monitor=monitor, env=self.env)
             self._waiters._isinternal = True
-        self.value = _SystemMonitor(
-            name="Value of " + self.name(),
-            level=True,
-            initial_tally=value,
-            monitor=monitor,
-            type=type,
-            env=self.env,
-        )
+        self.value = _SystemMonitor(name="Value of " + self.name(), level=True, initial_tally=value, monitor=monitor, type=type, env=self.env)
         if self.env._trace:
             self.env.print_trace("", "", self.name() + " create", "value = " + repr(self._value))
         self.setup(*args, **kwargs)
@@ -38065,13 +36699,7 @@ class State:
     def __repr__(self):
         return object_to_str(self) + " (" + self.name() + ")"
 
-    def print_histograms(
-        self,
-        exclude: Iterable = (),
-        as_str: bool = False,
-        file: TextIO = None,
-        graph_scale: float = None,
-    ) -> str:
+    def print_histograms(self, exclude: Iterable = (), as_str: bool = False, file: TextIO = None, graph_scale: float = None) -> str:
         """
         print histograms of the waiters queue and the value monitor
 
@@ -38246,12 +36874,7 @@ class State:
         if value_after is None:
             value_after = self._value
         if self.env._trace:
-            self.env.print_trace(
-                "",
-                "",
-                self.name() + " trigger",
-                " value = " + str(value) + " --> " + str(value_after) + " allow " + str(max) + " components",
-            )
+            self.env.print_trace("", "", self.name() + " trigger", " value = " + str(value) + " --> " + str(value_after) + " allow " + str(max) + " components")
         self._value = value
         self.value.tally(value)  # strictly speaking, not required
         self._trywait(max)
@@ -38509,47 +37132,18 @@ class Resource:
         self._minq = inf
         self._trying = False
 
-        self.capacity = _CapacityMonitor(
-            "Capacity of " + self.name(),
-            level=True,
-            initial_tally=capacity,
-            monitor=monitor,
-            type="float",
-            env=self.env,
-        )
+        self.capacity = _CapacityMonitor("Capacity of " + self.name(), level=True, initial_tally=capacity, monitor=monitor, type="float", env=self.env)
         self.capacity.parent = self
         self.claimed_quantity = _SystemMonitor(
-            "Claimed quantity of " + self.name(),
-            level=True,
-            initial_tally=initial_claimed_quantity,
-            monitor=monitor,
-            type="float",
-            env=self.env,
+            "Claimed quantity of " + self.name(), level=True, initial_tally=initial_claimed_quantity, monitor=monitor, type="float", env=self.env
         )
         self.available_quantity = _SystemMonitor(
-            "Available quantity of " + self.name(),
-            level=True,
-            initial_tally=capacity - initial_claimed_quantity,
-            monitor=monitor,
-            type="float",
-            env=self.env,
+            "Available quantity of " + self.name(), level=True, initial_tally=capacity - initial_claimed_quantity, monitor=monitor, type="float", env=self.env
         )
 
-        self.occupancy = _SystemMonitor(
-            "Occupancy of " + self.name(),
-            level=True,
-            initial_tally=0,
-            monitor=monitor,
-            type="float",
-            env=self.env,
-        )
+        self.occupancy = _SystemMonitor("Occupancy of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="float", env=self.env)
         if self.env._trace:
-            self.env.print_trace(
-                "",
-                "",
-                self.name() + " create",
-                "capacity=" + str(self._capacity) + (" anonymous" if self._anonymous else ""),
-            )
+            self.env.print_trace("", "", self.name() + " create", "capacity=" + str(self._capacity) + (" anonymous" if self._anonymous else ""))
         self.setup(*args, **kwargs)
 
     def ispreemptive(self) -> bool:
@@ -38623,12 +37217,7 @@ class Resource:
 
         self.requesters().reset_monitors(monitor=monitor, stats_only=stats_only)
         self.claimers().reset_monitors(monitor=monitor, stats_only=stats_only)
-        for m in (
-            self.capacity,
-            self.available_quantity,
-            self.claimed_quantity,
-            self.occupancy,
-        ):
+        for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
             m.reset(monitor=monitor, stats_only=stats_only)
 
     def print_statistics(self, as_str: bool = False, file: TextIO = None) -> str:
@@ -38654,50 +37243,18 @@ class Resource:
         result.append(f"Statistics of {self.name()} at {(self.env._now - self.env._offset):13.3f}")
         show_legend = True
         for q in [self.requesters(), self.claimers()]:
-            result.append(
-                q.length.print_statistics(
-                    show_header=False,
-                    show_legend=show_legend,
-                    do_indent=True,
-                    as_str=True,
-                )
-            )
+            result.append(q.length.print_statistics(show_header=False, show_legend=show_legend, do_indent=True, as_str=True))
             show_legend = False
             result.append("")
-            result.append(
-                q.length_of_stay.print_statistics(
-                    show_header=False,
-                    show_legend=show_legend,
-                    do_indent=True,
-                    as_str=True,
-                )
-            )
+            result.append(q.length_of_stay.print_statistics(show_header=False, show_legend=show_legend, do_indent=True, as_str=True))
             result.append("")
 
-        for m in (
-            self.capacity,
-            self.available_quantity,
-            self.claimed_quantity,
-            self.occupancy,
-        ):
-            result.append(
-                m.print_statistics(
-                    show_header=False,
-                    show_legend=show_legend,
-                    do_indent=True,
-                    as_str=True,
-                )
-            )
+        for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
+            result.append(m.print_statistics(show_header=False, show_legend=show_legend, do_indent=True, as_str=True))
             result.append("")
         return return_or_print(result, as_str, file)
 
-    def print_histograms(
-        self,
-        exclude=(),
-        as_str: bool = False,
-        file: TextIO = None,
-        graph_scale: float = None,
-    ) -> str:
+    def print_histograms(self, exclude=(), as_str: bool = False, file: TextIO = None, graph_scale: float = None) -> str:
         """
         prints histograms of the requesters and claimers queue as well as
         the capacity, available_quantity and claimed_quantity timstamped monitors of the resource
@@ -38729,12 +37286,7 @@ class Resource:
         for q in (self.requesters(), self.claimers()):
             if q not in exclude:
                 result.append(q.print_histograms(exclude=exclude, as_str=True, graph_scale=graph_scale))
-        for m in (
-            self.capacity,
-            self.available_quantity,
-            self.claimed_quantity,
-            self.occupancy,
-        ):
+        for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
             if m not in exclude:
                 result.append(m.print_histogram(as_str=True, graph_scale=graph_scale))
         return return_or_print(result, as_str, file)
@@ -38759,12 +37311,7 @@ class Resource:
         """
         self.requesters().monitor(value)
         self.claimers().monitor(value)
-        for m in (
-            self.capacity,
-            self.available_quantity,
-            self.claimed_quantity,
-            self.occupancy,
-        ):
+        for m in (self.capacity, self.available_quantity, self.claimed_quantity, self.occupancy):
             m.monitor(value)
 
     def register(self, registry: List) -> "Resource":
@@ -39088,13 +37635,7 @@ class PeriodMonitor:
         del self.periods
         self.m.period_monitors.remove(self)
 
-    def __init__(
-        self,
-        parent_monitor: "Monitor",
-        periods: Iterable = None,
-        period_monitor_names: Iterable = None,
-        env: "Environment" = None,
-    ):
+    def __init__(self, parent_monitor: "Monitor", periods: Iterable = None, period_monitor_names: Iterable = None, env: "Environment" = None):
         self.pc = _PeriodComponent(pm=self, skip_standby=True, suppress_trace=True)
         if env is None:
             self.env = g.default_env
@@ -39290,17 +37831,7 @@ class _APNG:
             return im
 
     class FrameControl:
-        def __init__(
-            self,
-            width=None,
-            height=None,
-            x_offset=0,
-            y_offset=0,
-            delay=100,
-            delay_den=1000,
-            depose_op=1,
-            blend_op=0,
-        ):
+        def __init__(self, width=None, height=None, x_offset=0, y_offset=0, delay=100, delay_den=1000, depose_op=1, blend_op=0):
             self.width = width
             self.height = height
             self.x_offset = x_offset
@@ -39311,17 +37842,7 @@ class _APNG:
             self.blend_op = blend_op
 
         def to_bytes(self):
-            return struct.pack(
-                "!IIIIHHbb",
-                self.width,
-                self.height,
-                self.x_offset,
-                self.y_offset,
-                self.delay,
-                self.delay_den,
-                self.depose_op,
-                self.blend_op,
-            )
+            return struct.pack("!IIIIHHbb", self.width, self.height, self.x_offset, self.y_offset, self.delay, self.delay_den, self.depose_op, self.blend_op)
 
     def __init__(self, num_plays=0):
         self.frames = []
@@ -39345,20 +37866,7 @@ class _APNG:
         self.frames.append((png, control))
 
     def to_bytes(self):
-        CHUNK_BEFORE_IDAT = {
-            "cHRM",
-            "gAMA",
-            "iCCP",
-            "sBIT",
-            "sRGB",
-            "bKGD",
-            "hIST",
-            "tRNS",
-            "pHYs",
-            "sPLT",
-            "tIME",
-            "PLTE",
-        }
+        CHUNK_BEFORE_IDAT = {"cHRM", "gAMA", "iCCP", "sBIT", "sRGB", "bKGD", "hIST", "tRNS", "pHYs", "sPLT", "tIME", "PLTE"}
         PNG_SIGN = b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
         out = [PNG_SIGN]
         other_chunks = []
@@ -39515,13 +38023,7 @@ def _i(p, v0, v1):
     return (1 - p) * v0 + p * v1
 
 
-def interpolate(
-    t: float,
-    t0: float,
-    t1: float,
-    v0: Union[float, Iterable],
-    v1: Union[float, Iterable],
-) -> Union[float, Tuple]:
+def interpolate(t: float, t0: float, t1: float, v0: Union[float, Iterable], v1: Union[float, Iterable]) -> Union[float, Tuple]:
     """
     does linear interpolation
 
@@ -39646,7 +38148,7 @@ def arange(start: float, stop: float, step: float = 1) -> Iterable:
         value += step
 
 
-def linspace(start: float, stop: float, num: int, endpoint: bool = True) -> Iterable:
+def linspace(start: float, stop: float, num: int = 50, endpoint: bool = True) -> Iterable:
     """
     like numpy.linspace, but returns a list
 
@@ -39660,6 +38162,8 @@ def linspace(start: float, stop: float, num: int, endpoint: bool = True) -> Iter
 
     num : int
         number of points in the space
+
+        default: 50
 
     endpoint : bool
         if True (default), stop is last point in the space
@@ -39678,13 +38182,7 @@ def linspace(start: float, stop: float, num: int, endpoint: bool = True) -> Iter
     return [start + step * i for i in range(num)]
 
 
-def interp(
-    x: float,
-    xp: Iterable,
-    fp: Iterable,
-    left: float = None,
-    right: float = None,
-) -> Any:
+def interp(x: float, xp: Iterable, fp: Iterable, left: float = None, right: float = None) -> Any:
     """
     linear interpolatation
 
@@ -39988,11 +38486,7 @@ standby = "standby"
 waiting = "waiting"
 
 
-def random_seed(
-    seed: Hashable = None,
-    randomstream: Any = None,
-    set_numpy_random_seed: bool = True,
-):
+def random_seed(seed: Hashable = None, randomstream: Any = None, set_numpy_random_seed: bool = True):
     """
     Reseeds a randomstream
 
@@ -40057,10 +38551,7 @@ def resize_with_pad(im, target_width, target_height):
 
     image_resize = im.resize((resize_width, resize_height), Image.ANTIALIAS)
     background = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 255))
-    offset = (
-        round((target_width - resize_width) / 2),
-        round((target_height - resize_height) / 2),
-    )
+    offset = (round((target_width - resize_width) / 2), round((target_height - resize_height) / 2))
     background.paste(image_resize, offset)
     return background.convert("RGB")
 
@@ -40128,12 +38619,7 @@ class _AnimateIntro(Animate3dBase):
         gl.glMatrixMode(gl.GL_PROJECTION)
 
         gl.glLoadIdentity()
-        glu.gluPerspective(
-            self.field_of_view_y(t),
-            glut.glutGet(glut.GLUT_WINDOW_WIDTH) / glut.glutGet(glut.GLUT_WINDOW_HEIGHT),
-            self.z_near(t),
-            self.z_far(t),
-        )
+        glu.gluPerspective(self.field_of_view_y(t), glut.glutGet(glut.GLUT_WINDOW_WIDTH) / glut.glutGet(glut.GLUT_WINDOW_HEIGHT), self.z_near(t), self.z_far(t))
 
         glu.gluLookAt(x_eye, y_eye, z_eye, x_center, y_center, z_center, x_up, y_up, z_up)
         gl.glEnable(gl.GL_LIGHTING)
@@ -40156,10 +38642,7 @@ class _AnimateExtro(Animate3dBase):
 
     def draw(self, t):
         if self.env.an_objects_over3d:
-            for ao in sorted(
-                self.env.an_objects_over3d,
-                key=lambda obj: (-obj.layer(t), obj.sequence),
-            ):
+            for ao in sorted(self.env.an_objects_over3d, key=lambda obj: (-obj.layer(t), obj.sequence)):
                 ao.make_pil_image(t - self.env._offset)
 
                 if ao._image_visible:
@@ -40193,19 +38676,9 @@ class _AnimateExtro(Animate3dBase):
             gl.glOrtho(0, self.env._width3d, 0, self.env._height3d, -1, 1)
             if overlap:
                 overlay_image = Image.new("RGBA", (self.env._width3d, self.env._height3d), (0, 0, 0, 0))
-                for ao in sorted(
-                    self.env.an_objects_over3d,
-                    key=lambda obj: (-obj.layer(t), obj.sequence),
-                ):
+                for ao in sorted(self.env.an_objects_over3d, key=lambda obj: (-obj.layer(t), obj.sequence)):
                     if ao._image_visible:
-                        overlay_image.paste(
-                            ao._image,
-                            (
-                                int(ao._image_x),
-                                int(self.env._height3d - ao._image_y - ao._image.size[1]),
-                            ),
-                            ao._image,
-                        )
+                        overlay_image.paste(ao._image, (int(ao._image_x), int(self.env._height3d - ao._image_y - ao._image.size[1])), ao._image)
                     imdata = overlay_image.tobytes("raw", "RGBA", 0, -1)
 
                 w = overlay_image.size[0]
@@ -40215,10 +38688,7 @@ class _AnimateExtro(Animate3dBase):
                 gl.glDrawPixels(w, h, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, imdata)
 
             else:
-                for ao in sorted(
-                    self.env.an_objects_over3d,
-                    key=lambda obj: (-obj.layer(self.env._t), obj.sequence),
-                ):
+                for ao in sorted(self.env.an_objects_over3d, key=lambda obj: (-obj.layer(self.env._t), obj.sequence)):
                     if ao._image_visible:
                         imdata = ao._image.tobytes("raw", "RGBA", 0, -1)
                         w = ao._image.size[0]
@@ -40422,11 +38892,7 @@ class Animate3dObj(Animate3dBase):
 
         gl.glMatrixMode(gl.GL_MODELVIEW)
         gl.glPushMatrix()
-        gl.glTranslate(
-            self.x(t) + self.x_offset,
-            self.y(t) + self.y_offset,
-            self.z(t) + self.z_offset,
-        )
+        gl.glTranslate(self.x(t) + self.x_offset, self.y(t) + self.y_offset, self.z(t) + self.z_offset)
         gl.glRotate(self.z_angle(t), 0.0, 0.0, 1.0)
         gl.glRotate(self.y_angle(t), 0.0, 1.0, 0.0)
         gl.glRotate(self.x_angle(t), 1.0, 0.0, 0.0)
@@ -40739,72 +39205,24 @@ class Animate3dGrid(Animate3dBase):
 
         for x in x_range:
             for y in y_range:
-                draw_line3d(
-                    x0=x,
-                    y0=y,
-                    z0=min(z_range),
-                    x1=x,
-                    y1=y,
-                    z1=max(z_range),
-                    gl_color=gl_color,
-                )
+                draw_line3d(x0=x, y0=y, z0=min(z_range), x1=x, y1=y, z1=max(z_range), gl_color=gl_color)
 
             for z in z_range:
-                draw_line3d(
-                    x0=x,
-                    y0=min(y_range),
-                    z0=z,
-                    x1=x,
-                    y1=max(y_range),
-                    z1=z,
-                    gl_color=gl_color,
-                )
+                draw_line3d(x0=x, y0=min(y_range), z0=z, x1=x, y1=max(y_range), z1=z, gl_color=gl_color)
 
         for y in y_range:
             for x in x_range:
-                draw_line3d(
-                    x0=x,
-                    y0=y,
-                    z0=min(z_range),
-                    x1=x,
-                    y1=y,
-                    z1=max(z_range),
-                    gl_color=gl_color,
-                )
+                draw_line3d(x0=x, y0=y, z0=min(z_range), x1=x, y1=y, z1=max(z_range), gl_color=gl_color)
 
             for z in z_range:
-                draw_line3d(
-                    x0=min(x_range),
-                    y0=y,
-                    z0=z,
-                    x1=max(x_range),
-                    y1=y,
-                    z1=z,
-                    gl_color=gl_color,
-                )
+                draw_line3d(x0=min(x_range), y0=y, z0=z, x1=max(x_range), y1=y, z1=z, gl_color=gl_color)
 
         for z in z_range:
             for x in x_range:
-                draw_line3d(
-                    x0=x,
-                    y0=min(y_range),
-                    z0=z,
-                    x1=x,
-                    y1=max(y_range),
-                    z1=z,
-                    gl_color=gl_color,
-                )
+                draw_line3d(x0=x, y0=min(y_range), z0=z, x1=x, y1=max(y_range), z1=z, gl_color=gl_color)
 
             for y in y_range:
-                draw_line3d(
-                    x0=min(x_range),
-                    y0=y,
-                    z0=z,
-                    x1=max(x_range),
-                    y1=y,
-                    z1=z,
-                    gl_color=gl_color,
-                )
+                draw_line3d(x0=min(x_range), y0=y, z0=z, x1=max(x_range), y1=y, z1=z, gl_color=gl_color)
 
 
 class Animate3dBox(Animate3dBase):
@@ -41491,19 +39909,7 @@ def draw_bar3d(
     )
 
 
-def draw_cylinder3d(
-    x0=0,
-    y0=0,
-    z0=0,
-    x1=1,
-    y1=1,
-    z1=1,
-    gl_color=(1, 1, 1),
-    radius=1,
-    number_of_sides=8,
-    rotation_angle=0,
-    show_lids=True,
-):
+def draw_cylinder3d(x0=0, y0=0, z0=0, x1=1, y1=1, z1=1, gl_color=(1, 1, 1), radius=1, number_of_sides=8, rotation_angle=0, show_lids=True):
     """
     draws a 3d cylinder (should be added to the event loop by encapsulating with Animate3dBase)
 
@@ -41725,16 +40131,7 @@ def draw_box3d(
     z1 = ((z_ref - 1) / 2) * z_len
     z2 = ((z_ref + 1) / 2) * z_len
 
-    bv = [
-        [x1, y1, z1],
-        [x2, y1, z1],
-        [x2, y2, z1],
-        [x1, y2, z1],
-        [x1, y1, z2],
-        [x2, y1, z2],
-        [x2, y2, z2],
-        [x1, y2, z2],
-    ]
+    bv = [[x1, y1, z1], [x2, y1, z1], [x2, y2, z1], [x1, y2, z1], [x1, y1, z2], [x2, y1, z2], [x2, y2, z2], [x1, y2, z2]]
 
     gl.glPushMatrix()
 
@@ -41846,15 +40243,7 @@ def draw_box3d(
     gl.glPopMatrix()
 
 
-def draw_sphere3d(
-    x=0,
-    y=0,
-    z=0,
-    radius=1,
-    number_of_slices=32,
-    number_of_stacks=None,
-    gl_color=(1, 1, 1),
-):
+def draw_sphere3d(x=0, y=0, z=0, radius=1, number_of_slices=32, number_of_stacks=None, gl_color=(1, 1, 1)):
     """
     draws a 3d spere (should be added to the event loop by encapsulating with Animate3dBase)
 
@@ -41871,12 +40260,7 @@ def draw_sphere3d(
     gl.glTranslate(x, y, z)
     gl.glMaterialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, gl_color)
 
-    glu.gluSphere(
-        quadratic,
-        radius,
-        number_of_slices,
-        number_of_slices if number_of_stacks is None else number_of_stacks,
-    )
+    glu.gluSphere(quadratic, radius, number_of_slices, number_of_slices if number_of_stacks is None else number_of_stacks)
 
     gl.glPopMatrix()
 
@@ -41946,12 +40330,7 @@ def fonts():
 
 
 def standardfonts():
-    return {
-        "": "Calibri",
-        "std": "Calibri",
-        "mono": "DejaVuSansMono",
-        "narrow": "mplus-1m-regular",
-    }
+    return {"": "Calibri", "std": "Calibri", "mono": "DejaVuSansMono", "narrow": "mplus-1m-regular"}
 
 
 def getfont(fontname, fontsize):
@@ -42043,22 +40422,7 @@ def arrow_polygon(size: float) -> Tuple:
         length of the arrow
     """
     size /= 4
-    return (
-        -2 * size,
-        -size,
-        0,
-        -size,
-        0,
-        -2 * size,
-        2 * size,
-        0,
-        0,
-        2 * size,
-        0,
-        size,
-        -2 * size,
-        size,
-    )
+    return (-2 * size, -size, 0, -size, 0, -2 * size, 2 * size, 0, 0, 2 * size, 0, size, -2 * size, size)
 
 
 def centered_rectangle(width: float, height: float) -> Tuple:
@@ -42330,11 +40694,14 @@ class ImageContainer:
                     except ImportError:
                         raise ImportError("pillow_heif is required for reading .heic files. Install with pip install pillow_heif")
                     register_heif_opener()
-                if "//" in str(spec):
+                if spec.count("//") == 1 and spec.count("///") == 0:
                     try:
-                        im = Image.open(io.BytesIO(urllib.request.urlopen(spec).read()))
-                    except Exception as e:
-                        raise FileNotFoundError(f"could not open URL {spec}: {e}")
+                        im = Image.open(spec)  # try a file with one //
+                    except Exception:
+                        try:
+                            im = Image.open(io.BytesIO(urllib.request.urlopen(spec).read()))
+                        except Exception as e:
+                            raise FileNotFoundError(f"could not open URL {spec}: {e}")
                 else:
                     im = Image.open(spec)
         else:  # it's a PIL Image, for sure
@@ -42541,7 +40908,7 @@ def set_environment_aliases():
         return  # do not set when using Sphinx build!
 
     for name, obj in list(globals().items()):
-        if not name.startswith("_") or name in ("_Trajectory", "_Distribution"):
+        if (not name.startswith("_") or name in ("_Trajectory", "_Distribution")) and name != "yieldless":
             if inspect.isclass(obj) and obj.__module__ == Environment.__module__:
                 if issubclass(obj, Exception):
                     exec(f"Environment.{name}={name}")
