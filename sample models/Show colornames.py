@@ -4,7 +4,9 @@ import salabim as sim
 
 env = sim.Environment()
 names = sorted(sim.colornames().keys())
-env.animation_parameters(modelname="show colornames", background_color="20%gray")
+env.modelname("show colornames")
+env.background_color("20%gray")
+env.animate(True)
 x = 10
 y = env.height() - 110
 sx = 165
@@ -25,4 +27,4 @@ for name in names:
         y -= sy + 4
         x = 10
 
-env.run()
+env.run(sim.inf)
