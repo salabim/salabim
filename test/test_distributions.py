@@ -118,7 +118,7 @@ def test_scipy_distribution():
 def test_numpy_distribution():
     try:
         import numpy as np
-    except ModuleNotFoundError:
+    except ImportError:
         pytest.skip("could not import numpy")
 
     env = sim.Environment(time_unit="hours")

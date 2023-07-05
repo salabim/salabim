@@ -138,6 +138,46 @@ def test_queue_priorities_update():
     for i, c in enumerate(q):
         c.priority(q, -i)
     assert list(q) == x
+    
+    
+def test_queue_capacity():
+    class X(sim.Component):
+        pass
+        
+    q0 = sim.Queue('q0')
+    q1 = sim.Queue('q1', capacity=4)
+    for _ in range(3):
+        x = X()
+        x.enter(q0)
+        x.enter(q1)
+    x = X()
+    q0.capacity.value = 4
+    x.enter(q0)
+    x.enter(q1)
+    x = X()
+    with pytest.raises(sim.QueueFullError):
+        x.enter(q0)
+    with pytest.raises(sim.QueueFullError):
+        x.enter(q1) 
+    q0.capacity.value=3
+    assert len(q0) == 4
+    q0.capacity.value = sim.inf
+    x = X()
+    x.enter(q0)  
+    assert len(q0) == 5
+    q2 = q0.copy() 
+    q3 = q1.copy(copy_capacity=True)
+    x = X()
+    with pytest.raises(sim.QueueFullError):
+        x.enter(q3)
+    q4 = q1 + q1 
+    assert q4.capacity.value == sim.inf  
+    q5 = q1.move()
+    assert q1.capacity.value == 4
+    assert q5.capacity.value == sim.inf
+    q6 = q1.move(copy_capacity=True)
+    assert q1.capacity.value == 4
+    assert q6.capacity.value == 4
 
 
 if __name__ == "__main__":

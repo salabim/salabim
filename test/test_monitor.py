@@ -1,10 +1,10 @@
-from PIL.Image import init
 import salabim as sim
 import pytest
 import tempfile
 import pickle
 from array import array
 import math
+import datetime
 
 
 def compare_output(out0, out1):
@@ -559,7 +559,86 @@ def test_map():
         array("d", [0.0, 1.0, 1.5, 2.0, 3.5, 4.0, 10.0, 10.0]),
     )
     assert m.x_map(int).x() == [45, 6, 5]
+    
+def test_as_dataframe():
+    try:
+        import pandas as pd
+    except ImportError:
+        pytest.skip("could not import pandas")
 
+    env = sim.Environment()
+    level_monitor0 = env.Monitor("level monitor0", level=True)
+    level_monitor1 = env.Monitor("level monitor1", level=True)
+    non_level_monitor = env.Monitor("non level monitor")
+    
+    env.run(till=1)
+    level_monitor0.tally(11)
+    non_level_monitor.tally(11)
+    env.run(till=2)
+    level_monitor0.tally(12)
+    non_level_monitor.tally(12)
+    env.run(till=3)
+    level_monitor1.tally(13)
+    non_level_monitor.tally(13)
+    env.run(till=4.5)
+    level_monitor0.tally(14.5)
+    level_monitor1.tally(14.5)
+    non_level_monitor.tally(14.5)
+    env.run(till=5)
+    level_monitor0.tally(15)
+    non_level_monitor.tally(15)
+    env.run(till=10)
+    level_monitor0.tally(20)
+    non_level_monitor.tally(20)
+    
+    df = level_monitor0.as_resampled_dataframe(delta_t=1, extra_monitors=[level_monitor1], min_t=-1, max_t=22)
+    df0 = pd.DataFrame(
+        {
+            "t": list(sim.arange(-1, 22)),
+            "level monitor0.x": [pd.NA, 0, 11, 12, 12, 12, 15, 15, 15, 15, 15, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+            "level monitor1.x": [pd.NA, 0, 0, 0, 13, 13, 14.5, 14.5, 14.5, 14.5, 14.5, 14.5, 14.5, 14.5, 14.5, 14.5, 14.5, 14.5, 14.5, 14.5, 14.5, 14.5, 14.5],
+        }
+    )
+    assert df.equals(df0)
+    
+    df = non_level_monitor.as_dataframe(include_t=False)
+    df0 = pd.DataFrame({"non level monitor.x": [11, 12, 13, 14.5, 15, 20]})
+    assert df.equals(df0)
+    
+    df = non_level_monitor.as_dataframe()
+    df0 = pd.DataFrame({"t": [1, 2, 3, 4.5, 5, 10], "non level monitor.x": [11, 12, 13, 14.5, 15, 20]})
+    assert df.equals(df0)    
 
+def test_as_dataframe_use_datetime0():
+    try:
+        import pandas as pd
+    except ImportError:
+        pytest.skip("could not import pandas")
+
+    env = sim.Environment(datetime0=datetime.datetime(2023,1,1), time_unit="days")
+    level_monitor0 = env.Monitor("level monitor0", level=True)
+    level_monitor1 = env.Monitor("level monitor1", level=True)
+    non_level_monitor = env.Monitor("non level monitor")
+
+    env.run(till=1.3)
+    level_monitor0.tally(11)
+    env.run(till=2.5)
+    level_monitor0.tally(12)
+    env.run(till=3.1)
+    level_monitor1.tally(14)
+    env.run(till=4.8)
+    level_monitor0.tally(14.5)
+    env.run(till=5)
+    env.datetime0(datetime.datetime(2023,1,1))
+    df = level_monitor0.as_resampled_dataframe(delta_t=datetime.timedelta(days=2), min_t=datetime.datetime(2023,1,3), use_datetime0=True)
+    d=datetime.datetime
+    df0=pd.DataFrame({"t": [d(2023,1,3),d(2023,1,5)], "level monitor0.x":[11,12]})
+    assert df0.equals(df)
+    df = level_monitor0.as_dataframe(use_datetime0=True)
+    df0=pd.DataFrame({"t":[d(2023,1,1), d(2023,1,2,7,12),d(2023,1,3,12),d(2023,1,5,19,12)], "level monitor0.x": [0,11,12,14.5]})
+    assert df0.equals(df)
+    df = level_monitor0.as_dataframe()
+    df0=pd.DataFrame({"t":[0,1.3,2.5,4.8], "level monitor0.x": [0,11,12,14.5]})
+    assert df0.equals(df)    
 if __name__ == "__main__":
     pytest.main(["-vv", "-s", "-x", __file__])

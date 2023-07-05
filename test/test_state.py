@@ -5,7 +5,6 @@ import pytest
 def test_wait():
     class X(sim.Component):
         def process(self):
-
             yield self.hold(1)
             s1.set(1)
             yield self.hold(1)
@@ -88,7 +87,8 @@ def test_urgent_and_priority(capsys):
     env.run(till=0, priority=-5)
     for c in x:
         print(c.name(), c.scheduled_priority())
-    events = trace_to_events(capsys.readouterr()[0])
+    out = capsys.readouterr()[0]    
+    events = trace_to_events(out)
     assert [event[1] for event in events] == [
         "main",
         "y.9",
