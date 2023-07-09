@@ -1,5 +1,49 @@
 salabim changelog
 
+version 23.3.0  2023-07-09 
+==========================
+Changed default mode (0)
+------------------------
+From now on, yieldless is the default mode.
+
+For non yieldless (yield) models to run you can
+- add sim.yieldless(False), just after import salabim as sim or
+- add the yieldless parameter to env = sim.Environment, like
+  env = sim.Environment(trace=True, yieldless=False) or
+- remove all yield statements or
+- run salabim_unyield.py over the required model(s)
+
+The documentation now also defaults to the yieldless version.
+
+Improved functionality in yield mode (0)
+----------------------------------------
+When another component than self was used in activate, passivate, hold (or any process interaction)
+it was not possible to use yield. So
+    yield other.activate()
+was not executed properly, although it did not raise an (immediate) error.
+From now on, this is accepted, which makes it also easier to translate yieldless models to not yieldless models,
+as the user can just add yield for any process interaction call.
+
+Related to this is a much more useful error message when a yield model is run in yieldless mode.
+
+Improved documentation (0)
+--------------------------
+Salabim now has to complete sets of documentation: for yieldless (default) and yield version.
+There are also two versions of the pdf documentation.
+
+sample models and sample 3d models (0)
+--------------------------------------
+The GitHub repository now features the yieldless versions. The non yieldless (yield) versions
+end with _yield.
+
+Bug fix (0)
+-----------
+When a queue element was selected by subscripting, like my_queue[index], None was returned
+when the index was out of range. Example my_queue[0] result is None, when my_queue is empty.
+This should raise an IndexError. Fixed.
+(inspired by a problem reported by Michiel Luyken)
+
+
 version 23.2.0  2023-07-02
 ==========================
 Completely new way of building processes (0)
@@ -11,7 +55,7 @@ beginners (and sometimes experts) to make mistakes.
 And last but not least, if you wanted a specific task to be called as a method,
 you had to use 'yield from', which is a confusing concept to say the least.
 
-Therefore, from now on the process interaction may be done with so called greenlets.
+Therefore, from now on the process interaction may be done with so-called greenlets.
 If you specify
     sim.yieldless(True)
 prior to any sim.Environment call, salabim works differently, as you can and should
@@ -87,7 +131,7 @@ or
 New functionality (2)
 ---------------------
 From this version, an alternative user interface (UI) via PySimpleGUI is available.
-This makes it easier to control animations and simulations via a sererate window.
+This makes it easier to control animations and simulations via a separate window.
 
 In the new control window the aplication can add widgets, including input, buttons,
 radio buttons, sliders, ...
@@ -135,7 +179,7 @@ were not implemented at all. Fixed.
 Bug fix (1)
 -----------
 When an unexpected keyword was given in any 'step' method (hold, activate, ...),
-the process was incorrecly terminated without any warning.
+the process was incorrectly terminated without any warning.
 Fixed.
 
 Bug fix (2)
@@ -143,7 +187,7 @@ Bug fix (2)
 In AnimateImage, filename that contained // was incorrectly always opened as a URL.
 Thus not correctly handling files like C://test//abc.jpg, although these are
 valid file names. Fixed.
-(Inspired by problem reported by Harald Mutzke)
+(Inspired by a problem reported by Harald Mutzke)
 
 Bug fix (3)
 -----------
