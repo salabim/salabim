@@ -1,6 +1,5 @@
-import sys
 from pathlib import Path
-
+import sys
 
 def unyield(filename):
     filename = str(filename)
@@ -14,6 +13,7 @@ def unyield(filename):
     with open(filename, "r") as f:
         text = f.read()
 
+    text = text.replace("sim.yieldless(True)\n","")
     number_of_added_lines = 0
     number_of_modified_lines = 0
 
@@ -22,9 +22,6 @@ def unyield(filename):
     for line in text.splitlines():
         parts = line.split("yield ", 1)
         result1 = ""
-        if "import salabim as sim" in line:
-            result = line
-            result1 = line.replace("import salabim as sim", "sim.yieldless(True)")
         if len(parts) > 1:
             parts[1] = parts[1].lstrip()
             if parts[0].strip():
@@ -48,12 +45,16 @@ def unyield(filename):
         print(f"{filename:60} file not converted as it does not contain any yield")
         return 0
     else:
-        new_filename = filename.replace(".py", "_yieldless.py")
-        with open(new_filename, "w") as f:
-            f.write("\n".join(output))
-        print(f"{filename:60} converted file: {new_filename} ")
-        return 1
+        new_filename = filename.replace(".py", "_yield.py")
+        if "sim.yieldless(False)" not in text:
+            text = text.replace("import salabim as sim", "import salabim as sim\nsim.yieldless(False)\n")
+            with open(new_filename, "w") as f:
+                f.write(text)
 
+            with open(filename, "w") as f:
+                f.write("\n".join(output))
+        print(f"{filename:60} yieldless file: {filename} / yield file: {new_filename}")
+        return 1
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
