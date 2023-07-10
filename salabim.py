@@ -1,13 +1,13 @@
-#               _         _      _               ____   _____     _____     _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    |___ /    / |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \      |_ \    | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _  ___) | _ | |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|____/ (_)|_|
+#               _         _      _               ____   _____     _____     ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    |___ /    |___ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \      |_ \      __) |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _  ___) | _  / __/
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|____/ (_)|_____|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "23.3.1"
+__version__ = "23.3.2"
 
 import heapq
 import random
@@ -7237,9 +7237,6 @@ Maybe this a non yieldless model. In that case:
         if self.env._yieldless:
             if self is self.env._current_component:
                 self.env._glet.switch()
-        else:  # ***
-            if self.env._current_component not in (self, self.env._main):
-                heapq.heappush(self.env._event_list, (self.env._now, -inf, 0, self.env._current_component, None))
 
     def _remove(self):
         if self._on_event_list:

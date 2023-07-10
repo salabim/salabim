@@ -1,5 +1,23 @@
 salabim changelog
 
+version 23.3.2  2023-07-10 
+==========================
+Bug fix (0)
+-----------
+Please note that
+    When another component than self was used in activate, passivate, hold (or any process interaction)
+    it was not possible to use yield. So
+        yield other.activate()
+    was not executed properly, although it did not raise an (immediate) error.
+    From now on, this is accepted, which makes it also easier to translate yieldless models to not yieldless models,
+    as the user can just add yield for any process interaction call.
+is not valid anymore as the implementation contained a serious bug. Fixed.
+
+To summarize (only relevant for yield versions):
+    other.activate(), other.hold(), etc should NEVER be called with as yield other.activate(), yield other.hold(), etc.
+    when other is not self!
+(bug reported by Michiel Luyken)
+
 version 23.3.1  2023-07-10 
 ==========================
 Bug fix (0)
