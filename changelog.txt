@@ -1,5 +1,18 @@
 salabim changelog
 
+version 23.3.1  2023-07-10 
+==========================
+Bug fix (0)
+-----------
+As mentioned in the 23.3.0 changelog, yieldless should be True by default.
+But yieldless was False. Fixed.
+To avoid any confusion: salabim runs now in yieldless mode by default!
+
+Bug fix (1)
+-----------
+A bug in Component.from_store caused that the component reported failed. Fixed.
+(bug reported by Michiel Luyken)
+
 version 23.3.0  2023-07-09 
 ==========================
 Changed default mode (0)

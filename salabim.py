@@ -1,13 +1,13 @@
-#               _         _      _               ____   _____     _____      ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    |___ /     / _ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \      |_ \    | | | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _  ___) | _ | |_| |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|____/ (_) \___/
+#               _         _      _               ____   _____     _____     _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    |___ /    / |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \      |_ \    | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _  ___) | _ | |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|____/ (_)|_|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "23.3.0"
+__version__ = "23.3.1"
 
 import heapq
 import random
@@ -81,6 +81,8 @@ if Pythonista:
 inf = float("inf")
 nan = float("nan")
 
+_yieldless = True
+
 
 class QueueFullError(Exception):
     pass
@@ -88,9 +90,6 @@ class QueueFullError(Exception):
 
 class SimulationStopped(Exception):
     pass
-
-
-_yieldless = False
 
 
 def yieldless(value: bool = None) -> bool:
@@ -7967,6 +7966,7 @@ Maybe this a non yieldless model. In that case:
             self._reschedule(
                 self.env._now, 0, False, f"from_store ({store.name()}) honor with {found_c.name()}", False, s0=self.env.last_s0, return_value=found_c
             )
+            return
 
         self._from_stores = from_stores
         for store in from_stores:
@@ -8110,6 +8110,7 @@ Maybe this a non yieldless model. In that case:
                 item.enter_sorted(q, priority)
                 self._to_store_item = None
                 self._to_store_store = store
+                self._to_stores = []
                 self._remove()
                 self.status._value = scheduled
                 self._reschedule(self.env._now, 0, False, f"to_store ({store.name()}) honor with {item.name()}", False, s0=self.env.last_s0)
