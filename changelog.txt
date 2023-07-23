@@ -1,5 +1,43 @@
 salabim changelog
 
+version 23.3.3  2023-07-23
+==========================
+Changed functionality (0)
+-------------------------
+In order to check whether a model that runs with sim.yieldless(False)
+is not a yieldless model, salabim may under rare circumstances report:
+    ValueError: process must be a generator (contain yield statements.)
+    Maybe this a yieldless model. In that case:
+    - remove sim.yieldless(False)
+    If it is indeed a yield model, make this process method (and maybe others) into a generator, e.g.
+    by adding at the end:
+        return
+        yield  # just to make this a generator
+
+So when it is indeed a yieldless model, remove the sim.yieldless(False) statement.
+If this is a model with yields, change the process method into a generator, e.g. by adding
+    yield self.hold(0)  # added to make this process a generator
+or
+    if False:
+        yield  # added to make this process a generator
+or (at the end)
+    return
+    yield  # added to make this process a generator
+    
+Added functionality (0)
+-----------------------
+The method Store.to_store_requesters() returns a reference to the to requesters, like
+Store.from_requesters() that was already in salabim.
+These methods can be very useful for animating a store.
+    
+Bug fix (0)
+-----------
+AnimateGrid used 0 and env.width() for the x-range. And 0 and env.height() for the y-range.
+This worked fine as long as screen coordinates were the same as user coordinates.
+In order to properly work with user coordinates, the x-range should be env.x0() and env.x1()
+and the y-range should be env.y0() and env.y1(). Fixed.
+
+
 version 23.3.2  2023-07-10 
 ==========================
 Bug fix (0)
