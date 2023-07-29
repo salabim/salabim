@@ -1,13 +1,13 @@
-#               _         _      _               ____   _____     _____     _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    |___ /    |___ /
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \      |_ \      |_ \
+#               _         _      _               ____   _____     _____     ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    |___ /    | ___|
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \      |_ \    |___ \
 #  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _  ___) | _  ___) |
 #  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|____/ (_)|____/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "23.3.3"
+__version__ = "23.3.5"
 
 import heapq
 import random
@@ -5595,7 +5595,6 @@ class Store(Queue):
         """
         return self._from_store_requesters
 
-
     def rescan(self):
         """
         Rescan for any components to be allowed from.
@@ -7000,13 +6999,14 @@ Maybe this a non yieldless model. In that case:
             else:
                 if not self.env._yieldless and not self.env._any_yield:
                     raise ValueError(
-"""process must be a generator (contain yield statements.)
+                        """process must be a generator (contain yield statements.)
 Maybe this a yieldless model. In that case:
 - remove sim.yieldless(False)
 If it is indeed a yield model, make this process method into a generator, e.g.
 by adding at the end:
     return
-    yield  # just to make this a generator""")
+    yield  # just to make this a generator"""
+                    )
                 self._process = p
                 self._process_isgenerator = False
                 self._process_kwargs = kwargs_p
@@ -7066,7 +7066,7 @@ by adding at the end:
         """
         size_x = 50
         size_y = 50
-        ao0 = AnimateRectangle(text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg") # ***
+        ao0 = AnimateRectangle(text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg")  # ***
         return (size_x, size_y, ao0)
 
     def animation3d_objects(self, id: Any) -> Tuple:
@@ -7467,19 +7467,22 @@ by adding at the end:
 Maybe this a non yieldless model. In that case:
 - add sim.yieldless(False) or
 - remove all yields or
-- run salabim_unyield.py""")
-                self.env._any_yield=True
+- run salabim_unyield.py"""
+                    )
+                self.env._any_yield = True
                 self._process = p(**kwargs)
                 self._process_isgenerator = True
             else:
                 if not self.env._yieldless and not self.env._any_yield:
-                    raise ValueError("""process must be a generator (contain yield statements.)
+                    raise ValueError(
+                        """process must be a generator (contain yield statements.)
 Maybe this a yieldless model. In that case:
 - remove sim.yieldless(False)
 If it is indeed a yield model, make this process method into a generator, e.g.
 by adding:
     return
-    yield""")
+    yield"""
+                    )
                 self._process = p
                 self._process_isgenerator = False
                 self._process_kwargs = kwargs
@@ -8015,7 +8018,6 @@ by adding:
         self,
         store: Union["Store", Iterable],
         item: "Component",
-        filter: Callable = lambda c: True,
         priority: float = 0,
         fail_priority: float = 0,
         urgent: bool = True,
@@ -8137,18 +8139,17 @@ by adding:
 
         if self.env._trace:
             self.env.print_trace("", "", self.name(), f"{item._name} to_store ({', '.join(store._name for store in to_stores)})")
-        if filter(item):
-            for store in to_stores:
-                q = store
-                if q.available_quantity() > 0:
-                    item.enter_sorted(q, priority)
-                    self._to_store_item = None
-                    self._to_store_store = store
-                    self._to_stores = []
-                    self._remove()
-                    self.status._value = scheduled
-                    self._reschedule(self.env._now, 0, False, f"to_store ({store.name()}) honor with {item.name()}", False, s0=self.env.last_s0)
-                    return
+        for store in to_stores:
+            q = store
+            if q.available_quantity() > 0:
+                item.enter_sorted(q, priority)
+                self._to_store_item = None
+                self._to_store_store = store
+                self._to_stores = []
+                self._remove()
+                self.status._value = scheduled
+                self._reschedule(self.env._now, 0, False, f"to_store ({store.name()}) honor with {item.name()}", False, s0=self.env.last_s0)
+                return
 
         for store in to_stores:
             self.enter(store._to_store_requesters)
@@ -8157,14 +8158,13 @@ by adding:
         self._to_store_item = item
         self._to_store_priority = priority
         self._to_stores = to_stores
-        self._to_store_filter = filter
-        
+
         if self._to_store_item:
             self._reschedule(scheduled_time, fail_priority, urgent, "request to_store", cap_now)
 
     def filter(self, value: callable):
         """
-        updates the filter used in self.from_store
+        updates the filter used in self.from_to
 
         Parameters
         ----------
@@ -9389,19 +9389,18 @@ by adding:
             store = q
             available_quantity = q.capacity._tally - q._length
             if available_quantity > 0:
-                for requester in store._to_store_requesters:
-                    if requester._to_store_filter(c):
-                        with self.env.suppress_trace():
-                            requester._to_store_item.enter_sorted(q, requester._to_store_priority)
-                        for store0 in requester._to_stores:
-                            requester.leave(store0._to_store_requesters)
-                        requester._to_stores = []
-                        requester._remove()
-                        requester.status._value = scheduled
-                        requester._reschedule(requester.env._now, 0, False, f"to_store ({store.name()}) honor ", False, s0=requester.env.last_s0)
-                        requester._to_store_item = None
-                        requester._to_store_store = self
-                        break
+                if len(store._to_store_requesters) > 0:
+                    requester = store._to_store_requesters[0]
+                    with self.env.suppress_trace():
+                        requester._to_store_item.enter_sorted(q, requester._to_store_priority)
+                    for store0 in requester._to_stores:
+                        requester.leave(store0._to_store_requesters)
+                    requester._to_stores = []
+                    requester._remove()
+                    requester.status._value = scheduled
+                    requester._reschedule(requester.env._now, 0, False, f"to_store ({store.name()}) honor ", False, s0=requester.env.last_s0)
+                    requester._to_store_item = None
+                    requester._to_store_store = self
         return self
 
     def priority(self, q: "Queue", priority: float = None) -> float:
@@ -9909,7 +9908,7 @@ class Environment:
             self._yieldless = _yieldless
         else:
             self._yieldless = yieldless
-        self._any_yield=False
+        self._any_yield = False
         if datetime0 is None:
             datetime0 = False
         self.datetime0(datetime0)
@@ -13322,6 +13321,15 @@ class Environment:
             """
 
         def from_store_requesters(self) -> "Queue":
+            """
+            get the queue holding all from_store requesting components
+
+            Returns
+            -------
+            queue holding all from_store requesting components : Queue
+            """
+
+        def to_store_requesters(self) -> "Queue":
             """
             get the queue holding all from_store requesting components
 
@@ -19960,6 +19968,7 @@ class Environment:
             over3d=None,
             keep=True,
             visible=True,
+            screen_coordinates=True,
         ):
             ...
 
@@ -28989,7 +28998,7 @@ class Environment:
         if text == "":  # necessary because of bug in PIL >= 4.2.1
             thiswidth, thisheight = (0, 0)
         else:
-            thiswidth, thisheight = f.getsize(text)
+            thiswidth, thisheight = f.getbbox(text)[2:]
         if screen_coordinates:
             return thiswidth
         else:
@@ -28999,7 +29008,7 @@ class Environment:
         if not screen_coordinates:
             fontsize = fontsize * self._scale
         f, heightA = getfont(font, fontsize)
-        thiswidth, thisheight = f.getsize("Ap")
+        thiswidth, thisheight = f.getbbox("Ap")[2:]
         if screen_coordinates:
             return thisheight
         else:
@@ -29012,7 +29021,7 @@ class Environment:
         lastwidth = 0
         for fontsize in range(1, 300):
             f = getfont(font, fontsize)
-            thiswidth, thisheight = f.getsize(text)
+            thiswidth, thisheight = f.getbbox(text)[2:]
             if thiswidth > width:
                 break
             lastwidth = thiswidth
@@ -30253,7 +30262,7 @@ class Animate2dBase(DynamicClass):
                         if flip_vertical:
                             image = image.transpose(method=Image.FLIP_TOP_BOTTOM)
 
-                        im1 = image.resize((int(width), int(height)), Image.ANTIALIAS)
+                        im1 = image.resize((int(width), int(height)), Image.LANCZOS)
                         self.imwidth, self.imheight = im1.size
                         if alpha != 255:
                             if has_numpy():
@@ -30355,14 +30364,14 @@ class Animate2dBase(DynamicClass):
                         else:
                             lines = lines[:max_lines]
 
-                        widths = [(font.getsize(line)[0] if line else 0) for line in lines]
+                        widths = [(font.getbbox(line)[2] if line else 0) for line in lines]
                         if widths:
                             totwidth = max(widths)
                         else:
                             totwidth = 0
 
                         number_of_lines = len(lines)
-                        lineheight = font.getsize("Ap")[1]
+                        lineheight = font.getbbox("Ap")[3]
                         totheight = number_of_lines * lineheight
                         im = Image.new("RGBA", (int(totwidth + 0.1 * fontsize), int(totheight)), (0, 0, 0, 0))
                         imwidth, imheight = im.size
@@ -32671,7 +32680,7 @@ class AnimateQueue(DynamicClass):
         self.keep = keep
         self.over3d = _default_over3d if over3d is None else over3d
         self.trajectory = trajectory
-        self.screen_coordinates =screen_coordinates
+        self.screen_coordinates = screen_coordinates
         self.register_dynamic_attributes(
             "xy_anchor x y id max_length direction reverse titleoffsetx titleoffsety titlefont titlefontsize titlecolor title layer visible keep trajectory"
         )
@@ -32763,7 +32772,7 @@ class AnimateQueue(DynamicClass):
             dimx = _call(animation_objects[0], t, c)
             dimy = _call(animation_objects[1], t, c)
             for ao in animation_objects[2:]:
-                ao.screen_coordinates=self.screen_coordinates # ***
+                ao.screen_coordinates = self.screen_coordinates  # ***
                 if isinstance(ao, AnimateClassic):
                     if direction == "t":
                         ao.x0 = xt + trajectory.x(t=x * 1.00, _t0=0)
@@ -32773,8 +32782,8 @@ class AnimateQueue(DynamicClass):
                         ao.y0 = y
                 else:
                     if direction == "t":
-                        ao.x = (xt + trajectory.x(t=x * 1.00, _t0=0)) # ***
-                        ao.y = (yt + trajectory.y(t=x * 1.00, _t0=0))
+                        ao.x = xt + trajectory.x(t=x * 1.00, _t0=0)  # ***
+                        ao.y = yt + trajectory.y(t=x * 1.00, _t0=0)
                         ao.angle = trajectory.angle(t=x * 1.00, _t0=0)
                     else:
                         ao.x = x
@@ -34654,11 +34663,11 @@ def AnimateGrid(spacing: float = 100, env: "Environment" = None, **kwargs):
     if env is None:
         env = g.default_env
 
-    for y in arange(env.y0(),env.y1() + 1, spacing):
-        AnimateLine(spec=(0,0,env.x1()-env.x0(), 0), x=0, y=y, text=str(y), text_anchor="sw", env=env, **kwargs)
+    for y in arange(env.y0(), env.y1() + 1, spacing):
+        AnimateLine(spec=(0, 0, env.x1() - env.x0(), 0), x=0, y=y, text=str(y), text_anchor="sw", env=env, **kwargs)
 
     for x in arange(env.x0(), env.x1() + 1, spacing):
-        AnimateLine(spec=(0, 0, 0, env.y1()-env.y0()), x=x, y=0, text=str(x), text_anchor="se", env=env, **kwargs)
+        AnimateLine(spec=(0, 0, 0, env.y1() - env.y0()), x=x, y=0, text=str(x), text_anchor="se", env=env, **kwargs)
 
 
 class ComponentGenerator(Component):
@@ -41379,7 +41388,7 @@ def getfont(fontname, fontsize):
     if result is None:
         result = ImageFont.load_default()  # last resort
 
-    heightA = result.getsize("A")[1]
+    heightA = result.getbbox("A")[3]
     getfont.lookup[(fontname, fontsize)] = result, heightA
     return result, heightA
 

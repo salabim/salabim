@@ -1,5 +1,20 @@
 salabim changelog
 
+version 23.3.5  2023-07-29
+==========================
+Compatibility update (0)
+------------------------
+Due to a change in Pillow 10.0.0, salabim did not work properly with that version:
+- font.getsize was deprecated. Salabim now uses font.getbbox.
+- Image.ANTIALIAS was deprecated. Salabim now uses Image.LANCZOS
+From now on, Pillow >=10.0.0 is also supported.
+
+version 23.3.4  2023-07-26
+==========================
+Bug fix (0)
+-----------
+A bug in Component.to_stock() fixed.
+
 version 23.3.3  2023-07-23
 ==========================
 Changed functionality (0)
