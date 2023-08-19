@@ -1,5 +1,106 @@
 salabim changelog
 
+version 23.3.6  2023-08-19
+==========================
+New functionality (0)
+---------------------
+The parameter datetime0 in Environment(), may now be also a string, which is relatively 
+free format as it uses dateutil.parser.parse.
+Note that (unless Environment.dateutil_parse is overridden), it is advised to use
+Y-M-D format, e.g.
+    env = sim.Environment(datetime0="2023-08-17")
+Note that for this functionality, dateutil has to be installed, most likely with
+    pip install python-dateutil
+
+New functionality (1)
+---------------------
+The parameter datetime0 in Environment.datetime0(), may now be also a string, which is relatively 
+free format as it uses dateutil.parser.parse.
+Note that (unless Environment.dateutil_parse is overridden), it is advised to use
+Y-M-D format, e.g.
+    env.datetime0("2023-08-17")
+Note that for this functionality, dateutil has to be installed, most likely with
+    pip install python-dateutil
+    
+New functionality (2)
+---------------------
+The above functionality uses a method Environment.dateutil_parse, which more or less defaults to 
+    def dateutil_parse(self, spec):
+        import dateutil.parser
+        return dateutil.parser.parse(spec, dayfirst=False, yearfirst=True)
+
+If other values for dayfirst or yearfirst are desired, formulate a custom method, like
+    sim.Environment.dateutil_parse = lambda self, spec: dateutil.parser.parse(spec, dayfirst=True, yearfirst=False)
+
+Refer to the Python dateutil.parse documentation for details.
+
+Note that for this functionality, dateutil has to be installed, most likely with
+    pip install python-dateutil
+
+Changed functionality (3)
+-------------------------
+If datetime0 is not False, all process interaction methods that require a time, like Component.hold,
+Component creation, fail_at parameters, can now be a datetime.datetime, e.g.
+    comp.hold(till=datetime.datetime(year=2023, month=8, day=17))
+Or it can be string containing a relatively free format date, like
+    comp.hold(till="2023-08_07")
+And now it is even possible to use a string:
+    comp.hold(till="1000")
+    
+If datetime0 is not False, all process interaction methods that require a duration, like Component.hold,
+Component creation, fail_delay parameters, can now be a datetime.timedelta, e.g.
+    comp.hold(datetime.timedelta(hours=1)
+    Vehicle(delay=
+Or it can be string containing a relatively free format duration, like
+    comp.hold("12:00:00"))
+And now it is even possible to use a string:
+    comp.hold("1000")
+    
+Of course, these parameters can also be a callable, like
+    comp.hold(env.Pdf(("12:00", "13:45", "20:30"), 1))
+    
+Note that this functionality is a by-product of the implementation of the not yet documented, but already
+available, UI (using PySimpleGUI) functionality.
+
+New functionality (4)
+---------------------
+The value of State.value can now be assigned and queried directly. E.g.
+    my_state.value.value = 3
+    print(my_state.value.value)
+is equivalent to
+    my_state.set(3)
+    print(my_state.get())
+This can be useful to increment or decrement a state. E.g.
+    my_state.value.value += 5
+is equivalent to
+    my.state.set(my_state.get() + 5)
+
+The value of Component.mode can now be assigned also like:
+    my_component.mode.value = "working"
+, instead of
+    my_component.set_mode("working")
+This can also be useful to increment or decrement a mode. E.g.
+    my_component.mode.value += 5
+is equivalent to
+    my_component.set_mode(my_component.mode() + 5)
+
+Changed functionality (0)
+-------------------------
+The class Environmnent does not contain a subclass Environment anymore,
+so you can't say
+    env1 = env.Environment()
+anymore. This was never intended to be supported.
+Use 
+    env1 = sim.Environment()
+now.
+
+Compatibility fix (0)
+---------------------
+When saving a video as .gif, Pythonista required the images2gif module, which has a bug in
+the latest version of Pythonista.
+As Pythonista has now an updated version of Pillow, saving can and will be done in the same way as
+in non Pythonista versions.
+
 version 23.3.5  2023-07-29
 ==========================
 Compatibility update (0)
