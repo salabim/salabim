@@ -9421,7 +9421,7 @@ by adding:
                     requester.status._value = scheduled
                     requester._reschedule(requester.env._now, 0, False, f"to_store ({store.name()}) honor ", False, s0=requester.env.last_s0)
                     requester._to_store_item = None
-                    requester._to_store_store = self
+                    requester._to_store_store = store
         return self
 
     def priority(self, q: "Queue", priority: float = None) -> float:
