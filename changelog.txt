@@ -1,12 +1,70 @@
 salabim changelog
 
-version 23.3.7  
+version 23.3.8  2023-09-05
+==========================
+Enhanced UI functionality (0)
+-----------------------------
+The UI window layout has been changed to be more useful with
+narrower windows.
+Some more updates to the appearance.
+
+When the UI is started, the time in the animation window is no longer disabled.
+The user can always switch that off with Environment.show_time(False).
+
+Environment.start_ui() now has useful defaults for window_size and window_position.
+
+Environment.start_ui() now has a parameter default_actions, which is True by default.
+If False, there are no actions like, pause/go, speed, etc. defined, so the user has to
+specify the required actions with the actions parameter.
+This is useful to use a different layout or leave out certain elements. Be sure to
+use the same keys to be able to use the programmed interactions. However, you
+can leave out elements.
+
+It is recommended to use the standard actions as a template:
+
+    [sg.Text("", key="-TIME-", metadata=[1, 2], size=200)],
+    [sg.Button("Pause", key="-PAUSE-GO-", metadata=[1, 2]), sg.Button("Stop", key="-STOP-", button_color=("white", "firebrick3"), metadata=[1, 2])],
+    [sg.Checkbox("Pause at each step", False, key="-PAUSE-AT-EACH-STEP-", enable_events=True, metadata=[1, 2])],
+    [sg.Text(f"Pause at{env.get_time_unit(template='(t)')}", key="-PAUSE-AT-TEXT-", size=17), sg.Input("", key="-PAUSE-AT-", size=(10, 20))],
+    [sg.Text(f"Pause each{env.get_time_unit(template='(d)')}", key="-PAUSE-EACH-TEXT-", size=17), sg.Input("", key="-PAUSE-EACH-", size=(10, 20))],
+    [
+        sg.Text("Speed", key="-SPEED-TEXT-", metadata=[1]),
+        sg.Button("/2", key="-SPEED/2-", metadata=[1]),
+        sg.Button("*2", key="-SPEED*2-", metadata=[1]),
+        sg.Input("", key="-SPEED-", size=(7, 10)),
+    ],
+    [sg.Checkbox("Trace", env.trace(), key="-TRACE-", metadata=[1, 2], enable_events=True)],
+    [sg.Checkbox("Synced", env.synced(), key="-SYNCED-", metadata=[1], enable_events=True)],
+    [sg.Checkbox("Animate", True, key="-ANIMATE-", metadata=[1, 2], enable_events=True)],
+
+
+The simulation did not stop exactly at the time given in 'Pause at'. Fixed.
+
+Added demos (0)
+---------------
+The program demo_ui.py shows a pretty standard UI with some extra elements.
+
+The program demo_horizontal_ui.py demonstrates the same functionality, but now
+with a horizontal UI window. Note that this requires quite a bit more
+code than the standard one.
+But it demonstrates what is possible.
+
+Bug fix (0)
+-----------
+Component.to_store_store did not always return the right store. Fixed.
+Thanks to Florian Förster for reporting this bug and the fix.
+
+Bug fix (1)
+-----------
+Store.to_store_requesters() returned the wrong queue. Fixed. 
+
+version 23.3.7  2023-08-22
 ==========================
 Bug fix (0)
 -----------
 Environment.paused(True) did not call set_start_animation(), which is required. Fixed.
 
-Big fix (1)
+Bug fix (1)
 -----------
 Removing and showing an animated monitor did not restore the labels and label lines. Fixed. 
 

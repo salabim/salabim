@@ -1,13 +1,13 @@
-#               _         _      _               ____   _____     _____     _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    |___ /    |___  |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \      |_ \       / /
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _  ___) | _   / /
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|____/ (_) /_/
+#               _         _      _               ____   _____     _____      ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    |___ /     ( _ )
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \      |_ \     / _ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _  ___) | _ | (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|____/ (_) \___/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "23.3.7"
+__version__ = "23.3.8"
 
 import heapq
 import random
@@ -3923,11 +3923,10 @@ class AnimateMonitor(DynamicClass):
         self.ao_now_line.remove()
         for ao in self.ao_label_texts:
             ao.remove()
-        self.ao_label_texts=[]
+        self.ao_label_texts = []
         for ao in self.ao_label_lines:
             ao.remove()
-        self.ao_label_lines=[]
-        
+        self.ao_label_lines = []
 
         self.env.sys_objects.discard(self)
 
@@ -5627,7 +5626,7 @@ class Store(Queue):
         -------
         queue holding all from_store requesting components : Queue
         """
-        return self._from_store_requesters
+        return self._to_store_requesters
 
     def rescan(self):
         """
@@ -7099,7 +7098,7 @@ by adding at the end:
         """
         size_x = 50
         size_y = 50
-        ao0 = AnimateRectangle(text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg")  # ***
+        ao0 = AnimateRectangle(text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg")
         return (size_x, size_y, ao0)
 
     def animation3d_objects(self, id: Any) -> Tuple:
@@ -9421,7 +9420,7 @@ by adding:
                     requester.status._value = scheduled
                     requester._reschedule(requester.env._now, 0, False, f"to_store ({store.name()}) honor ", False, s0=requester.env.last_s0)
                     requester._to_store_item = None
-                    requester._to_store_store = self
+                    requester._to_store_store = store
         return self
 
     def priority(self, q: "Queue", priority: float = None) -> float:
@@ -9698,7 +9697,7 @@ by adding:
             if self.isdata():
                 return "N/A"
             if self._process is None:
-                s0 = ""  # ***
+                s0 = ""
                 frame = _get_caller_frame()
                 lineno = inspect.getframeinfo(frame).lineno
                 s0 = rpad(str(lineno) + "+", 6)
@@ -23620,7 +23619,7 @@ class Environment:
             if animate != self._animate:
                 frame_changed = True
                 self._animate = animate
-                if self._ui:
+                if self._ui and "-ANIMATE-" in self._ui_keys:
                     self._ui_window["-ANIMATE-"].update(animate)
 
         self._scale = self._width / (self._x1 - self._x0)
@@ -23735,8 +23734,11 @@ class Environment:
                 g.animation_env._animate = self._animate
                 if not Pythonista:
                     if g.animation_env.root is not None:  # for blind animation to work properly
-                        g.animation_env.root.destroy()
-                        g.animation_env.root = None
+                        if self._ui:
+                            self.root.withdraw()
+                        else:
+                            g.animation_env.root.destroy()
+                            g.animation_env.root = None
                 g.animation_env = None
 
             if self._blind_animation:
@@ -25054,8 +25056,9 @@ class Environment:
                 if not self.animate():
                     if value:
                         self.animate(True)
-                        self._paused = True  # ***
-                        self.env._ui_window["-ANIMATE-"].update(False)  # this is required as the self.animate() also sets the value
+                        self._paused = True
+                        if "-ANIMATE-" in self._ui_keys:
+                            self.env._ui_window["-ANIMATE-"].update(False)  # this is required as the self.animate() also sets the value
 
         return self._paused
 
@@ -25556,7 +25559,6 @@ class Environment:
             screen_coordinates=True,
             xy_anchor="ne",
             env=self,
-            visible=lambda: not self._ui,
         )
         ao.text = self.clocktext
 
@@ -25640,7 +25642,6 @@ class Environment:
             else:
                 fps = 0
             s += f"fps={fps:.1f}"
-
         if self._show_time:
             if s != "":
                 s += " "
@@ -26003,15 +26004,50 @@ class Environment:
         """
         return self._sequence_number
 
-    def get_time_unit(self) -> str:
+    def get_time_unit(self, template: str = None) -> str:
         """
         gets time unit
+
+        Parameters
+        ----------
+        template : str
+            normally only used in UI functions
+
+            default: just return time_unit (including n/a)
+
+            if "d", time_unit as duration
+
+            if "t", time_unit as time
+
+            if "(d)", time_unit as (duration)
+
+            if "(t)", time_unit as (time)
+
+            Note that n/a is suppressed and an extra space is added at the front
+            if result is not the null strinf
 
         Returns
         -------
         Current time unit dimension (default "n/a") : str
         """
-        return self._time_unit_name
+        if template is None:
+            return self._time_unit_name
+        if template not in "d t (d) (t)".split():
+            raise ValueError
+
+        result = ""
+        if "t" in template and self._datetime0:
+            if "(" in template:
+                result = "yyyy-mm-dd"
+        else:
+            if self._time_unit_name != "n/a":
+                result = self._time_unit_name
+        if result:
+            if "(" in template:
+                result = f" ({result})"
+            else:
+                result = f" {result}"
+        return result
 
     def years(self, t: float) -> float:
         """
@@ -26751,19 +26787,56 @@ class Environment:
     def stop_ui(self):
         if self._ui:
             animate = self.animate()
-            self.pauser.cancel()
+            if not self.pauser.isdata():
+                self.pauser.cancel()
             self._ui = False
             self._ui_window.close()
             self.animate(animate)
             self._ui = False
 
-    def start_ui(self, window_size: Tuple, window_position: Tuple, actions=None, user_handle_event=None):
+    def start_ui(
+        self,
+        window_size: Tuple = (None, None),
+        window_position: Tuple = (None, None),
+        elements: List = None,
+        user_handle_event: Callable = None,
+        default_elements: bool = True,
+        actions: List = None,
+    ):
+        """
+        start the PySimpleGUI UI
+
+        Parameters
+        ----------
+        window_size : tuple
+            width (int) ; default (None): 300
+
+            height (int) ; default (None): 600
+
+        window_position : tuple
+            x (int) ; default (None): width of animation
+
+            y (int) ; default (None): 0
+
+        elements : list
+            extra elements to add (refer to PySimpleGUI reference)
+
+        user_handle_event : callable
+            default: no handler
+
+        default_elements : bool
+            if True (default), UI will start with the standard elements
+
+            if False, no standard elements will be used. Use elements
+            to add required standard elements
+        """
         global sg
 
         try:
             import PySimpleGUI as sg
         except ImportError:
             raise ImportError("PySimpleGUI required for ui. Install with pip install PySimpleGUI")
+        self.remove_topleft_buttons()
 
         self.animation_parameters(use_toplevel=True)
         self.pauser = _Pauser(at=inf)
@@ -26775,35 +26848,56 @@ class Environment:
         else:
             self.user_handle_event = user_handle_event
 
-        frame0 = [
-            [sg.Text("", key="-TIME-", metadata=[1, 2])],
-            [sg.Button("Pause", key="-PAUSE-GO-", metadata=[1, 2]), sg.Button("Stop", key="-STOP-", button_color=("white", "firebrick3"), metadata=[1, 2])],
-            [
-                sg.Checkbox("Pause at each step", False, key="-PAUSE-AT-EACH-STEP-", enable_events=True, metadata=[1, 2]),
-                sg.Text("Pause at", key="-PAUSE-AT-TEXT-"),
-                sg.Input("", key="-PAUSE-AT-", size=(10, 20)),
-                sg.Text("Pause each", key="-PAUSE-EACH-TEXT-"),
-                sg.Input("", key="-PAUSE-EACH-", size=(10, 20)),
-            ],
-            [
-                sg.Button("Speed/2", key="-SPEED/2-", metadata=[1]),
-                sg.Button("Speed*2", key="-SPEED*2-", metadata=[1]),
-                sg.Text("Speed", key="-SPEED-TEXT-"),
-                sg.Input("", key="-SPEED-", size=(4, 10)),
-            ],
-            [sg.Checkbox("Trace", self.trace(), key="-TRACE-", metadata=[1, 2], enable_events=True)],
-            [sg.Checkbox("Synced", self.synced(), key="-SYNCED-", metadata=[1], enable_events=True)],
-            [sg.Checkbox("Animate", True, key="-ANIMATE-", metadata=[1, 2], enable_events=True)],
-        ]
+        if default_elements:
+            frame0 = [
+                [sg.Text("", key="-TIME-", metadata=[1, 2], size=200)],
+                [sg.Button("Pause", key="-PAUSE-GO-", metadata=[1, 2]), sg.Button("Stop", key="-STOP-", button_color=("white", "firebrick3"), metadata=[1, 2])],
+                [sg.Checkbox("Pause at each step", False, key="-PAUSE-AT-EACH-STEP-", enable_events=True, metadata=[1, 2])],
+                [sg.Text(f"Pause at{self.get_time_unit(template='(t)')}", key="-PAUSE-AT-TEXT-", size=17), sg.Input("", key="-PAUSE-AT-", size=(10, 20))],
+                [sg.Text(f"Pause each{self.get_time_unit(template='(d)')}", key="-PAUSE-EACH-TEXT-", size=17), sg.Input("", key="-PAUSE-EACH-", size=(10, 20))],
+                [
+                    sg.Text("Speed", key="-SPEED-TEXT-", metadata=[1]),
+                    sg.Button("/2", key="-SPEED/2-", metadata=[1]),
+                    sg.Button("*2", key="-SPEED*2-", metadata=[1]),
+                    sg.Input("", key="-SPEED-", size=(7, 10)),
+                ],
+                [sg.Checkbox("Trace", self.trace(), key="-TRACE-", metadata=[1, 2], enable_events=True)],
+                [sg.Checkbox("Synced", self.synced(), key="-SYNCED-", metadata=[1], enable_events=True)],
+                [sg.Checkbox("Animate", True, key="-ANIMATE-", metadata=[1, 2], enable_events=True)],
+            ]
+        else:
+            frame0 = []
+
+        if elements:
+            if frame0:
+                frame0.append([sg.HorizontalSeparator()])
+            frame0.extend(elements)
+
         if actions:
-            frame0.append([sg.HorizontalSeparator()])
+            if frame0:
+                frame0.append([sg.HorizontalSeparator()])
             frame0.extend(actions)
-        layout = [[sg.Frame("salabim", frame0, pad=((0, 0), (20, 0)))]]
+
+        layout = [[sg.Frame("", frame0, pad=((0, 0), (20, 0)))]]
+
+        window_size = list(window_size)
+        if window_size[0] is None:
+            window_size[0] = 300
+        if window_size[1] is None:
+            window_size[1] = self.height() + 33
+
+        window_position = list(window_position)
+
+        if window_position[0] is None:
+            window_position[0] = self.width() + 10
+        if window_position[1] is None:
+            window_position[1] = 0
 
         self._last_animate = "?"
         self._last_paused = "?"
-        self._ui_window = sg.Window("salabim control", layout, size=window_size, location=window_position)
+        self._ui_window = sg.Window("", no_titlebar=True, layout=layout, size=window_size, location=window_position)
         self._ui_window.finalize()
+        self._ui_keys = {key.key for key in self._ui_window.element_list()}
 
         self.pause_at = inf
         self._pause_at_each_step = False
@@ -26813,7 +26907,8 @@ class Environment:
         return self._ui_window
 
     def set_pause_go_button(self):
-        self._ui_window["-PAUSE-GO-"].Update("Go" if self._paused else "Pause")
+        if "-PAUSE-GO-" in self._ui_keys:
+            self._ui_window["-PAUSE-GO-"].Update("Go" if self._paused else "Pause")
 
     def _handle_ui_event(self):
         if self._last_animate != self._animate or self._last_paused != self._paused:
@@ -26833,42 +26928,47 @@ class Environment:
 
         event, values = self._ui_window.read(timeout=0)
 
-        t = self.pauser.scheduled_time()
-        s = [self.clocktext(self.t())]
-        if t != inf and not self._paused:
-            s.append(f" | Pause at {self.clocktext(t)}")
-        if self.animate():
-            s.append(f" | Speed={self.speed():.3f}")
-
         if values is None:
             return
 
-        if values["-SPEED-"] == "":
-            self._ui_window["-SPEED-"].update(str(self.speed()))
+        if "-SPEED-" in self._ui_keys:
+            if values["-SPEED-"] == "":
+                self._ui_window["-SPEED-"].update(str(self.speed()))
 
-        self._ui_window["-TIME-"].Update("".join(s))
+        if "-TIME-" in self._ui_keys:
+            t = self.pauser.scheduled_time()
+            s = [f"t={self.time_to_str(self.t()).lstrip()}{self.get_time_unit(template='t')}"]
+            if t != inf and not self._paused:
+                s.append(f" | Pause at {self.time_to_str(t).lstrip()}{self.get_time_unit(template='t')}")
+            if self.animate():
+                s.append(f" | Speed={self.speed():.3f}")
+
+            self._ui_window["-TIME-"].Update("".join(s))
 
         if event in ("__TIMEOUT__", sg.WIN_CLOSED, "Exit"):
             return
 
         if event == "-STOP-":
-            ch = sg.popup_yes_no(f"{chr(160):>50}", "", title="Stop?")  # chr(160) is a non breaking blank, equivalent to "\0xA0")
+            ch = sg.popup_yes_no(f"{chr(160):>50}", title="Stop?")  # chr(160) is a non breaking blank, equivalent to "\0xA0")
             if ch == "Yes":
                 sys.exit()
 
         if event == "-PAUSE-GO-":
-            if not self.animate():
-                animate = values["-ANIMATE-"]
-                self.animate(True)
-                self.paused(False)
-                self._ui_window["-ANIMATE-"].update(animate)  # this is required as the self.animate() also sets the value
-
+            # if not self.animate():
+            #     self.animate(True)
+            #     self.paused(False)
+            #     if "-ANIMATE-" in self._ui_keys:
+            #         self._ui_window["-ANIMATE-"].update(animate)  # this is required as the self.animate() also sets the value
+                
             self.set_start_animation()
             if self._paused:
-                pause_at_str = values["-PAUSE-AT-"]
+                if "-PAUSE-AT-" in self._ui_keys:
+                    pause_at_str = values["-PAUSE-AT-"]
+                else:
+                    pause_at_str = ""
                 if pause_at_str != "":
                     try:
-                        self.pause_at = self.spec_to_time(pause_at_str)  # ***
+                        self.pause_at = self.spec_to_time(pause_at_str)
                     except ValueError:
                         self.pause_at = None
                 else:
@@ -26877,7 +26977,10 @@ class Environment:
                 if self.pause_at is None:
                     sg.popup(f"Pause not valid")
                 else:
-                    pause_each_str = values["-PAUSE-EACH-"]
+                    if "-PAUSE-EACH-" in self._ui_keys:
+                        pause_each_str = values["-PAUSE-EACH-"]
+                    else:
+                        pause_each_str = ""
                     if pause_each_str.strip() != "":
                         try:
                             pause_each = self.spec_to_duration(pause_each_str)
@@ -26891,46 +26994,54 @@ class Environment:
                         sg.popup(f"Pause interval not valid")
                     else:
                         if self.pause_at > self.t():
-                            self.animate(values["-ANIMATE-"])
+                            if "-ANIMATE-" in self._ui_keys:
+                                self.animate(values["-ANIMATE-"])
                             self.paused(False)
                             if self.pauser.scheduled_time() != self.pause_at:
                                 self.pauser.activate(at=self.pause_at)
                         else:
-                            sg.popup(f"Pause at should be > {self.env.clocktext(self.env.t())}")
+                            sg.popup(f"Pause at should be > {self.time_to_str(self.t()).lstrip()}")
             else:
                 self.paused(True)
                 self._ui_window[event].Update("Pause")
 
-            new_speed = float(values["-SPEED-"])
-            if new_speed != self.speed():
-                self.speed(new_speed)
-                self.set_start_animation()
+            if "-SPEED-" in self._ui_keys:
+                new_speed = float(values["-SPEED-"])
+                if new_speed != self.speed():
+                    self.speed(new_speed)
+                    self.set_start_animation()
 
         if event == "-SPEED*2-":
             self.speed(self.speed() * 2)
-            self._ui_window["-SPEED-"].update(str(self.speed()))
+            if "-SPEED-" in self._ui_keys:
+                self._ui_window["-SPEED-"].update(str(self.speed()))
             self.set_start_animation()
 
         if event == "-SPEED/2-":
             self.speed(self.speed() / 2)
-            self._ui_window["-SPEED-"].update(str(self.speed()))
+            if "-SPEED-" in self._ui_keys:
+                self._ui_window["-SPEED-"].update(str(self.speed()))
             self.set_start_animation()
 
         if event == "-SYNCED-":
-            self.synced(values["-SYNCED-"])
+            if "-SYNCED-" in self._ui_keys:
+                self.synced(values["-SYNCED-"])
 
         if event == "-PAUSE-AT-EACH-STEP-":
-            self._pause_at_each_step = values["-PAUSE-AT-EACH-STEP-"]
+            if "-PAUSE-AT-EACH-STEP-" in self._ui_keys:
+                self._pause_at_each_step = values["-PAUSE-AT-EACH-STEP-"]
 
         if event == "-TRACE-":
-            self.trace(values["-TRACE-"])
+            if "-TRACE-" in self._ui_keys:
+                self.trace(values["-TRACE-"])
 
         if event == "-ANIMATE-":
-            if values["-ANIMATE-"]:
-                self.animate(True)
-                self.paused(True)
-            else:
-                _AnimateOff(urgent=True)
+            if "-ANIMATE-" in self._ui_keys:
+                if values["-ANIMATE-"]:
+                    self.animate(True)
+                    self.paused(True)
+                else:
+                    _AnimateOff(urgent=True)
 
         self.user_handle_event(env=self, window=self._ui_window, event=event, values=values)
 
@@ -26938,14 +27049,18 @@ class Environment:
 class _Pauser(Component):
     def process(self):
         event, values = self.env._ui_window.read(timeout=0)
-        animate = values["-ANIMATE-"]
+        if "-ANIMATE-" in self.env._ui_keys:
+            animate = values["-ANIMATE-"]
         self.env.animation_start_time = self.env._now
+        self.env._t = self.env._now
         self.env.animate(True)
         self.env.paused(True)
         self.env.set_pause_go_button()
-        if values["-PAUSE-AT-"] != "" and self.env._now >= self.env.spec_to_time(values["-PAUSE-AT-"]):
-            self.env._ui_window["-PAUSE-AT-"].Update("")
-        self.env._ui_window["-ANIMATE-"].update(animate)  # this is required as the self.animate() also sets the value
+        if "-PAUSE-AT-" in self.env._ui_keys:
+            if values["-PAUSE-AT-"] != "" and self.env._now >= self.env.spec_to_time(values["-PAUSE-AT-"]):
+                self.env._ui_window["-PAUSE-AT-"].Update("")
+        if "-ANIMATE-" in self.env._ui_keys:
+            self.env._ui_window["-ANIMATE-"].update(animate)  # this is required as the self.animate() also sets the value
 
 
 class _AnimateOff(Component):
@@ -29826,7 +29941,7 @@ class AnimateQueue(DynamicClass):
             dimx = _call(animation_objects[0], t, c)
             dimy = _call(animation_objects[1], t, c)
             for ao in animation_objects[2:]:
-                ao.screen_coordinates = self.screen_coordinates  # ***
+                ao.screen_coordinates = self.screen_coordinates
                 if isinstance(ao, AnimateClassic):
                     if direction == "t":
                         ao.x0 = xt + trajectory.x(t=x * 1.00, _t0=0)
@@ -29836,7 +29951,7 @@ class AnimateQueue(DynamicClass):
                         ao.y0 = y
                 else:
                     if direction == "t":
-                        ao.x = xt + trajectory.x(t=x * 1.00, _t0=0)  # ***
+                        ao.x = xt + trajectory.x(t=x * 1.00, _t0=0)
                         ao.y = yt + trajectory.y(t=x * 1.00, _t0=0)
                         ao.angle = trajectory.angle(t=x * 1.00, _t0=0)
                     else:
