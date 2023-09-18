@@ -52,7 +52,7 @@ def do_animation():
     env.animation_parameters(animate=True, x0=xbound[left], y0=-waterdepth, x1=xbound[right], modelname="Lock", speed=8, background_color="20%gray")
 
     for side in [left, right]:
-        sim.AnimateQueue(queue=wait[side], x=xdoor[side], y=10 + ylevel[side], direction="n", title="")
+        sim.AnimateQueue(queue=wait[side], x=xdoor[side], y=10 + ylevel[side], direction="n", title="", screen_coordinates=False)
 
     sim.AnimateRectangle(spec=(xbound[left], ylevel[left] - waterdepth, xdoor[left], ylevel[left]), fillcolor="aqua")
     sim.AnimateRectangle(spec=(xdoor[right], ylevel[right] - waterdepth, xbound[right], ylevel[right]), fillcolor="aqua")
@@ -67,53 +67,58 @@ def do_animation():
     sim.AnimateMonitor(
         wait[left].length,
         linecolor="orange",
-        fillcolor="bg",
-        x=-225,
-        y=-200,
-        xy_anchor="n",
+        fillcolor="",
+        x=512 - 225,
+        y=768 - 200,
         horizontal_scale=1,
         width=450,
         linewidth=2,
+        labels=[5, 10, 15],
+        label_linecolor="40% gray",
         title=lambda: "Number of waiting ships left. Mean={:10.2f}".format(wait[left].length.mean()),
+        screen_coordinates=True,
     )
     sim.AnimateMonitor(
         wait[right].length,
         linecolor="orange",
-        fillcolor="bg",
-        x=-225,
-        y=-300,
-        xy_anchor="n",
+        fillcolor="",
+        x=512 - 225,
+        y=768 - 300,
         horizontal_scale=1,
         width=450,
         linewidth=2,
+        labels=[5, 10, 15],
+        label_linecolor="40% gray",
         title=lambda: "Number of waiting ships right. Mean={:10.2f}".format(wait[right].length.mean()),
     )
     sim.AnimateMonitor(
         wait[left].length_of_stay,
         linecolor="white",
-        fillcolor="bg",
-        x=-225,
-        y=-400,
-        xy_anchor="n",
+        fillcolor="",
+        x=512 - 225,
+        y=768 - 400,
         vertical_scale=0.5,
         horizontal_scale=1,
         width=450,
         height=75,
         linewidth=4,
+        labels=[50, 100, 150],
+        label_linecolor="40% gray",
         title=lambda: "Waiting time of ships left. Mean={:10.2f}".format(wait[left].length_of_stay.mean()),
     )
     sim.AnimateMonitor(
         wait[right].length_of_stay,
         linecolor="white",
-        fillcolor="bg",
-        x=-225,
-        y=-500,
-        xy_anchor="n",
+        fillcolor="",
+        x=512 - 225,
+        y=768 - 500,
         vertical_scale=0.5,
         horizontal_scale=1,
         width=450,
         height=75,
         linewidth=4,
+        labels=[50, 100, 150],
+        label_linecolor="40% gray",
         title=lambda: "Waiting time of ships left. Mean={:10.2f}".format(wait[right].length_of_stay.mean()),
     )
 
