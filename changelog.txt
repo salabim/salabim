@@ -1,5 +1,91 @@
 salabim changelog
 
+version 23.3.9  2023-09-18
+==========================
+New functionality (0)
+---------------------
+A new context manager sim.capture_stdout(), makes it possible to capture all stdout output.
+Unless include_print=False is given, the output *also* goes to the console (as usual).
+
+For example, with
+     with sim.capture_stdout():
+         env = sim.Environment(trace=True)
+all trace output will printed AND be captured.
+
+With
+     with sim.capture_stdout(include_print=False):
+         env = sim.Environment(trace=True)
+, trace output will not be printed, but still be captured.
+
+The captured output can be retrieved with 
+    sim.captured_stdout_as_dataframe()  to retrieve it as a (one column) pandas dataframe.
+    sim.captured_stdout_as_str() to retrieve it as a string
+    sim.captured_stdout_as_file() to retrieve it in a file (given as a str, Path or file handle)
+
+The first is particularly useful for Python in Excel.
+
+It is possible to clear the captured_stdout information with
+    sim.clear_captured_stdout()
+
+Of course, we can also use env.capture_stdout(), env.captured_stdout_to_df(). etc. instead.
+
+New functionality (1)
+---------------------
+Salabim can now run under Python in Excel.
+
+This required a change in the line number assessment.
+When the line cannot be determined, a question mark will now be used instead.
+
+Note that only blind animation is supported as tkinter is not available under
+Python in Excel. 
+Although technically salabim supports making an animated Gif under Python in Excel (with
+some specialized VBA code), this is not practical (as of now).
+
+Changed functionality (0)
+-------------------------
+The salabim code now contains encoded versions of the fonts
+    "calibri" / "std" / ""
+    "dejavusansmono" / "mono"
+    "mplus_1m_regular" / "narrow"
+This means that it is not longer required to have the files
+    calibri.ttf
+    DejaVuSansMono.ttf
+    mplus-1m-regular.ttf
+installed or available anywhere anymore.
+Also, when a font is not found, salabim will fall back to the calibri font.
+
+This makes distributing models without installing salabim simpler.
+
+And it also makes font handling available to models run under PythonInExcel.
+
+Changed functionality (1)
+-------------------------
+AnimateQueue() / Queue.animate() now has a screen_coordinates parameter that is True by default.
+If the animation objects of the components to be shown are in user coordinates, specify screen_coordinates=False.
+Actually, this change was already introduced in salabim 23.3.5, but was left out of the changelog of that version.
+
+Bug fix (0)
+-----------
+The patch in salabim 23.3.5 to support Pillow 10.0.0, did not work under all circumstances.
+Fixed.
+
+Bug fix (1)
+-----------
+Blind animation still required tkinter under some circumstances. Fixed.
+
+Bug fix (2)
+-----------
+Blind animation video making did not finish when env.run() was specified. Fixed.
+
+Bug fix (3)
+-----------
+AnimateMonitor() / Monitor.animate() label lines did not observe the xy_offset parameter. Fixed.
+AnimateMonotor() / Monitor.animate() label lines could 'override' the surrounding rectangle. Fixed.
+
+Bug fix (3)
+-----------
+AnimateText did not observe the offsetx and offsety parameter correctly. Fixed.
+
 version 23.3.8  2023-09-05
 ==========================
 Enhanced UI functionality (0)
@@ -281,7 +367,7 @@ Related to this is a much more useful error message when a yield model is run in
 
 Improved documentation (0)
 --------------------------
-Salabim now has to complete sets of documentation: for yieldless (default) and yield version.
+Salabim now has two complete sets of documentation: for yieldless (default) and yield version.
 There are also two versions of the pdf documentation.
 
 sample models and sample 3d models (0)
