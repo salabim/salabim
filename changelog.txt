@@ -1,5 +1,62 @@
 salabim changelog
 
+version 23.3.10 2023-10-09 
+===========================
+Added functionality (0)
+-----------------------
+Saving
+    an animated gif, png or webp file
+    a snapshot 
+under Python In Excel, now saves an encoded file to sim.pie_result().
+The stored result contains the name of the file, so later decoding to a real file is possible.
+
+Also, a file handler b64_file_handler is provided to allow writing to a file
+in binary or text mode as an encoded file. This is used internally, but it can be used
+by an application as well.
+
+It is also possible to add text to the sim.pie_result() list without
+affecting the stored file(s) information.
+
+Note that for the decoding a VBA macro is required.
+
+Changed functionality (0)
+-------------------------
+Under Python in Excel, blind_animation is enabled by default for a call to Environment().
+
+Changed functionality (1)
+-------------------------
+If the trace had to show a line in the source of salabim (particularly in ComponentGenerator),
+the line numbers were not always displayed correctly and were not very useful
+for the trace anyway.
+From now on, in that case, no line number will be shown. 
+
+Bug fix (0)
+-----------
+Label lines in AnimateMonitor / Monitor.animate() were obscured by the fillcolor.
+From now on, the line around the frame will be shown over the label lines,
+whereas the label lines will be shown over the filled rectangle.
+
+Bug fix (1)
+-----------
+On Pythonista, the fallback font did not work properly as Pythonista does not support
+file handles as the font parameter for PIL.ImageFont. Therefore, on this platform
+salabim falls back on the standard Arial font.
+
+Bug fix (2)
+-----------
+Pause/Resume an animation with <space> didn't work properly. Fixed.
+(bug reported by Harald Mutzke)
+
+Type annotation fix (0)
+-----------------------
+Fixed a wrong type annotation in AnimateSlider.
+(flagged by Harald Mutzke)
+
+PyPI/GitHub distribution change (0)
+------------------=-----------------
+On PyPI salabim now has a meaningful description.
+GitHub also has an updated readme.
+
 version 23.3.9  2023-09-18
 ==========================
 New functionality (0)
@@ -10,7 +67,7 @@ Unless include_print=False is given, the output *also* goes to the console (as u
 For example, with
      with sim.capture_stdout():
          env = sim.Environment(trace=True)
-all trace output will printed AND be captured.
+all trace output will be printed AND be captured.
 
 With
      with sim.capture_stdout(include_print=False):
@@ -18,7 +75,7 @@ With
 , trace output will not be printed, but still be captured.
 
 The captured output can be retrieved with 
-    sim.captured_stdout_as_dataframe()  to retrieve it as a (one column) pandas dataframe.
+    sim.captured_stdout_as_list()  to retrieve it as a list of strings
     sim.captured_stdout_as_str() to retrieve it as a string
     sim.captured_stdout_as_file() to retrieve it in a file (given as a str, Path or file handle)
 
@@ -27,7 +84,7 @@ The first is particularly useful for Python in Excel.
 It is possible to clear the captured_stdout information with
     sim.clear_captured_stdout()
 
-Of course, we can also use env.capture_stdout(), env.captured_stdout_to_df(). etc. instead.
+Of course, we can also use env.capture_stdout(), env.captured_stdout_to_dataframe(), etc. instead.
 
 New functionality (1)
 ---------------------
@@ -39,7 +96,7 @@ When the line cannot be determined, a question mark will now be used instead.
 Note that only blind animation is supported as tkinter is not available under
 Python in Excel. 
 Although technically salabim supports making an animated Gif under Python in Excel (with
-some specialized VBA code), this is not practical (as of now).
+some specialized VBA code), this is not very practical (as of now).
 
 Changed functionality (0)
 -------------------------
@@ -82,7 +139,7 @@ Bug fix (3)
 AnimateMonitor() / Monitor.animate() label lines did not observe the xy_offset parameter. Fixed.
 AnimateMonotor() / Monitor.animate() label lines could 'override' the surrounding rectangle. Fixed.
 
-Bug fix (3)
+Bug fix (4)
 -----------
 AnimateText did not observe the offsetx and offsety parameter correctly. Fixed.
 
