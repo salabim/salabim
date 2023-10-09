@@ -1,6 +1,8 @@
+salabim
+-------
 Object oriented discrete event simulation and animation in Python.
 
-Discrete ewvent simulation (DES) can be used in a variety of logistics applications:
+Discrete event simulation (DES) can be used in a variety of logistics applications:
 
 * production facilities
 * warehousing
@@ -27,6 +29,7 @@ The package provides
 * advanced statistical sampling
 
 In contrast to some other Python DES packages it is not required to use yield statements for the process control.
+Salabim has very minimal requirements (without animation none). 
 
 Salabim runs under Windows, MacOS and Linux, iOS/iPadOS (Pythonista) and can be used with "Python In Excel".
 
