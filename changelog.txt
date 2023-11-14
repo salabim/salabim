@@ -1,5 +1,72 @@
 salabim changelog
 
+version 23.3.11 2023-11-14
+===========================
+Changed functionality (0)
+-------------------------
+From now on, Monitor.print_statistics and Monitor.print_histogram does not show "no data"
+anymore when the number of entries / total weight is zero. This change is made to be
+have a more consistent output, which is important when post processing the output string.
+
+In relation to this, histogram_autoscale now also returns 'sensible' values when
+there are no entries or the total weight is zero.
+
+Changed functionality (1)
+-------------------------
+When a component is cancelled, any claimed resources are now automatically released.
+This is in line with the termination of a component.
+(inspired by Luca Di Gaspero)
+
+Extended functionality (0)
+--------------------------
+Under Windows, fonts are now also searched in the user/AppData/Local/Microsoft/Windows/Fonts
+folder, as fonts are sometimes installed there as well. 
+
+Python in Excel functionality (0)
+---------------------------------
+In Python in Excel, line numbers are now completely suppressed in the trace.
+
+The test for PythonInExcel has been changed (by testing whether __file__ is in globals())
+to be compatible with the new runner functionality.
+
+The file salabim.py now contains the line
+    # module = salabim
+, to make it compatible with Python in Excel, out of the box.
+
+Bug fix (0)
+-----------
+A problem with activating a process in yieldless mode fixed.
+(Bug reported by bonusguy)
+
+Bug fix (1)
+-----------
+A bug in Component.cancel() prevented a process to stop correctly in yieldless mode. Fixed.
+(Bug reported by Devin Kain)
+
+Bug fix (2)
+-----------
+A bug in Component.passivate(), Component.standby(), Component.from_store() and Component.to_store()
+in yieldless mode.
+When called one of these methods were applied on a component that's not current (so not self), the
+process of that component stopped incorrectly. E.g.
+   other_car.passivate()
+Fixed.
+
+Documententation updates (0)
+----------------------------
+The documentation (both html and pdf) have been updated considerably, mainly as a result of
+the preparation of the printed user and reference manual.
+
+Availability of printed user and reference manual (0)
+-----------------------------------------------------
+Now a printed manual is available from your local Amazon site in two formats:
+
+* full colour premium paper hardcover (ISBN 9798867009403)
+* full colour standard paper paperback (ISBN 9798865131472)
+
+Please search for "salabim user and reference manual" on your local Amazon site and you can buy it directly there.
+
+
 version 23.3.10 2023-10-09 
 ===========================
 Added functionality (0)
@@ -75,16 +142,16 @@ With
 , trace output will not be printed, but still be captured.
 
 The captured output can be retrieved with 
-    sim.captured_stdout_as_list()  to retrieve it as a list of strings
+    sim.captured_stdout_as_list() to retrieve it as a list of strings
     sim.captured_stdout_as_str() to retrieve it as a string
     sim.captured_stdout_as_file() to retrieve it in a file (given as a str, Path or file handle)
 
-The first is particularly useful for Python in Excel.
+The first function is particularly useful for Python in Excel.
 
 It is possible to clear the captured_stdout information with
     sim.clear_captured_stdout()
 
-Of course, we can also use env.capture_stdout(), env.captured_stdout_to_dataframe(), etc. instead.
+Of course, we can also use env.capture_stdout(), env.captured_stdout_to_list(), etc. instead.
 
 New functionality (1)
 ---------------------
