@@ -9,7 +9,7 @@ import types
 import itertools
 import os
 import platform
-from ycecream import yc
+#from ycecream import yc
 import numpy as np
 import datetime
 import pickle
@@ -22,7 +22,332 @@ Pythonista = platform.system() == "Darwin"
 
 
 def exp():
-    exp219()
+    exp234()
+
+def exp234():
+    class X(sim.Component):
+        def process(self):
+            self.hold(1)
+            self.cancel()
+            self.hold(2)
+
+    class Y(sim.Component):
+        def process(self):
+            self.hold(10)
+
+    class Z(sim.Component):
+        def process(self):
+            self.hold(4)
+            env.y.cancel()
+            self.hold(40)
+
+
+    env=sim.Environment(trace=True)
+    X()
+    env.y = Y()
+    Z()
+    env.run()
+    
+def exp233():
+    env = sim.Environment()
+    with env.redirect_stdout("test.txt"):
+        for i in range(10):
+            print(f"{i*'abc'}")
+
+    # with open("test.txt", "w") as f:
+    #     print("123", file=f)
+    #     with env.redirect_stdout(f):
+    #         for i in range(10):
+    #             print(f"{i*'abc'}")
+    #     print("456", file=f)
+
+    # f = env.redirect_stdout("test.txt")
+    # for i in range(10):
+    #     print(f"{i*'abc'}")
+    # f.close()
+
+    # with sim.capture_stdout():
+    #     for i in range(10):
+    #         print(f"{i*'abca'}")
+    # print(sim.captured_stdout_as_list())   
+    # print(sim.captured_stdout_as_str())
+    # with open("test.txt", "a") as f:
+    #     sim.captured_stdout_as_file(f, mode="w")   
+
+
+def exp232():
+    env=sim.Environment()
+    mon_level=env.Monitor("mon_level",level=True)
+    mon_nonlevel=env.Monitor("mon_nonlevel")
+    mon_nonlevel.tally(10)
+
+    mon_level.tally(10)
+    env.run(1)
+    # mon_nonlevel.print_histogram(values=True)
+    # mon_nonlevel.print_histogram()
+
+    # mon_level.print_histogram(values=True)
+    print(mon_nonlevel.sys_weight())
+
+    print(mon_level.sys_weight())
+    mon_level.print_histogram()
+
+
+
+def exp231():
+    sim.yieldless(False)
+    env = sim.Environment()
+
+    env.animate(True)
+#    env.AnimateText("courier-new", font="courier-new", fontsize=50, x=100, y=100)
+    env.AnimateText("ier-new", font="ier-new", fontsize=50, x=100, y=150)
+    env.AnimateText("dejavusansmono", font="dejavusansmono", fontsize=50, x=100, y=250)
+    env.AnimateText("mplus-1m-regular", font="mplus-1m-regular", fontsize=50, x=100, y=300)
+    env.AnimateText("dejavusansmono mono", font="mono", fontsize=50, x=100, y=350)
+    env.AnimateText("mplus-1m-regular narrow", font="narrow", fontsize=50, x=100, y=400)
+    env.AnimateText("<none> calibri", font="", fontsize=50, x=100, y=450)
+    env.modelname("Fonts")
+    env.run(env.inf)
+
+
+def exp230():
+    from pathlib import Path
+
+    env = sim.Environment()
+    with env.capture_stdout():
+        print("abc")
+        print("def")
+    print(env.captured_stdout_as_str())
+    print(env.captured_stdout_as_dataframe())
+    env.captured_stdout_as_file("test")
+    with open("test1", "w") as f:
+        env.captured_stdout_as_file(f)
+    env.clear_captured_stdout()
+    env.captured_stdout_as_file(Path("test2"))
+
+    env.run(1000)
+
+
+def exp229():
+    sim.yieldless(False)
+
+    class X(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(1)
+                yield self.get((env.res, 1))
+
+    class Y(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(10)
+                yield self.put((env.res, 1))
+
+    env = sim.Environment(trace=True)
+
+    env.res = env.Resource("res", capacity=5, anonymous=True)
+
+    X()
+    Y()
+    env.run(30)
+
+
+def exp228():
+    class X(sim.Component):
+        def process(self):
+            for i in range(7):
+                env.an.offsetx = i * 100
+                env.an.offsety = i * 100
+                env.an.fillcolor = env.colorinterpolate(i, 0, 7, "red", "blue")
+                yield self.hold(1)
+
+    sim.yieldless(False)
+    env = sim.Environment(blind_animation=True)
+
+    env.an = sim.AnimateRectangle((0, 0, 100, 100))
+    env.show_time(True)
+    X()
+    env.animate(True)
+    env.video("text.gif")
+    env.run()
+    env.video("")
+
+
+def exp227():
+    class X(sim.Component):
+        def process(self):
+            for i in range(5):
+                self.hold(i)
+
+    with sim.capture_stdout():
+        env = sim.Environment(trace=True)
+        X()
+        env.run()
+    print(sim.captured_stdout_as_df("output"))
+
+
+def exp226():
+    class X(sim.Component):
+        def process(self):
+            self.to_store(store0, self)
+            self.to_store(store1, self)
+            self.hold(1)
+            store1._to_store_requesters.print_info()
+            store1.to_store_requesters().print_info()
+
+            self.leave(store1)
+
+    class Y(sim.Component):
+        def process(self):
+            self.hold(0.5)
+            self.to_store((store0, store1), self)
+
+            print(self.to_store_store())
+            self.hold(1)
+
+    env = sim.Environment(trace=True)
+    store0 = env.Store("store0", capacity=1)
+    store1 = env.Store("store1", capacity=1)
+    x = X()
+    y = Y()
+    env.run()
+
+
+def exp225():
+    class X(sim.Component):
+        def process(self):
+            while True:
+                self.hold(1)
+                env.mon.tally(env.now() * 4)
+
+    env = sim.Environment()
+    env.mon = env.Monitor(level=True)
+    env.mon.animate(x=100, y=10, width=1000, height=500, horizontal_scale=20)
+    env.animate(True)
+    for t in sorted(env.fonts()):
+        if t[0][0].lower().startswith("cali"):
+            print(t)
+
+    env.AnimateText("ABC", font="courier-new", fontsize=100, x=100, y=100)
+    X()
+    env.run(10)
+    env.paused(True)
+    env.run()
+
+
+def exp224():
+    sim.yieldless(False)
+
+    class X(sim.Component):
+        def process(self):
+            yield self.hold(1, mode="a")
+            self.mode.value = "b"
+            yield self.hold(0, mode="short")
+            yield self.hold(100, mode="long")
+
+    env = sim.Environment(trace=True)
+
+    s = env.State()
+    s.set(3)
+    print(type(s.value.value))
+    s.value.value += 2
+    x = X()
+    env.run()
+    print(x.mode.xt(force_numeric=False))
+    print(x.status.xt(force_numeric=False))
+
+
+def exp223():
+    class X(sim.Component):
+        def process(self):
+            self.hold(1)
+            self.hold("1")
+            self.hold("12:00:00")
+            self.hold(till="2023-01-05")
+            self.hold(till=datetime.datetime(2023, 3, 1))
+
+    import dateutil.parser
+
+    sim.Environment.dateutil_parse = lambda self, spec: dateutil.parser.parse(spec, dayfirst=True, yearfirst=True)
+    env = sim.Environment(trace=True, datetime0="2023-1-1", time_unit="days")
+    env.datetime0("2022-01-01")
+    print(env.spec_to_time(12))
+    print(env.spec_to_time("12"))
+    print(env.spec_to_time("2023-1-2 12:01"))
+    print(env.spec_to_time(datetime.datetime(2023, 1, 3)))
+    print(env.spec_to_time("0:0:1"))
+    print(env.dateutil_parse("0:0:1"))
+
+    print(env.spec_to_duration("12:0:0"))
+    print(env.spec_to_duration(datetime.timedelta(hours=12)))
+
+    env.run("1")
+    X()
+
+    env = sim.Environment(trace=True, datetime0="2023-1-1", time_unit="hours")
+    print(env.spec_to_duration("12:00"))
+
+
+def exp222():
+    sim.yieldless(False)
+    env = sim.Environment(trace=True)
+
+    class Tick(sim.Component):
+        def process(self):
+            while True:
+                yield self.hold(1)
+
+    class X(sim.Component):
+        def setup(self, t):
+            self.t = t
+
+        def process(self):
+            yield self.to_store(store, item=self, filter=lambda c: c.t < env.now())
+
+    store = sim.Store("store")
+    X(t=10)
+    X(t=9)
+    X(t=11)
+    Tick()
+
+    env.run(14)
+
+
+def exp221():
+    env = sim.Environment()
+    env.width(200)
+    env.AnimateGrid()
+    q = env.Queue("q")
+    sim.Component().enter(q)
+    sim.Component().enter(q)
+
+    q.animate(x=100, y=100, screen_coordinates=False)
+    env.animate(True)
+    env.run(10000)
+
+
+def exp220():
+    import salabim as sim
+
+    sim.yieldless(False)
+
+    class X(sim.Component):
+        def process(self):
+            item = yield self.from_store(env.store)
+            yield self.to_store(env.store, item)
+
+    class Y(sim.Component):
+        def process(self):
+            return
+
+    env = sim.Environment(trace=True)
+    env.store = env.Store("store")
+
+    y = Y()
+    y.enter(env.store)
+    X()
+    env.run()
+
 
 def exp219():
     class X(sim.Component):
@@ -54,7 +379,7 @@ def exp219():
 
     modes = "abc def ghi jkl".split()
 
-    sim.yieldless(True)
+    sim.yieldless(False)
     env = sim.Environment(trace=True)
 
     r = sim.Resource("r")
@@ -71,9 +396,9 @@ def exp219():
     env.run(till=50)
 
 
-
 def exp218():
     sim.yieldless(True)
+
     class X(sim.Component):
         def process(self):
             self.hold(10)
@@ -83,54 +408,57 @@ def exp218():
         def process1(self):
             self.hold(200)
 
-    env=sim.Environment(trace=True)
+    env = sim.Environment(trace=True)
     X()
     env.run()
 
+
 def exp217():
     sim.yieldless(False)
+
     class X(sim.Component):
         def process(self):
             ...
 
-    env=sim.Environment(trace=True)
+    env = sim.Environment(trace=True)
     env.ComponentGenerator(X, iat=sim.Uniform(0, 2), at=500, till=504, force_at=True)
     env.run()
 
     print("YIELDLESS==========================")
     sim.yieldless(True)
+
     class X(sim.Component):
         def process(self):
             ...
 
-    env=sim.Environment(trace=True)
+    env = sim.Environment(trace=True)
     env.ComponentGenerator(X, iat=sim.Uniform(0, 2), at=500, till=504, force_at=True)
     env.run()
-
 
 
 def exp216():
     env = sim.Environment()
     env.animate(True)
 
-    sim.AnimateRectangle(spec=(0, 0, 200, 200), fillcolor="blue" ,text="layer=1", layer=-1)
+    sim.AnimateRectangle(spec=(0, 0, 200, 200), fillcolor="blue", text="layer=1", layer=-1)
     sim.AnimateRectangle(spec=(150, 150, 350, 350), fillcolor="red", text="layer=0")
-    sim.AnimateRectangle(spec=(300, 300, 500, 500), fillcolor="green" ,text="layer=1", layer=1)
+    sim.AnimateRectangle(spec=(300, 300, 500, 500), fillcolor="green", text="layer=1", layer=1)
     env.run(10000)
+
 
 def exp215():
     class X(sim.Component):
-        def double_hold(self,d):
-            yield self.hold(d*2)
+        def double_hold(self, d):
+            yield self.hold(d * 2)
 
         def process(self):
-            y=Y()
+            y = Y()
             yield self.hold(4)
             y.activate()
             yield from self.double_hold(2)
             yield self.request(r)
             yield self.hold(1)
-            
+
     class Y(sim.Component):
         def process(self):
             yield self.hold(3)
@@ -139,32 +467,47 @@ def exp215():
 
     class StandBy(sim.Component):
         def process(self):
-            while env.now()<5:
+            while env.now() < 5:
                 print("*")
                 yield self.standby()
 
     env = sim.Environment(trace=True)
-    r=env.Resource()
-#    env.animate(True)
-    x=X()
-    x=X()
+    r = env.Resource()
+    #    env.animate(True)
+    x = X()
+    x = X()
     StandBy()
-#    y=Y()
+    #    y=Y()
     env.run()
+
 
 def exp214():
-    class X(sim.Component):
-        def double_hold(self,d):
-            yield self.hold(d*2)
+    from dataclasses import dataclass, field
 
-        def process(self):
-            yield self.hold(1)
-            ...
-            yield from self.double_hold(2)
+    class A:
+        env: sim.Environment = field(init=False, default=None)
 
-    env = sim.Environment(trace=True)
-    X()
-    env.run()
+        def __post_init__(self):
+            self.env = sim.Environment(trace=True, yieldless=False)
+
+        @dataclass()
+        class X(sim.Component):
+            print("**********")
+
+            def double_hold(self, d):
+                yield self.hold(d * 2)
+
+            def process(self):
+                yield self.hold(1)
+                ...
+                yield from self.double_hold(2)
+
+        env = sim.Environment(trace=True)
+        X()
+        env.run()
+
+    A()
+
 
 def exp213():
     import time
@@ -173,7 +516,7 @@ def exp213():
     class ClientGenerator(sim.Component):
         def process(self):
             while True:
-                yield self.hold(env.Uniform(0, 2 * env.mean_iat))
+                self.hold(env.Uniform(0, 2 * env.mean_iat))
                 Client()
 
     class Client(sim.Component):
@@ -181,8 +524,8 @@ def exp213():
             env.client_count += 1
             if self.env.pause_at_10 and env.client_count % 10 == 0:
                 self.env.paused(True)
-            yield self.request(env.servers)
-            yield self.hold(env.Normal(env.mean_service_time, 5), cap_now=True)
+            self.request(env.servers)
+            self.hold(env.Normal(env.mean_service_time, 5), cap_now=True)
             self.release()
 
     def user_handle_event(env, window, event, values):
@@ -191,6 +534,9 @@ def exp213():
         env.mean_service_time = float(values["-SERVICE-TIME-"])
         env.pause_at_10 = values["-PAUSE-AT-10-"]
 
+    env = sim.Environment(trace=False, datetime0=datetime.datetime(2023, 1, 1), time_unit="hours")
+    env = sim.Environment(trace=False, datetime0=datetime.datetime(2023, 1, 1))
+    env = sim.Environment(trace=False, time_unit="hours")
     env = sim.Environment(trace=False)
     env.pause_at_10 = False
     env.client_count = 0
@@ -208,16 +554,16 @@ def exp213():
     env.AnimateText(text=lambda: f"Arrival of client {env.client_count}" if env.client_count else "", x=50, y=10, text_anchor="w", font="calibri")
     env.AnimateMonitor(env.servers.requesters().length, x=50, y=300, width=800, height=100)
     env.AnimateMonitor(env.servers.claimers().length, x=50, y=450, width=800, height=100)
+
+    env.animate(True)
     env.start_ui(
-        window_size=(400, 650),
-        window_position=(1200, 100),
-        actions=[
+        elements=[
             [sg.Text("Number of servers", key=""), sg.Input(env.servers.capacity(), key="-NUMBER-OF-SERVERS-", size=(4, 10))],
             [sg.Text("Inter arrival time", key=""), sg.Input(env.mean_iat, key="-IAT-", size=(4, 10))],
             [
                 sg.Text("Service time", key=""),
                 sg.Slider(
-                    range=(1, 30), default_value=env.mean_service_time, expand_x=True, enable_events=False, orientation="horizontal", key="-SERVICE-TIME-"
+                    range=(1, 30), default_value=env.mean_service_time, expand_x=False, enable_events=False, orientation="horizontal", key="-SERVICE-TIME-"
                 ),
             ],
             [sg.HorizontalSeparator()],
@@ -226,12 +572,12 @@ def exp213():
             ],  # metadata==[1,2] signifies that this widget should be shown even when animating or not animated running
         ],
         user_handle_event=user_handle_event,
+        default_elements=True,
     )
+
     env.speed(31)
-
-    env.animate(True)
+    env.show_time(False)
     env.paused(True)
-
     try:
         env.run()
     except:
@@ -262,7 +608,7 @@ def exp211():
 
     class X(sim.Component):
         def process(self):
-            yield self.hold(1)
+            self.hold(1)
 
     env = sim.Environment(trace=True)
     #    env.ComponentGenerator(X, till=10, number=4, equidistant=True, at_end=at_end)
@@ -1317,6 +1663,7 @@ def exp166():
 
 
 def exp165():
+    sim.yieldless(False)
     class X(sim.Component):
         def process(self):
             yield self.hold(10)
@@ -1839,6 +2186,8 @@ def exp151():
 
 
 def exp150():
+    sim.yieldless(False)
+
     class X(sim.Component):
         def process(self):
             while True:
@@ -1849,9 +2198,16 @@ def exp150():
 
     env = sim.Environment()
     env.animate(True)
+    env.width(900)
+    env.x1(1024)
+    env.AnimateRectangle((10, 10, 1014, 500), fillcolor="", linecolor="green")
+    env.AnimateText("Hallo", x=0, y=100, offsetx=1024, text_anchor="e")
+
     env.mon_total = sim.Monitor("total", level=True)
     env.mon_delta = sim.Monitor("delta", level=True)
-    an_total = env.mon_total.animate(width=950, height=200, x=30, y=10, horizontal_scale=10, vertical_offset=0, vertical_scale=10, labels=range(0, 21, 5))
+    an_total = env.mon_total.animate(
+        width=950, height=200, x=30, y=10, horizontal_scale=10, vertical_offset=0, vertical_scale=10, labels=range(0, 21, 5), screen_coordinates=False
+    )
     env.mon_delta.animate(
         width=950,
         height=200,
@@ -1867,11 +2223,14 @@ def exp150():
         linecolor="red",
         titlecolor="red",
         title="            delta",
+        screen_coordinates=False,
     )
     X()
     env.run(10)
     an_total.remove()
-    an_total = env.mon_total.animate(width=950, height=200, x=30, y=10, horizontal_scale=10, vertical_offset=-50, vertical_scale=10, labels=range(5, 26, 5))
+    an_total = env.mon_total.animate(
+        width=950, height=200, x=30, y=10, horizontal_scale=10, vertical_offset=-50, vertical_scale=10, labels=range(5, 26, 5), screen_coordinates=False
+    )
     env.run()
 
 
