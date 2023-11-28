@@ -1,5 +1,53 @@
 salabim changelog
 
+version 23.3.12 2023-11-28
+===========================
+Changed functionality (0)
+-------------------------
+In order to avoid excessive cache size, the sequence number is not cached anymore
+for non serialized names (those that do not end in "." or ",").
+To the user that has the effect that calling sequence_number method on non serialized
+components, queues, monitors, resources, environment and states will always return 1.
+In practice that means that:
+    man0 = Man(name="man")
+    man1 = Man(name="man")
+    print(man0.sequence_number(), man1.sequence_number())
+will now print
+    1 1
+,wheras that used to be
+    1 2
+For 
+    man0 = Man()
+    man1 = Man()
+    print(man0.sequence_number(), man1.sequence_number())
+the output is still
+    1 2
+Internaly, neither the base_name nor the sequence_number are stored anymore
+for non serialized names, which reduces the memory footprint (marginally).
+
+The documentation has been updated reflecting this change.
+
+(inspired by an observation of Floris Padt)
+
+Changed functionality (1)
+-------------------------
+In AnimateImage, a width or height of 0, resulted in a ValueError, caused by Pillow.
+From now on, a width of 0, is accepted, which can be useful for
+dynamic sizing of an image. So,
+    sim.AnimateImage("my_image.png", width=lambda t: sim.interpolate(t, 0, 10, 1024, 0))
+will now result "nothing" after env.t() > 10.
+
+Bug fix (0)
+-----------
+A bug caused a ValueError when tracing with suppress_trace_linenumbers=True in yieldless mode. Fixed.
+(bug reported by Ben Moverley Smith)
+
+Bug fix (1)
+-----------
+For some reason, adding audio to a video file didn't work anymore (new version of ffmpeg?).
+Fixed by adding the -safe 0 command to the final ffmpeg command.
+
+
 version 23.3.11 2023-11-14
 ===========================
 Changed functionality (0)
