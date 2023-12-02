@@ -30,4 +30,4 @@ env.run(100)
 
 producer.status.print_histogram(values=True, graph_scale=30)
 consumer.status.print_histogram(values=True, graph_scale=30)
-products.contents().length.print_histogram(graph_scale=None)
+products.length.print_histogram(graph_scale=None)
