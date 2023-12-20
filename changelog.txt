@@ -1,12 +1,34 @@
 salabim changelog
 
+version 23.3.13  2023-12-20
+===========================
+Bug fix (0)
+-----------
+When calling Component.from_store, the return value was incorrectly None when the request
+could be honoured immediately.
+Fixed.
+(bug reported by Bart van Corven)
+
+Bug fix (1)
+-----------
+Calling Environment.width() with adjust_x0_x1_y0=True didn't work properly. Fixed.
+
+Bug fix (2)
+-----------
+Animating an animated gif or webp with AnimateImage(animation_repeat=True) caused a bug. Fixed.
+
+Bug fix (3)
+-----------
+Calling Resource.release with a non anonymous resource caused an error. Fixed.
+(bug reported by Floris Padt) 
+
 version 23.3.12 2023-11-28
 ===========================
 Changed functionality (0)
 -------------------------
 In order to avoid excessive cache size, the sequence number is not cached anymore
-for non serialized names (those that do not end in "." or ",").
-To the user that has the effect that calling sequence_number method on non serialized
+for non-serialized names (those that do not end in "." or ",").
+To the user that has the effect that calling sequence_number method on non-serialized
 components, queues, monitors, resources, environment and states will always return 1.
 In practice that means that:
     man0 = Man(name="man")
@@ -14,7 +36,7 @@ In practice that means that:
     print(man0.sequence_number(), man1.sequence_number())
 will now print
     1 1
-,wheras that used to be
+,whereas that used to be
     1 2
 For 
     man0 = Man()
@@ -22,16 +44,16 @@ For
     print(man0.sequence_number(), man1.sequence_number())
 the output is still
     1 2
-Internaly, neither the base_name nor the sequence_number are stored anymore
-for non serialized names, which reduces the memory footprint (marginally).
+Internally, neither the base_name nor the sequence_number are stored anymore
+for non-serialized names, which reduces the memory footprint (marginally).
 
 The documentation has been updated reflecting this change.
 
-(inspired by an observation of Floris Padt)
+(inspired by an observation by Floris Padt)
 
 Changed functionality (1)
 -------------------------
-In AnimateImage, a width or height of 0, resulted in a ValueError, caused by Pillow.
+In AnimateImage, a width of 0, resulted in a ValueError, caused by Pillow.
 From now on, a width of 0, is accepted, which can be useful for
 dynamic sizing of an image. So,
     sim.AnimateImage("my_image.png", width=lambda t: sim.interpolate(t, 0, 10, 1024, 0))
@@ -39,7 +61,7 @@ will now result "nothing" after env.t() > 10.
 
 Bug fix (0)
 -----------
-A bug caused a ValueError when tracing with suppress_trace_linenumbers=True in yieldless mode. Fixed.
+A bug caused a ValueError when tracing with suppress_trace_linenumbers(True) in yieldless mode. Fixed.
 (bug reported by Ben Moverley Smith)
 
 Bug fix (1)
