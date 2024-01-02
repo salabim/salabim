@@ -1,5 +1,43 @@
 salabim changelog
 
+version 24.0.0  2024-01-02
+==========================
+Added functionality (0)
+-----------------------
+The parameter 'interrupted' for Component.hold() has been introduced.
+With this it is possible to hold a component, and let it go immediately in interrupted state.
+This is very useful to simulate breakdowns, where a component should immediately observe
+the breakdown state:
+     yield self.hold(10, interrupted=machine.mode() == "down")
+This functionality would be rather difficult to implement, otherwise.
+
+Note that the parameter 'interrupted' may be also an integer >=1 to denote the interrupt level.
+
+
+Changed functionality (0)
+-------------------------
+For stability reasons, Component.interrupt() is from now on only allowed for scheduled components.
+
+Added test (0)
+--------------
+A common mistake is to test the value of a monitor, like Component.mode or Component.status with
+a string or integer.
+E.g.
+    if comp.status == "passive":
+        ...
+In this case the test will always fail. Of course it should read:
+    if comp.status() == "passive":
+        ...
+
+From this version on, testing a monitor against anything else than a monitor will raise
+a TypeError.
+So, now
+    if comp.status == "passive":
+        ...
+will show:
+    TypeError: Not allowed to compare Monitor with str . Add parentheses?
+
+
 version 23.3.13  2023-12-20
 ===========================
 Bug fix (0)

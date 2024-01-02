@@ -1,13 +1,13 @@
-#               _         _      _               ____   _____     _____     _  _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ |___ /    |___ /    / ||___ /
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) |  |_ \      |_ \    | |  |_ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _  ___) | _ | | ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_)|____/ (_)|_||____/
+#               _         _      _               ____   _  _        ___       ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \     / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | | | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | |_| |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_) \___/
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "23.3.13"
+__version__ = "24.0.0"
 
 import heapq
 import random
@@ -492,6 +492,11 @@ class Monitor:
             self._t.extend(len(fill) * [self.env._now])
 
         self.setup(*args, **kwargs)
+
+    def __eq__(self, other):
+        if isinstance(other, Monitor):
+            return super().__eq__(other)
+        raise TypeError(f"Not allowed to compare Monitor with {type(other).__name__} . Add parentheses?")
 
     def __add__(self, other):
         self._block_stats_only()
@@ -7637,6 +7642,7 @@ by adding:
         priority: float = 0,
         urgent: bool = False,
         mode: str = None,
+        interrupted: Union[bool, int] = False,
         cap_now: bool = None,
     ) -> None:
         """
@@ -7690,6 +7696,13 @@ by adding:
 
             also mode_time will be set to now, if mode is set.
 
+        interrupted : bool or int
+            if False (default), not interrupted
+
+            if True, the component will immediately go into interrupted state
+
+            if an integer, this is the interrupt_level
+
         cap_now : bool
             indicator whether times (duration, till) in the past are allowed. If, so now() will be used.
             default: sys.default_cap_now(), usualy False
@@ -7722,8 +7735,42 @@ by adding:
                 scheduled_time = till + self.env._offset
             else:
                 raise ValueError("both duration and till specified")
-        self.status._value = scheduled
-        self._reschedule(scheduled_time, priority, urgent, "hold", cap_now)
+        if scheduled_time < self.env._now:
+            if cap_now is None:
+                cap_now = g._default_cap_now
+            if cap_now:
+                scheduled_time = self.env._now
+            else:
+                raise ValueError(f"scheduled time ({scheduled_time:0.3f}) before now ({self.env._now:0.3f})")
+
+        if interrupted:
+            self._remaining_duration = scheduled_time - self.env._now
+            self._interrupted_status = scheduled
+            self._interrupt_level = int(interrupted)
+            self.status._value = "interrupted"
+            if self.env._trace:
+                caller = "hold-interrupt"
+                lineno = self.lineno_txt(add_at=True)
+
+                scheduled_time_str = "scheduled for " + self.env.time_to_str(scheduled_time - self.env._offset).strip()
+                if (scheduled_time == self.env._now) or (scheduled_time == inf):
+                    delta = ""
+                else:
+                    delta = f" +{self.env.duration_to_str(scheduled_time - self.env._now)}"
+                lineno = self.lineno_txt(add_at=True)
+                self.env.print_trace(
+                    "",
+                    "",
+                    self.name() + " " + caller + delta,
+                    merge_blanks(scheduled_time_str + _prioritytxt(priority) + _urgenttxt(urgent) + lineno, self._modetxt(), ""),
+                )
+
+            if self.env._yieldless:
+                if self is self.env._current_component:
+                    self.env._glet.switch()
+        else:
+            self.status._value = scheduled
+            self._reschedule(scheduled_time, priority, urgent, "hold", cap_now)
 
     def passivate(self, mode: str = None) -> None:
         """
@@ -7758,6 +7805,7 @@ by adding:
             lineno = self.lineno_txt(add_at=True)
             self.env.print_trace("", "", self.name() + " passivate", merge_blanks(lineno, self._modetxt()))
         self.status._value = passive
+
         if self.env._yieldless:
             if self is self.env._current_component:
                 self.env._glet.switch()
@@ -7779,27 +7827,26 @@ by adding:
 
         Note
         ----
-        Cannot be applied on the current component.
+        The component has to be scheduled.
 
         Use resume() to resume
         """
-        if self.status.value == current:
-            raise ValueError(self.name() + " current component cannot be interrupted")
+        if self.status.value != scheduled:
+            raise ValueError(self.name() + " component not scheduled")
+        self.set_mode(mode)
+        if self.status.value == interrupted:
+            self._interrupt_level += 1
+            extra = "." + str(self._interrupt_level)
         else:
-            self.set_mode(mode)
-            if self.status.value == interrupted:
-                self._interrupt_level += 1
-                extra = "." + str(self._interrupt_level)
-            else:
-                self._checkisnotdata()
-                self._remove()
-                self._remaining_duration = self._scheduled_time - self.env._now
-                self._interrupted_status = self.status.value
-                self._interrupt_level = 1
-                self.status._value = interrupted
-                extra = ""
-            lineno = self.lineno_txt(add_at=True)
-            self.env.print_trace("", "", self.name() + " interrupt" + extra, merge_blanks(lineno, self._modetxt()))
+            self._checkisnotdata()
+            self._remove()
+            self._remaining_duration = self._scheduled_time - self.env._now
+            self._interrupted_status = self.status.value
+            self._interrupt_level = 1
+            self.status._value = interrupted
+            extra = ""
+        lineno = self.lineno_txt(add_at=True)
+        self.env.print_trace("", "", self.name() + " interrupt" + extra, merge_blanks(lineno, self._modetxt()))
 
     def resume(self, all: bool = False, mode: str = None, priority: float = 0, urgent: bool = False) -> None:
         """
@@ -7856,25 +7903,9 @@ by adding:
                 self.status._value = self._interrupted_status
                 lineno = self.lineno_txt(add_at=True)
                 self.env.print_trace("", "", self.name() + " resume (" + self.status() + ")", merge_blanks(lineno, self._modetxt()))
-                if self.status.value == passive:
-                    self.env.print_trace("", "", self.name() + " passivate", merge_blanks(lineno, self._modetxt()))
-                elif self.status.value == standby:
-                    self._scheduled_time = self.env._now
-                    self.env._standbylist.append(self)
-                    self.env.print_trace("", "", self.name() + " standby", merge_blanks(lineno, self._modetxt()))
-                elif self.status.value in (scheduled, waiting, requesting):
-                    if self.status.value == waiting:
-                        if self._waits:
-                            if self._trywait():
-                                return
-                            reason = "wait"
-                    elif self.status.value == requesting:
-                        if self._tryrequest():
-                            return
-                        reason = "request"
-                    elif self.status.value == scheduled:
-                        reason = "hold"
-                    self._reschedule(self.env._now + self._remaining_duration, priority, urgent, reason, False)
+                if self.status.value == scheduled:
+                    reason = "hold"
+                    self._reschedule(self.env._now + self._remaining_duration, priority, urgent, "hold", False)
                 else:
                     raise Exception(self.name() + " unexpected interrupted_status", self.status.value())
         else:
@@ -7944,15 +7975,18 @@ by adding:
             self._remove()
             self._check_fail()
         self._scheduled_time = self.env._now
-        self.env._standbylist.append(self)
         self.set_mode(mode)
+        caller = "standby"
+        self.env._standbylist.append(self)
+        self.status._value = standby
+
         if self.env._trace:
             if self.env._buffered_trace:
                 self.env._buffered_trace = False
             else:
                 lineno = self.lineno_txt(add_at=True)
-                self.env.print_trace("", "", "standby", merge_blanks(lineno, self._modetxt()))
-        self.status._value = standby
+                self.env.print_trace("", "", caller, merge_blanks(lineno, self._modetxt()))
+
         if self.env._yieldless:
             if self is self.env._current_component:
                 self.env._glet.switch()
@@ -8417,9 +8451,9 @@ by adding:
         urgent = kwargs.pop("urgent", False)
         schedule_priority = kwargs.pop("priority", 0)
         cap_now = kwargs.pop("cap_now", None)
-
-        self.oneof_request = kwargs.pop("oneof", False)
+        oneof = kwargs.pop("oneof", False)
         called_from = kwargs.pop("called_from", "request")
+        self.oneof_request = oneof
         if kwargs:
             raise TypeError(called_from + "() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
@@ -8509,6 +8543,8 @@ by adding:
         for r, q in self._requests.items():
             if q < r._minq:
                 r._minq = q
+
+        self._remaining_duration = scheduled_time - self.env._now
 
         self._tryrequest()
 
@@ -8948,6 +8984,9 @@ by adding:
 
         if not self._waits:
             raise TypeError("no states specified")
+
+        self._remaining_duration = scheduled_time - self.env._now
+
         self._trywait()
 
         if self._waits:
@@ -10399,6 +10438,9 @@ class Environment:
             *args,
             **kwargs,
         ):
+            ...
+
+        def __eq__(self, other):
             ...
 
         def __add__(self, other):
@@ -14685,6 +14727,7 @@ class Environment:
             priority: float = 0,
             urgent: bool = False,
             mode: str = None,
+            interrupted: Union[bool, int] = False,
             cap_now: bool = None,
         ) -> None:
             """
@@ -14738,6 +14781,13 @@ class Environment:
 
                 also mode_time will be set to now, if mode is set.
 
+            interrupted : bool or int
+                if False (default), not interrupted
+
+                if True, the component will immediately go into interrupted state
+
+                if an integer, this is the interrupt_level
+
             cap_now : bool
                 indicator whether times (duration, till) in the past are allowed. If, so now() will be used.
                 default: sys.default_cap_now(), usualy False
@@ -14788,7 +14838,7 @@ class Environment:
 
             Note
             ----
-            Cannot be applied on the current component.
+            The component has to be scheduled.
 
             Use resume() to resume
             """

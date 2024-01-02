@@ -22,32 +22,122 @@ Pythonista = platform.system() == "Darwin"
 
 
 def exp():
-    exp234()
+    exp237()
 
-def exp234():
-    class X(sim.Component):
+def exp238():
+    class X1(sim.Component):
         def process(self):
-            self.hold(1)
-            self.cancel()
-            self.hold(2)
+            yield self.hold(10,interrupted=2)
 
-    class Y(sim.Component):
+    class Control(sim.Component):
+        def process(self):
+            yield self.hold(1)
+            env.x1.resume()
+            yield self.hold(1)
+            env.x1.resume()
+
+    env = sim.Environment(trace=True, yieldless=False)
+    env.x1=X1()
+
+
+    Control()
+
+    env.run()
+
+
+def exp237():
+    class X1(sim.Component):
+        def process(self):
+            self.hold(10,interrupted=2)
+
+    class X2(sim.Component):
         def process(self):
             self.hold(10)
 
-    class Z(sim.Component):
+    class Control(sim.Component):
         def process(self):
-            self.hold(4)
-            env.y.cancel()
-            self.hold(40)
+            self.hold(1)
+            print(env.x2.status())
+            env.x2.interrupt()
 
+            env.x1.resume()
+            self.hold(1)
+            env.x1.resume()
+            env.x2.resume()
 
-    env=sim.Environment(trace=True)
-    X()
-    env.y = Y()
-    Z()
+    env = sim.Environment(trace=True)
+    env.x1=X1()
+    env.x2=X2()
+
+    Control()
+
     env.run()
-    
+
+def exp236():
+    class X1(sim.Component):
+        def process(self):
+            env.mon1.tally(8)
+            self.hold(3)
+            env.mon1.tally(0)
+            self.hold(5)
+
+    class X2(sim.Component):
+        def process(self):
+            env.mon2.tally(0)
+            self.hold(4)
+            env.mon2.tally(8)
+            self.hold(5)
+
+
+
+    env = sim.Environment()
+    X1()
+    X2()
+    env.mon1=env.Monitor("mon1",level=True)
+    env.mon2=env.Monitor("mon2",level=True)
+    env.mon1.animate(x=100, y=100, horizontal_scale=10)
+    env.mon2.animate(x=100, y=200, horizontal_scale=10)
+
+    env.animate(True)
+    env.run(8)
+    env.mon12=sum((env.mon1, env.mon2))
+    env.mon12.animate(x=100, y=300, horizontal_scale=10)
+
+    env.run(1000)
+
+def exp235():
+    env = sim.Environment()
+    env.animate(True)
+    env.AnimateImage("Upward Systems.jpg", width=lambda t: env.interpolate(t,0,10,1024,0))
+    env.run(10000)    
+
+def exp234():
+    class X(sim.Component):
+        ...
+
+    class Y(sim.Component):
+        ...
+
+    class Man(sim.Component):
+        ...
+
+    env=sim.Environment(trace=False)
+    x=X()
+    x=X()
+    x=X()
+    x=X(name="")
+    print(x.name(),x.base_name(), x.sequence_number())
+
+    man0 = Man(name="man")
+    man1 = Man(name="man")
+    print(man0. sequence_number(), man1.sequence_number())
+
+    man0 = Man()
+    man1 = Man()
+    print(man0. sequence_number(), man1.sequence_number())
+
+
+
 def exp233():
     env = sim.Environment()
     with env.redirect_stdout("test.txt"):
@@ -150,6 +240,7 @@ def exp229():
     X()
     Y()
     env.run(30)
+    print(env.res.occupancy.stdmean())
 
 
 def exp228():
