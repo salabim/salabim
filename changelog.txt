@@ -1,5 +1,58 @@
 salabim changelog
 
+version 24.0.1  
+==========================
+New functionality (0)
+---------------------
+The method Environment.ui_granularity has been introduced.
+With this, it is possible to set the number of simulation steps that has to be
+called before _handle_ui_event is called (again).
+This can significantly improve performance during simulation with animation off
+and the UI shown.
+The ui_granularity is 1 at start up.
+It might require some experimentation to find a suitable value:
+- too low might result in slow execution
+- too high might result in bas responsiveness
+
+
+Enhancement (0)
+---------------
+Component.request() needed to have at least one resource specified.
+From now on, the request method also works without any resource (tuple) specified. So
+    self.request()
+is allowed, although it is just a dummy action, like self.hold(0).
+ 
+
+Bug fix (0)
+-----------
+When passing (non consumed) parameters to the Component.process method, an error was raised in
+yieldless mode, so
+    class X(sim.Component):
+        def process(self, extra):
+            print(f"{extra=})
+            self.hold(1)
+    x = X(extra="extra")
+didn't work properly in yieldless mode.
+Fixed.
+
+
+Bug fix (1)
+-----------
+In yieldless mode, the line number where a component becomes current,
+sometimes incorrectly referred to a line in salabim, instead of the user program. Fixed.
+
+
+Bug fix (2)
+-----------
+If ComponentGenerator was used with a spread (i.e. no iat) at a time not being 0,
+an error was raised. Fixed.
+
+
+Bug fix (3)
+-----------
+With blind_animation mode was True, video production didn't work in yieldless mode. Fixed.
+(Bug reported by max l)
+
 version 24.0.0  2024-01-02
 ==========================
 Added functionality (0)

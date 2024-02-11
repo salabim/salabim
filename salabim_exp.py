@@ -22,7 +22,71 @@ Pythonista = platform.system() == "Darwin"
 
 
 def exp():
-    exp237()
+    exp242()
+
+def exp242():
+#    sim.yieldless(False)
+    env = sim.Environment(blind_animation=True)
+    env.animate(True)
+    with env.video("test.gif"):
+        env.run(1)
+
+
+def exp241():
+    # sim.yieldless(False)
+
+    # class X(sim.Component):
+    #     def process(self):
+    #         ...
+
+    # env = sim.Environment(trace=True)
+    # env.ComponentGenerator(X, iat=sim.Uniform(0, 2), at=500, till=504, number=3)
+    # env.run()
+
+    print("YIELDLESS==========================")
+    sim.yieldless(True)
+
+    class X(sim.Component):
+        def process(self):
+            ...
+
+    env = sim.Environment(trace=True)
+    env.run(100)
+    env.ComponentGenerator(X, at=500, till=504, number=3)
+    env.run()
+
+def exp240():
+    class X1(sim.Component):
+        def process(self):
+            self.hold(10)
+
+
+    env = sim.Environment(trace=True)
+    env.x1=X1()
+
+    env.run()
+
+
+def exp239():
+    class X1(sim.Component):
+        def process(self):
+            self.hold(10)
+
+    class X2(sim.Component):
+        def process(self):
+            self.hold(1)
+            env.x1.interrupt()
+            self.hold(100)
+            env.x1.request(env.r)
+
+    env = sim.Environment(trace=True)
+    env.r=sim.Resource("r")
+    env.x1=X1()
+    X2()
+
+    env.run()
+
+
 
 def exp238():
     class X1(sim.Component):
