@@ -9,7 +9,8 @@ import types
 import itertools
 import os
 import platform
-#from ycecream import yc
+
+# from ycecream import yc
 import numpy as np
 import datetime
 import pickle
@@ -22,10 +23,64 @@ Pythonista = platform.system() == "Darwin"
 
 
 def exp():
-    exp242()
+    exp176()
+
+def exp246():
+    env = sim.Environment()
+    env.AnimateText(lambda: str(env.now()), fontsize=10)
+    env.animate(True)
+    while True:
+        env.run(1)
+
+
+def exp245():
+    class X(sim.Component):
+        def process(self):
+            self.hold(1)
+    env = sim.Environment(trace=True)
+    X()
+    env.run()
+
+def exp244():
+    import salabim as sim
+    env=sim.Environment()
+    env.animate(True)
+    env.AnimateRectangle((100,200,900,600,200),fillcolor="",linewidth=5,linecolor="red",as_points=True)
+    env.run(1000)
+def exp243():
+    import salabim as sim
+
+    class MyComponent(sim.Component):
+        def put_unconditional(self, resource_quantity):
+            resource, quantity = resource_quantity
+            resource._claimed_quantity -= quantity
+            resource.claimed_quantity.tally(resource._claimed_quantity)
+            resource.occupancy.tally(0 if resource._capacity <= 0 else resource._claimed_quantity / resource._capacity)
+            resource.available_quantity.tally(resource._capacity - resource._claimed_quantity)
+            if self.env._trace:
+                self.env.print_trace("", "", self.name(), f"put_unconditional {quantity} in {resource.name()}")
+
+    class X(MyComponent):
+        def process(self):
+            print(env.r.available_quantity())
+            self.get((env.r, 2))
+            self.passivate()
+
+    class Y(MyComponent):
+        def process(self):
+            self.put_unconditional((env.r, 10))
+
+    env = sim.Environment(trace=True)
+    env.r = env.Resource("r", capacity=10, anonymous=True,initial_claimed_quantity=10)
+    X(at=3)
+    Y(at=2)
+    env.run()
+    print(env.r.claimed_quantity())
+    print(env.r.available_quantity())
+
 
 def exp242():
-#    sim.yieldless(False)
+    #    sim.yieldless(False)
     env = sim.Environment(blind_animation=True)
     env.animate(True)
     with env.video("test.gif"):
@@ -55,14 +110,14 @@ def exp241():
     env.ComponentGenerator(X, at=500, till=504, number=3)
     env.run()
 
+
 def exp240():
     class X1(sim.Component):
         def process(self):
             self.hold(10)
 
-
     env = sim.Environment(trace=True)
-    env.x1=X1()
+    env.x1 = X1()
 
     env.run()
 
@@ -80,18 +135,17 @@ def exp239():
             env.x1.request(env.r)
 
     env = sim.Environment(trace=True)
-    env.r=sim.Resource("r")
-    env.x1=X1()
+    env.r = sim.Resource("r")
+    env.x1 = X1()
     X2()
 
     env.run()
 
 
-
 def exp238():
     class X1(sim.Component):
         def process(self):
-            yield self.hold(10,interrupted=2)
+            yield self.hold(10, interrupted=2)
 
     class Control(sim.Component):
         def process(self):
@@ -101,8 +155,7 @@ def exp238():
             env.x1.resume()
 
     env = sim.Environment(trace=True, yieldless=False)
-    env.x1=X1()
-
+    env.x1 = X1()
 
     Control()
 
@@ -112,7 +165,7 @@ def exp238():
 def exp237():
     class X1(sim.Component):
         def process(self):
-            self.hold(10,interrupted=2)
+            self.hold(10, interrupted=2)
 
     class X2(sim.Component):
         def process(self):
@@ -130,12 +183,13 @@ def exp237():
             env.x2.resume()
 
     env = sim.Environment(trace=True)
-    env.x1=X1()
-    env.x2=X2()
+    env.x1 = X1()
+    env.x2 = X2()
 
     Control()
 
     env.run()
+
 
 def exp236():
     class X1(sim.Component):
@@ -152,28 +206,28 @@ def exp236():
             env.mon2.tally(8)
             self.hold(5)
 
-
-
     env = sim.Environment()
     X1()
     X2()
-    env.mon1=env.Monitor("mon1",level=True)
-    env.mon2=env.Monitor("mon2",level=True)
+    env.mon1 = env.Monitor("mon1", level=True)
+    env.mon2 = env.Monitor("mon2", level=True)
     env.mon1.animate(x=100, y=100, horizontal_scale=10)
     env.mon2.animate(x=100, y=200, horizontal_scale=10)
 
     env.animate(True)
     env.run(8)
-    env.mon12=sum((env.mon1, env.mon2))
+    env.mon12 = sum((env.mon1, env.mon2))
     env.mon12.animate(x=100, y=300, horizontal_scale=10)
 
     env.run(1000)
 
+
 def exp235():
     env = sim.Environment()
     env.animate(True)
-    env.AnimateImage("Upward Systems.jpg", width=lambda t: env.interpolate(t,0,10,1024,0))
-    env.run(10000)    
+    env.AnimateImage("Upward Systems.jpg", width=lambda t: env.interpolate(t, 0, 10, 1024, 0))
+    env.run(10000)
+
 
 def exp234():
     class X(sim.Component):
@@ -185,21 +239,20 @@ def exp234():
     class Man(sim.Component):
         ...
 
-    env=sim.Environment(trace=False)
-    x=X()
-    x=X()
-    x=X()
-    x=X(name="")
-    print(x.name(),x.base_name(), x.sequence_number())
+    env = sim.Environment(trace=False)
+    x = X()
+    x = X()
+    x = X()
+    x = X(name="")
+    print(x.name(), x.base_name(), x.sequence_number())
 
     man0 = Man(name="man")
     man1 = Man(name="man")
-    print(man0. sequence_number(), man1.sequence_number())
+    print(man0.sequence_number(), man1.sequence_number())
 
     man0 = Man()
     man1 = Man()
-    print(man0. sequence_number(), man1.sequence_number())
-
+    print(man0.sequence_number(), man1.sequence_number())
 
 
 def exp233():
@@ -223,16 +276,16 @@ def exp233():
     # with sim.capture_stdout():
     #     for i in range(10):
     #         print(f"{i*'abca'}")
-    # print(sim.captured_stdout_as_list())   
+    # print(sim.captured_stdout_as_list())
     # print(sim.captured_stdout_as_str())
     # with open("test.txt", "a") as f:
-    #     sim.captured_stdout_as_file(f, mode="w")   
+    #     sim.captured_stdout_as_file(f, mode="w")
 
 
 def exp232():
-    env=sim.Environment()
-    mon_level=env.Monitor("mon_level",level=True)
-    mon_nonlevel=env.Monitor("mon_nonlevel")
+    env = sim.Environment()
+    mon_level = env.Monitor("mon_level", level=True)
+    mon_nonlevel = env.Monitor("mon_nonlevel")
     mon_nonlevel.tally(10)
 
     mon_level.tally(10)
@@ -247,13 +300,12 @@ def exp232():
     mon_level.print_histogram()
 
 
-
 def exp231():
     sim.yieldless(False)
     env = sim.Environment()
 
     env.animate(True)
-#    env.AnimateText("courier-new", font="courier-new", fontsize=50, x=100, y=100)
+    #    env.AnimateText("courier-new", font="courier-new", fontsize=50, x=100, y=100)
     env.AnimateText("ier-new", font="ier-new", fontsize=50, x=100, y=150)
     env.AnimateText("dejavusansmono", font="dejavusansmono", fontsize=50, x=100, y=250)
     env.AnimateText("mplus-1m-regular", font="mplus-1m-regular", fontsize=50, x=100, y=300)
@@ -1448,13 +1500,14 @@ def exp177():
 
 
 def exp176():
+    sim.yieldless(False)
     class X(sim.Component):
         def animation_objects(self, id):
             if id == 1:
-                an0 = sim.AnimateRectangle(spec=(-30, -30, 30, 30), offsety=-30, text=self.name(), fillcolor="blue")
-                return 70, 70, an0
+                an0 = sim.AnimateRectangle(spec=(-30, -30, 30, 30), offsety=-30, text=self.name(), fillcolor="blue",linecolor="red",linewidth=2)
+                return 30, 70, an0
             else:
-                an0 = sim.AnimateRectangle(spec=(-30, -30, 30, 30), offsety=-30, text=self.name(), fillcolor="green", visible=lambda t: int(t % 2) == 0)
+                an0 = sim.AnimateRectangle(spec=(-30, -30, 30, 30), offsety=-30, text=self.name(), fillcolor="green", visible=lambda t: int(t % 2) == 0,linecolor="red")
                 an1 = sim.AnimateCircle(radius=20, text=self.name(), offsety=-30, fillcolor="red", visible=lambda t: int(t % 2) == 1)
                 return lambda t: 70 if (int(t) % 2) == 0 else 45, lambda t: 70 if (int(t) % 2) == 0 else 45, an0, an1
 
@@ -1475,7 +1528,7 @@ def exp176():
     env = sim.Environment()
     q = sim.Queue("q")
     an_q = sim.AnimateQueue(q, x=lambda t: 100 + 10 * t, y=100, direction=lambda t: "e" if int(t % 2) == 0 else "n", keep=lambda t: not (4 < t < 5))
-    an_q1 = sim.AnimateQueue(q, x=1000, y=200, direction="w", id=1)
+    an_q1 = sim.AnimateQueue(q, x=1000, y=200, direction="w", id=1,reverse=True)
 
     sim.ComponentGenerator(X, iat=sim.Uniform(1, 2))
     Y()
@@ -1819,6 +1872,7 @@ def exp166():
 
 def exp165():
     sim.yieldless(False)
+
     class X(sim.Component):
         def process(self):
             yield self.hold(10)

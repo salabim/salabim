@@ -1,13 +1,13 @@
-#               _         _      _               ____   _  _        ___      _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_|
+#               _         _      _               ____   _  _        ___      ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    |___ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |     __) |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _  / __/
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_____|
 #  Discrete event simulation in Python
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.1"
+__version__ = "24.0.2"
 
 import heapq
 import random
@@ -56,6 +56,7 @@ ColorType = Union[str, Iterable[float]]
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
 PyDroid = sys.platform == "linux" and any("pydroid" in v for v in os.environ.values())
+PyPy = platform.python_implementation() == "PyPy"
 Chromebook = "penguin" in platform.uname()
 PythonInExcel = not ("__file__" in globals())
 
@@ -70,7 +71,8 @@ def a_log(*args):
         print(*args, file=a_logfile)
 
 
-class g: ...
+class g:
+    ...
 
 
 if PythonInExcel:
@@ -148,7 +150,7 @@ if Pythonista:
 inf = float("inf")
 nan = float("nan")
 
-_yieldless = True
+_yieldless = not Pythonista  # True, unless running under Pythonista
 
 
 class QueueFullError(Exception):
@@ -4070,7 +4072,7 @@ if Pythonista:
                 else:
                     if (env._step_pressed or (not env._paused)) and env._animate:
                         env.step()
-                        env._t = env._now
+                        env._t = env._now 
                         if not env._current_component._suppress_pause_at_step:
                             env._step_pressed = False
                 if not env._paused:
@@ -8674,7 +8676,7 @@ by adding:
                     r.occupancy.tally(0 if r._capacity <= 0 else r._claimed_quantity / r._capacity)
                     r.available_quantity.tally(r._capacity - r._claimed_quantity)
                     if self.env._trace:
-                        self.env.print_trace("", "", self.name(), "claim " + str(r._claimed_quantity) + " from " + r.name() + prio_trace)
+                        self.env.print_trace("", "", self.name(), f"claim {self._requests[r]} from {r.name()} {prio_trace}")
                 self.leave(r._requesters)
                 if r._requesters._length == 0:
                     r._minq = inf
@@ -9852,9 +9854,11 @@ by adding:
                         lineno = inspect.getframeinfo(frame).lineno
                 else:
                     frame_last = frame
-                    while frame.f_back is not None:
+                    i = 20  # prevent infinite loop
+                    while frame.f_back is not None and i:
                         frame_last = frame
                         frame = frame.f_back
+                        i -= 1
                     if inspect.getframeinfo(frame).filename == __file__:  # one up if we landed in salabim.py
                         frame = frame_last
                     lineno = inspect.getframeinfo(frame).lineno
@@ -10732,7 +10736,13 @@ class Environment:
                 return
             c._check_fail()
             if self.env._yieldless:
-                c._glet.switch()
+                if PyPy:
+                    try:
+                        c._glet.switch()
+                    except greenlet._continuation.error:
+                        ...  # this is to prevent a strange error (bug) in PyPy/greenlet
+                else:
+                    c._glet.switch()
                 if c._glet.dead:
                     self._terminate(c)
             else:
@@ -14935,7 +14945,6 @@ class Animate2dBase(DynamicClass):
 
                     if self.type == "rectangle":
                         as_points = self.as_points(t)
-
                         rectangle = tuple(de_none(self.spec(t)))
                         self._image_ident = (tuple(rectangle), linewidth, linecolor, fillcolor, as_points, angle, self.screen_coordinates)
                     elif self.type == "line":
@@ -14972,18 +14981,54 @@ class Animate2dBase(DynamicClass):
 
                     if self._image_ident != self._image_ident_prev:
                         if self.type == "rectangle":
-                            p = [
-                                rectangle[0],
-                                rectangle[1],
-                                rectangle[2],
-                                rectangle[1],
-                                rectangle[2],
-                                rectangle[3],
-                                rectangle[0],
-                                rectangle[3],
-                                rectangle[0],
-                                rectangle[1],
-                            ]
+                            px = [rectangle[0], rectangle[2]]
+                            py = [rectangle[1], rectangle[3]]
+
+                            if len(rectangle) == 5:
+                                r = rectangle[4]
+                            else:
+                                r = 0
+                            if r == 0:
+                                p = [px[0], py[0], px[1], py[0], px[1], py[1], px[0], py[1], px[0], py[0]]
+                            else:
+                                if not self.screen_coordinates:
+                                    r *= self.env._scale
+
+                                r = min(r, abs(px[0] - px[1]) / 2, abs(py[0] - py[1]) / 2) # make sure the arc fits
+
+                                if self.screen_coordinates:
+                                    nsteps = int(math.sqrt(r) * 6)
+                                else:
+                                    nsteps = int(math.sqrt(r * self.env._scale) * 6)
+                                tarc_angle = 360 / nsteps
+
+                                p = []
+
+                                for x0, y0, x1, y1, x2, y2, arc_angle0 in [
+                                    [px[0] + r, py[0], px[1] - r, py[0], px[1] - r, py[0] + r, -90],
+                                    [px[1], py[0] + r, px[1], py[1] - r, px[1] - r, py[1] - r, 0],
+                                    [px[1] - r, py[1], px[0] + r, py[1], px[0] + r, py[1] - r, 90],
+                                    [px[0], py[1] - r, px[0], py[0] + r, px[0] + r, py[0] + r, 180],
+                                ]:
+                                    p.append(x0)
+                                    p.append(y0)
+                                    p.append(x1)
+                                    p.append(y1)
+
+                                    arc_angle = arc_angle0
+
+                                    ended = False
+                                    while True:
+                                        sint = math.sin(math.radians(arc_angle))
+                                        cost = math.cos(math.radians(arc_angle))
+                                        p.append(x2 + r*cost)
+                                        p.append(y2 + r*sint)
+                                        if ended:
+                                            break
+                                        arc_angle += tarc_angle
+                                        if arc_angle >= arc_angle0 + 90:
+                                            arc_angle = arc_angle0 + 90
+                                            ended = True
 
                         elif self.type == "line":
                             p = line
@@ -15572,6 +15617,8 @@ class Animate:
     rectangle0 : list or tuple
         the rectangle (xlowerleft,ylowerleft,xupperright,yupperright) at time t0
 
+        optionally a fifth element can be used to specify the radius of a rounded rectangle
+
     image : str, pathlib.Path or PIL image
         the image to be displayed
 
@@ -15685,6 +15732,8 @@ class Animate:
     rectangle1 : tuple
         the rectangle (xlowerleft,ylowerleft,xupperright,yupperright) at time t1
         (default: rectangle0)
+
+        optionally a fifth element can be used to specify the radius of a rounded rectangle
 
     linewidth1 : float
         linewidth of the contour at time t1 (default linewidth0)
@@ -16104,6 +16153,9 @@ class Animate:
 
             (xlowerleft,ylowerlef,xupperright,yupperright) (default see below)
 
+            optionally a fifth element can be used to specify the radius of a rounded rectangle
+
+
         points0 : tuple
             the points(s) at time t0 (xa,ya,xb,yb,xc,yc, ...) (default see below)
 
@@ -16205,6 +16257,7 @@ class Animate:
             the rectangle at time t (xlowerleft,ylowerleft,xupperright,yupperright)
             (default: rectangle0)
 
+            optionally a fifth element can be used to specify the radius of a rounded rectangle
 
         points1 : tuple
             the points(s) at time t1 (xa,ya,xb,yb,xc,yc, ...) (default: points0)
@@ -18207,6 +18260,8 @@ class AnimateRectangle(Animate2dBase):
     ----------
     spec : four item tuple or list
         should specify xlowerleft, ylowerleft, xupperright, yupperright
+
+        optionally a fifth element can be used to specify the radius of a rounded rectangle
 
     x : float
         position of anchor point (default 0)
@@ -24156,7 +24211,7 @@ def _set_name(name, _nameserialize, object):
         if name in _nameserialize:
             _nameserialize[name] = sequence_number = _nameserialize[name] + 1
         else:
-            _nameserialize[name] = sequence_number = 0 if name.endswith(",") else 1
+            _nameserialize[name] = sequence_number = 1 if name.endswith(",") else 0
 
         object._name = f"{name[:-1]}.{sequence_number}"
         object._base_name = name
@@ -26552,7 +26607,7 @@ def can_video(try_only: bool = True) -> bool:
         except ImportError:
             if try_only:
                 return False
-            if platform.python_implementation == "PyPy":
+            if PyPy:
                 raise NotImplementedError("video production is not supported under PyPy.")
             else:
                 raise ImportError("cv2 required for video production. Install with pip install opencv-python")
@@ -27030,7 +27085,8 @@ class redirect_stdout:
         self.mode = mode
         sys.stdout = self
 
-    def __enter__(self): ...
+    def __enter__(self):
+        ...
 
     def close(self):
         self.flush()

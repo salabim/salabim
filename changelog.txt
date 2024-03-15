@@ -1,18 +1,86 @@
 salabim changelog
 
-version 24.0.1  
+version 24.0.2  2024-03-15
+==========================
+Added functionality (0)
+-----------------------
+Salabim now also supports rounded rectangles, which can result in more pleasing animations.
+
+Therefore, the spec argument (tuple) of sim.AnimateRectangle now has an optional fifth item, 
+which is the radius of the corners of the rounded rectangle.
+
+The same holds for the rectangle0 and rectangle1 (tuple) paramaters of sim.Animate.
+
+Note that if the radius is too big, the radius will be adjusted.
+
+Changed functionality (0)
+-------------------------
+Under Pythonista, yieldless is False by default, now.
+This can be useful for models which have no active components (and just env.run() statements).
+
+Bug fix (0)
+-----------
+In version 23.3.12 the naming of components, queues, etc. was changed.
+Unfortunately, the role of , and . at the end of the name were swapped.
+From this version, the naming/sequence number system works again as intended and documented. So
+    for i in range(3):
+        car = Car('Audi.')
+        print(car.name(), car.sequence_number())
+    for i in range(3):
+        car = Car('BMW,')
+        print(car.name(), car.sequence_number())
+
+will now (again) result in:
+    Audi.0 0
+    Audi.1 1
+    Audi.2 2
+    BMW.1 1
+    BMW.2 2
+    BMW.3 3
+
+Bug fix (1)
+-----------
+Under PyPy yieldless did not work properly. Fixed.
+
+Clarification (0)
+-----------------
+The salabim documentation states that models could run much faster under PyPy.
+("We have found 6 to 7 times faster execution compared to CPython.")
+
+In practice, the performance gain is much smaller. It is not uncommon that
+models run even slower under PyPy!
+Therefore, the paragraph about PyPy has been removed from the documentation.
+
+(Inspired by a comment by Luc van den Brink)
+
+Clarification (1)
+-----------------
+For the alternative UI the package PySimpleGUI is required.
+Just recently, PySimpleGUI has changed its license to a more restrictive one.
+And for commercial applications, charges apply.
+If you want to use the real open-source version (which I recommend), please install
+PySimpleGUI with
+    pip install PySimpleGUI==4.60.5
+of course, this version is not maintained any more, but the package is rather stable.
+
+I have also cloned the old PySimpleGUIfile repository to salabim, so you can just 
+copy pysimplegui.py (the only required file) from that repo to your model folder.
+
+This information is also added to the documentation.
+
+version 24.0.1  2024-01-11
 ==========================
 New functionality (0)
 ---------------------
 The method Environment.ui_granularity has been introduced.
-With this, it is possible to set the number of simulation steps that has to be
+With this, it is possible to set the number of simulation steps that have to be
 called before _handle_ui_event is called (again).
 This can significantly improve performance during simulation with animation off
 and the UI shown.
-The ui_granularity is 1 at start up.
+The ui_granularity is 1 at start-up.
 It might require some experimentation to find a suitable value:
 - too low might result in slow execution
-- too high might result in bas responsiveness
+- too high might result in bad responsiveness
 
 
 Enhancement (0)
@@ -25,7 +93,7 @@ is allowed, although it is just a dummy action, like self.hold(0).
 
 Bug fix (0)
 -----------
-When passing (non consumed) parameters to the Component.process method, an error was raised in
+When passing (non-consumed) parameters to the Component.process method, an error was raised in
 yieldless mode, so
     class X(sim.Component):
         def process(self, extra):
@@ -50,7 +118,7 @@ an error was raised. Fixed.
 
 Bug fix (3)
 -----------
-With blind_animation mode was True, video production didn't work in yieldless mode. Fixed.
+With blind_animation mode True, video production didn't work in yieldless mode. Fixed.
 (Bug reported by max l)
 
 version 24.0.0  2024-01-02
@@ -489,7 +557,7 @@ And now it is even possible to use a string:
 If datetime0 is not False, all process interaction methods that require a duration, like Component.hold,
 Component creation, fail_delay parameters, can now be a datetime.timedelta, e.g.
     comp.hold(datetime.timedelta(hours=1)
-    Vehicle(delay=
+    Vehicle(delay=datetime.timedelta(days=2))
 Or it can be string containing a relatively free format duration, like
     comp.hold("12:00:00"))
 And now it is even possible to use a string:
