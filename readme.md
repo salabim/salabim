@@ -8,8 +8,6 @@
 
 </div>
 
-
-
 Salabim is a Python library for object-oriented discrete event simulation (DES) and animation.
 
 ## Introduction
