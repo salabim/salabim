@@ -2,7 +2,7 @@
 
 [![Latest Release](https://img.shields.io/badge/Latest%20Version-24.0.2-blue?logo=github)](https://github.com/salabim/salabim/blob/master/changelog.txt)
 
-# ***SALABIM***
+# **salabim**
 
 Salabim is a Python library for object-oriented discrete event simulation (DES) and animation.
 
@@ -22,7 +22,7 @@ Salabim follows a well-proven and intuitive process description method similar t
 - Tracing facilities
 - Advanced statistical sampling
 
-In contrast to some other Python DES packages, Salabim does not require the use of yield statements for process control, making it more straightforward to use. Salabim has minimal requirements, especially when animation is disabled.
+In contrast to some other Python DES packages, salabim does not require the use of yield statements for process control, making it more straightforward to use. Salabim has minimal requirements, especially when animation is disabled.
 
 ## Features and documentation
 
@@ -43,6 +43,6 @@ Ruud van der Ham is available and willing to help users with issues related to t
 
 ## Getting Started
 
-To start using Salabim, visit [www.salabim.org](www.salabim.org) for installation instructions and further details.
+To start using salabim, visit [www.salabim.org](www.salabim.org) for installation instructions and further details.
 
 ---
