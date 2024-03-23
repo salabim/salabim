@@ -26,12 +26,12 @@ In contrast to some other Python DES packages, salabim does not require the use 
 
 ## Features and documentation
 
-- Cross-platform support: Salabim runs on Windows, macOS, Linux, iOS/iPadOS (Pythonista), and can even be used with "Python In Excel".
+- Cross-platform support: salabim runs on Windows, macOS, Linux, iOS/iPadOS (Pythonista), and can even be used with "Python In Excel".
 - Comprehensive documentation: Visit [www.salabim.org/manual](www.salabim.org/manual) for detailed documentation.
 
 ## Contributing and Reporting Issues
 
-Contributions to Salabim are highly appreciated! You can contribute by issuing a pull request or submitting an issue on [GitHub](https://github.com/salabim/salabim). Alternatively, you can use the [Salabim Google group](https://groups.google.com/g/salabim) for discussions and reporting issues.
+Contributions to salabim are highly appreciated! You can contribute by issuing a pull request or submitting an issue on [GitHub](https://github.com/salabim/salabim). Alternatively, you can use the [salabim Google user group](https://groups.google.com/g/salabim) for discussions and reporting issues.
 
 ## License
 
