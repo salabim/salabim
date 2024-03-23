@@ -18,8 +18,7 @@ Salabim follows a well-proven and intuitive process description method similar t
 - Stores
 - States
 - Monitors for data collection and presentation
-- 2D animation (including video production)
-- 3D animation (including video production)
+- 2D and 3D animation (including video production)
 - Tracing facilities
 - Advanced statistical sampling
 
