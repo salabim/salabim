@@ -1,8 +1,6 @@
-<img src="https://www.salabim.org/wp-content/uploads/2018/09/cropped-salabim-logo-red-black-with-payoff-e1536663466315.png" />
+<img src="https://www.salabim.org/salabim_logo_payoff.png" />
 
-[![Latest Release](https://img.shields.io/badge/Latest%20Version-24.0.2-blue?logo=github)](https://github.com/salabim/salabim/blob/master/changelog.txt)
-
-# **salabim**
+</br>
 
 Salabim is a Python library for object-oriented discrete event simulation (DES) and animation.
 
@@ -45,4 +43,9 @@ Ruud van der Ham is available and willing to help users with issues related to t
 
 To start using salabim, visit [www.salabim.org](www.salabim.org) for installation instructions and further details.
 
----
+## Badges
+
+![PyPI](https://img.shields.io/pypi/v/zalabim) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/zalabim) ![PyPI - Implementation](https://img.shields.io/pypi/implementation/zalabim)
+
+![PyPI - License](https://img.shields.io/pypi/l/zalabim) ![Black](https://img.shields.io/badge/code%20style-black-000000.svg) 
+ ![GitHub last commit](https://img.shields.io/github/last-commit/salabim/zalabim)
