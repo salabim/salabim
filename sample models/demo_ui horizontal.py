@@ -83,8 +83,8 @@ env.start_ui(
         ],
         [
             sg.Checkbox("Pause at each 10th client arrival", False, key="-PAUSE-AT-10-", metadata=[1, 2], enable_events=True),
-        sg.Checkbox("Show watermark", True, key="-SHOW-WATERMARK-", metadata=[1, 2])],
-
+            sg.Checkbox("Show watermark", True, key="-SHOW-WATERMARK-", metadata=[1, 2]),
+        ],
     ],
     user_handle_event=user_handle_event,
     default_elements=False,

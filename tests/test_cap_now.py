@@ -1,7 +1,6 @@
 import salabim as sim
 import pytest
 
-sim.yieldless(False)
 def test():
     class X(sim.Component):
         def process(self):
@@ -17,7 +16,7 @@ def test():
             yield self.hold(-1)
             assert env.now() == now
 
-    env = sim.Environment()    
+    env = sim.Environment(yieldless=False)    
     X()
     
     env.run(-1, cap_now=True)

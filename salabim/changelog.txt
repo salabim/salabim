@@ -1,5 +1,15 @@
 salabim changelog
 
+version 24.0.3  2024-05-01
+==========================
+Internal organization completely changed. Now uses git for version
+control.
+
+Changed the styling of the salabim logo, which will be visible on the
+website,readme, manual.
+Also the Environment.modelname() method now shows the new styling.
+
+
 version 24.0.2  2024-03-15
 ==========================
 Added functionality (0)
@@ -9,7 +19,7 @@ Salabim now also supports rounded rectangles, which can result in more pleasing 
 Therefore, the spec argument (tuple) of sim.AnimateRectangle now has an optional fifth item, 
 which is the radius of the corners of the rounded rectangle.
 
-The same holds for the rectangle0 and rectangle1 (tuple) paramaters of sim.Animate.
+The same holds for the rectangle0 and rectangle1 (tuple) parameters of sim.Animate.
 
 Note that if the radius is too big, the radius will be adjusted.
 

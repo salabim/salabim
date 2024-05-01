@@ -45,7 +45,7 @@ To start using salabim, visit [www.salabim.org](www.salabim.org) for installatio
 
 ## Badges
 
-![PyPI](https://img.shields.io/pypi/v/zalabim) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/zalabim) ![PyPI - Implementation](https://img.shields.io/pypi/implementation/zalabim)
+![PyPI](https://img.shields.io/pypi/v/salabim) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/salabim) ![PyPI - Implementation](https://img.shields.io/pypi/implementation/salabim)
 
-![PyPI - License](https://img.shields.io/pypi/l/zalabim) ![Black](https://img.shields.io/badge/code%20style-black-000000.svg) 
- ![GitHub last commit](https://img.shields.io/github/last-commit/salabim/zalabim)
+![PyPI - License](https://img.shields.io/pypi/l/salabim) ![Black](https://img.shields.io/badge/code%20style-black-000000.svg) 
+ ![GitHub last commit](https://img.shields.io/github/last-commit/salabim/salabim)

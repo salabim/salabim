@@ -29,17 +29,17 @@ def test_monitor1():
             for v in range(0, 101):
                 self.ml.tally(v)
                 self.m.tally(v)
-                yield self.hold(1)
+                self.hold(1)
                 env.ended = True
 
     class Controller(sim.Component):
         def process(self):
             while not env.ended:
-                yield self.hold(sim.Uniform(10, 20)())
+                self.hold(sim.Uniform(10, 20)())
                 for i in (False, True):
                     env.x[i].ml.monitor(False)
                     env.x[i].interrupt()
-                yield self.hold(sim.Uniform(1000, 2000)())
+                self.hold(sim.Uniform(1000, 2000)())
                 for i in (False, True):
                     env.x[i].ml.monitor(True)
                     env.x[i].resume()
@@ -182,21 +182,21 @@ def test_monitor4():
             self.ml = sim.Monitor("ml", level=True, initial_tally=10, stats_only=stats_only)
 
         def process(self):
-            yield self.hold(till=5)
+            self.hold(till=5)
             self.ml.tally(5)
-            yield self.hold(till=6)
+            self.hold(till=6)
             self.ml.monitor(False)
             self.ml.tally(6)
-            yield self.hold(till=7)
+            self.hold(till=7)
             self.ml.tally(7)
-            yield self.hold(till=7.5)
+            self.hold(till=7.5)
             assert self.ml() == 7
-            yield self.hold(till=8)
+            self.hold(till=8)
             self.ml.tally(8)
             self.ml.monitor(True)
-            yield self.hold(till=9)
+            self.hold(till=9)
             self.ml.tally(9)
-            yield self.hold(1000)
+            self.hold(1000)
 
     env = sim.Environment()
     env.ml = sim.Monitor("ml", level=True)
@@ -241,7 +241,7 @@ def test_percentile():
             for value in (4, 1, 1, 3, 6, 3, 0, 7, 2, 2):
                 env.ml.tally(value)
                 env.m.tally(value)
-                yield self.hold(1)
+                self.hold(1)
 
     env = sim.Environment()
 
@@ -293,16 +293,16 @@ def test_pickle():
             for v in range(101):
                 env.ml.tally(v)
                 env.m.tally(v)
-                yield self.hold(1)
+                self.hold(1)
                 env.ended = True
 
     class Controller(sim.Component):
         def process(self):
             while not env.ended:
-                yield self.hold(sim.Uniform(10, 20)())
+                self.hold(sim.Uniform(10, 20)())
                 env.ml.monitor(False)
                 env.x.interrupt()
-                yield self.hold(sim.Uniform(1000, 2000)())
+                self.hold(sim.Uniform(1000, 2000)())
                 env.ml.monitor(True)
                 env.x.resume()
 
@@ -388,19 +388,19 @@ def test_level_values():
     class X(sim.Component):
         def process(self):
             self.set_mode("abc")
-            yield self.hold(0)
-            yield self.request(r, mode="def")
-            yield self.hold(10.1, mode="ghi")
+            self.hold(0)
+            self.request(r, mode="def")
+            self.hold(10.1, mode="ghi")
             self.release()
-            yield self.passivate(mode="jkl")
+            self.passivate(mode="jkl")
 
     class Interrupter(sim.Component):
         def process(self):
-            yield self.hold(6)
+            self.hold(6)
             x0.interrupt()
             x1.interrupt()
             x2.interrupt()
-            yield self.hold(4)
+            self.hold(4)
             x0.resume()
             x1.resume()
             x2.resume()
@@ -520,25 +520,25 @@ def test_map():
     class X1(sim.Component):
         def process(self):
             m1.tally("x1.0")
-            yield self.hold(2)
+            self.hold(2)
             m1.tally("x1.2")
-            yield self.hold(2)
+            self.hold(2)
             m1.tally("x1.4")
 
     class X2(sim.Component):
         def process(self):
-            yield self.hold(1)
+            self.hold(1)
             m2.tally("x2.1")
-            yield self.hold(1)
+            self.hold(1)
             m2.tally("x2.3")
-            yield self.hold(1)
+            self.hold(1)
             m2.tally("x2.4")
 
     class M2Spoiler(sim.Component):
         def process(self):
-            yield self.hold(1.5)
+            self.hold(1.5)
             m2.monitor(False)
-            yield self.hold(2)
+            self.hold(2)
             m2.monitor(True)
 
     inf = sim.inf

@@ -7,7 +7,7 @@ def test_define():
     class X(sim.Component):
         def process(self):
             with pytest.raises(ValueError):
-                yield self.from_store(())
+                self.from_store(())
 
     store0 = sim.Store("store")
     X()

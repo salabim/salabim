@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "salabim"
+authors = [
+    {name = "Ruud van der Ham", email = "rt.van.der.ham@gmail.com"}
+]
+description = "salabim - discrete event simulation in Python"
+version = "24.0.3"
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3 :: Only"
+]
+[project.urls]
+Homepage = "https://github.com/salabim/salabim"
+Repository = "https://github.com/salabim/salabim"
+
+
+[tool.setuptools]
+packages = ["salabim"]
+
+[tool.setuptools.package-data]
+"*" = ["*.ttf", "*.txt"]

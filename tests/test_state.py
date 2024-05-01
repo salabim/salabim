@@ -5,25 +5,25 @@ import pytest
 def test_wait():
     class X(sim.Component):
         def process(self):
-            yield self.hold(1)
+            self.hold(1)
             s1.set(1)
-            yield self.hold(1)
+            self.hold(1)
             s1.set(2)
             s2.set("red")
-            yield self.hold(2)
+            self.hold(2)
             s1.set(30)
 
     class Z1(sim.Component):
         def process(self):
             while True:
-                yield self.wait((s1, lambda x, component, state: x / 2 > self.env.now()))
-                yield self.hold(1.5)
+                self.wait((s1, lambda x, component, state: x / 2 > self.env.now()))
+                self.hold(1.5)
 
     class Z2(sim.Component):
         def process(self):
             while True:
-                yield self.wait((s2, lambda x, *_: x in ("red", "yellow")))
-                yield self.hold(1.5)
+                self.wait((s2, lambda x, *_: x in ("red", "yellow")))
+                self.hold(1.5)
 
     def red_or_yellow(x, component, state):
         return x in component.ok_colors
@@ -34,8 +34,8 @@ def test_wait():
 
         def process(self):
             while True:
-                yield self.wait((s2, red_or_yellow))
-                yield self.hold(1.5)
+                self.wait((s2, red_or_yellow))
+                self.hold(1.5)
 
     env = sim.Environment(trace=False)
     s1 = sim.State(name="s.", value=0)
@@ -70,9 +70,9 @@ def test_urgent_and_priority(capsys):
         def process(self):
 
             if self == x[8]:
-                yield self.hold(0, priority=-6, urgent=True)
+                self.hold(0, priority=-6, urgent=True)
             if self == x[7]:
-                yield self.hold(0, priority=-6)
+                self.hold(0, priority=-6)
             pass
 
     class Y(sim.Component):
