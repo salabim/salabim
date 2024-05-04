@@ -8,7 +8,7 @@ authors = [
     {name = "Ruud van der Ham", email = "rt.van.der.ham@gmail.com"}
 ]
 description = "salabim - discrete event simulation in Python"
-version = "24.0.3"
+version = "24.0.4-1"
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = [
@@ -19,7 +19,7 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only"
 ]
 [project.urls]
-Homepage = "https://github.com/salabim/salabim"
+Homepage = "https://salabim.org"
 Repository = "https://github.com/salabim/salabim"
 
 

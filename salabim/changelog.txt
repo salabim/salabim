@@ -1,14 +1,21 @@
 salabim changelog
 
-version 24.0.3  2024-05-01
+version 24.0.4  2024-05-03
 ==========================
+Although there's no functional change, this is a major upgrade,
+that could result in bugs or unexpected behaviour.
+Please report any bug or problem.
+
 Internal organization completely changed. Now uses git for version
-control.
+control. That means that it is much easier for the developer
+to push new versions.
+
+And for publishing on PyPI salabim now uses a pyproject.toml file.
+This also makes publishing easier for the developer.
 
 Changed the styling of the salabim logo, which will be visible on the
-website,readme, manual.
+website, readme, manual.
 Also the Environment.modelname() method now shows the new styling.
-
 
 version 24.0.2  2024-03-15
 ==========================

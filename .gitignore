@@ -9,4 +9,5 @@ toml_versioner.py
 artwork/*
 manual/*
 manual_yield/*
+misc
 

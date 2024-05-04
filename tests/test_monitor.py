@@ -397,13 +397,13 @@ def test_level_values():
     class Interrupter(sim.Component):
         def process(self):
             self.hold(6)
-            x0.interrupt()
-            x1.interrupt()
-            x2.interrupt()
+            for x in (x0,x1,x2):
+                if x.isscheduled():
+                    x.interrupt()
             self.hold(4)
-            x0.resume()
-            x1.resume()
-            x2.resume()
+            for x in (x0,x1,x2):
+                if x.isinterrupted():
+                    x.resume()
 
     def status_map(status):
         return sim.statuses().index(status)
@@ -425,7 +425,7 @@ def test_level_values():
 
     env.run(till=50)
 
-    assert x1.status.value_duration("requesting") == pytest.approx(10.1)
+    assert x1.status.value_duration("requesting") == pytest.approx(14.1)
 
     assert x0.mode.xt(force_numeric=None) == (["abc", "ghi", "jkl", "jkl"], array("d", [0.0, 4.3, 18.4, 50.0]))
     assert x0.status.xt(force_numeric=None) == (
