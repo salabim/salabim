@@ -52,10 +52,16 @@ def _install(files, url=None):
 
     Version history
     ---------------
+    version 1.0.8  2024-05-06
+        Changed the way the package is found (again)
+
+    version 1.0.7  2024-05-04
+        Changed the way the package is found (again)
+
     version 1.0.6  2024-05-01
         If the first source file can't be found in the current working directory,
         the program will search one level deep
-        
+
     version 1.0.5  2020-06-24
         Bug with removing the dist-info of packages starting with the same name fixed.
 
@@ -90,13 +96,15 @@ def _install(files, url=None):
         raise ValueError("no files specified")
     if files[0][0] == "!":
         raise ValueError("first item in files (sourcefile) may not be optional")
-    package = Path(files[0]).stem
-    sourcefile = files[0]
 
-    if Path(sourcefile).is_file():
-        prefix = Path("")
-    else:
-        prefix = Path(sourcefile).stem # one level deep
+    sourcefile = files[0]
+    package = Path(sourcefile).stem
+
+    file_folder = Path(__file__).parent
+    if not (file_folder / sourcefile).is_file():
+        top_folder = (file_folder / "..").resolve()
+        os.chdir(top_folder / package)
+
     file_contents = {}
     for file in files:
         optional = file[0] == "!"
@@ -114,9 +122,9 @@ def _install(files, url=None):
                 exists = False
 
         else:
-            exists = (prefix / Path(file)).is_file()
+            exists = Path(file).is_file()
             if exists:
-                with open(prefix / Path(file), "rb") as f:
+                with open(Path(file), "rb") as f:
                     file_contents[file] = f.read()
 
         if (not exists) and (not optional):
@@ -219,7 +227,6 @@ def _install(files, url=None):
                         record_file.write("\n")
 
     return info
-
 
 
 if __name__ == "__main__":

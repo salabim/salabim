@@ -10,4 +10,5 @@ artwork/*
 manual/*
 manual_yield/*
 misc
-
+*.html
+upload_html.py

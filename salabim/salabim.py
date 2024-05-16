@@ -1,13 +1,13 @@
-#               _         _      _               ____   _  _        ___      _  _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    | || |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | || |_
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ |__   _|
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)   |_|
+#               _         _      _               ____   _  _        ___      ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    | ___|
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   |___ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _  ___) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|____/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.4" 
+__version__ = "24.0.5"
 
 import heapq
 import random
@@ -581,6 +581,7 @@ class Monitor:
         name = kwargs.pop("name", None)
         if kwargs:
             raise TypeError("merge() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
+        new_xtype = self.xtype
 
         for m in monitors:
             m._block_stats_only()
@@ -589,9 +590,12 @@ class Monitor:
             if self._level != m._level:
                 raise TypeError("not possible to mix level monitor with non level monitor")
             if self.xtype != m.xtype:
-                raise TypeError("not possible to mix type '" + self.xtype + "' with type '" + m.xtype + "'")
+                new_xtype = "any"
             if self.env != m.env:
                 raise TypeError("not possible to mix environments")
+            if m.xtype != new_xtype:
+                new_xtype = "any"  # to allow mixed xtypes
+
         if name is None:
             if self.name().endswith(".merged"):
                 # this to avoid multiple .merged (particularly when merging with the + operator)
@@ -599,7 +603,7 @@ class Monitor:
             else:
                 name = self.name() + ".merged"
 
-        new = _SystemMonitor(name=name, type=self.xtype, level=self._level, env=self.env)
+        new = _SystemMonitor(name=name, type=new_xtype, level=self._level, env=self.env)
 
         merge = [self] + list(monitors)
 
@@ -3156,7 +3160,9 @@ class Monitor:
         self.cached_xweight[(ex0, force_numeric)] = (t_extra, xweight)
         return xweight
 
-    def as_dataframe(self, include_t: bool = True, use_datetime0=False) -> "dataframe":
+    def as_dataframe(
+        self, include_t: bool = True, use_datetime0=False, ex0: bool = False, exoff=False, force_numeric: bool = True, add_now: bool = True
+    ) -> "dataframe":
         """
         makes a pandas dataframe with the x-values and optionally the t-values of the monitors
 
@@ -3188,14 +3194,15 @@ class Monitor:
             import pandas as pd
         except ImportError:
             raise ImportError("Monitor.as_dataframe requires pandas")
+        xs, ts = self.xt(ex0=ex0, exoff=exoff, force_numeric=force_numeric, add_now=add_now)
         if include_t:
             if use_datetime0:
-                df = pd.DataFrame({"t": [self.env.t_to_datetime(t) for t in self._t]})
+                df = pd.DataFrame({"t": [self.env.t_to_datetime(t) for t in ts]})
             else:
-                df = pd.DataFrame({"t": self._t})
+                df = pd.DataFrame({"t": ts})
         else:
             df = pd.DataFrame()
-        df[f"{self.name()}.x"] = self._x
+        df[f"{self.name()}.x"] = xs
 
         return df
 
@@ -13642,7 +13649,7 @@ class Environment:
 
         lastwidth = 0
         for fontsize in range(1, 300):
-            f = getfont(font, fontsize)
+            f, heightA = getfont(font, fontsize)
             thiswidth, thisheight = f.getbbox(text)[2:]
             if thiswidth > width:
                 break
@@ -23428,7 +23435,7 @@ class Resource:
             else:
                 q = quantity
 
-            self._claimed_quantity -= q_claimers
+            self._claimed_quantity -= q
             if self._claimed_quantity < 1e-8:
                 self._claimed_quantity = 0
             self.claimed_quantity.tally(self._claimed_quantity)
@@ -27086,7 +27093,7 @@ reset()
 set_environment_aliases()
 
 if __name__ == "__main__":
-    sys.path.insert(0,str(Path.cwd()/"misc"))
+    sys.path.insert(0, str(Path.cwd() / "misc"))
     try:
         import salabim_exp
     except Exception as e:
