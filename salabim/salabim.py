@@ -1,13 +1,13 @@
-#               _         _      _               ____   _  _        ___      ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    | ___|
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   |___ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _  ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|____/
+#               _         _      _               ____   _  _        ___       __
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \     / /_
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | '_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_) \___/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.5"
+__version__ = "24.0.6"
 
 import heapq
 import random
@@ -3374,6 +3374,15 @@ class _StateMonitor(Monitor):
     @_value.setter
     def _value(self, value: Any) -> None:
         self.parent.set(value)
+
+    @property
+    def value(self) -> Any:
+        return self.parent.get()
+
+    @value.setter
+    def value(self, value: Any) -> None:
+        self.parent.set(value)
+
 
 
 class _SystemMonitor(Monitor):

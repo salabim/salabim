@@ -110,6 +110,17 @@ def test_urgent_and_priority(capsys):
     with pytest.raises(TypeError):
         X(process="", priority=1)
 
+def test_value():
+    env = sim.Environment(trace=False)
+    s1 = sim.State(name="s.", value=0)
+    env.run(1)
+    s1.value.value+=1
+    env.run(1)
+    s1.value.value+=1
+    env.run(1)
+
+    assert s1()==2
+
 
 if __name__ == "__main__":
     pytest.main(["-vv", "-s", __file__])

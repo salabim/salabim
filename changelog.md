@@ -1,5 +1,21 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 24.0.6  2024-06-20
+
+From this version on,  the monitor associated with a state (`State.value`) has a `value` property. In previous version only `_value` was supported.
+
+So now, we can say
+
+```
+mystate.value.value += 1
+```
+
+as an alternative to
+
+```
+my_state.set(my_state())
+```
+
 #### version 24.0.5  2024-05-16
 
 - When merging monitors, all monitors had to be of the same type. 
@@ -93,7 +109,7 @@ From this version, the naming/sequence number system works again as intended and
 
 will now (again) result in:
     Audi.0 0
-Audi.1 1
+    Audi.1 1
     Audi.2 2
     BMW.1 1
     BMW.2 2

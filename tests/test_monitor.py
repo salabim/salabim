@@ -635,10 +635,10 @@ def test_as_dataframe_use_datetime0():
     df0=pd.DataFrame({"t": [d(2023,1,3),d(2023,1,5)], "level monitor0.x":[11,12]})
     assert df0.equals(df)
     df = level_monitor0.as_dataframe(use_datetime0=True)
-    df0=pd.DataFrame({"t":[d(2023,1,1), d(2023,1,2,7,12),d(2023,1,3,12),d(2023,1,5,19,12)], "level monitor0.x": [0,11,12,14.5]})
+    df0=pd.DataFrame({"t":[d(2023,1,1), d(2023,1,2,7,12),d(2023,1,3,12),d(2023,1,5,19,12),d(2023,1,6,0,0)], "level monitor0.x": [0,11,12,14.5,14.5]})
     assert df0.equals(df)
     df = level_monitor0.as_dataframe()
-    df0=pd.DataFrame({"t":[0,1.3,2.5,4.8], "level monitor0.x": [0,11,12,14.5]})
+    df0=pd.DataFrame({"t":[0,1.3,2.5,4.8,5.0], "level monitor0.x": [0,11,12,14.5,14.5]})
     assert df0.equals(df)    
 if __name__ == "__main__":
     pytest.main(["-vv", "-s", "-x", __file__])
