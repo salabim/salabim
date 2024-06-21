@@ -13,7 +13,7 @@ mystate.value.value += 1
 as an alternative to
 
 ```
-my_state.set(my_state())
+my_state.set(my_state() + 1)
 ```
 
 #### version 24.0.5  2024-05-16

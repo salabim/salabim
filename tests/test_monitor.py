@@ -640,5 +640,9 @@ def test_as_dataframe_use_datetime0():
     df = level_monitor0.as_dataframe()
     df0=pd.DataFrame({"t":[0,1.3,2.5,4.8,5.0], "level monitor0.x": [0,11,12,14.5,14.5]})
     assert df0.equals(df)    
+    df = level_monitor0.as_dataframe(add_now=False)
+    df0=pd.DataFrame({"t":[0,1.3,2.5,4.8], "level monitor0.x": [0,11,12,14.5]})
+    assert df0.equals(df)    
+
 if __name__ == "__main__":
     pytest.main(["-vv", "-s", "-x", __file__])
