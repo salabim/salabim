@@ -1,13 +1,13 @@
-#               _         _      _               ____   _  _        ___       __
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \     / /_
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | '_ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | (_) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_) \___/
+#               _         _      _               ____   _  _        ___      _____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    |___  |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |      / /
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _   / /
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_) /_/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.6"
+__version__ = "24.0.7"
 
 import heapq
 import random
@@ -10057,6 +10057,9 @@ class Environment:
         This is particularly useful when running a simulation on a server.
         Note that this will show a slight performance increase, when creating videos.
 
+    Any valid parameter for Environment.animation_parameters() will be forwarded to animation_parameters(), e.g.
+        env = sim.Environment(trace=True, animation=True, speed=5)
+
     Note
     ----
     The trace may be switched on/off later with trace
@@ -10089,6 +10092,7 @@ class Environment:
             if isdefault_env:
                 name = "default environment"
         _set_name(name, Environment._nameserialize, self)
+
         self._nameserializeMonitor = {}  # required here for to_freeze functionality
         self._time_unit = _time_unit_lookup(time_unit)
         self._time_unit_name = time_unit
@@ -10238,6 +10242,15 @@ class Environment:
         self.an_modelname()
 
         self.an_clocktext()
+
+        ap_parameters= [parameter for parameter in inspect.signature(self.animation_parameters).parameters]
+        ap_kwargs={}
+        for k,v in list(kwargs.items()):
+            if k in ap_parameters:
+                del kwargs[k]   
+                ap_kwargs[k]=v
+        if ap_kwargs:
+            self.animation_parameters(**ap_kwargs)
 
         self.setup(*args, **kwargs)
 
@@ -26664,7 +26677,10 @@ class ImageContainer:
 
     def init(self, spec):
         can_animate(try_only=True)  # to load PIL
+
         if isinstance(spec, (str, Path)):
+            spec=str(spec)  # to process Path correctly
+
             if spec == "":
                 im = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
                 # (0, 0) raises an error on some platforms
@@ -27102,7 +27118,7 @@ reset()
 set_environment_aliases()
 
 if __name__ == "__main__":
-    sys.path.insert(0, str(Path.cwd() / "misc"))
+    sys.path.insert(0, str(Path(__file__).parent / ".." / "misc"))
     try:
         import salabim_exp
     except Exception as e:

@@ -1,6 +1,33 @@
 ### changelog | salabim | discrete event simulation
 
-#### version 24.0.6  2024-06-20
+#### version 24.0.7  2024-06-25
+
+- In initializing Environment, it is now possible to directly present parameters for `Environment.animation_parameters`, e.g.
+
+  ```
+  env = sim.Environment(trace=True, animation=True, speed=5)
+  ```
+
+  is equivalent to
+
+  ```
+  env = sim.Enviroment(trace=True)
+  env.animation_parameters(animation=True, speed=5)
+  ```
+
+  or
+
+  ```
+  env = sim.Enviroment(trace=True)
+  env.animation(True)
+  env.speed(5)
+  ```
+
+  This can make code a bit smaller and more readable.
+
+- Using a Path object as the spec parameter for `Environment.AnimateImage()`raised an error. Fixed.
+
+#### 24.0.6  2024-06-20
 
 From this version on,  the monitor associated with a state (`State.value`) has a `value` property. In previous version only `_value` was supported.
 
