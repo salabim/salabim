@@ -1,13 +1,13 @@
-#               _         _      _               ____   _  _        ___      _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    |___  |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |      / /
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _   / /
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_) /_/
+#               _         _      _               ____   _  _        ___       ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \     ( _ )
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |    / _ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_) \___/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.7"
+__version__ = "24.0.8"
 
 import heapq
 import random
@@ -9017,6 +9017,7 @@ by adding:
             self.status._value = waiting
             self._reschedule(scheduled_time, schedule_priority, urgent, "wait", cap_now)
         else:
+            return # ***
             if self.env._yieldless:
                 if self is self.env._current_component:
                     self.env._glet.switch()

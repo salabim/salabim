@@ -1,5 +1,9 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 24.0.8  2024-06-26
+
+- Bug in `Component.wait()` in *yieldless* mode caused a process to come to a standstill if the wait condition was met immediately. Fixed.
+
 #### version 24.0.7  2024-06-25
 
 - In initializing Environment, it is now possible to directly present parameters for `Environment.animation_parameters`, e.g.
