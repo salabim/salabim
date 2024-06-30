@@ -1,5 +1,56 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 24.0.9  2024-06-30
+
+- The image parameter of `AnimateImage` can now can also be an image in a zip archive. In order to specify that, use the name of the zipfile, followed by a bar (|) and the name of the file in the zip archive. So, for instance
+  `AnimateImage("cars.zip|bmw.png")`
+
+- Dynamic attributes for anaimation objects can now b expressed differently.
+  The advanced section of the Animation chapter in the manual mentions says:
+
+  > The various classes have a lot of parameters, like color, line width, font, etc.
+  >
+  > These parameters can be given just as a scalar, like:
+  >
+  > ```
+  > sim.AnimateText(text='Hello world', x=200, y=300, textcolor='red')
+  > ```
+  >
+  > But each of these parameters may also be a:
+  >
+  > - function with zero arguments
+  > - function with one argument being the time t
+  > - function with two arguments being ‘arg’ and the time t
+  > - a method with instance ‘arg’ and the time t
+  >   
+  
+  Although not properly documented, It was always possible to add keyword arguments provided `arg` and `t` were specified:
+  
+  ```
+  sim.AnimateText(text= lambda arg, t, self=self: self.message)
+  ```
+  
+  From this version on, it also possible to leave out arg and t in this case:
+  
+  ```
+  sim.AnimateText(text= lambda self=self: self.message)
+  ```
+  
+  or
+  
+  ```
+  for n in range(4):
+      AnimateText(text=lambda self=self, n=n: self.message[n], y=n*30)
+  ```
+  
+  If the time parameter is required in this case, `env.t()` can be used.
+  
+  The `arg` parameter is not used at al in this specification. 
+  
+  > [!TIP]
+  >
+  > It is strongly recommended to try and use this new specification as it is more intuitive.
+
 #### version 24.0.8  2024-06-26
 
 - Bug in `Component.wait()` in *yieldless* mode caused a process to come to a standstill if the wait condition was met immediately. Fixed.

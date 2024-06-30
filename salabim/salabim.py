@@ -1,13 +1,13 @@
 #               _         _      _               ____   _  _        ___       ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \     ( _ )
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |    / _ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | (_) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_) \___/
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \     / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | (_) |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _  \__, |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)   /_/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.8"
+__version__ = "24.0.9"
 
 import heapq
 import random
@@ -42,6 +42,7 @@ import datetime
 import urllib.request
 import urllib.error
 import base64
+import zipfile
 
 from pathlib import Path
 
@@ -71,8 +72,7 @@ def a_log(*args):
         print(*args, file=a_logfile)
 
 
-class g:
-    ...
+class g: ...
 
 
 if PythonInExcel:
@@ -3384,7 +3384,6 @@ class _StateMonitor(Monitor):
         self.parent.set(value)
 
 
-
 class _SystemMonitor(Monitor):
     @property
     def value(self) -> Any:
@@ -3444,6 +3443,10 @@ class DynamicClass:
         if callable(c):
             if inspect.isfunction(c):
                 nargs = c.__code__.co_argcount
+                if c.__defaults__ is not None:
+                    c.__defaults__ = tuple(self if x == object else x for x in c.__defaults__)  # indicate that object refers to animation object itself
+                    nargs -= len(c.__defaults__)
+
                 if nargs == 0:
                     return lambda t: c()
                 if nargs == 1:
@@ -3456,7 +3459,7 @@ class DynamicClass:
     def getattribute_spec(self, attr):
         """
         special version of getattribute.
-        When it's dynamic it will return the value in case of a constan or a parameterless function
+        When it's dynamic it will return the value in case of a constant or a parameterless function
         Used only in AnimateCombined
         """
 
@@ -8323,7 +8326,6 @@ by adding:
 
         for store in to_stores:
             self.enter(store._to_store_requesters)
-
         self.status._value = requesting
         self._to_store_item = item
         self._to_store_priority = priority
@@ -9017,7 +9019,7 @@ by adding:
             self.status._value = waiting
             self._reschedule(scheduled_time, schedule_priority, urgent, "wait", cap_now)
         else:
-            return # ***
+            return  # ***
             if self.env._yieldless:
                 if self is self.env._current_component:
                     self.env._glet.switch()
@@ -10244,12 +10246,12 @@ class Environment:
 
         self.an_clocktext()
 
-        ap_parameters= [parameter for parameter in inspect.signature(self.animation_parameters).parameters]
-        ap_kwargs={}
-        for k,v in list(kwargs.items()):
+        ap_parameters = [parameter for parameter in inspect.signature(self.animation_parameters).parameters]
+        ap_kwargs = {}
+        for k, v in list(kwargs.items()):
             if k in ap_parameters:
-                del kwargs[k]   
-                ap_kwargs[k]=v
+                del kwargs[k]
+                ap_kwargs[k] = v
         if ap_kwargs:
             self.animation_parameters(**ap_kwargs)
 
@@ -15651,6 +15653,12 @@ class Animate:
 
         This may be either a filename or a PIL image
 
+        if image is a string consisting of a zipfile-name, a bar (|) and a filename,
+        the given filename will be read from the specified zip archive, e.g
+
+        sim.AnimateImage(image="cars.zip|bmw.png")
+
+
     text : str, tuple or list
         the text to be displayed
 
@@ -16190,6 +16198,11 @@ class Animate:
             the image to be displayed
 
             This may be either a filename or a PIL image (default see below)
+
+            if image is a string consisting of a zipfile-name, a bar (|) and a filename,
+            the given filename will be read from the specified zip archive, e.g
+
+        sim.AnimateImage(image="cars.zip|bmw.png")
 
         text : str
             the text to be displayed (default see below)
@@ -19351,6 +19364,11 @@ class AnimateImage(Animate2dBase):
 
         if used as function or method or in direct assigmnent,
         the image should be a file containing an image or a PIL image
+
+        if image is a string consisting of a zipfile-name, a bar (|) and a filename,
+        the given filename will be read from the specified zip archive, e.g
+
+        sim.AnimateImage(image="cars.zip|bmw.png")
 
     x : float
         position of anchor point (default 0)
@@ -26680,7 +26698,7 @@ class ImageContainer:
         can_animate(try_only=True)  # to load PIL
 
         if isinstance(spec, (str, Path)):
-            spec=str(spec)  # to process Path correctly
+            spec = str(spec)  # to process Path correctly
 
             if spec == "":
                 im = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
@@ -26703,7 +26721,18 @@ class ImageContainer:
                         except Exception as e:
                             raise FileNotFoundError(f"could not open URL {spec}: {e}")
                 else:
-                    im = Image.open(spec)
+                    if "|" in spec:
+                        zip_part, image_part = spec.split("|")
+                        zip_part = zip_part.strip()
+                        if zip_part.lower().endswith(".zip"):
+                            image_part = image_part.strip()
+                            with zipfile.ZipFile(zip_part) as ziphandle:
+                                image_data = ziphandle.read(image_part)
+                                im = Image.open(io.BytesIO(image_data))
+                        else:
+                            im = Image.open(spec)
+                    else:
+                        im = Image.open(spec)
         else:  # it's a PIL Image, for sure
             im = spec
 
@@ -27090,8 +27119,7 @@ class redirect_stdout:
         self.mode = mode
         sys.stdout = self
 
-    def __enter__(self):
-        ...
+    def __enter__(self): ...
 
     def close(self):
         self.flush()
@@ -27119,6 +27147,7 @@ reset()
 set_environment_aliases()
 
 if __name__ == "__main__":
+
     sys.path.insert(0, str(Path(__file__).parent / ".." / "misc"))
     try:
         import salabim_exp
