@@ -7,7 +7,7 @@
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.10"
+__version__ = "24.0.10" 
 
 import heapq
 import random
