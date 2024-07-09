@@ -1,5 +1,20 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 24.0.10  2024-07-
+
+- In version 24.0.9 the dynamic argument could be already object, but was not documented.
+  If the value of the parameter is `object` , this refers to the animation object itself. So, we can say
+
+  ```
+  sim.AnimateText(text="Hello", x=lambda t: t * 10, y=lambda t, me=object: me.x(t))
+  ```
+
+  It is also possible now to specify arg=object  for completeness:
+
+  ```
+  sim.AnimateText(text="Hello", x=lambda t: t*10, y=lambda arg, t: arg.x(t), arg=object)
+  ```
+
 #### version 24.0.9  2024-06-30
 
 - The image parameter of `AnimateImage` can now can also be an image in a zip archive. In order to specify that, use the name of the zipfile, followed by a bar (|) and the name of the file in the zip archive. So, for instance

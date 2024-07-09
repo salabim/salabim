@@ -7,7 +7,7 @@
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.9"
+__version__ = "24.0.10"
 
 import heapq
 import random
@@ -3472,6 +3472,9 @@ class DynamicClass:
         if callable(c):
             if inspect.isfunction(c):
                 nargs = c.__code__.co_argcount
+                if c.__defaults__ is not None:
+                    c.__defaults__ = tuple(self if x == object else x for x in c.__defaults__)  # indicate that object refers to animation object itself
+                    nargs -= len(c.__defaults__)
                 if nargs == 0:
                     return c()
                 if nargs == 1:
@@ -14101,7 +14104,7 @@ class Environment:
 
         also the legend for line numbers will be printed
 
-        not that the header is only printed if trace=True
+        note that the header is only printed if trace=True
         """
         len_s1 = len(self.time_to_str(0))
         self.print_trace((len_s1 - 4) * " " + "time", "current component", "action", "information", "" if PythonInExcel else "line#")
@@ -14849,7 +14852,7 @@ class Animate2dBase(DynamicClass):
 
         self.env = g.default_env if env is None else env
         self.sequence = self.env.serialize()
-        self.arg = self if arg is None else arg
+        self.arg = self if arg in (None, object) else arg 
         self.over3d = _default_over3d if over3d is None else over3d
         self.screen_coordinates = screen_coordinates
         self.attached_to = attached_to
