@@ -29,7 +29,7 @@ class Clerk(sim.Component):
             self.customer.activate()
 
 
-env = sim.Environment(trace=False)
+env = sim.Environment(trace=True)
 CustomerGenerator()
 clerks = [Clerk() for _ in range(3)]
 

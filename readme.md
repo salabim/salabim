@@ -33,11 +33,11 @@ In contrast to some other Python DES packages, salabim does not require the use 
 ### Features and documentation
 
 - Cross-platform support: salabim runs on Windows, macOS, Linux, iOS/iPadOS (Pythonista), and can even be used with "Python In Excel".
-- Comprehensive documentation: Visit https://www.salabim.org/manual for detailed documentation.
+- Comprehensive documentation: Visit [www.salabim.org/manual](www.salabim.org/manual) for detailed documentation.
 
 ### Resources
 
-The salabim package can be found on GitHub: https://www.github.com/salabim/salabim
+The salabim package can be found on GitHub: www.github.com/salabim/salabim
 
 And on PyPI: https://pypi.org/project/salabim/
 

@@ -4,6 +4,7 @@ sim.yieldless(True)
 import PySimpleGUI as sg
 
 
+
 class ClientGenerator(sim.Component):
     def process(self):
         while True:

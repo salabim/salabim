@@ -1,7 +1,12 @@
 ### changelog | salabim | discrete event simulation
 
-#### version 24.0.10  2024-07-
+#### version 24.0.10  2024-08-06
 
+- When PySimpleGUI was installed with
+  ```pip install PySimpleGUI-4-Foss```
+
+  sometimes an error occurred. Fixed.  
+  
 - In version 24.0.9 the dynamic argument could be already object, but was not documented.
   If the value of the parameter is `object` , this refers to the animation object itself. So, we can say
 
@@ -14,6 +19,14 @@
   ```
   sim.AnimateText(text="Hello", x=lambda t: t*10, y=lambda arg, t: arg.x(t), arg=object)
   ```
+  
+- If a user had forgotten to initialize the environment  (with `env = sim.Environment()`), a rather cryptic AttributeError was raised, From now on a meaningful ValueError will be raised instead:
+
+  `ValueError: no default environment. Did yout forget to call sim.Environment()?` 
+
+- When slicing a monitor in animate mode, the slice ended at `env.now()` rather than `env.t()`, thus making *running averages* in an animation difficult (or incorrect). 
+  
+- When slicing a non level monitor in animate mode, an error was raised if there were no entries (yet). Fixed.
 
 #### version 24.0.9  2024-06-30
 
@@ -42,20 +55,15 @@
   Although not properly documented, It was always possible to add keyword arguments provided `arg` and `t` were specified:
   
   ```
-  sim.AnimateText(text= lambda arg, t, self=self: self.message)
+  for n in range(4):
+      AnimateText(text=lambda arg, t, n=n: self.message[n], y=n * 30)
   ```
   
-  From this version on, it also possible to leave out arg and t in this case:
-  
-  ```
-  sim.AnimateText(text= lambda self=self: self.message)
-  ```
-  
-  or
+  From this version on, it also possible to leave out `arg` and `t` in this case:
   
   ```
   for n in range(4):
-      AnimateText(text=lambda self=self, n=n: self.message[n], y=n*30)
+      AnimateText(text=lambda n=n: self.message[n], y=n * 30)
   ```
   
   If the time parameter is required in this case, `env.t()` can be used.

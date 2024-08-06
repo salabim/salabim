@@ -7,7 +7,7 @@
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.10" 
+__version__ = "24.0.9"
 
 import heapq
 import random
@@ -445,10 +445,8 @@ class Monitor:
         *args,
         **kwargs,
     ):
-        if env is None:
-            self.env = g.default_env
-        else:
-            self.env = env
+        self.env = _set_env(env)
+
         if isinstance(self.env, Environment):
             _set_name(name, self.env._nameserializeMonitor, self)
         else:
@@ -855,8 +853,10 @@ class Monitor:
             else:
                 stop += self.env._offset
                 stop_action = "b"  # non inclusive
-
-            stop = min(stop, self.env._now - self.env._offset)  # not self.now() in order to support frozen monitors
+            if self.env._animate:
+                stop=min(stop,self.env._t)
+            else:
+                stop = min(stop, self.env._now - self.env._offset)  # not self.now() in order to support frozen monitors
             actions.append((start, "a", 0, 0))
             actions.append((stop, stop_action, 0, 0))
         else:
@@ -888,8 +888,33 @@ class Monitor:
             new._x.append(curx)
 
         enabled = False
+        if self.env._animate:
+            _x=self._x[:]
+            _t=self._t[:]
+            if self._x:
+                _x.append(self._x[-1])
+                _t.append(self.env._t)
+            if isinstance(self._weight,bool):
+                _weight=self._weight
+            else:
+                _weight=self._weight[:]
+                _weight.append(self._weight[-1])
+        else:
+            _x=self._x
+            _t=self._t
+            _weight=self._weight
+
+
+        if self.env._animate:
+            if self._x:
+                _x.append(_x[-1])
+                _t.append(self.env._t)
+            try:
+                _weight.append(self.weight[-1])
+            except AttributeError:
+                ... # ignore if bool
         for t, type, x, weight in heapq.merge(
-            actions, zip(self._t, itertools.repeat("c"), self._x, self._weight if (self._weight and not self._level) else (1,) * len(self._x))
+            actions, zip(self._t, itertools.repeat("c"), _x, _weight if (_weight and not self._level) else (1,) * len(_x))
         ):
             if new._level:
                 if type == "a":
@@ -4293,10 +4318,8 @@ class Queue:
     """
 
     def __init__(self, name: str = None, monitor: Any = True, fill: Iterable = None, capacity: float = inf, env: "Environment" = None, *args, **kwargs) -> None:
-        if env is None:
-            self.env = g.default_env
-        else:
-            self.env = env
+        self.env = _set_env(env)
+
         _set_name(name, self.env._nameserializeQueue, self)
         self._head = Qmember()
         self._tail = Qmember()
@@ -5819,7 +5842,8 @@ class Animate3dBase(DynamicClass):
         self, visible: bool = True, keep: bool = True, arg: Any = None, layer: float = 0, parent: "Component" = None, env: "Environment" = None, **kwargs
     ) -> None:
         super().__init__()
-        self.env = g.default_env if env is None else env
+        self.env = _set_env(env)
+
         self.visible = visible
         self.keep = keep
         self.arg = self if arg is None else arg
@@ -7063,10 +7087,8 @@ class Component:
         env: "Environment" = None,
         **kwargs,
     ):
-        if env is None:
-            self.env = g.default_env
-        else:
-            self.env = env
+        self.env = _set_env(env)
+
         _set_name(name, self.env._nameserializeComponent, self)
         self._qmembers = {}
         self._process = None
@@ -14673,7 +14695,7 @@ class Environment:
         if self._last_animate != self._animate or self._last_paused != self._paused:
             for key in self._ui_window.key_dict:
                 field = self._ui_window[key]
-                if type(field) != sg.PySimpleGUI.HorizontalSeparator:
+                if type(field) != sg.HorizontalSeparator:
                     if self._paused:
                         field.update(visible=True)
                     else:
@@ -14850,9 +14872,10 @@ class Animate2dBase(DynamicClass):
         screen_coordinates = locals_["screen_coordinates"]
         over3d = locals_["over3d"]
 
-        self.env = g.default_env if env is None else env
+        self.env = _set_env(env)
+
         self.sequence = self.env.serialize()
-        self.arg = self if arg in (None, object) else arg 
+        self.arg = self if arg in (None, object) else arg
         self.over3d = _default_over3d if over3d is None else over3d
         self.screen_coordinates = screen_coordinates
         self.attached_to = attached_to
@@ -15930,7 +15953,8 @@ class Animate:
         animation_to: float = inf,
         env: "Environment" = None,
     ):
-        self.env = g.default_env if env is None else env
+        self.env = _set_env(env)
+
         self._image_ident = None  # denotes no image yet
         self._image = None
         self._image_x = 0
@@ -17052,7 +17076,8 @@ class AnimateEntry:
         env: "Environment" = None,
         xy_anchor: str = "sw",
     ):
-        self.env = g.default_env if env is None else env
+        self.env = _set_env(env)
+
         self.env.ui_objects.append(self)
         self.type = "entry"
         self.value = value
@@ -17197,7 +17222,8 @@ class AnimateButton:
         env: "Environment" = None,
         xy_anchor: str = "sw",
     ):
-        self.env = g.default_env if env is None else env
+        self.env = _set_env(env)
+
         self.type = "button"
         self.t0 = -inf
         self.t1 = inf
@@ -17378,7 +17404,7 @@ class AnimateSlider:
         labelcolor: ColorType = None,  # only for backward compatibility
         layer: float = None,  # only for backward compatibility
     ):
-        self.env = g.default_env if env is None else env
+        self.env = _set_env(env)
         n = round((vmax - vmin) / resolution) + 1
         self.vmin = vmin
         self.vmax = vmin + (n - 1) * resolution
@@ -22640,10 +22666,7 @@ class State:
     """
 
     def __init__(self, name: str = None, value: Any = False, type: str = "any", monitor: bool = True, env: "Environment" = None, *args, **kwargs):
-        if env is None:
-            self.env = g.default_env
-        else:
-            self.env = env
+        self.env = _set_env(env)
         _set_name(name, self.env._nameserializeState, self)
         self._value = value
         with self.env.suppress_trace():
@@ -23118,11 +23141,7 @@ class Resource:
         *args,
         **kwargs,
     ):
-        if env is None:
-            self.env = g.default_env
-        else:
-            self.env = env
-
+        self.env = _set_env(env)
         if initial_claimed_quantity != 0:
             if not anonymous:
                 raise ValueError("initial_claimed_quantity != 0 only allowed for anonymous resources")
@@ -23651,10 +23670,8 @@ class PeriodMonitor:
 
     def __init__(self, parent_monitor: "Monitor", periods: Iterable = None, period_monitor_names: Iterable = None, env: "Environment" = None):
         self.pc = _PeriodComponent(pm=self, skip_standby=True, suppress_trace=True)
-        if env is None:
-            self.env = g.default_env
-        else:
-            self.env = env
+        self.env = _set_env(env)
+
         if periods is None:
             periods = 24 * [1]
         self.periods = periods
@@ -26929,6 +26946,21 @@ def reset() -> None:
     g._default_cap_now = False
 
     random_seed()  # always start with seed 1234567
+
+
+def _set_env(env):
+    """
+    returns g._default_env if env is None
+    returns env, otherwise
+
+    will raise a ValueError if g.default_env is None (nit initialized)
+    """
+
+    if env is None:
+        if g.default_env is None:
+            raise ValueError("no default environment. Did yout forget to call sim.Environment()?")
+        return g.default_env
+    return env
 
 
 App = Environment
