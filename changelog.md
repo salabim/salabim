@@ -1,5 +1,9 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 24.0.11  2024-08-18
+
+- salabim can now also run (including .gif video creation) under AnacondaCode (Excel extension). The functionality is the same as running under PythonInExcel.
+
 #### version 24.0.10  2024-08-06
 
 - When PySimpleGUI was installed with

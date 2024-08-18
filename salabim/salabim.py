@@ -1,13 +1,13 @@
-#               _         _      _               ____   _  _        ___      _   ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / | / _ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | || | | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | || |_| |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_| \___/
+#               _         _      _               ____   _  _        ___      _  _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / |/ |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | || |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | || |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_||_|
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.10"
+__version__ = "24.0.11"
 
 import heapq
 import random
@@ -60,6 +60,7 @@ PyDroid = sys.platform == "linux" and any("pydroid" in v for v in os.environ.val
 PyPy = platform.python_implementation() == "PyPy"
 Chromebook = "penguin" in platform.uname()
 PythonInExcel = not ("__file__" in globals())
+AnacondaCode = "pyscript" in sys.modules
 
 
 def a_log(*args):
@@ -75,7 +76,7 @@ def a_log(*args):
 class g: ...
 
 
-if PythonInExcel:
+if PythonInExcel or AnacondaCode:
     _pie_result = []
 
     def pie_result():
@@ -854,7 +855,7 @@ class Monitor:
                 stop += self.env._offset
                 stop_action = "b"  # non inclusive
             if self.env._animate:
-                stop=min(stop,self.env._t)
+                stop = min(stop, self.env._t)
             else:
                 stop = min(stop, self.env._now - self.env._offset)  # not self.now() in order to support frozen monitors
             actions.append((start, "a", 0, 0))
@@ -889,21 +890,20 @@ class Monitor:
 
         enabled = False
         if self.env._animate:
-            _x=self._x[:]
-            _t=self._t[:]
+            _x = self._x[:]
+            _t = self._t[:]
             if self._x:
                 _x.append(self._x[-1])
                 _t.append(self.env._t)
-            if isinstance(self._weight,bool):
-                _weight=self._weight
+            if isinstance(self._weight, bool):
+                _weight = self._weight
             else:
-                _weight=self._weight[:]
+                _weight = self._weight[:]
                 _weight.append(self._weight[-1])
         else:
-            _x=self._x
-            _t=self._t
-            _weight=self._weight
-
+            _x = self._x
+            _t = self._t
+            _weight = self._weight
 
         if self.env._animate:
             if self._x:
@@ -912,10 +912,8 @@ class Monitor:
             try:
                 _weight.append(self.weight[-1])
             except AttributeError:
-                ... # ignore if bool
-        for t, type, x, weight in heapq.merge(
-            actions, zip(self._t, itertools.repeat("c"), _x, _weight if (_weight and not self._level) else (1,) * len(_x))
-        ):
+                ...  # ignore if bool
+        for t, type, x, weight in heapq.merge(actions, zip(self._t, itertools.repeat("c"), _x, _weight if (_weight and not self._level) else (1,) * len(_x))):
             if new._level:
                 if type == "a":
                     enabled = True
@@ -10207,7 +10205,7 @@ class Environment:
         self.stopped = False
         self._paused = False
         self.last_s0 = ""
-        if PythonInExcel:
+        if PythonInExcel or AnacondaCode:
             self._blind_animation = True
         else:
             self._blind_animation = blind_animation
@@ -11502,7 +11500,7 @@ class Environment:
                     if self._video_pingpong:
                         self._images.extend(self._images[::-1])
                     if self._video_repeat == 1:  # in case of repeat == 1, loop should not be specified (otherwise, it might show twice)
-                        if PythonInExcel:  # ***
+                        if PythonInExcel or AnacondaCode:  # ***
                             with b64_file_handler(self._video_name, mode="b", result=_pie_result) as f:
                                 self._images[0].save(
                                     f,
@@ -11523,7 +11521,7 @@ class Environment:
                                 optimize=False,
                             )
                     else:
-                        if PythonInExcel:  # ***
+                        if PythonInExcel or AnacondaCode:  # ***
                             with b64_file_handler(self._video_name, mode="b", result=_pie_result) as f:
                                 self._images[0].save(
                                     f,
@@ -13112,7 +13110,7 @@ class Environment:
             mode = "RGB"
         else:
             raise ValueError("extension " + extension + "  not supported")
-        if PythonInExcel:
+        if PythonInExcel or AnacondaCode:
             with b64_file_handler(str(filename), mode="b", result=_pie_result) as f:
                 format = "jpeg" if extension == ".jpg" else extension[1:]
                 self._capture_image(mode, video_mode).save(f, format=format)
@@ -14129,15 +14127,15 @@ class Environment:
         note that the header is only printed if trace=True
         """
         len_s1 = len(self.time_to_str(0))
-        self.print_trace((len_s1 - 4) * " " + "time", "current component", "action", "information", "" if PythonInExcel else "line#")
-        self.print_trace(len_s1 * "-", 20 * "-", 35 * "-", 48 * "-", "" if PythonInExcel else 6 * "-")
+        self.print_trace((len_s1 - 4) * " " + "time", "current component", "action", "information", "" if (PythonInExcel or AnacondaCode) else "line#")
+        self.print_trace(len_s1 * "-", 20 * "-", 35 * "-", 48 * "-", "" if (PythonInExcel or AnacondaCode) else 6 * "-")
         for ref in range(len(self._source_files)):
             for fullfilename, iref in self._source_files.items():
                 if ref == iref:
                     self._print_legend(iref)
 
     def _print_legend(self, ref):
-        if PythonInExcel:
+        if PythonInExcel or AnacondaCode:
             return
         if ref:
             s = "line numbers prefixed by " + chr(ord("A") + ref - 1) + " refer to"
@@ -14155,7 +14153,7 @@ class Environment:
         return self.filename_lineno_to_str(frameinfo.filename, frameinfo.lineno)
 
     def filename_lineno_to_str(self, filename, lineno):
-        if PythonInExcel:
+        if PythonInExcel or AnacondaCode:
             return "n/a"
         if Path(filename).name == Path(__file__).name:  # internal salabim address
             return "n/a"
@@ -24262,7 +24260,7 @@ def _set_name(name, _nameserialize, object):
 
 @functools.lru_cache()
 def _screen_dimensions():
-    if PythonInExcel:
+    if PythonInExcel or AnacondaCode:
         return 1024, 768
     if Pythonista:
         screen_width, screen_height = ui.get_screen_size()
@@ -26278,7 +26276,7 @@ def _std_fonts():
 
 
 def fonts():
-    if PythonInExcel:
+    if PythonInExcel or AnacondaCode:
         return []
     if not hasattr(fonts, "font_list"):
         fonts.font_list = []
@@ -26551,7 +26549,7 @@ def can_animate(try_only: bool = True) -> bool:
         except ImportError:
             ImageGrab = None
 
-        if not Pythonista and not PythonInExcel:
+        if not Pythonista and not (PythonInExcel or AnacondaCode):
             from PIL import ImageTk
     except ImportError:
         if try_only:
@@ -26560,7 +26558,7 @@ def can_animate(try_only: bool = True) -> bool:
 
     g.dummy_image = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
 
-    if not Pythonista and not PythonInExcel:
+    if not Pythonista and not (PythonInExcel or AnacondaCode):
         if PyDroid:
             if not g.tkinter_loaded:
                 if try_only:
