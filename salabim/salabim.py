@@ -60,7 +60,7 @@ PyDroid = sys.platform == "linux" and any("pydroid" in v for v in os.environ.val
 PyPy = platform.python_implementation() == "PyPy"
 Chromebook = "penguin" in platform.uname()
 PythonInExcel = not ("__file__" in globals())
-AnacondaCode = "pyscript" in sys.modules
+AnacondaCode = sys.platform=="emscripten"
 
 
 def a_log(*args):
@@ -26942,6 +26942,7 @@ def reset() -> None:
     g.tkinter_loaded = "?"
     g.image_container_cache = {}
     g._default_cap_now = False
+    g._captured_stdout=[]
 
     random_seed()  # always start with seed 1234567
 
@@ -26999,15 +27000,11 @@ Environment.{name}.__doc__ = {name}.__doc__"""
                 exec(f"Environment.{name}={name}")
 
 
-_captured_store = []
-
-
 def clear_captured_stdout():
     """
     empties the captured stdout
     """
-    global _captured_store
-    _captured_store.clear()
+    g._captured_stdout.clear()
 
 
 def captured_stdout_as_str() -> str:
@@ -27019,7 +27016,7 @@ def captured_stdout_as_str() -> str:
     captured stdout : str
     """
 
-    return "".join(_captured_store)
+    return "".join(g._captured_stdout)
 
 
 def captured_stdout_as_file(file: Union[str, Path, "file"], mode: str = None):
@@ -27097,16 +27094,14 @@ class capture_stdout:
         sys.stdout = self.stdout
 
     def write(self, data):
-        global _captured_store
-        _captured_store.append(data)
+        g._captured_stdout.append(data)
         if self.include_print:
             self.stdout.write(data)
 
     def flush(self):
-        global _captured_store
         if self.include_print:
             self.stdout.flush()
-        _captured_store.append("\n")
+        g._captured_stdout.append("\n")
 
 
 class redirect_stdout:
@@ -27164,7 +27159,7 @@ class redirect_stdout:
         self.close()
 
     def write(self, data):
-        global _captured_store
+        global _captured_stdout
         self.file.write(data)
         if self.include_print:
             self.stdout.write(data)
