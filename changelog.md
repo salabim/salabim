@@ -1,10 +1,16 @@
 ### changelog | salabim | discrete event simulation
 
-#### version 24.0.11  2024-08-24
+#### version 24.0.12  2024-08-27
 
-- salabim can now also run (including .gif video creation) under AnacondaCode (Excel extension). The functionality is the same as running under PythonInExcel.
-- alternative way of testing for running under AnacondaCode
-- `captured_stdout` is now cleared with a `sim.reset()` call, which is particularly useful for running under AnacondaCode
+- Using the `fill` parameter of `sim.Store` resulted in an error. Fixed.
+- Alternative way of testing for running under *AnacondaCode*
+- `captured_stdout` is now cleared with a `sim.reset()` call, which is particularly useful for running under *AnacondaCode* and Pythonista
+- Under *PythonInExcel* and *AnacondaCode*, `yieldless` is now False by default (as under *Pythonista*).
+
+#### version 24.0.11  2024-08-18
+
+- salabim can now also run (including .gif video creation) under *AnacondaCode* (Excel extension). The functionality is essentially 
+the same as running under *PythonInExcel*.
 
 #### version 24.0.10  2024-08-06
 

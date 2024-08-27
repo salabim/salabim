@@ -1,13 +1,13 @@
-#               _         _      _               ____   _  _        ___      _  _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / |/ |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | || |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | || |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_||_|
+#               _         _      _               ____   _  _        ___      _  ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / ||___ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | |  __) |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | | / __/
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_||_____|
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.11"
+__version__ = "24.0.12"
 
 import heapq
 import random
@@ -151,9 +151,11 @@ if Pythonista:
 inf = float("inf")
 nan = float("nan")
 
-_yieldless = not Pythonista  # True, unless running under Pythonista
-
-
+if Pythonista or AnacondaCode or PythonInExcel:
+    _yieldless = False
+else:
+    _yieldless=True
+    
 class QueueFullError(Exception):
     pass
 
@@ -5714,15 +5716,19 @@ class Queue:
 
 
 class Store(Queue):
-    def __init__(self, name: str = None, capacity: int = inf, env: "Environment" = None, *args, **kwargs):
-        super().__init__(name=name, capacity=capacity, env=env, *args, **kwargs)
+    def __init__(self, name: str = None, monitor: Any = True, fill: Iterable = None, capacity: float = inf, env: "Environment" = None, *args, **kwargs) -> None:
+        super().__init__(name=name, monitor=monitor,fill=None,capacity=capacity, env=env, *args, **kwargs)
+
         with self.env.suppress_trace():
             self._to_store_requesters = Queue(f"{name}.to_store_requesters", env=env)
             self._to_store_requesters._isinternal = True
             self._from_store_requesters = Queue(f"{name}.from_store_requesters", env=env)
             self._from_store_requesters._isinternal = True
 
-        self.setup(*args, **kwargs)
+            if fill is not None:  # this cannot be done by Queue.__init__ as the requesters are not defined at that time
+                with self.env.suppress_trace():
+                    for c in fill:
+                        c.enter(self)
 
     def set_capacity(self, cap: float) -> None:
         """
@@ -26796,7 +26802,7 @@ class ImageContainer:
         if not (0 <= t_from < t_to):
             raise ValueError(f"animation_from={t_from} not with 0 and animation_to={t_to}")
         if t_to > self._duration:
-            raise ValueError(f"animation_to={t_to} > duration={duration}")
+            raise ValueError(f"animation_to={t_to} > duration={self._duration}")
         if pingpong:
             interval = 2 * (t_to - t_from)
         else:
