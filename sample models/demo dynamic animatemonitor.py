@@ -1,5 +1,6 @@
 import salabim as sim
 
+
 class X(sim.Component):
     def process(self):
         v0 = v1 = 10
@@ -10,10 +11,11 @@ class X(sim.Component):
             non_level_monitor.tally(v1)
             self.hold(1)
 
+
 env = sim.Environment()
 env.speed(10)
 
-sim.AnimateText("Demonstration dynamic AnimateMonitor", fontsize=20, y=700,x=100)
+sim.AnimateText("Demonstration dynamic AnimateMonitor", fontsize=20, y=700, x=100)
 
 level_monitor = sim.Monitor("level_monitor", level=True)
 non_level_monitor = sim.Monitor("non_level_monitor")

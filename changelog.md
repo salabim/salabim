@@ -1,10 +1,42 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 24.0.13  2024-09-23
+- sim.ComponentGenerator can now also be used with a number of moments:
+
+  ```
+  sim.ComponentGenerator(Ship, moments=(10, 20, 50))
+  ```
+  This will generate Ships at t=10, t=20 and t=50. The times should be specified in the current time unit.
+  The moments do not have to be sorted.
+
+  Note that moment cannot be used together with at, delay, till,duration, number, iat,force_at, force_till, disturbance or  equidistant
+  
+- This version introduces a new class: Event. This is a specialized Component, that is most useful as a timer, which performs
+  some action after a certain time. E.g.:
+  ```
+  class Client(sim.Component):
+      def process(self):
+          timer = sim.Event(action= lambda: self.activate(), name='timer', delay=10)
+          self.hold(sim.Uniform(0,20))
+          timer.cancel()  # this can be done even is the action was taken and timer is a data component
+          if timer.action_taken():
+              print("balked, because I had to wait for 10 minutes")      
+              return
+          print("do stuff ...")
+  ```
+   For more information, see the section on events and the reference in the latest documentation.
+  
+- Canceling a data component does not result in an exception anymore. This can be useful to cancel a wake up event even if it
+  it already ended.
+  
+- When reading a font file, the fontfile was not closed, thus causing a warning message if run under Viktor.ai. Fixed.
+  (Inspired by a comment by Michiel Luyken)
+
 #### version 24.0.12  2024-08-27
 
 - Using the `fill` parameter of `sim.Store` resulted in an error. Fixed.
 - Alternative way of testing for running under *AnacondaCode*
-- `captured_stdout` is now cleared with a `sim.reset()` call, which is particularly useful for running under *AnacondaCode* and Pythonista
+- captured_stdout` is now cleared with a `sim.reset()` call, which is particularly useful for running under *AnacondaCode* and Pythonista
 - Under *PythonInExcel* and *AnacondaCode*, `yieldless` is now False by default (as under *Pythonista*).
 
 #### version 24.0.11  2024-08-18
@@ -95,21 +127,21 @@ the same as running under *PythonInExcel*.
 - In initializing Environment, it is now possible to directly present parameters for `Environment.animation_parameters`, e.g.
 
   ```
-  env = sim.Environment(trace=True, animation=True, speed=5)
+  env = sim.Environment(trace=True, animate=True, speed=5)
   ```
 
   is equivalent to
 
   ```
   env = sim.Enviroment(trace=True)
-  env.animation_parameters(animation=True, speed=5)
+  env.animation_parameters(animate=True, speed=5)
   ```
 
   or
 
   ```
   env = sim.Enviroment(trace=True)
-  env.animation(True)
+  env.animate(True)
   env.speed(5)
   ```
 

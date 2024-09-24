@@ -1,5 +1,15 @@
-import salabim as sim
 import pytest
+from pathlib import Path
+import sys
+import os
+
+if __name__ == "__main__":
+    file_folder = Path(__file__).parent
+    top_folder = (file_folder / "..").resolve()
+    sys.path.insert(0, str(top_folder))
+    os.chdir(file_folder)
+
+import salabim as sim
 
 
 class X(sim.Component):
@@ -190,9 +200,21 @@ def test_dis():
     for component in components:
         names.tally(component.name().split(".")[0])
 
+def test_moments():
+    moments=(1,2,3,4,100,5)
+    components = exp(X, moments=moments)
+    assert components[0].enter_time(components) == 1
+    assert components[1].enter_time(components) == 2
+    assert components[2].enter_time(components) == 3
+    assert components[3].enter_time(components) == 4
+    assert components[4].enter_time(components) == 5
+    assert components[5].enter_time(components) == 100
+
+
 
 #    names.print_histogram(values=True, sort_on_weight=True)
 
 if __name__ == "__main__":
-    pytest.main(["-vv", "-s", __file__])
+    pytest.main(["-vv", "-s",__file__])
+
 

@@ -1,13 +1,13 @@
-#               _         _      _               ____   _  _        ___      _  ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / ||___ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | |  __) |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | | / __/
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_||_____|
+#               _         _      _               ____   _  _        ___      _  _____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / ||___ /
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | |  |_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | | ___) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_||____/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.12"
+__version__ = "24.0.13"
 
 import heapq
 import random
@@ -60,7 +60,7 @@ PyDroid = sys.platform == "linux" and any("pydroid" in v for v in os.environ.val
 PyPy = platform.python_implementation() == "PyPy"
 Chromebook = "penguin" in platform.uname()
 PythonInExcel = not ("__file__" in globals())
-AnacondaCode = sys.platform=="emscripten"
+AnacondaCode = sys.platform == "emscripten"
 
 
 def a_log(*args):
@@ -154,8 +154,9 @@ nan = float("nan")
 if Pythonista or AnacondaCode or PythonInExcel:
     _yieldless = False
 else:
-    _yieldless=True
-    
+    _yieldless = True
+
+
 class QueueFullError(Exception):
     pass
 
@@ -4144,7 +4145,7 @@ if Pythonista:
                     try:
                         ims = scene.load_pil_image(capture_image)
                     except SystemError:
-                        im_file = "temp.png"  # hack for Pythonista 3.4 ***
+                        im_file = "temp.png"  # hack for Pythonista 3.4
                         capture_image.save(im_file, "PNG")
                         ims = scene.load_image_file(im_file)
                     scene.image(ims, 0, 0, *capture_image.size)
@@ -5717,7 +5718,7 @@ class Queue:
 
 class Store(Queue):
     def __init__(self, name: str = None, monitor: Any = True, fill: Iterable = None, capacity: float = inf, env: "Environment" = None, *args, **kwargs) -> None:
-        super().__init__(name=name, monitor=monitor,fill=None,capacity=capacity, env=env, *args, **kwargs)
+        super().__init__(name=name, monitor=monitor, fill=None, capacity=capacity, env=env, *args, **kwargs)
 
         with self.env.suppress_trace():
             self._to_store_requesters = Queue(f"{name}.to_store_requesters", env=env)
@@ -7981,6 +7982,10 @@ by adding:
         ----
         Only if yieldless is False: if to be used for the current component, use ``yield self.cancel()``.
         """
+        if self.status.value == data:
+            if self.env._trace:
+                self.env.print_trace("", "", "cancel (on data component) " + self.name() + " " + self._modetxt())
+            return
         if self.status.value != current:
             self._checkisnotdata()
             self._remove()
@@ -9048,10 +9053,8 @@ by adding:
             self.status._value = waiting
             self._reschedule(scheduled_time, schedule_priority, urgent, "wait", cap_now)
         else:
-            return  # ***
-            if self.env._yieldless:
-                if self is self.env._current_component:
-                    self.env._glet.switch()
+            return
+
 
     def _trywait(self):
         if self.status.value == interrupted:
@@ -10000,6 +10003,211 @@ by adding:
             return None
 
 
+class Event(Component):
+    """
+    Event object
+
+    An event object is a specialized Component that is usually not subclassed.
+
+    Apart from the usual Component parameters it has an action parameter, to specifies what should
+    happen after becoming active. This action is usually a lambda function.
+
+    Parameters
+    ----------
+    action : callable
+        function called when the component becomes current.
+
+    action_string : str
+        string to be printed in trace when action gets executed (default: "action")
+
+    name : str
+        name of the component.
+
+        if the name ends with a period (.),
+        auto serializing will be applied
+
+        if the name end with a comma,
+        auto serializing starting at 1 will be applied
+
+        if omitted, the name will be derived from the class
+        it is defined in (lowercased)
+
+    at : float or distribution
+        schedule time
+
+        if omitted, now is used
+
+        if distribution, the distribution is sampled
+
+    delay : float or distributiom
+        schedule with a delay
+
+        if omitted, no delay
+
+        if distribution, the distribution is sampled
+
+    priority : float
+        priority
+
+        default: 0
+
+        if a component has the same time on the event list, this component is sorted accoring to
+        the priority.
+
+    urgent : bool
+        urgency indicator
+
+        if False (default), the component will be scheduled
+        behind all other components scheduled
+        for the same time and priority
+
+        if True, the component will be scheduled
+        in front of all components scheduled
+        for the same time and priority
+
+    suppress_trace : bool
+        suppress_trace indicator
+
+        if True, this component will be excluded from the trace
+
+        If False (default), the component will be traced
+
+        Can be queried or set later with the suppress_trace method.
+
+    suppress_pause_at_step : bool
+        suppress_pause_at_step indicator
+
+        if True, if this component becomes current, do not pause when stepping
+
+        If False (default), the component will be paused when stepping
+
+        Can be queried or set later with the suppress_pause_at_step method.
+
+    skip_standby : bool
+        skip_standby indicator
+
+        if True, after this component became current, do not activate standby components
+
+        If False (default), after the component became current  activate standby components
+
+        Can be queried or set later with the skip_standby method.
+
+    mode : str preferred
+        mode
+
+        will be used in trace and can be used in animations
+
+        if omitted, the mode will be "".
+
+        also mode_time will be set to now.
+
+    cap_now : bool
+        indicator whether times (at, delay) in the past are allowed. If, so now() will be used.
+        default: sys.default_cap_now(), usualy False
+
+    env : Environment
+        environment where the component is defined
+
+        if omitted, default_env will be used
+    """
+
+    def __init__(
+        self,
+        action: Callable,
+        action_string="action",
+        name: str = None,
+        at: Union[float, Callable] = None,
+        delay: Union[float, Callable] = None,
+        priority: float = None,
+        urgent: bool = None,
+        suppress_trace: bool = False,
+        suppress_pause_at_step: bool = False,
+        skip_standby: bool = False,
+        mode: str = "",
+        cap_now: bool = None,
+        env: "Environment" = None,
+        **kwargs,
+    ):
+        self._action = action
+        self._action_string = action_string
+        self._action_taken = False
+        if env is None:
+            env = g.default_env
+        super().__init__(
+            name=name,
+            at=at,
+            delay=delay,
+            priority=priority,
+            urgent=urgent,
+            suppress_trace=suppress_trace,
+            suppress_pause_at_step=suppress_pause_at_step,
+            skip_standby=skip_standby,
+            mode=mode,
+            cap_now=cap_now,
+            env=env,
+            process="process" if env._yieldless else "process_yield",
+            **kwargs,
+        )
+
+    def process_yield(self):
+        self.env.print_trace("", "", self._action_string, "")
+        self._action()
+        self._action_taken = True
+        return
+        yield 1  # just to make it a generator
+
+    def process(self):
+        self.env.print_trace("", "", self._action_string, "")
+        self._action()
+        self._action_taken = True
+
+    def action(self, value=None):
+        """
+        action
+
+        Parameters
+        ----------
+        value : callable
+            new action callable
+
+        Returns
+        -------
+        current action : callable
+        """
+        if value is not None:
+            self._action = value
+        return self._action
+
+    def action_string(self, value=None):
+        """
+        action_string
+
+        Parameters
+        ----------
+        value : string
+            new action_string
+
+        Returns
+        -------
+        current action_string : string
+        """
+
+        if value is not None:
+            self._action_string = value
+        return self._action_string
+
+    def action_taken(self):
+        """
+        action_taken
+
+        Returns
+        -------
+        action taken: bool
+            True if action has been taken, False if not
+        """
+        return self._action_taken
+
+  
 class Environment:
     """
     environment object
@@ -10791,7 +10999,7 @@ class Environment:
                 if c.overridden_lineno:
                     self.print_trace(self.time_to_str(self._now - self._offset), c.name(), "current", s0=un_na(c.overridden_lineno))
                 else:
-                    self.print_trace(self.time_to_str(self._now - self._offset), c.name(), "current", s0=un_na(c.lineno_txt()))  # ***
+                    self.print_trace(self.time_to_str(self._now - self._offset), c.name(), "current", s0=un_na(c.lineno_txt()))
             if c == self._main:
                 self.running = False
                 return
@@ -11506,7 +11714,7 @@ class Environment:
                     if self._video_pingpong:
                         self._images.extend(self._images[::-1])
                     if self._video_repeat == 1:  # in case of repeat == 1, loop should not be specified (otherwise, it might show twice)
-                        if PythonInExcel or AnacondaCode:  # ***
+                        if PythonInExcel or AnacondaCode:
                             with b64_file_handler(self._video_name, mode="b", result=_pie_result) as f:
                                 self._images[0].save(
                                     f,
@@ -11527,7 +11735,7 @@ class Environment:
                                 optimize=False,
                             )
                     else:
-                        if PythonInExcel or AnacondaCode:  # ***
+                        if PythonInExcel or AnacondaCode:
                             with b64_file_handler(self._video_name, mode="b", result=_pie_result) as f:
                                 self._images[0].save(
                                     f,
@@ -15312,8 +15520,6 @@ class Animate2dBase(DynamicClass):
 
                     if not self.screen_coordinates:
                         fontsize = fontsize * self.env._scale
-                        # offsetx = offsetx * self.env._scale  # ***
-                        # offsety = offsety * self.env._scale  # ***
                     text_anchor = self.text_anchor(t)
 
                     if self.attached_to:
@@ -15347,6 +15553,7 @@ class Animate2dBase(DynamicClass):
                             qx = (x - self.env._x0) * self.env._scale
                             qy = (y - self.env._y0) * self.env._scale
                     max_lines = self.max_lines(t)
+
                     self._image_ident = (text, fontname, fontsize, angle, textcolor, max_lines)
                     if self._image_ident != self._image_ident_prev:
                         font, heightA = getfont(fontname, fontsize)
@@ -19822,6 +20029,13 @@ class ComponentGenerator(Component):
 
         e.g. env.main().activate()
 
+    moments : iterable
+        specifies the moments when the components have to be generated. It is not required that these are sorted.
+
+        note that the moments are specified in the current time unit
+
+        cannot be used together with at, delay, till, duration, number, iat,force_at, force_till, disturbance or equidistant
+
     env : Environment
         environment where the component is defined
 
@@ -19850,6 +20064,7 @@ class ComponentGenerator(Component):
         disturbance: Callable = None,
         equidistant: bool = False,
         at_end: Callable = None,
+        moments: Iterable = None,
         env: "Environment" = None,
         **kwargs,
     ):
@@ -19867,6 +20082,15 @@ class ComponentGenerator(Component):
 
         if not callable(component_class):
             raise ValueError("component_class must be a callable")
+        if moments is not None:
+            if any(prop for prop in (at, delay, till, duration, number, iat, force_at, force_till, disturbance, equidistant)):
+                raise ValueError(
+                    "specifying at, delay, till,duration, number, iat,force_at, force_till, disturbance or equidistant is not allowed, if moments is specified"
+                )
+            if callable(moments):
+                moments = moments()
+            moments = sorted([env.spec_to_time(moment) for moment in moments])
+
         self.component_class = component_class
         self.iat = iat
         self.disturbance = disturbance
@@ -19909,25 +20133,26 @@ class ComponentGenerator(Component):
             at = None
             process = ""
         else:
-            if self.iat is None and not equidistant:
-                if till == inf or self.number == inf:
-                    raise ValueError("iat not specified --> till and number need to be specified")
-                if disturbance is not None:
-                    raise ValueError("iat not specified --> disturbance not allowed")
+            if (self.iat is None and not equidistant) or moments:
+                if not moments:
+                    if till == inf or self.number == inf:
+                        raise ValueError("iat not specified --> till and number need to be specified")
+                    if disturbance is not None:
+                        raise ValueError("iat not specified --> disturbance not allowed")
 
-                samples = sorted([Uniform(at, till)() for _ in range(self.number)])
-                if force_at or force_till:
-                    if number == 1:
-                        if force_at and force_till:
-                            raise ValueError("force_at and force_till does not allow number=1")
-                        samples = [at] if force_at else [till]
-                    else:
-                        v_at = at if force_at else samples[0]
-                        v_till = till if force_till else samples[-1]
-                        min_sample = samples[0]
-                        max_sample = samples[-1]
-                        samples = [interpolate(sample, min_sample, max_sample, v_at, v_till) for sample in samples]
-                self.intervals = [t1 - t0 for t0, t1 in zip([0] + samples, samples)]
+                    moments = sorted([Uniform(at, till)() for _ in range(self.number)])
+                    if force_at or force_till:
+                        if number == 1:
+                            if force_at and force_till:
+                                raise ValueError("force_at and force_till does not allow number=1")
+                            moments = [at] if force_at else [till]
+                        else:
+                            v_at = at if force_at else moments[0]
+                            v_till = till if force_till else moments[-1]
+                            min_moment = moments[0]
+                            max_moment = moments[-1]
+                            moments = [interpolate(moment, min_moment, max_moment, v_at, v_till) for moment in moments]
+                self.intervals = [t1 - t0 for t0, t1 in zip([0] + moments, moments)]
                 at = self.intervals[0]
                 self.intervals[0] = 0
                 process = "do_spread_yieldless" if env._yieldless else "do_spread"
@@ -26316,7 +26541,7 @@ def fonts():
 
         for dir, recursive in dir_recursives:
             for file_path in dir.glob("**/*.*" if recursive else "*.*"):
-                if file_path.suffix.lower() == ".ttf":  # ***
+                if file_path.suffix.lower() == ".ttf":
                     file = str(file_path)
                     fn = os.path.basename(file).split(".")[0]
                     if "_std_fonts" in globals() and fn in _std_fonts():  # test for availabiitly, because of minimized version
@@ -26376,7 +26601,8 @@ def getfont(fontname, fontsize):
             return getfont.lookup[(fontname, fontsize)]
     else:
         getfont.lookup = {}
-
+    if fontname=="":
+        a=1
     if isinstance(fontname, str):
         fontlist1 = [fontname]
     else:
@@ -26409,7 +26635,8 @@ def getfont(fontname, fontsize):
                     result = ImageFont.truetype(filename, size=int(fontsize))
                 else:
                     #  refer to https://github.com/python-pillow/Pillow/issues/3730 for explanation (in order to load >= 500 fonts)
-                    result = ImageFont.truetype(font=io.BytesIO(open(filename, "rb").read()), size=int(fontsize))
+                    with open(filename, "rb") as f:
+                        result = ImageFont.truetype(font=io.BytesIO(f.read()), size=int(fontsize))
                 break
             except Exception:
                 raise
@@ -26948,7 +27175,7 @@ def reset() -> None:
     g.tkinter_loaded = "?"
     g.image_container_cache = {}
     g._default_cap_now = False
-    g._captured_stdout=[]
+    g._captured_stdout = []
 
     random_seed()  # always start with seed 1234567
 
@@ -27181,7 +27408,6 @@ reset()
 set_environment_aliases()
 
 if __name__ == "__main__":
-
     sys.path.insert(0, str(Path(__file__).parent / ".." / "misc"))
     try:
         import salabim_exp
