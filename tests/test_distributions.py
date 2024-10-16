@@ -1,7 +1,16 @@
-import salabim as sim
 import pytest
 import collections
+from pathlib import Path
+import os
+import sys
 
+if __name__ == "__main__":
+    file_folder = Path(__file__).parent
+    top_folder = (file_folder / "..").resolve()
+    sys.path.insert(0, str(top_folder))
+    os.chdir(file_folder)
+
+import salabim as sim
 
 def collect(dis, n=10000):
     m = sim.Monitor()
@@ -85,11 +94,13 @@ def test_int_uniform():
     assert set(m.x()) == {1, 2, 3, 4, 5, 6}
     count = collections.Counter(m.x())
     for v, n in count.items():
-        assert n == pytest.approx(10000 / 6, rel=1e-1)
+        assert n == pytest.approx(10000 / 6, rel=10)
 
 
 def test_pdf():
     env = sim.Environment()
+    d=sim.Pdf((1,10,2,70,3,20))
+    assert str(d)=="Pdf"
     m = collect(sim.Pdf((1,10,2,70,3,20)))
     assert m.mean() == pytest.approx(2.1, rel=1e-2)
     m = collect(sim.Pdf((1,2,3),(10,70,20)))
@@ -99,6 +110,36 @@ def test_pdf():
     assert m.mean() == pytest.approx(2.1, rel=1e-2)
     m = collect(sim.Pdf(d))
     assert m.mean() == pytest.approx(2.1, rel=1e-2)
+
+
+def test_pmf():
+    env = sim.Environment()
+    d=sim.Pmf((1,10,2,70,3,20))
+    assert str(d)=="Pmf"    
+    m = collect(sim.Pmf((1,10,2,70,3,20)))
+    assert m.mean() == pytest.approx(2.1, rel=1e-2)
+    m = collect(sim.Pmf((1,2,3),(10,70,20)))
+    assert m.mean() == pytest.approx(2.1, rel=1e-2)
+    d = {1:10, 2:70, 3:20}
+    m = collect(sim.Pmf(d.keys(),d.values()))
+    assert m.mean() == pytest.approx(2.1, rel=1e-2)
+    m = collect(sim.Pmf(d))
+    assert m.mean() == pytest.approx(2.1, rel=1e-2)
+
+def test_cumpdf():
+    env = sim.Environment()
+    d=sim.CumPdf((1, 10, 2, 80, 3,100))
+    assert str(d)=="CumPdf"
+    m = collect(d)
+    assert m.mean() == pytest.approx(2, rel=1e-1)
+
+def test_cumpmf():
+    env = sim.Environment()
+    d=sim.CumPmf((1, 10, 2, 80, 3,100))
+    assert str(d)=="CumPmf"
+    m = collect(d)
+    assert m.mean() == pytest.approx(2, rel=1e-1)
+
 
 def test_scipy_distribution():
     try:

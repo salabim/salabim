@@ -1,5 +1,19 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 24.0.14  2024-
+- sim.AnimateImage has a new parameter: height. So, the image can be scaled according to the
+  height, rather than the width. If both width and height are specified, the aspect ratio might not be the same as the original image.
+
+- sim.Animate now has two new parameters: height0 and height1. See above.
+
+- The method Pdf is now available also under the name Pmf (probability mass function), which is technically more correct. 
+  Also, CumPdf is now available under the name CumPmf (cumulative probability mass function)
+  (Inspired by a comment by Cahyadi Nugraha)
+
+- If either Environment.width or Environment.height was a float, some animation methods did not work properly. Fixed.
+
+- When rendering an animation to video, pasting frames could make the program crash sometimes. Fixed.
+
 #### version 24.0.13  2024-09-23
 - sim.ComponentGenerator can now also be used with a number of moments:
 

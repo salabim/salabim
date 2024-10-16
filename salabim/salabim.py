@@ -1,13 +1,13 @@
-#               _         _      _               ____   _  _        ___      _  _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / ||___ /
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | |  |_ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | | ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_||____/
+#               _         _      _               ____   _  _        ___      _  _  _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / || || |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | || || |_
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | ||__   _|
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_|   |_|
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.13"
+__version__ = "24.0.14"
 
 import heapq
 import random
@@ -9055,7 +9055,6 @@ by adding:
         else:
             return
 
-
     def _trywait(self):
         if self.status.value == interrupted:
             return False
@@ -10207,7 +10206,7 @@ class Event(Component):
         """
         return self._action_taken
 
-  
+
 class Environment:
     """
     environment object
@@ -11349,13 +11348,13 @@ class Environment:
 
         if width is not None:
             if self._width != width:
-                self._width = width
+                self._width = int(width)
                 frame_changed = True
                 width_changed = True
 
         if height is not None:
             if self._height != height:
-                self._height = height
+                self._height = int(height)
                 frame_changed = True
                 height_changed = True
 
@@ -11804,7 +11803,8 @@ class Environment:
             for ao in an_objects:
                 ao.make_pil_image(self.t())
                 if ao._image_visible and (include_topleft or not ao.getattr("in_topleft", False)):
-                    image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image)
+                    image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])),ao._image.convert("RGBA"),)
+
 
         return image.convert(mode)
 
@@ -13201,7 +13201,7 @@ class Environment:
                     if co is None:
                         if len(g.canvas_objects) >= self._maximum_number_of_bitmaps:
                             if overflow_image is None:
-                                overflow_image = Image.new("RGBA", (self._width, self._height), (0, 0, 0, 0))
+                                overflow_image = Image.new("RGBA", (int(self._width), int(self._height)), (0, 0, 0, 0))
                             overflow_image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image)
                             ao.canvas_object = None
                         else:
@@ -15426,10 +15426,20 @@ class Animate2dBase(DynamicClass):
                     spec = self.image(t)
                     image_container = ImageContainer(spec)
                     width = self.width(t)
-                    if width is None:
-                        width = image_container.images[0].size[0]
+                    height = self.height(t)
 
-                    height = width * image_container.images[0].size[1] / image_container.images[0].size[0]
+                    if width is None:
+                        if height is None:
+                            width = image_container.images[0].size[0]
+                            height = image_container.images[0].size[1]
+                        else:
+                            width = height * image_container.images[0].size[0] / image_container.images[0].size[1]
+                    else:
+                        if height is None:
+                            height = width * image_container.images[0].size[1] / image_container.images[0].size[0]
+                        else:
+                            ...
+
                     if not self.screen_coordinates:
                         width *= self.env._scale
                         height *= self.env._scale
@@ -15448,7 +15458,6 @@ class Animate2dBase(DynamicClass):
                         offsety = offsety * self.env._scale
 
                     alpha = int(self.alpha(t))
-
                     image, id = image_container.get_image(
                         (t - self.animation_start(t)) * self.animation_speed(t),
                         repeat=self.animation_repeat(t),
@@ -15456,6 +15465,7 @@ class Animate2dBase(DynamicClass):
                         t_from=self.animation_from(t),
                         t_to=self.animation_to(t),
                     )
+
                     self._image_ident = (spec, id, width, height, angle, alpha, flip_horizontal, flip_vertical)
 
                     if self._image_ident != self._image_ident_prev:
@@ -15736,6 +15746,9 @@ class AnimateClassic(Animate2dBase):
     def width(self, t):
         return self.master.width(t)
 
+    def height(self, t):
+        return self.master.height(t)
+
     def anchor(self, t):
         return self.master.anchor(t)
 
@@ -15963,6 +15976,11 @@ class Animate:
 
        if omitted or None, no scaling
 
+    height0 : float
+       width of the image to be displayed at time t0
+
+       if omitted or None, no scaling
+
     t1 : float
         time of end of the animation (default inf)
 
@@ -16030,6 +16048,9 @@ class Animate:
 
     width1 : float
        width of the image to be displayed at time t1 (default: width0)
+
+    height1 : float
+       width of the image to be displayed at time t1 (default: height0)
 
     over3d : bool
         if True, this object will be rendered to the OpenGL window
@@ -16099,6 +16120,7 @@ class Animate:
     font                                                                      -
     fontsize0,fontsize1                                                       -
     width0,width1                     -
+    height0,height1                   -
     ======================  ========= ========= ========= ========= ========= =========
     """
 
@@ -16134,6 +16156,7 @@ class Animate:
         alpha0: float = 255,
         fontsize0: float = 20,
         width0: float = None,
+        height0: float = None,
         t1: float = None,
         x1: float = None,
         y1: float = None,
@@ -16152,6 +16175,7 @@ class Animate:
         alpha1: float = None,
         fontsize1: float = None,
         width1: float = None,
+        height1: float = None,
         xy_anchor: str = "",
         over3d: bool = None,
         flip_horizontal: bool = False,
@@ -16198,10 +16222,12 @@ class Animate:
         self.text0 = text
 
         if image is None:
-            self.width0 = 0  # just to be able to interpolate
+            self.width0 = 0  # just to be able to interpolat
+            self.height0 = 0
         else:
             self.image0 = image
             self.width0 = width0  # None means original size
+            self.height0 = height0
 
         self.as_points0 = as_points
         self.font0 = font
@@ -16263,7 +16289,7 @@ class Animate:
         self.alpha1 = self.alpha0 if alpha1 is None else alpha1
         self.fontsize1 = self.fontsize0 if fontsize1 is None else fontsize1
         self.width1 = self.width0 if width1 is None else width1
-
+        self.height1 = self.height0 if height1 is None else height1
         self.t1 = inf if t1 is None else t1
         if self.env._animate_debug:
             self.caller = self.env._frame_to_lineno(_get_caller_frame(), add_filename=True)
@@ -16322,6 +16348,7 @@ class Animate:
         alpha0=None,
         fontsize0=None,
         width0=None,
+        height0=None,
         xy_anchor1=None,
         as_points=None,
         t1=None,
@@ -16342,6 +16369,7 @@ class Animate:
         alpha1=None,
         fontsize1=None,
         width1=None,
+        height1=None,
         flip_horizontal=None,
         flip_vertical=None,
         animation_start=None,
@@ -16494,6 +16522,11 @@ class Animate:
 
             if None, the original width of the image will be used
 
+        height0 : float
+            height of the image to be displayed at time t0 (default see below)
+
+            if None, the original height of the image will be used
+
         t1 : float
             time of end of the animation (default: inf)
 
@@ -16560,6 +16593,8 @@ class Animate:
         width1 : float
            width of the image to be displayed at time t1 (default: width0)
 
+        height1 : float
+           height of the image to be displayed at time t1 (default: height0)
 
         Note
         ----
@@ -16595,6 +16630,8 @@ class Animate:
             self.max_lines0 = max_lines
 
         self.width0 = self.width() if width0 is None else width0
+        self.height0 = self.height() if height0 is None else height0
+
         if image is not None:
             self.image0 = image
 
@@ -16641,6 +16678,7 @@ class Animate:
         self.alpha1 = self.alpha0 if alpha1 is None else alpha1
         self.fontsize1 = self.fontsize0 if fontsize1 is None else fontsize1
         self.width1 = self.width0 if width1 is None else width1
+        self.height1 = self.height0 if height1 is None else height1
         self.xy_anchor1 = self.xy_anchor0 if xy_anchor1 is None else xy_anchor1
 
         self.t1 = inf if t1 is None else t1
@@ -16938,7 +16976,7 @@ class Animate:
 
     def width(self, t=None):
         """
-        width position of an animated image object. May be overridden.
+        width of an animated image object. May be overridden.
 
         Parameters
         ----------
@@ -16962,6 +17000,33 @@ class Animate:
             width1 = ImageContainer(self.image1).images[0].size[0]
 
         return interpolate((self.env._now if t is None else t), self.t0, self.t1, width0, width1)
+
+    def height(self, t=None):
+        """
+        height of an animated image object. May be overridden.
+
+        Parameters
+        ----------
+        t : float
+            current time
+
+        Returns
+        -------
+        height : float
+            default behaviour: linear interpolation between self.height0 and self.height1
+
+            if None, the original height of the image will be used
+        """
+        height0 = self.height0
+        height1 = self.height1
+        if height0 is None and height1 is None:
+            return None
+        if height0 is None:
+            height0 = ImageContainer(self.image0).images[0].size[0]
+        if height1 is None:
+            height1 = ImageContainer(self.image1).images[0].size[0]
+
+        return interpolate((self.env._now if t is None else t), self.t0, self.t1, height0, height1)
 
     def fontsize(self, t=None):
         """
@@ -19656,6 +19721,8 @@ class AnimateImage(Animate2dBase):
     width : float
        width of the image (default: None = no scaling)
 
+    heighth : float
+       height of the image (default: None = no scaling)
 
     text : str, tuple or list
         the text to be displayed
@@ -19791,6 +19858,7 @@ class AnimateImage(Animate2dBase):
         x: Union[float, Callable] = None,
         y: Union[float, Callable] = None,
         width: Union[float, Callable] = None,
+        height: Union[float, Callable] = None,
         text: Union[str, Callable] = None,
         fontsize: Union[float, Callable] = None,
         textcolor: Union[ColorType, Callable] = None,
@@ -19833,6 +19901,7 @@ class AnimateImage(Animate2dBase):
                 x=0,
                 y=0,
                 width=None,
+                height=None,
                 text="",
                 fontsize=15,
                 textcolor="bg",
@@ -19915,10 +19984,10 @@ class ComponentGenerator(Component):
 
     Parameters
     ----------
-    component_class : callable, usually a subclass of Component or Pdf or Cdf distribution
+    component_class : callable, usually a subclass of Component or Pdf/Pmf or Cdf distribution
         the type of components to be generated
 
-        in case of a distribution, the Pdf or Cdf should return a callable
+        in case of a distribution, the Pdf/Pmf or Cdf should return a callable
 
     generator_name : str
         name of the component generator.
@@ -20478,7 +20547,7 @@ class _Distribution:
         If, after number_of_tries retries, the sampled value is still not within the given bounds,
         fail_value  will be returned
 
-        Samples that cannot be converted (only possible with Pdf and CumPdf) to float
+        Samples that cannot be converted (only possible with /Pmf and CumPdf/CumPmf) to float
         are assumed to be within the bounds.
         """
         return Bounded(self, lowerbound, upperbound, fail_value, number_of_retries, include_lowerbound, include_upperbound).sample()
@@ -20718,7 +20787,7 @@ class Bounded(_Distribution):
     If, after number_of_tries retries, the sampled value is still not within the given bounds,
     fail_value  will be returned
 
-    Samples that cannot be converted to float (only possible with Pdf and CumPdf)
+    Samples that cannot be converted to float (only possible with Pdf/Pmf and CumPdf)
     are assumed to be within the bounds.
     """
 
@@ -22214,6 +22283,9 @@ class Pdf(_Distribution):
 
     If it is a salabim distribution, not the distribution,
     but a sample will be returned when calling sample.
+
+
+    This method is also available under the name Pmf
     """
 
     def __init__(self, spec: Union[Iterable, Dict], probabilities=None, time_unit: str = None, randomstream: Any = None, env: "Environment" = None):
@@ -22358,9 +22430,151 @@ class Pdf(_Distribution):
         return self._mean
 
 
+class Pmf(Pdf):
+    """
+    Probability mass function
+
+    Parameters
+    ----------
+    spec : list, tuple or dict
+        either
+
+        -   if no probabilities specified:
+
+            list/tuple with x-values and corresponding probability
+            dict where the keys are re x-values and the values are probabilities
+            (x0, p0, x1, p1, ...xn,pn)
+
+        -   if probabilities is specified:
+
+            list with x-values
+
+    probabilities : iterable or float
+        if omitted, spec contains the probabilities
+
+        the iterable (p0, p1, ...pn) contains the probabilities of the corresponding
+        x-values from spec.
+
+        alternatively, if a float is given (e.g. 1), all x-values
+        have equal probability. The value is not important.
+
+    time_unit : str
+        specifies the time unit
+
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
+
+        default : no conversion
+
+
+    randomstream : randomstream
+        if omitted, random will be used
+
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
+
+    env : Environment
+        environment where the distribution is defined
+
+        if omitted, default_env will be used
+
+    Note
+    ----
+    p0+p1=...+pn>0
+
+    all densities are auto scaled according to the sum of p0 to pn,
+    so no need to have p0 to pn add up to 1 or 100.
+
+    The x-values can be any type.
+
+    If it is a salabim distribution, not the distribution,
+    but a sample will be returned when calling sample.
+
+    This method is also available under the name Pdf
+
+    """
+
+    def __repr__(self):
+        return "Pmf"
+
+    def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
+        """
+        prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        file: file
+            if None(default), all output is directed to stdout
+
+            otherwise, the output is directed to the file
+
+        Returns
+        -------
+        info (if as_str is True) : str
+        """
+        result = []
+        result.append("Pmf distribution " + hex(id(self)))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
+        return return_or_print(result, as_str, file)
+
+    def sample(self, n: int = None) -> Any:
+        """
+        Parameters
+        ----------
+        n : number of samples : int
+            if not specified, specifies just return one sample, as usual
+
+            if specified, return a list of n sampled values from the distribution without replacement.
+            This requires that all probabilities are equal.
+
+            If n > number of values in the Pmf distribution, n is assumed to be the number of values
+            in the distribution.
+
+            If a sampled value is a distribution, a sample from that distribution will be returned.
+
+        Returns
+        -------
+        Sample of the distribution : any (usually float) or list
+            In case n is specified, returns a list of n values
+
+        """
+        if self.supports_n:
+            if n is None:
+                return self.randomstream.sample(self._x, 1)[0]
+            else:
+                if n < 0:
+                    raise ValueError("n < 0")
+                n = min(n, len(self._x))
+                xs = self.randomstream.sample(self._x, n)
+                return [x.sample() if isinstance(x, _Distribution) else x for x in xs]
+        else:
+            if n is None:
+                r = self.randomstream.random()
+                for cum, x in zip([0] + self._cum, [0] + self._x):
+                    if r <= cum:
+                        if isinstance(x, _Distribution):
+                            return x.sample()
+                        return x
+            else:
+                raise ValueError("not all probabilities are the same")
+
+    def mean(self) -> float:
+        """
+        Returns
+        -------
+        mean of the distribution : float
+            if the mean can't be calculated (if not all x-values are scalars or distributions),
+            nan will be returned.
+        """
+        return self._mean
+
+
 class CumPdf(_Distribution):
     """
-    Cumulative Probability distribution function
+    Cumulative Probability mass function
 
     Parameters
     ----------
@@ -22413,6 +22627,8 @@ class CumPdf(_Distribution):
 
     If it is a salabim distribution, not the distribution,
     but a sample will be returned when calling sample.
+
+    This method is also available under the name CumPmf
     """
 
     def __init__(
@@ -22501,6 +22717,116 @@ class CumPdf(_Distribution):
         """
         result = []
         result.append("CumPdf distribution " + hex(id(self)))
+        result.append("  randomstream=" + hex(id(self.randomstream)))
+        return return_or_print(result, as_str, file)
+
+    def sample(self) -> Any:
+        """
+        Returns
+        -------
+        Sample of the distribution : any (usually float)
+        """
+        r = self.randomstream.random()
+        for cum, x in zip([0] + self._cum, [0] + self._x):
+            if r <= cum:
+                if isinstance(x, _Distribution):
+                    return x.sample()
+                return x
+
+    def mean(self) -> float:
+        """
+        Returns
+        -------
+        mean of the distribution : float
+            if the mean can't be calculated (if not all x-values are scalars or distributions),
+            nan will be returned.
+        """
+        return self._mean
+
+
+class CumPmf(CumPdf):
+    """
+    Cumulative Probability mass function
+
+    Parameters
+    ----------
+    spec : list or tuple
+        either
+
+        -   if no cumprobabilities specified:
+
+            list with x-values and corresponding cumulative probability
+            (x0, p0, x1, p1, ...xn,pn)
+
+        -   if cumprobabilities is specified:
+
+            list with x-values
+
+    cumprobabilities : list, tuple or float
+        if omitted, spec contains the probabilities
+
+        the list (p0, p1, ...pn) contains the cumulative probabilities of the corresponding
+        x-values from spec.
+
+
+    time_unit : str
+        specifies the time unit
+
+        must be one of "years", "weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"
+
+        default : no conversion
+
+
+    randomstream : randomstream
+        if omitted, random will be used
+
+        if used as random.Random(12299)
+        it assigns a new stream with the specified seed
+
+    env : Environment
+        environment where the distribution is defined
+
+        if omitted, default_env will be used
+
+    Note
+    ----
+    p0<=p1<=..pn>0
+
+    all densities are auto scaled according to pn,
+    so no need to have pn be 1 or 100.
+
+    The x-values can be any type.
+
+    If it is a salabim distribution, not the distribution,
+    but a sample will be returned when calling sample.
+
+    This method is also available under the name CumPdf
+    """
+
+    def __repr__(self):
+        return "CumPmf"
+
+    def print_info(self, as_str: bool = False, file: TextIO = None) -> str:
+        """
+        prints information about the distribution
+
+        Parameters
+        ----------
+        as_str: bool
+            if False (default), print the info
+            if True, return a string containing the info
+
+        file: file
+            if None(default), all output is directed to stdout
+
+            otherwise, the output is directed to the file
+
+        Returns
+        -------
+        info (if as_str is True) : str
+        """
+        result = []
+        result.append("CumPmf distribution " + hex(id(self)))
         result.append("  randomstream=" + hex(id(self.randomstream)))
         return return_or_print(result, as_str, file)
 
@@ -24127,7 +24453,7 @@ class _APNG:
 
     def to_bytes(self):
         CHUNK_BEFORE_IDAT = {"cHRM", "gAMA", "iCCP", "sBIT", "sRGB", "bKGD", "hIST", "tRNS", "pHYs", "sPLT", "tIME", "PLTE"}
-        PNG_SIGN = b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
+        PNG_SIGN = b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"
         out = [PNG_SIGN]
         other_chunks = []
         seq = 0
@@ -26601,8 +26927,8 @@ def getfont(fontname, fontsize):
             return getfont.lookup[(fontname, fontsize)]
     else:
         getfont.lookup = {}
-    if fontname=="":
-        a=1
+    if fontname == "":
+        a = 1
     if isinstance(fontname, str):
         fontlist1 = [fontname]
     else:
