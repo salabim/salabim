@@ -11803,8 +11803,7 @@ class Environment:
             for ao in an_objects:
                 ao.make_pil_image(self.t())
                 if ao._image_visible and (include_topleft or not ao.getattr("in_topleft", False)):
-                    image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])),ao._image.convert("RGBA"),)
-
+                    image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image.convert("RGBA"))
 
         return image.convert(mode)
 
@@ -25386,6 +25385,11 @@ class Animate3dObj(Animate3dBase):
     ):
         super().__init__(visible=visible, arg=arg, layer=layer, parent=parent, env=env, **kwargs)
 
+        global pywavefront
+        global visualization
+        global pyglet
+
+
         self.x = x
         self.y = y
         self.z = z
@@ -25407,18 +25411,26 @@ class Animate3dObj(Animate3dBase):
         self.y_offset = 0
         self.z_offset = 0
 
-        if "pywavefront" not in sys.modules:
-            global pywavefront
-            global visualization
-            try:
-                import pywavefront
-                from pywavefront import visualization
-            except ImportError:
-                pywavefront = None
+        try:
+            import pywavefront
+        except ImportError:
+            pywavefront=None
+                
+        try:
+            import pyglet   # this is a requirement for visualization!
+        except ImportError:
+            pyglet=None
+
+        from pywavefront import visualization
 
     def draw(self, t):
+        global pywavefront
+        global visualization
+        global pyglet
         if pywavefront is None:
             raise ImportError("Animate3dObj requires pywavefront. Not found")
+        if pyglet is None:                    
+            raise ImportError("Animate3dObj requires pyglet. Not found")
 
         obj_filename = Path(self.filename(t))
         if not obj_filename.suffix:
@@ -27163,17 +27175,23 @@ def can_animate3d(try_only: bool = True) -> bool:
             import OpenGL.GL as gl
             import OpenGL.GLU as glu
             import OpenGL.GLUT as glut
+            import OpenGL
         except ImportError:
             if try_only:
                 return False
             else:
                 raise ImportError("OpenGL is required for animation3d. Install with pip install PyOpenGL or see salabim manual")
+        try:
+            glut.glutInit()
+        except OpenGL.error.NullFunctionError:
+            raise ImportError("Installed OpenGL does not support glut. Try 'pip install OpenGL-glut' or see the salabim documentation")
+    
         return True
     else:
         if try_only:
             return False
         else:
-            raise ImportError("cannot even animate, let alone animate3d")
+            raise ImportError("cannot animate, let alone animate3d")
 
 
 def can_video(try_only: bool = True) -> bool:

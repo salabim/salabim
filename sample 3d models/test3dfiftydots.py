@@ -7,9 +7,9 @@ import functools
 import fiftydots
 
 yc.show_line_number = True
-gl = sim.gl
-glu = sim.glu
-glut = sim.glut
+import OpenGL.GL as gl
+import OpenGL.GLU as glu
+import OpenGL.GLUT as glut
 
 
 env = sim.Environment(trace=False)

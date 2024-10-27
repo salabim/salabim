@@ -9,6 +9,6 @@ toml_versioner.py
 artwork/*
 manual/*
 manual_yield/*
-misc
+misc/*
 *.html
 upload_html.py

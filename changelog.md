@@ -1,18 +1,27 @@
 ### changelog | salabim | discrete event simulation
 
-#### version 24.0.14  2024-
-- sim.AnimateImage has a new parameter: height. So, the image can be scaled according to the
+#### version 24.0.14  2024-10-22
+- `sim.AnimateImage` has a new parameter: height. So, the image can be scaled according to the
   height, rather than the width. If both width and height are specified, the aspect ratio might not be the same as the original image.
 
-- sim.Animate now has two new parameters: height0 and height1. See above.
+- `sim.Animate` now has two new parameters: height0 and height1. See above.
 
-- The method Pdf is now available also under the name Pmf (probability mass function), which is technically more correct. 
-  Also, CumPdf is now available under the name CumPmf (cumulative probability mass function)
+- The method `Pdf` is now available also under the name `Pmf` (probability mass function), which is technically more correct. 
+  Also, `CumPdf` is now available under the name `CumPmf` (cumulative probability mass function). The manual is updated accordingly.
   (Inspired by a comment by Cahyadi Nugraha)
 
-- If either Environment.width or Environment.height was a float, some animation methods did not work properly. Fixed.
+- If either `Environment.width` or `Environment.height` was a float, some animation methods did not work properly. Fixed.
 
 - When rendering an animation to video, pasting frames could make the program crash sometimes. Fixed.
+
+- Explicit test whether OpenGL supports glut introduced. Explicit test for availabity of pyglet (required for pywavefront) introduced.
+
+- Not so much a change in salabim itself: 
+  A version of OpenGL (PyOpenGL) which supports glut (required for 3D salabim animations)
+  can now be pip installed: `pip install OpenGL-glut` (Windows Intel/AMD 64 bit only!).
+  This makes running 3D animations under Python 3.13 possible and 
+  installation for other Python versions much easier. The documentation is updated with this information.
+  Also, from now on the documentation recommends installing an even older version of pyglet: `pip install pyglet==1.4.0`  
 
 #### version 24.0.13  2024-09-23
 - sim.ComponentGenerator can now also be used with a number of moments:

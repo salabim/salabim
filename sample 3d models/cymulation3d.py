@@ -5,7 +5,7 @@ from pathlib import Path
 import OpenGL.GL as gl
 import OpenGL.GLU as glu
 import OpenGL.GLUT as glut
-
+import OpenGL
 
 MAX_CONTAINERS_IN_PILE = 5
 SLACK_HEIGHT = 1  # space between top container and container in flight
