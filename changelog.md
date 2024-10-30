@@ -1,6 +1,6 @@
 ### changelog | salabim | discrete event simulation
 
-#### version 24.0.15  2024-
+#### version 24.0.15  2024-10-30
 - Introduced `Environment.minimized` method, which can be useful for real-time simulation without showing an animation window:
 ```
   minimized
@@ -17,13 +17,14 @@
   current state of the animation window : bool
       True if current animation windows is minimized
       False otherwise
+```
 
-  Realtime simulation is now covered in section Miscellaneous/Realtime simulation of the documentation
+- Realtime simulation is now covered in section Miscellaneous/Realtime simulation of the documentation.
 
 - The changelog for version 24.0.14 mentioned a new way of installing 3D support for Python 3.13. The instructions
-  have been changed again and the result is a more stable and better documented installation. Refer to the Overview
+  have been changed (again) and the result is a more stable and better documented installation. Refer to the Overview
   section of the documentation for details.
-```
+
 
 #### version 24.0.14  2024-10-22
 - `sim.AnimateImage` has a new parameter: height. So, the image can be scaled according to the
@@ -51,14 +52,14 @@
 #### version 24.0.13  2024-09-23
 - sim.ComponentGenerator can now also be used with a number of moments:
 
-  ```
+```
   sim.ComponentGenerator(Ship, moments=(10, 20, 50))
-  ```
+```
   This will generate Ships at t=10, t=20 and t=50. The times should be specified in the current time unit.
   The moments do not have to be sorted.
 
   Note that moment cannot be used together with at, delay, till,duration, number, iat,force_at, force_till, disturbance or  equidistant
-  
+
 - This version introduces a new class: Event. This is a specialized Component, that is most useful as a timer, which performs
   some action after a certain time. E.g.:
   ```
@@ -203,9 +204,9 @@ From this version on,  the monitor associated with a state (`State.value`) has a
 
 So now, we can say
 
-```
+  ```
 mystate.value.value += 1
-```
+  ```
 
 as an alternative to
 
@@ -221,28 +222,28 @@ my_state.set(my_state() + 1)
 
 - The *Monitor.as_dataframe()* now has additional parameters (in line with methods *Monitor.xt()* and *Monitor.tx()*):
   
-  ```
+```
   ex0 : bool
           if False (default), include zeroes. if True, exclude zeroes
-  
+
   exoff : bool
       if False (default), include self.off. if True, exclude self.off's
       non level monitors will return all values, regardless of exoff
-  
+
   force_numeric : bool
       if True (default), convert non numeric tallied values numeric if possible, otherwise assume 0
       if False, do not interpret x-values, return as list if type is list
-  
+
   add_now : bool
       if True (default), the last tallied x-value and the current time is added to the result
       if False, the result ends with the last tallied value and the time that was tallied
       non level monitors will never add now
       if now is <= last tallied value, nothing will be added, even if add_now is True
-  ```
-  
+```
+
   Note that `add_now` is True by default, whereas in salabim <= 24.0.4 now was not added.
   (Inspired by a comment by Yin Chi Chang)
-  
+
 - Bug in `Environment.getfontsize_to_fit` fixed.
 
 - Bug when in `Resource.release()` with an anonymous resource fixed.
@@ -251,7 +252,7 @@ my_state.set(my_state() + 1)
 
 #### Older versions
 
-```
+  ```
 version 24.0.4  2024-05-03
 ==========================
 
@@ -2384,7 +2385,7 @@ This can be handy in writing dynamic lambda function, e.g. to get the maximum of
 (see example below)
 
 Exam
-```
+  ```
 
 ple:
 
