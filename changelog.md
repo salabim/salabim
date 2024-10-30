@@ -1,5 +1,30 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 24.0.15  2024-
+- Introduced `Environment.minimized` method, which can be useful for real-time simulation without showing an animation window:
+```
+  minimized
+
+  Parameters
+  ----------
+  value : bool
+      if True, minimize the curent animation window
+      if False, (re)show the current animation window
+      if None (default): no action
+
+  Returns
+  -------
+  current state of the animation window : bool
+      True if current animation windows is minimized
+      False otherwise
+
+  Realtime simulation is now covered in section Miscellaneous/Realtime simulation of the documentation
+
+- The changelog for version 24.0.14 mentioned a new way of installing 3D support for Python 3.13. The instructions
+  have been changed again and the result is a more stable and better documented installation. Refer to the Overview
+  section of the documentation for details.
+```
+
 #### version 24.0.14  2024-10-22
 - `sim.AnimateImage` has a new parameter: height. So, the image can be scaled according to the
   height, rather than the width. If both width and height are specified, the aspect ratio might not be the same as the original image.

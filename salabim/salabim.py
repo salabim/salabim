@@ -12778,6 +12778,31 @@ class Environment:
             self.animation_parameters(synced=value, animate=None)
         return self._synced
 
+    def minimized(self, value: bool=None)-> bool:
+        """
+        minimized
+
+        Parameters
+        ----------
+        value : bool
+            if True, minimize the curent animation window
+
+            if False, (re)show the current animation window
+
+            if None (default): no action
+
+        Returns
+        -------
+        current state of the animation window : bool
+            True if current animation windows is minimized, False otherwise
+        """
+        if value is not None:
+            if value:
+                self.root.withdraw()
+            else:
+                self.root.deiconify()
+        return not bool(self.root.winfo_viewable())
+
     def speed(self, value: float = None) -> float:
         """
         speed
