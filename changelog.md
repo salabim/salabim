@@ -1,5 +1,12 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 24.0.16  2024-11-14
+- Bug in `Component.interrupt()` prevented interrupted components to be interrupted (and thus increasing the interrupt level). Fixed. The docstring has been changed to reflect this fix.
+  (Inspired by a comment by Michiel Luyken)
+  
+- Transparent videos (.gif and .webp) were actually saved as non transparent. Fixed.
+- A bug in Pillow under Python 3.13 made it impossible to save animated gif/webp videos. Salabim now detects the problem and, if found, saves file non transparent. Hopefully, this will be fixed in an upcoming version of Pillow for Python 3.13.
+
 #### version 24.0.15  2024-10-30
 - Introduced `Environment.minimized` method, which can be useful for real-time simulation without showing an animation window:
 ```

@@ -1,13 +1,13 @@
-#               _         _      _               ____   _  _        ___      _  ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / || ___|
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | ||___ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | | ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_||____/
+#               _         _      _               ____   _  _        ___      _   __
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / | / /_
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | || '_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | || (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_| \___/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.15"
+__version__ = "24.0.16"
 
 import heapq
 import random
@@ -7879,11 +7879,11 @@ by adding:
 
         Note
         ----
-        The component has to be scheduled.
+        The component has to be scheduled or interrupted.
 
         Use resume() to resume
         """
-        if self.status.value != scheduled:
+        if self.status.value not in (scheduled, interrupted):
             raise ValueError(self.name() + " component not scheduled")
         self.set_mode(mode)
         if self.status.value == interrupted:
@@ -11725,14 +11725,20 @@ class Environment:
                                     format="GIF",
                                 )
                         else:
-                            self._images[0].save(
-                                self._video_name,
-                                disposal=2,
-                                save_all=True,
-                                append_images=self._images[1:],
-                                duration=round(1000 / self._real_fps),
-                                optimize=False,
-                            )
+                            for _ in range(2): # normally runs only once
+                                try:
+                                    self._images[0].save(
+                                        self._video_name,
+                                        disposal=2,
+                                        save_all=True,
+                                        append_images=self._images[1:],
+                                        duration=round(1000 / self._real_fps),
+                                        optimize=False,
+                                    )
+                                    break
+                                except ValueError:  # prevent bug in Python 3.13
+                                    self._images=[image.convert("RGB") for image in self._images]
+
                     else:
                         if PythonInExcel or AnacondaCode:
                             with b64_file_handler(self._video_name, mode="b", result=_pie_result) as f:
@@ -11747,15 +11753,20 @@ class Environment:
                                     format="GIF",
                                 )
                         else:
-                            self._images[0].save(
-                                self._video_name,
-                                disposal=2,
-                                save_all=True,
-                                append_images=self._images[1:],
-                                loop=self._video_repeat,
-                                duration=round(1000 / self._real_fps),
-                                optimize=False,
-                            )
+                            for _ in range(2): # normally runs only once
+                                try:
+
+                                    self._images[0].save(
+                                        self._video_name,
+                                        disposal=2,
+                                        save_all=True,
+                                        append_images=self._images[1:],
+                                        loop=self._video_repeat,
+                                        duration=round(1000 / self._real_fps),
+                                        optimize=False,
+                                    )
+                                except ValueError:  # prevent bug in Python 3.13
+                                    self._images=[image.convert("RGB") for image in self._images]
 
                     del self._images
             elif self._video_out == "png":
@@ -11804,7 +11815,6 @@ class Environment:
                 ao.make_pil_image(self.t())
                 if ao._image_visible and (include_topleft or not ao.getattr("in_topleft", False)):
                     image.paste(ao._image, (int(ao._image_x), int(self._height - ao._image_y - ao._image.size[1])), ao._image.convert("RGBA"))
-
         return image.convert(mode)
 
     def insert_frame(self, image: Any, number_of_frames: int = 1) -> None:
@@ -11819,6 +11829,8 @@ class Environment:
         nuumber_of_frames: int
             Number of 1/30 second long frames to be inserted
         """
+
+
         if self._video_out is None:
             raise ValueError("video not set")
         if isinstance(image, (Path, str)):
@@ -11843,6 +11855,7 @@ class Environment:
                 image = image.convert("RGB")
                 open_cv_image = cv2.cvtColor(numpy.array(image), cv2.COLOR_RGB2BGR)
                 self._video_out.write(open_cv_image)
+
 
     def _save_frame(self):
         self._exclude_from_animation = "not in video"
@@ -25118,7 +25131,7 @@ def resize_with_pad(im, target_width, target_height):
     """
     Resize PIL image keeping ratio and using black background.
     """
-    if im.height == target_width and im.width == target_height:
+    if im.height == target_height and im.width == target_width:
         return im
     target_ratio = target_height / target_width
     im_ratio = im.height / im.width
