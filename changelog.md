@@ -1,5 +1,9 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 24.0.17  2024-11-
+- Bug in wait evaluation testing with all=True fixed.
+  (Inspired by a bug report by Marko Djogatovic)
+
 #### version 24.0.16  2024-11-14
 - Bug in `Component.interrupt()` prevented interrupted components to be interrupted (and thus increasing the interrupt level). Fixed. The docstring has been changed to reflect this fix.
   (Inspired by a comment by Michiel Luyken)

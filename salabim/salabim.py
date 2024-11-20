@@ -1,13 +1,13 @@
-#               _         _      _               ____   _  _        ___      _   __
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / | / /_
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | || '_ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | || (_) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_| \___/
+#               _         _      _               ____   _  _        ___      _  _____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / ||___  |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | |   / /
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | |  / /
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_| /_/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.16"
+__version__ = "24.0.17"
 
 import heapq
 import random
@@ -7956,7 +7956,6 @@ by adding:
                 lineno = self.lineno_txt(add_at=True)
                 self.env.print_trace("", "", self.name() + " resume (" + self.status() + ")", merge_blanks(lineno, self._modetxt()))
                 if self.status.value == scheduled:
-                    reason = "hold"
                     self._reschedule(self.env._now + self._remaining_duration, priority, urgent, "hold", False)
                 else:
                     raise Exception(self.name() + " unexpected interrupted_status", self.status.value())
@@ -9066,7 +9065,7 @@ by adding:
                         honored = False
                         break
                 elif valuetype == 1:
-                    if eval(value.replace("$", "state._value")):
+                    if not eval(value.replace("$", "state._value")):
                         honored = False
                         break
                 elif valuetype == 2:
