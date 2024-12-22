@@ -1,13 +1,13 @@
-#               _         _      _               ____   _  _        ___      _  _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / ||___  |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | |   / /
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | |  / /
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_| /_/
+#               _         _      _               ____   _  _        ___      _   ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / | ( _ )
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | | / _ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | || (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_| \___/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.17"
+__version__ = "24.0.18"
 
 import heapq
 import random
@@ -31,7 +31,6 @@ import subprocess
 import tempfile
 import struct
 import binascii
-import operator
 import copy
 import numbers
 import platform
@@ -7317,6 +7316,30 @@ by adding at the end:
     def __repr__(self):
         return object_to_str(self) + " (" + self.name() + ")"
 
+    def reset_monitors(self, monitor: bool = None, stats_only: bool = None) -> None:
+        """
+        resets the monitor for the component's status and mode monitors
+
+        Parameters
+        ----------
+        monitor : bool
+            if True, monitoring will be on.
+
+            if False, monitoring is disabled
+
+            if omitted, no change of monitoring state
+
+        stats_only : bool
+            if True, only statistics will be collected (using less memory, but also less functionality)
+
+            if False, full functionality
+
+            if omittted, no change of stats_only
+        """
+        self.status.reset(monitor=monitor, stats_only=stats_only)
+        self.mode.reset(monitor=monitor, stats_only=stats_only)
+
+
     def register(self, registry: List) -> "Component":
         """
         registers the component in the registry
@@ -8829,6 +8852,131 @@ by adding:
             for r in list(self._claims):
                 self._release(r)
 
+    def wait_for(self,cond, states, priority=0, urgent=False, mode=None,fail_delay=None, fail_at=None, cap_now=None):
+        schedule_priority = priority
+        """
+        wait for any or all of the given state values are met
+
+        Parameters
+        ----------
+        cond : callable
+            parameterless function that return True if wait is over
+
+        states : iterable
+            specicies which states should trigger the cond to be checked
+
+        priority : float
+            priority of the fail event
+
+            default: 0
+
+            if a component has the same time on the event list, this component is sorted accoring to
+            the priority.
+
+        urgent : bool
+            urgency indicator
+
+            if False (default), the component will be scheduled
+            behind all other components scheduled
+            for the same time and priority
+
+            if True, the component will be scheduled
+            in front of all components scheduled
+            for the same time and priority
+
+        fail_at : float or distribution
+            time out
+
+            if the wait is not honored before fail_at,
+            the wait will be cancelled and the
+            parameter failed will be set.
+
+            if not specified, the wait will not time out.
+
+            if distribution, the distribution is sampled
+
+        fail_delay : float or distribution
+            time out
+
+            if the wait is not honored before now+fail_delay,
+            the request will be cancelled and the
+            parameter failed will be set.
+
+            if not specified, the wait will not time out.
+
+            if distribution, the distribution is sampled
+
+        mode : str preferred
+            mode
+
+            will be used in trace and can be used in animations
+
+            if nothing specified, the mode will be unchanged.
+
+            also mode_time will be set to now, if mode is set.
+
+        cap_now : bool
+            indicator whether times (fail_at, fail_duration) in the past are allowed. If, so now() will be used.
+            default: sys.default_cap_now(), usualy False
+
+        Note
+        ----
+        Not allowed for data components or main.
+
+        Only if yieldless is False: If to be used for the current component
+        (which will be nearly always the case),
+        use ``yield self.wait(...)``.
+
+        """
+        if self.status.value != current:
+            self._checkisnotdata()
+            self._checkisnotmain()
+            self._remove()
+            self._check_fail()
+
+        self._failed = False
+
+        if fail_at is None:
+            if fail_delay is None:
+                scheduled_time = inf
+            else:
+                if fail_delay == inf:
+                    scheduled_time = inf
+                else:
+                    fail_delay = self.env.spec_to_duration(fail_delay)
+                    scheduled_time = self.env._now + fail_delay
+        else:
+            if fail_delay is None:
+                fail_at = self.env.spec_to_time(fail_at)
+                scheduled_time = fail_at + self.env._offset
+            else:
+                raise ValueError("both fail_at and fail_delay specified")
+
+        self.set_mode(mode)
+
+        self._cond=cond  # add test ***
+        for state in states:
+            self._waits.append((state, None,None))
+            if priority is None:
+                self.enter(state._waiters)
+            else:
+                self.enter_sorted(state._waiters, priority)
+
+        if not self._waits:
+            raise TypeError("no states specified")
+
+        self._remaining_duration = scheduled_time - self.env._now
+
+        self._trywait()
+
+        if self._waits:
+            self.status._value = waiting
+            self._reschedule(scheduled_time, schedule_priority, urgent, "wait_for", cap_now)
+        else:
+            return
+
+
+
     def wait(self, *args, **kwargs) -> None:
         """
         wait for any or all of the given state values are met
@@ -8978,6 +9126,8 @@ by adding:
         schedule_priority = kwargs.pop("priority", 0)
         cap_now = kwargs.pop("cap_now", None)
 
+        self._cond=None
+
         if kwargs:
             raise TypeError("wait() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
@@ -9055,39 +9205,43 @@ by adding:
             return
 
     def _trywait(self):
+
         if self.status.value == interrupted:
             return False
-        if self._wait_all:
-            honored = True
-            for state, value, valuetype in self._waits:
-                if valuetype == 0:
-                    if value != state._value:
-                        honored = False
-                        break
-                elif valuetype == 1:
-                    if not eval(value.replace("$", "state._value")):
-                        honored = False
-                        break
-                elif valuetype == 2:
-                    if not value(state._value, self, state):
-                        honored = False
-                        break
-
+        if self._cond:
+            honored = self._cond()
         else:
-            honored = False
-            for state, value, valuetype in self._waits:
-                if valuetype == 0:
-                    if value == state._value:
-                        honored = True
-                        break
-                elif valuetype == 1:
-                    if eval(value.replace("$", str(state._value))):
-                        honored = True
-                        break
-                elif valuetype == 2:
-                    if value(state._value, self, state):
-                        honored = True
-                        break
+            if self._wait_all:
+                honored = True
+                for state, value, valuetype in self._waits:
+                    if valuetype == 0:
+                        if value != state._value:
+                            honored = False
+                            break
+                    elif valuetype == 1:
+                        if not eval(value.replace("$", "state._value")):
+                            honored = False
+                            break
+                    elif valuetype == 2:
+                        if not value(state._value, self, state):
+                            honored = False
+                            break
+
+            else:
+                honored = False
+                for state, value, valuetype in self._waits:
+                    if valuetype == 0:
+                        if value == state._value:
+                            honored = True
+                            break
+                    elif valuetype == 1:
+                        if eval(value.replace("$", str(state._value))):
+                            honored = True
+                            break
+                    elif valuetype == 2:
+                        if value(state._value, self, state):
+                            honored = True
+                            break
 
         if honored:
             for s, _, _ in self._waits:
@@ -15004,7 +15158,7 @@ class Environment:
                     self.pause_at = inf
 
                 if self.pause_at is None:
-                    sg.popup(f"Pause not valid")
+                    sg.popup("Pause not valid")
                 else:
                     if "-PAUSE-EACH-" in self._ui_keys:
                         pause_each_str = values["-PAUSE-EACH-"]
@@ -15023,7 +15177,7 @@ class Environment:
                             self.pause_at = None
 
                     if self.pause_at is None:
-                        sg.popup(f"Pause interval not valid")
+                        sg.popup("Pause interval not valid")
                     else:
                         if self.pause_at > self.t() * 0.99999999:
                             if "-ANIMATE-" in self._ui_keys:
@@ -23508,7 +23662,7 @@ class State:
         self.value.tally(value_after)
         self._trywait()
 
-    def _trywait(self, max=inf):
+    def _trywait(self, max=inf): # this _trywait of a state
         mx = self._waiters._head.successor
         while mx != self._waiters._tail:
             c = mx.component
@@ -26976,8 +27130,6 @@ def getfont(fontname, fontsize):
             return getfont.lookup[(fontname, fontsize)]
     else:
         getfont.lookup = {}
-    if fontname == "":
-        a = 1
     if isinstance(fontname, str):
         fontlist1 = [fontname]
     else:

@@ -1,6 +1,15 @@
 ### changelog | salabim | discrete event simulation
 
-#### version 24.0.17  2024-11-
+#### version 24.0.18  2024-12-22
+
+* Component now has a method `reset_monitors()`, which can be useful to prevent keeping statistics of the status and mode monitors. Apart from disabling monitoring completely, it is also possible to use stats_only.
+  Note that this functionality was already available for Queue, Store, Resource and State.
+
+  So by issuing  `reset_monitors(False)` in the setup of all components, queues, stores, resources and states, memory consumption may be considerably less.
+
+  (inspired by a remark by 董江成 and a comment by Lukas Hollenstein)
+
+#### version 24.0.17  2024-11-19
 - Bug in wait evaluation testing with all=True fixed.
   (Inspired by a bug report by Marko Djogatovic)
 
