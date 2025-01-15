@@ -1,5 +1,50 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 25.0.0  2025-01-15
+
+* Component.enter() now has an optional priority parameter. If the priority parameter is omitted, the component will enter at the tail of the queue, 
+  while setting the sorting parameter to the value of the value of the priority of the tail component
+  
+* Queue.add() and Queue.append() now have an optional priority parameter (like Component.enter())
+
+* Component.to_store() now has an optional request_priority parameter specifying in which order component will enter the requesters queue.
+
+* Component.from_store() now has an optional request_priority parameter specifying in which order component will enter the requesters queue.
+
+* Component.request() now has an optional request_priority parameter specifying in which order component will enter the requesters queue.
+  If a priority is specified with the resource spec, this parameter is ignored.
+  
+* Component.wait() now has an optional request_priority parameter specifying in which order component will enter the waiters queue.
+  If a priority is specified with the state spec, this parameter is ignored.
+  
+* The docstrings and the documentation now explicitly indicate that a priority should be float (although other types might work as well)  
+
+* Internal change: Component.request() and Component.wait() now explicitly specify keyword arguments rather than popping from kwarg
+
+* AnimateText (and text in other Animatexxx classes), now support ANSI color escape sequences. This makes it possible to change color in the same call to AnimateText (et al). Note that salabim only support foreground colors.
+  In order to facilitate the build up of ANSI escape sequences, salabim has a class ANSI that can be used as sim.ANSI.red, sim.ANSI.dark_blue, etc. Supported colors are sim.ANSI.black, sim.ANSI.white, sim.ANSI.red, sim.ANSI.green, sim.ANSI.blue, sim.ANSI.cyan, sim.ANSI.magenta, sim.ANSI.yellow, sim.ANSI.dark_black, sim.ANSI.dark_white, sim.ANSI.dark_red, sim.ANSI.dark_green, sim.ANSI.dark_blue, sim.ANSI.dark_cyan, sim.ANSI.dark_magenta  and sim.ANSI.dark_yellow. To reset to the textcolor, use sim.ANSI.reset.
+  E.g. 
+  
+  ```
+  sim.AnimateRectangle(
+      (0, 0, 260, 40),
+      x=100,
+      y=100,
+      text=f"{sim.ANSI.blue}blue{sim.ANSI.white}blanc{sim.ANSI.red}rouge",
+      fillcolor="black",
+      text_anchor="sw",
+      fontsize=40,
+  )
+  ```
+  
+  will put this image on the animation canvas:
+  
+  <img src="https://www.salabim.org/bleublancrouge.png"> 
+
+
+- salabim used to apply a correction algorithm for fixing a Pillow bug that made characters (sometimes) look 'shadowed'. Apparently Pillow has fixed that bug now, so the special code has been removed from the salabim code base. This results in faster rendering of texts.
+- Bug in Component.wait() with a specified priority fixed.
+
 #### version 24.0.18  2024-12-22
 
 * Component now has a method `reset_monitors()`, which can be useful to prevent keeping statistics of the status and mode monitors. Apart from disabling monitoring completely, it is also possible to use stats_only.

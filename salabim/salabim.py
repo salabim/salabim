@@ -1,14 +1,13 @@
-#               _         _      _               ____   _  _        ___      _   ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | || |      / _ \    / | ( _ )
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || || |_    | | | |   | | / _ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ |__   _| _ | |_| | _ | || (_) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____|   |_|  (_) \___/ (_)|_| \___/
+#               _         _      _               ____   ____       ___       ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \     / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | | | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | |_| |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_) \___/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "24.0.18"
-
+__version__ = "25.0.0"
 import heapq
 import random
 import time
@@ -42,8 +41,12 @@ import urllib.request
 import urllib.error
 import base64
 import zipfile
-
 from pathlib import Path
+try:
+    import peek
+except ModuleNotFoundError:
+    ...
+    
 
 from typing import Any, Union, Iterable, Tuple, List, Callable, TextIO, Dict, Set, Type, Hashable, Optional
 
@@ -61,6 +64,46 @@ Chromebook = "penguin" in platform.uname()
 PythonInExcel = not ("__file__" in globals())
 AnacondaCode = sys.platform == "emscripten"
 
+_color_name_to_ANSI = dict(
+    dark_black="\033[0;30m",
+    dark_red="\033[0;31m",
+    dark_green="\033[0;32m",
+    dark_yellow="\033[0;33m",
+    dark_blue="\033[0;34m",
+    dark_magenta="\033[0;35m",
+    dark_cyan="\033[0;36m",
+    dark_white="\033[0;37m",
+    black="\033[1;30m",
+    red="\033[1;31m",
+    green="\033[1;32m",
+    yellow="\033[1;33m",
+    blue="\033[1;34m",
+    magenta="\033[1;35m",
+    cyan="\033[1;36m",
+    white="\033[1;37m",
+    reset="\033[0m",
+)
+_ANSI_to_rgb = {
+    "\033[1;30m": (51, 51, 51),
+    "\033[1;31m": (255, 0, 0),
+    "\033[1;32m": (0, 255, 0),
+    "\033[1;33m": (255, 255, 0),
+    "\033[1;34m": (0, 178, 255),
+    "\033[1;35m": (255, 0, 255),
+    "\033[1;36m": (0, 255, 255),
+    "\033[1;37m": (255, 255, 255),
+    "\033[0;30m": (76, 76, 76),
+    "\033[0;31m": (178, 0, 0),
+    "\033[0;32m": (0, 178, 0),
+    "\033[0;33m": (178, 178, 0),
+    "\033[0;34m": (0, 89, 255),
+    "\033[0;35m": (178, 0, 178),
+    "\033[0;36m": (0, 178, 178),
+    "\033[0;37m": (178, 178, 178),
+    "\033[0m": (),
+}
+
+ANSI=types.SimpleNamespace(_color_name_to_ANSI.items())
 
 def a_log(*args):
     if not hasattr(a_log, "a_logfile_name"):
@@ -4866,7 +4909,7 @@ class Queue:
         """
         return getattr(self, "_sequence_number", 1)
 
-    def add(self, component: "Component") -> "Queue":
+    def add(self, component: "Component", priority: float = None) -> "Queue":
         """
         adds a component to the tail of a queue
 
@@ -4877,18 +4920,23 @@ class Queue:
 
             may not be member of the queue yet
 
+        priority : float
+            if None (default), add to the tail of the queue
+
+            otherwise, put after the last component with the same priority
+
         Note
         ----
-        the priority will be set to
+        if prioority is None, the priority will be set to
         the priority of the tail of the queue, if any
         or 0 if queue is empty
 
         This method is equivalent to append()
         """
-        component.enter(self)
+        component.enter(self, priority)
         return self
 
-    def append(self, component: "Component") -> "Queue":
+    def append(self, component: "Component", priority: float = None) -> "Queue":
         """
         appends a component to the tail of a queue
 
@@ -4899,9 +4947,14 @@ class Queue:
 
             may not be member of the queue yet
 
+        priority : float
+            if None (default), add to the tail of the queue
+
+            otherwise, put after the last component with the same priority
+
         Note
         ----
-        the priority will be set to
+        if priority is None, the priority will be set to
         the priority of the tail of the queue, if any
         or 0 if queue is empty
 
@@ -5013,7 +5066,7 @@ class Queue:
         component.enter_behind(self, poscomponent)
         return self
 
-    def add_sorted(self, component: "Component", priority: Any) -> "Queue":
+    def add_sorted(self, component: "Component", priority: float) -> "Queue":
         """
         adds a component to a queue, according to the priority
 
@@ -5024,7 +5077,7 @@ class Queue:
 
             may not be member of the queue yet
 
-        priority: type that can be compared with other priorities in the queue
+        priority: float
             priority in the queue
 
         Note
@@ -7339,7 +7392,6 @@ by adding at the end:
         self.status.reset(monitor=monitor, stats_only=stats_only)
         self.mode.reset(monitor=monitor, stats_only=stats_only)
 
-
     def register(self, registry: List) -> "Component":
         """
         registers the component in the registry
@@ -8073,6 +8125,7 @@ by adding:
         self,
         store: Union["Store", Iterable],
         filter: Callable = lambda c: True,
+        request_priority: Any = 0,
         fail_priority: float = 0,
         urgent: bool = True,
         fail_at: float = None,
@@ -8095,6 +8148,9 @@ by adding:
             should be a function with one parameter(component) and returning a bool
 
             default: lambda c: True (i.e. always return True)
+
+        request_priority: float
+            put component in to_store_requesters according to the given priority (default 0)
 
         fail_priority : float
             priority of the fail event
@@ -8236,7 +8292,7 @@ by adding:
 
         self._from_stores = from_stores
         for store in from_stores:
-            self.enter(store._from_store_requesters)
+            self.enter_sorted(store._from_store_requesters, priority=request_priority)
         self.status._value = requesting
         self._from_store_item = None
         self._from_store_filter = filter
@@ -8249,6 +8305,7 @@ by adding:
         self,
         store: Union["Store", Iterable],
         item: "Component",
+        request_priority: float = None,
         priority: float = 0,
         fail_priority: float = 0,
         urgent: bool = True,
@@ -8268,6 +8325,9 @@ by adding:
         item: Component
             component to put to store
 
+        request_priority: float
+            put component in to_store_requesters according to the given priority (default 0)
+
         fail_priority : float
             priority of the fail event
 
@@ -8279,11 +8339,11 @@ by adding:
         urgent : bool
             urgency indicator
 
-            if False (default), the component will be scheduled
+            if False (default), the fail event will be scheduled
             behind all other components scheduled
             for the same time and priority
 
-            if True, the component will be scheduled
+            if True, the fail event will be scheduled
             in front of all components scheduled
             for the same time and priority
 
@@ -8381,7 +8441,7 @@ by adding:
                 return
 
         for store in to_stores:
-            self.enter(store._to_store_requesters)
+            self.enter_sorted(store._to_store_requesters, priority=request_priority)
         self.status._value = requesting
         self._to_store_item = item
         self._to_store_priority = priority
@@ -8407,7 +8467,19 @@ by adding:
         for store in self._from_stores:
             store.rescan()
 
-    def request(self, *args, **kwargs) -> None:
+    def request(
+        self,
+        *args,
+        fail_at: float = None,
+        fail_delay: float = None,
+        mode: Any = None,
+        urgent: bool = False,
+        request_priority: float = 0,
+        schedule_priority: float = 0,
+        cap_now: bool = None,
+        oneof: bool = False,
+        called_from: str = "request",
+    ) -> None:
         """
         request from a resource or resources
 
@@ -8417,9 +8489,12 @@ by adding:
             - resource, where quantity=1, priority=tail of requesters queue
             - tuples/list containing a resource, a quantity and optionally a priority.
                 if the priority is not specified, the request
-                for the resource be added to the tail of
-                the requesters queue
+                for the resource will be added according to the request_priority parameter
 
+        request_priority: float
+            (may be overridden by the priority parameter in the arg sequence)
+
+            put component requesters according to the given priority (default 0)
 
         priority : float
             priority of the fail event
@@ -8522,17 +8597,7 @@ by adding:
         --> requests 1 from r1, r2 or r3
 
         """
-        fail_at = kwargs.pop("fail_at", None)
-        fail_delay = kwargs.pop("fail_delay", None)
-        mode = kwargs.pop("mode", None)
-        urgent = kwargs.pop("urgent", False)
-        schedule_priority = kwargs.pop("priority", 0)
-        cap_now = kwargs.pop("cap_now", None)
-        oneof = kwargs.pop("oneof", False)
-        called_from = kwargs.pop("called_from", "request")
         self.oneof_request = oneof
-        if kwargs:
-            raise TypeError(called_from + "() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
 
         if self.status.value != current:
             self._checkisnotdata()
@@ -8565,7 +8630,7 @@ by adding:
             return
         for arg in args:
             q = 1
-            priority = inf
+            priority = request_priority
             if isinstance(arg, Resource):
                 r = arg
             elif isinstance(arg, (tuple, list)):
@@ -8603,7 +8668,7 @@ by adding:
             if self.oneof_request:
                 addstring += " (oneof)"
 
-            self.enter_sorted(r._requesters, priority)
+            self.enter(r._requesters, priority)
             if self.env._trace:
                 self.env.print_trace("", "", self.name(), req_text + r.name() + addstring)
 
@@ -8852,7 +8917,7 @@ by adding:
             for r in list(self._claims):
                 self._release(r)
 
-    def wait_for(self,cond, states, priority=0, urgent=False, mode=None,fail_delay=None, fail_at=None, cap_now=None):
+    def wait_for(self, cond, states, request_priority=0, priority=0, urgent=False, mode=None, fail_delay=None, fail_at=None, cap_now=None):
         schedule_priority = priority
         """
         wait for any or all of the given state values are met
@@ -8864,6 +8929,9 @@ by adding:
 
         states : iterable
             specicies which states should trigger the cond to be checked
+
+        request_priority : float
+            put component in waiters queue according to the given priority (deafult 0)
 
         priority : float
             priority of the fail event
@@ -8954,9 +9022,9 @@ by adding:
 
         self.set_mode(mode)
 
-        self._cond=cond  # add test ***
+        self._cond = cond  # add test ***
         for state in states:
-            self._waits.append((state, None,None))
+            self._waits.append((state, None, None))
             if priority is None:
                 self.enter(state._waiters)
             else:
@@ -8975,9 +9043,18 @@ by adding:
         else:
             return
 
-
-
-    def wait(self, *args, **kwargs) -> None:
+    def wait(
+        self,
+        *args,
+        fail_at: float = None,
+        fail_delay: float = None,
+        all: bool = False,
+        mode: Any = None,
+        urgent: bool = False,
+        request_priority: float = 0,
+        schedule_priority: float = 0,
+        cap_now: bool = None,
+    ) -> None:
         """
         wait for any or all of the given state values are met
 
@@ -8993,6 +9070,8 @@ by adding:
                 be added to the tail of
                 the waiters queue
 
+        request_priority : float
+            put component in waiters queue according to the given priority (default 0)
 
         priority : float
             priority of the fail event
@@ -9118,18 +9197,7 @@ by adding:
         --> waits for s1.value()==True and s2.value==True
 
         """
-        fail_at = kwargs.pop("fail_at", None)
-        fail_delay = kwargs.pop("fail_delay", None)
-        all = kwargs.pop("all", False)
-        mode = kwargs.pop("mode", None)
-        urgent = kwargs.pop("urgent", False)
-        schedule_priority = kwargs.pop("priority", 0)
-        cap_now = kwargs.pop("cap_now", None)
-
-        self._cond=None
-
-        if kwargs:
-            raise TypeError("wait() got an unexpected keyword argument '" + tuple(kwargs)[0] + "'")
+        self._cond = None
 
         if self.status.value != current:
             self._checkisnotdata()
@@ -9160,7 +9228,7 @@ by adding:
 
         for arg in args:
             value = True
-            priority = None
+            priority = request_priority
             if isinstance(arg, State):
                 state = arg
             elif isinstance(arg, (tuple, list)):
@@ -9168,10 +9236,8 @@ by adding:
                 if not isinstance(state, State):
                     raise TypeError("incorrect specifier", arg)
                 if len(arg) >= 2:
-                    value = arg[1]
+                    priority = arg[1]
                 if len(arg) >= 3:
-                    priority = arg[2]
-                if len(arg) >= 4:
                     raise TypeError("incorrect specifier", arg)
             else:
                 raise TypeError("incorrect specifier", arg)
@@ -9205,7 +9271,6 @@ by adding:
             return
 
     def _trywait(self):
-
         if self.status.value == interrupted:
             return False
         if self._cond:
@@ -9600,7 +9665,7 @@ by adding:
                 index += 1
             return index
 
-    def enter(self, q: "Queue") -> "Component":
+    def enter(self, q: "Queue", priority: float = None) -> "Component":
         """
         enters a queue at the tail
 
@@ -9616,8 +9681,17 @@ by adding:
         or 0 if queue is empty
         """
         self._checknotinqueue(q)
-        priority = q._tail.predecessor.priority
-        Qmember().insert_in_front_of(q._tail, self, q, priority)
+        if priority is None:
+            priority = q._tail.predecessor.priority
+            Qmember().insert_in_front_of(q._tail, self, q, priority)
+        else:
+            if q._length >= 1 and priority < q._head.successor.priority:  # direct enter component that's smaller than the rest
+                m2 = q._head.successor
+            else:
+                m2 = q._tail
+                while (m2.predecessor != q._head) and (m2.predecessor.priority > priority):
+                    m2 = m2.predecessor
+            Qmember().insert_in_front_of(m2, self, q, priority)
         return self
 
     def enter_at_head(self, q: "Queue") -> "Component":
@@ -9696,22 +9770,14 @@ by adding:
         q : Queue
             queue to enter
 
-        priority: type that can be compared with other priorities in the queue
+        priority: float
             priority in the queue
 
         Note
         ----
         The component is placed just before the first component with a priority > given priority
         """
-        self._checknotinqueue(q)
-        if q._length >= 1 and priority < q._head.successor.priority:  # direct enter component that's smaller than the rest
-            m2 = q._head.successor
-        else:
-            m2 = q._tail
-            while (m2.predecessor != q._head) and (m2.predecessor.priority > priority):
-                m2 = m2.predecessor
-        Qmember().insert_in_front_of(m2, self, q, priority)
-        return self
+        return self.enter(q, priority)
 
     def leave(self, q: "Queue" = None) -> "Component":
         """
@@ -9777,7 +9843,7 @@ by adding:
         q : Queue
             queue where the component belongs to
 
-        priority : type that can be compared with other priorities in the queue
+        priority : float
             priority in queue
 
             if omitted, no change
@@ -10919,8 +10985,8 @@ class Environment:
         s = "view("
         items = []
         for prop in props.split():
-            items.append(f"{getattr(self.view,prop)(t):.4f}")
-        print("view(" + (",".join(f"{prop}={getattr(self.view,prop)(t):.4f}" for prop in props.split())) + f")  # t={t:.4f}")
+            items.append(f"{getattr(self.view, prop)(t):.4f}")
+        print("view(" + (",".join(f"{prop}={getattr(self.view, prop)(t):.4f}" for prop in props.split())) + f")  # t={t:.4f}")
 
     def _bind(self, tkinter_event, func):
         self.root.bind(tkinter_event, func)
@@ -11036,7 +11102,7 @@ class Environment:
             ao.label = "fovy" if prop == "field_of_view_y" else prop
 
             ao = AnimateText(
-                text=lambda arg, t: f"{getattr(self.view,arg.prop)(t):11.3f}",
+                text=lambda arg, t: f"{getattr(self.view, arg.prop)(t):11.3f}",
                 x=5 + i * 80 + 70,
                 y=top,
                 font="calibri",
@@ -11878,7 +11944,7 @@ class Environment:
                                     format="GIF",
                                 )
                         else:
-                            for _ in range(2): # normally runs only once
+                            for _ in range(2):  # normally runs only once
                                 try:
                                     self._images[0].save(
                                         self._video_name,
@@ -11890,7 +11956,7 @@ class Environment:
                                     )
                                     break
                                 except ValueError:  # prevent bug in Python 3.13
-                                    self._images=[image.convert("RGB") for image in self._images]
+                                    self._images = [image.convert("RGB") for image in self._images]
 
                     else:
                         if PythonInExcel or AnacondaCode:
@@ -11906,9 +11972,8 @@ class Environment:
                                     format="GIF",
                                 )
                         else:
-                            for _ in range(2): # normally runs only once
+                            for _ in range(2):  # normally runs only once
                                 try:
-
                                     self._images[0].save(
                                         self._video_name,
                                         disposal=2,
@@ -11919,7 +11984,7 @@ class Environment:
                                         optimize=False,
                                     )
                                 except ValueError:  # prevent bug in Python 3.13
-                                    self._images=[image.convert("RGB") for image in self._images]
+                                    self._images = [image.convert("RGB") for image in self._images]
 
                     del self._images
             elif self._video_out == "png":
@@ -11983,7 +12048,6 @@ class Environment:
             Number of 1/30 second long frames to be inserted
         """
 
-
         if self._video_out is None:
             raise ValueError("video not set")
         if isinstance(image, (Path, str)):
@@ -12008,7 +12072,6 @@ class Environment:
                 image = image.convert("RGB")
                 open_cv_image = cv2.cvtColor(numpy.array(image), cv2.COLOR_RGB2BGR)
                 self._video_out.write(open_cv_image)
-
 
     def _save_frame(self):
         self._exclude_from_animation = "not in video"
@@ -12944,7 +13007,7 @@ class Environment:
             self.animation_parameters(synced=value, animate=None)
         return self._synced
 
-    def minimized(self, value: bool=None)-> bool:
+    def minimized(self, value: bool = None) -> bool:
         """
         minimized
 
@@ -13212,7 +13275,7 @@ class Environment:
         """
         return self._current_component
 
-    def run(self, duration: float = None, till: float = None, priority: Any = inf, urgent: bool = False, cap_now: bool = None):
+    def run(self, duration: float = None, till: float = None, priority: float = inf, urgent: bool = False, cap_now: bool = None):
         """
         start execution of the simulation
 
@@ -13352,7 +13415,6 @@ class Environment:
                         self._t = self.animation_start_time
                     else:
                         self._t = self.animation_start_time + ((time.time() - self.animation_start_clocktime) * self._speed)
-
                 while self.peek() < self._t:
                     self.step()
                     if not (self.running and self._animate):
@@ -15780,29 +15842,49 @@ class Animate2dBase(DynamicClass):
                         im = Image.new("RGBA", (int(totwidth + 0.1 * fontsize), int(totheight)), (0, 0, 0, 0))
                         imwidth, imheight = im.size
                         draw = ImageDraw.Draw(im)
-                        pos = 0
+                        ypos = 0
+                        now_color = textcolor
                         for line, width in zip(lines, widths):
                             if line:
-                                draw.text(xy=(0.1 * fontsize, pos), text=line, font=font, fill=textcolor)
+                                if "\033[" in line:  # ANSI
+                                    xpos = 0.1 * fontsize
+                                    while line:
+                                        for ansi, rgb in _ANSI_to_rgb.items():
+                                            if line.startswith(ansi):
+                                                if rgb:
+                                                    now_color = rgb
+                                                else:
+                                                    now_color = textcolor
+                                                line = line[len(ansi) :]
+                                                break
+                                        else:
+                                            c = line[0]
+                                            draw.text(xy=(xpos, ypos), text=c, font=font, fill=now_color)
+                                            charwidth = font.getbbox(c)[2]
+                                            xpos += charwidth
+                                            line = line[1:]
 
-                            pos += lineheight
-                        # this code is to correct a bug in the rendering of text,
-                        # leaving a kind of shadow around the text
-                        del draw
-                        if textcolor[:3] != (0, 0, 0):  # black is ok
-                            if False and has_numpy():
-                                arr = numpy.asarray(im).copy()
-                                arr[:, :, 0] = textcolor[0]
-                                arr[:, :, 1] = textcolor[1]
-                                arr[:, :, 2] = textcolor[2]
-                                im = Image.fromarray(numpy.uint8(arr))
-                            else:
-                                pix = im.load()
-                                for y in range(imheight):
-                                    for x in range(imwidth):
-                                        pix[x, y] = (textcolor[0], textcolor[1], textcolor[2], pix[x, y][3])
+                                else:
+                                    draw.text(xy=(0.1 * fontsize, ypos), text=line, font=font, fill=now_color)
 
-                        # end of code to correct bug
+                            ypos += lineheight
+                        # # this code is to correct a bug in the rendering of text,
+                        # # leaving a kind of shadow around the text
+                        # del draw
+                        # if textcolor[:3] != (0, 0, 0):  # black is ok
+                        #     if False and has_numpy():
+                        #         arr = numpy.asarray(im).copy()
+                        #         arr[:, :, 0] = textcolor[0]
+                        #         arr[:, :, 1] = textcolor[1]
+                        #         arr[:, :, 2] = textcolor[2]
+                        #         im = Image.fromarray(numpy.uint8(arr))
+                        #     else:
+                        #         pix = im.load()
+                        #         for y in range(imheight):
+                        #             for x in range(imwidth):
+                        #                 pix[x, y] = (textcolor[0], textcolor[1], textcolor[2], pix[x, y][3])
+
+                        # # end of code to correct bug
 
                         self.imwidth, self.imheight = im.size
                         self.heightA = heightA
@@ -23662,7 +23744,7 @@ class State:
         self.value.tally(value_after)
         self._trywait()
 
-    def _trywait(self, max=inf): # this _trywait of a state
+    def _trywait(self, max=inf):  # this _trywait of a state
         mx = self._waiters._head.successor
         while mx != self._waiters._tail:
             c = mx.component
@@ -25580,7 +25662,6 @@ class Animate3dObj(Animate3dBase):
         global visualization
         global pyglet
 
-
         self.x = x
         self.y = y
         self.z = z
@@ -25605,12 +25686,12 @@ class Animate3dObj(Animate3dBase):
         try:
             import pywavefront
         except ImportError:
-            pywavefront=None
-                
+            pywavefront = None
+
         try:
-            import pyglet   # this is a requirement for visualization!
+            import pyglet  # this is a requirement for visualization!
         except ImportError:
-            pyglet=None
+            pyglet = None
 
         from pywavefront import visualization
 
@@ -25620,7 +25701,7 @@ class Animate3dObj(Animate3dBase):
         global pyglet
         if pywavefront is None:
             raise ImportError("Animate3dObj requires pywavefront. Not found")
-        if pyglet is None:                    
+        if pyglet is None:
             raise ImportError("Animate3dObj requires pyglet. Not found")
 
         obj_filename = Path(self.filename(t))
@@ -27374,7 +27455,7 @@ def can_animate3d(try_only: bool = True) -> bool:
             glut.glutInit()
         except OpenGL.error.NullFunctionError:
             raise ImportError("Installed OpenGL does not support glut. Try 'pip install OpenGL-glut' or see the salabim documentation")
-    
+
         return True
     else:
         if try_only:
@@ -27737,7 +27818,7 @@ def set_environment_aliases():
         return  # do not set when using Sphinx build!
 
     for name, obj in list(globals().items()):
-        if (not name.startswith("_") or name in ("_Trajectory", "_Distribution")) and name != "yieldless" and name != "Environment":
+        if (not name.startswith("_") or name in ("_Trajectory", "_Distribution")) and name != "yieldless" and name != "Environment" and not hasattr(Environment,name):
             if inspect.isclass(obj) and obj.__module__ == Environment.__module__:
                 if issubclass(obj, Exception):
                     exec(f"Environment.{name}={name}")
