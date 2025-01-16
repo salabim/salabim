@@ -1,5 +1,8 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 25.0.1  2025-01-17
+* A bug prevented salabim to run under Python <3.13. Fixed.
+
 #### version 25.0.0  2025-01-15
 
 * Component.enter() now has an optional priority parameter. If the priority parameter is omitted, the component will enter at the tail of the queue, 

@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___       ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \     / _ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | | | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | |_| |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_) \___/
+#               _         _      _               ____   ____       ___      _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_|
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "25.0.0"
+__version__ = "25.0.1"
 import heapq
 import random
 import time
@@ -42,11 +42,7 @@ import urllib.error
 import base64
 import zipfile
 from pathlib import Path
-try:
-    import peek
-except ModuleNotFoundError:
-    ...
-    
+   
 
 from typing import Any, Union, Iterable, Tuple, List, Callable, TextIO, Dict, Set, Type, Hashable, Optional
 
@@ -103,7 +99,7 @@ _ANSI_to_rgb = {
     "\033[0m": (),
 }
 
-ANSI=types.SimpleNamespace(_color_name_to_ANSI.items())
+ANSI=types.SimpleNamespace(**_color_name_to_ANSI)
 
 def a_log(*args):
     if not hasattr(a_log, "a_logfile_name"):
