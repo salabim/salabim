@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_|
+#               _         _      _               ____   ____       ___      ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    |___ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |     __) |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _  / __/
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_____|
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "25.0.1"
+__version__ = "25.0.2"
 import heapq
 import random
 import time
@@ -8121,7 +8121,7 @@ by adding:
         self,
         store: Union["Store", Iterable],
         filter: Callable = lambda c: True,
-        request_priority: Any = 0,
+        request_priority: float = 0,
         fail_priority: float = 0,
         urgent: bool = True,
         fail_at: float = None,
@@ -8301,7 +8301,7 @@ by adding:
         self,
         store: Union["Store", Iterable],
         item: "Component",
-        request_priority: float = None,
+        request_priority: float = 0,
         priority: float = 0,
         fail_priority: float = 0,
         urgent: bool = True,
@@ -8323,6 +8323,9 @@ by adding:
 
         request_priority: float
             put component in to_store_requesters according to the given priority (default 0)
+
+        priority : float
+            put component in the store according to this priority (default 0)
 
         fail_priority : float
             priority of the fail event
@@ -8471,7 +8474,7 @@ by adding:
         mode: Any = None,
         urgent: bool = False,
         request_priority: float = 0,
-        schedule_priority: float = 0,
+        priority: float = 0,
         cap_now: bool = None,
         oneof: bool = False,
         called_from: str = "request",
@@ -8615,7 +8618,7 @@ by adding:
                 scheduled_time = fail_at + self.env._offset
             else:
                 raise ValueError("both fail_at and fail_delay specified")
-
+        schedule_priority=priority
         self.set_mode(mode)
 
         self._failed = False
@@ -8914,7 +8917,6 @@ by adding:
                 self._release(r)
 
     def wait_for(self, cond, states, request_priority=0, priority=0, urgent=False, mode=None, fail_delay=None, fail_at=None, cap_now=None):
-        schedule_priority = priority
         """
         wait for any or all of the given state values are met
 
@@ -9017,6 +9019,7 @@ by adding:
                 raise ValueError("both fail_at and fail_delay specified")
 
         self.set_mode(mode)
+        schedule_priority=priority
 
         self._cond = cond  # add test ***
         for state in states:
@@ -9048,7 +9051,7 @@ by adding:
         mode: Any = None,
         urgent: bool = False,
         request_priority: float = 0,
-        schedule_priority: float = 0,
+        priority: float = 0,
         cap_now: bool = None,
     ) -> None:
         """
@@ -9219,10 +9222,11 @@ by adding:
                 scheduled_time = fail_at + self.env._offset
             else:
                 raise ValueError("both fail_at and fail_delay specified")
-
+        schedule_priority=priority
         self.set_mode(mode)
 
         for arg in args:
+
             value = True
             priority = request_priority
             if isinstance(arg, State):
@@ -9232,8 +9236,10 @@ by adding:
                 if not isinstance(state, State):
                     raise TypeError("incorrect specifier", arg)
                 if len(arg) >= 2:
-                    priority = arg[1]
+                    value = arg[1]
                 if len(arg) >= 3:
+                    priority = arg[2]
+                if len(arg) >= 4:
                     raise TypeError("incorrect specifier", arg)
             else:
                 raise TypeError("incorrect specifier", arg)
@@ -9255,6 +9261,7 @@ by adding:
 
         if not self._waits:
             raise TypeError("no states specified")
+
 
         self._remaining_duration = scheduled_time - self.env._now
 

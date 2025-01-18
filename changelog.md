@@ -1,6 +1,12 @@
 ### changelog | salabim | discrete event simulation
 
+####  version 25.0.2  2025-01-18
+
+* Bug in Component.wait() fixed.
+  (thanks to a bug report by Thomas Müller)
+
 #### version 25.0.1  2025-01-17
+
 * A bug prevented salabim to run under Python <3.13. Fixed.
 
 #### version 25.0.0  2025-01-15
