@@ -1,5 +1,10 @@
 ### changelog | salabim | discrete event simulation
 
+####  version 25.0.3  2025-01-24
+
+* Bug in Component.from_store with a filter fixed.
+  (thanks to a bug report by  董江成 and Lukas Hollenstein)
+
 ####  version 25.0.2  2025-01-18
 
 * Bug in Component.wait() fixed.

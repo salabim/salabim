@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    |___ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |     __) |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _  / __/
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_____|
+#               _         _      _               ____   ____       ___      _____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    |___ /
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |     |_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _  ___) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|____/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "25.0.2"
+__version__ = "25.0.3"
 import heapq
 import random
 import time
@@ -5826,7 +5826,7 @@ class Store(Queue):
                     for store in c._from_stores:
                         c.leave(store._from_store_requesters)
                     with self.env.suppress_trace():
-                        item = self.pop(0)
+                        self.remove(item)
                     c._from_stores = []
                     c._from_store_item = item
                     c._from_store_store = self
