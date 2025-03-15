@@ -1,5 +1,38 @@
 ### changelog | salabim | discrete event simulation
 
+####  version 25.0.5  2025-03-15
+
+* In yieldless mode if an environment goes out of scope (most likely by creating a new environment with the same name), still open greenlets
+  are not garbage collected. Unfortunately, it is not possible to clean these up automatically. This happens when running several scenarios and  a new environment is initiated, whereas the 'old' environment is not required anymore, like in
+
+  ```
+  for var1, var2, var3 in itertools.product(range(10), range(5), range(50)):
+      env = sim.Enviroment()
+      ... #  experiment with var1, var2 and var3
+  ```
+
+  This introduced a memory leak.
+
+  From this version on, the method `Environment.cancel_all()` ) may be called when the environment is no longer needed:
+
+  ```
+  for var1, var2, var3 in itertools.product(range(10), range(5), range(50)):
+      env = sim.Enviroment()
+      ... #  experiment with var1, var2 and var3
+      env.cancel_all()
+  ```
+
+  Although it is possible to issue this in yielded mode, it has no effect on the garbage collection, then. 
+  Technical detail: In order to cancel all components (also the passive and scheduled for inf), these components are now always placed on the event list.
+  Note that there is still a (considerably smaller) memory when running in yieldless mode. So, in really critical (read: large number of scenarios) applications, it might be better to consider using yielded mode. 
+  
+* If a `setup` method of any salabim object (Component, Queue, Resource, ...) had any parameter that was also used in the `__init__` method, that parameter was already 'consumed' and caused an error that might be confusing.
+  From this version, salabim checks if this is the case and, if so, raises a much more clear `TypeError`.
+
+* If a `process` method of a Component had any parameter that was also used in the `__init__` or `setup` method,
+  that parameter was already 'consumed' and caused an error that might be confusing. 
+  From this version, salabim checks if this is the case and, if so, raises a much more clear `TypeError`.
+
 ####  version 25.0.3  2025-01-24
 
 * Bug in Component.from_store with a filter fixed.

@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    |___ /
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |     |_ \
+#               _         _      _               ____   ____       ___      ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    | ___|
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   |___ \
 #  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _  ___) |
 #  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|____/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "25.0.3"
+__version__ = "25.0.5"
 import heapq
 import random
 import time
@@ -42,7 +42,7 @@ import urllib.error
 import base64
 import zipfile
 from pathlib import Path
-   
+
 
 from typing import Any, Union, Iterable, Tuple, List, Callable, TextIO, Dict, Set, Type, Hashable, Optional
 
@@ -99,7 +99,8 @@ _ANSI_to_rgb = {
     "\033[0m": (),
 }
 
-ANSI=types.SimpleNamespace(**_color_name_to_ANSI)
+ANSI = types.SimpleNamespace(**_color_name_to_ANSI)
+
 
 def a_log(*args):
     if not hasattr(a_log, "a_logfile_name"):
@@ -484,10 +485,10 @@ class Monitor:
         fill: Iterable = None,
         stats_only: bool = False,
         env: "Environment" = None,
-        *args,
         **kwargs,
     ):
         self.env = _set_env(env)
+        _check_overlapping_parameters(self, "__init__", "setup")
 
         if isinstance(self.env, Environment):
             _set_name(name, self.env._nameserializeMonitor, self)
@@ -532,7 +533,7 @@ class Monitor:
             self._x.extend(fill)
             self._t.extend(len(fill) * [self.env._now])
 
-        self.setup(*args, **kwargs)
+        self.setup(**kwargs)
 
     def __eq__(self, other):
         if isinstance(other, Monitor):
@@ -4356,8 +4357,9 @@ class Queue:
         if omitted, default_env will be used
     """
 
-    def __init__(self, name: str = None, monitor: Any = True, fill: Iterable = None, capacity: float = inf, env: "Environment" = None, *args, **kwargs) -> None:
+    def __init__(self, name: str = None, monitor: Any = True, fill: Iterable = None, capacity: float = inf, env: "Environment" = None, **kwargs) -> None:
         self.env = _set_env(env)
+        _check_overlapping_parameters(self, "__init__", "setup")
 
         _set_name(name, self.env._nameserializeQueue, self)
         self._head = Qmember()
@@ -4390,7 +4392,7 @@ class Queue:
                     c.enter(self)
         if self.env._trace:
             self.env.print_trace("", "", self.name() + " create")
-        self.setup(*args, **kwargs)
+        self.setup(**kwargs)
 
     def setup(self) -> None:
         """
@@ -5896,6 +5898,7 @@ class Animate3dBase(DynamicClass):
     ) -> None:
         super().__init__()
         self.env = _set_env(env)
+        _check_overlapping_parameters(self, "__init__", "setup")
 
         self.visible = visible
         self.keep = keep
@@ -7142,6 +7145,8 @@ class Component:
     ):
         self.env = _set_env(env)
 
+        _check_overlapping_parameters(self, "__init__", "setup")
+
         _set_name(name, self.env._nameserializeComponent, self)
         self._qmembers = {}
         self._process = None
@@ -7196,9 +7201,22 @@ class Component:
                 else:
                     self.env.print_trace("", "", self.name() + " create data component", self._modetxt())
         else:
+            _check_overlapping_parameters(self, "__init__", "process")
+            _check_overlapping_parameters(self, "setup", "process")
+
             self.env.print_trace("", "", self.name() + " create", self._modetxt())
 
+            process_parameters = inspect.signature(self.process).parameters
+            init_parameters = inspect.signature(self.__init__).parameters
+            if process_parameters:
+                for parameter in process_parameters:
+                    if parameter in init_parameters:
+                        raise AttributeError(
+                            f"{self.__class__.__name__}.process() error: parameter '{parameter}' not allowed, because it is a parameter of {self.__class__.__name__}.__init__()"
+                        )
+
             kwargs_p = {}
+
             if kwargs:
                 parameters = inspect.signature(p).parameters
 
@@ -7254,6 +7272,7 @@ by adding at the end:
             self.status._value = scheduled
             if self.env._yieldless:
                 self._glet = greenlet.greenlet(lambda: self._process(**kwargs_p), parent=self.env._glet)
+                self.env.glets.append(self._glet)
             self._reschedule(scheduled_time, priority, urgent, "activate", cap_now, extra=extra)
         self.setup(**kwargs)
 
@@ -7493,14 +7512,13 @@ by adding at the end:
         return return_or_print(result, as_str, file)
 
     def _push(self, t, priority, urgent, return_value=None, switch=True):
-        if t != inf:
-            self.env._seq += 1
-            if urgent:
-                seq = -self.env._seq
-            else:
-                seq = self.env._seq
-            self._on_event_list = True
-            heapq.heappush(self.env._event_list, (t, priority, seq, self, return_value))
+        self.env._seq += 1
+        if urgent:
+            seq = -self.env._seq
+        else:
+            seq = self.env._seq
+        self._on_event_list = True
+        heapq.heappush(self.env._event_list, (t, priority, seq, self, return_value))
         if self.env._yieldless:
             if self is self.env._current_component:
                 self.env._glet.switch()
@@ -7928,6 +7946,7 @@ by adding:
             lineno = self.lineno_txt(add_at=True)
             self.env.print_trace("", "", self.name() + " passivate", merge_blanks(lineno, self._modetxt()))
         self.status._value = passive
+        self._push(inf, 0, False, None)
 
         if self.env._yieldless:
             if self is self.env._current_component:
@@ -8069,6 +8088,8 @@ by adding:
             self.env.print_trace("", "", "cancel " + self.name() + " " + self._modetxt())
         self.status._value = data
         if self.env._yieldless:
+            self._glet.throw()
+            self._glet = None
             if self is self.env._current_component:
                 self.env._glet.switch()
 
@@ -8618,7 +8639,7 @@ by adding:
                 scheduled_time = fail_at + self.env._offset
             else:
                 raise ValueError("both fail_at and fail_delay specified")
-        schedule_priority=priority
+        schedule_priority = priority
         self.set_mode(mode)
 
         self._failed = False
@@ -9019,7 +9040,7 @@ by adding:
                 raise ValueError("both fail_at and fail_delay specified")
 
         self.set_mode(mode)
-        schedule_priority=priority
+        schedule_priority = priority
 
         self._cond = cond  # add test ***
         for state in states:
@@ -9222,11 +9243,10 @@ by adding:
                 scheduled_time = fail_at + self.env._offset
             else:
                 raise ValueError("both fail_at and fail_delay specified")
-        schedule_priority=priority
+        schedule_priority = priority
         self.set_mode(mode)
 
         for arg in args:
-
             value = True
             priority = request_priority
             if isinstance(arg, State):
@@ -9261,7 +9281,6 @@ by adding:
 
         if not self._waits:
             raise TypeError("no states specified")
-
 
         self._remaining_duration = scheduled_time - self.env._now
 
@@ -10546,9 +10565,11 @@ class Environment:
         do_reset: bool = None,
         blind_animation: bool = False,
         yieldless: bool = None,
-        *args,
         **kwargs,
     ):
+        _check_overlapping_parameters(self, "__init__", "setup")
+
+        self.glets = []
         if name is None:
             if isdefault_env:
                 name = "default environment"
@@ -10713,7 +10734,7 @@ class Environment:
         if ap_kwargs:
             self.animation_parameters(**ap_kwargs)
 
-        self.setup(*args, **kwargs)
+        self.setup(**kwargs)
 
     # ENVIRONMENT ANNOTATION START
     # ENVIRONMENT ANNOTATION END
@@ -10730,6 +10751,10 @@ class Environment:
         only keyword arguments are passed
         """
         pass
+
+    def cancel_all(self):
+        for t, priority, sequence, comp, return_value in self._event_list:
+            comp.cancel()
 
     def serialize(self) -> int:
         self.serial += 1
@@ -11203,6 +11228,8 @@ class Environment:
             if self._event_list:
                 (t, priority, seq, c, return_value) = heapq.heappop(self._event_list)
             else:
+                t = inf  # only events with t==inf left, so signal that we have ended
+            if t == inf:
                 c = self._main
                 if self.end_on_empty_eventlist:
                     t = self.env._now
@@ -23495,8 +23522,10 @@ class State:
         if omitted, default_env is used
     """
 
-    def __init__(self, name: str = None, value: Any = False, type: str = "any", monitor: bool = True, env: "Environment" = None, *args, **kwargs):
+    def __init__(self, name: str = None, value: Any = False, type: str = "any", monitor: bool = True, env: "Environment" = None, **kwargs):
         self.env = _set_env(env)
+        _check_overlapping_parameters(self, "__init__", "setup")
+
         _set_name(name, self.env._nameserializeState, self)
         self._value = value
         with self.env.suppress_trace():
@@ -23505,7 +23534,7 @@ class State:
         self.value = _StateMonitor(parent=self, name="Value of " + self.name(), level=True, initial_tally=value, monitor=monitor, type=type, env=self.env)
         if self.env._trace:
             self.env.print_trace("", "", self.name() + " create", "value = " + repr(self._value))
-        self.setup(*args, **kwargs)
+        self.setup(**kwargs)
 
     def setup(self) -> None:
         """
@@ -23968,10 +23997,11 @@ class Resource:
         honor_only_highest_priority: bool = False,
         monitor: bool = True,
         env: "Environment" = None,
-        *args,
         **kwargs,
     ):
         self.env = _set_env(env)
+        _check_overlapping_parameters(self, "__init__", "setup")
+
         if initial_claimed_quantity != 0:
             if not anonymous:
                 raise ValueError("initial_claimed_quantity != 0 only allowed for anonymous resources")
@@ -24006,7 +24036,7 @@ class Resource:
         self.occupancy = _SystemMonitor("Occupancy of " + self.name(), level=True, initial_tally=0, monitor=monitor, type="float", env=self.env)
         if self.env._trace:
             self.env.print_trace("", "", self.name() + " create", "capacity=" + str(self._capacity) + (" anonymous" if self._anonymous else ""))
-        self.setup(*args, **kwargs)
+        self.setup(**kwargs)
 
     def ispreemptive(self) -> bool:
         """
@@ -25088,6 +25118,28 @@ def _set_name(name, _nameserialize, object):
         object._sequence_number = sequence_number
     else:
         object._name = name
+
+
+def _check_overlapping_parameters(obj, method_name0, method_name1):
+    """
+    this function is a helper to see whether __init__, setup and process parameters overlap
+
+    Parameters
+    ----------
+    obj : object
+        object to be checked (usually called with self)
+
+    method_name0 : str
+        name of the first method to be tested
+
+    method_name1 : str
+        name of the second method to be tested
+    """
+    overlapping_parameters = set(inspect.signature(getattr(obj, method_name0)).parameters) & set(inspect.signature(getattr(obj, method_name1)).parameters)
+    if overlapping_parameters:
+        raise TypeError(
+            f"{obj.__class__.__name__}.{method_name1}()  error: parameter '{list(overlapping_parameters)[0]}' not allowed, because it is also a parameter of {obj.__class__.__name__}.{method_name0}()"
+        )
 
 
 @functools.lru_cache()
@@ -27821,7 +27873,12 @@ def set_environment_aliases():
         return  # do not set when using Sphinx build!
 
     for name, obj in list(globals().items()):
-        if (not name.startswith("_") or name in ("_Trajectory", "_Distribution")) and name != "yieldless" and name != "Environment" and not hasattr(Environment,name):
+        if (
+            (not name.startswith("_") or name in ("_Trajectory", "_Distribution"))
+            and name != "yieldless"
+            and name != "Environment"
+            and not hasattr(Environment, name)
+        ):
             if inspect.isclass(obj) and obj.__module__ == Environment.__module__:
                 if issubclass(obj, Exception):
                     exec(f"Environment.{name}={name}")
