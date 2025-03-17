@@ -17,6 +17,10 @@ dependencies = [
     "greenlet",
     "python-dateutil",
 ]
+optional-dependencies.dev = [
+    "greenlet",
+    "python-dateutil",
+]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "License :: OSI Approved :: MIT License",
