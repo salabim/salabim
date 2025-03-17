@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    | ___|
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   |___ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _  ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|____/
+#               _         _      _               ____   ____       ___       __
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \     / /_
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | '_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_) \___/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "25.0.5"
+__version__ = "25.0.6"
 import heapq
 import random
 import time
@@ -7201,19 +7201,10 @@ class Component:
                 else:
                     self.env.print_trace("", "", self.name() + " create data component", self._modetxt())
         else:
-            _check_overlapping_parameters(self, "__init__", "process")
-            _check_overlapping_parameters(self, "setup", "process")
+            _check_overlapping_parameters(self, "__init__", process_name,process=p)
+            _check_overlapping_parameters(self, "setup", process_name,process=p)
 
             self.env.print_trace("", "", self.name() + " create", self._modetxt())
-
-            process_parameters = inspect.signature(self.process).parameters
-            init_parameters = inspect.signature(self.__init__).parameters
-            if process_parameters:
-                for parameter in process_parameters:
-                    if parameter in init_parameters:
-                        raise AttributeError(
-                            f"{self.__class__.__name__}.process() error: parameter '{parameter}' not allowed, because it is a parameter of {self.__class__.__name__}.__init__()"
-                        )
 
             kwargs_p = {}
 
@@ -25120,7 +25111,7 @@ def _set_name(name, _nameserialize, object):
         object._name = name
 
 
-def _check_overlapping_parameters(obj, method_name0, method_name1):
+def _check_overlapping_parameters(obj, method_name0, method_name1,process=None):
     """
     this function is a helper to see whether __init__, setup and process parameters overlap
 
@@ -25134,8 +25125,18 @@ def _check_overlapping_parameters(obj, method_name0, method_name1):
 
     method_name1 : str
         name of the second method to be tested
+
+    process: method
+        used for process check: should be the process methoc
     """
-    overlapping_parameters = set(inspect.signature(getattr(obj, method_name0)).parameters) & set(inspect.signature(getattr(obj, method_name1)).parameters)
+    method0=getattr(obj, method_name0)
+
+    if process is None:
+        method1=getattr(obj, method_name1)
+    else:
+        method1=process
+
+    overlapping_parameters = set(inspect.signature(method0).parameters) & set(inspect.signature(method1).parameters)
     if overlapping_parameters:
         raise TypeError(
             f"{obj.__class__.__name__}.{method_name1}()  error: parameter '{list(overlapping_parameters)[0]}' not allowed, because it is also a parameter of {obj.__class__.__name__}.{method_name0}()"

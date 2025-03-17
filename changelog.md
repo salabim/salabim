@@ -1,5 +1,10 @@
 ### changelog | salabim | discrete event simulation
 
+####  version 25.0.6  2025-03-17
+
+* bug in the overlapping parameter check of the `process` method, as introduced in version 25.0.5 fixed.
+  (thanks to a bug report by Harald Mutzke)
+
 ####  version 25.0.5  2025-03-15
 
 * In yieldless mode if an environment goes out of scope (most likely by creating a new environment with the same name), still open greenlets
