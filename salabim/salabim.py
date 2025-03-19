@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___       __
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \     / /_
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | '_ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | (_) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_) \___/
+#               _         _      _               ____   ____       ___      _____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    |___  |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |      / /
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _   / /
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_) /_/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "25.0.6"
+__version__ = "25.0.7"
 import heapq
 import random
 import time
@@ -3209,7 +3209,7 @@ class Monitor:
             if ex0:
                 x0 = [vx for vx in x if vx != 0]
                 if typecode:
-                    x0 = array.array(typecode, x)
+                    x0 = array.array(typecode, x0)
 
             if self._weight:
                 if ex0:

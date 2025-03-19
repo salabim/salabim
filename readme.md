@@ -47,7 +47,7 @@ Contributions to salabim are highly appreciated! You can contribute by issuing a
 
 ### License
 
-Salabim is licensed under the MIT License. For details, please refer to the [LICENSE](LICENSE) file.
+Salabim is licensed under the MIT License.
 
 ### Support
 

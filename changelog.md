@@ -1,8 +1,13 @@
 ### changelog | salabim | discrete event simulation
 
+####  version 25.0.7  2025-03-19
+
+* Bug in the internal Monitor._xweight() method for non level monitors, made that sometime ex0=True in several monitor methods was ignored. Fixed.
+  (thanks to a bug report by Lukas Hollenstein)
+
 ####  version 25.0.6  2025-03-17
 
-* bug in the overlapping parameter check of the `process` method, as introduced in version 25.0.5 fixed.
+* Bug in the overlapping parameter check of the `process` method, as introduced in version 25.0.5 fixed.
   (thanks to a bug report by Harald Mutzke)
 
 ####  version 25.0.5  2025-03-15
@@ -29,7 +34,7 @@
 
   Although it is possible to issue this in yielded mode, it has no effect on the garbage collection, then. 
   Technical detail: In order to cancel all components (also the passive and scheduled for inf), these components are now always placed on the event list.
-  Note that there is still a (considerably smaller) memory when running in yieldless mode. So, in really critical (read: large number of scenarios) applications, it might be better to consider using yielded mode. 
+  Note that there is still a (considerably smaller) memory leak when running in yieldless mode. So, in really critical (read: large number of scenarios) applications, it might be better to consider using yielded mode. 
   
 * If a `setup` method of any salabim object (Component, Queue, Resource, ...) had any parameter that was also used in the `__init__` method, that parameter was already 'consumed' and caused an error that might be confusing.
   From this version, salabim checks if this is the case and, if so, raises a much more clear `TypeError`.
