@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    |___  |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |      / /
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _   / /
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_) /_/
+#               _         _      _               ____   ____       ___       ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \     ( _ )
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |    / _ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_) \___/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "25.0.7"
+__version__ = "25.0.8"
 import heapq
 import random
 import time
@@ -7263,7 +7263,6 @@ by adding at the end:
             self.status._value = scheduled
             if self.env._yieldless:
                 self._glet = greenlet.greenlet(lambda: self._process(**kwargs_p), parent=self.env._glet)
-                self.env.glets.append(self._glet)
             self._reschedule(scheduled_time, priority, urgent, "activate", cap_now, extra=extra)
         self.setup(**kwargs)
 
@@ -7503,13 +7502,14 @@ by adding at the end:
         return return_or_print(result, as_str, file)
 
     def _push(self, t, priority, urgent, return_value=None, switch=True):
-        self.env._seq += 1
-        if urgent:
-            seq = -self.env._seq
-        else:
-            seq = self.env._seq
-        self._on_event_list = True
-        heapq.heappush(self.env._event_list, (t, priority, seq, self, return_value))
+        if t!=inf:
+            self.env._seq += 1
+            if urgent:
+                seq = -self.env._seq
+            else:
+                seq = self.env._seq
+            self._on_event_list = True
+            heapq.heappush(self.env._event_list, (t, priority, seq, self, return_value))
         if self.env._yieldless:
             if self is self.env._current_component:
                 self.env._glet.switch()
@@ -7937,7 +7937,6 @@ by adding:
             lineno = self.lineno_txt(add_at=True)
             self.env.print_trace("", "", self.name() + " passivate", merge_blanks(lineno, self._modetxt()))
         self.status._value = passive
-        self._push(inf, 0, False, None)
 
         if self.env._yieldless:
             if self is self.env._current_component:
@@ -8079,8 +8078,6 @@ by adding:
             self.env.print_trace("", "", "cancel " + self.name() + " " + self._modetxt())
         self.status._value = data
         if self.env._yieldless:
-            self._glet.throw()
-            self._glet = None
             if self is self.env._current_component:
                 self.env._glet.switch()
 
@@ -10560,7 +10557,6 @@ class Environment:
     ):
         _check_overlapping_parameters(self, "__init__", "setup")
 
-        self.glets = []
         if name is None:
             if isdefault_env:
                 name = "default environment"
@@ -10742,10 +10738,6 @@ class Environment:
         only keyword arguments are passed
         """
         pass
-
-    def cancel_all(self):
-        for t, priority, sequence, comp, return_value in self._event_list:
-            comp.cancel()
 
     def serialize(self) -> int:
         self.serial += 1
