@@ -2,7 +2,7 @@
 
 ####  version 25.0.8  2025-03-29
 
-* The yielded mode memory leak solution as introduced in version 25.0.5 did work properly. Therefore, the method `Environment.cancell_all()`
+* The yieldless mode memory leak solution as introduced in version 25.0.5 did not work properly. Therefore, the method `Environment.cancell_all()`
   has been removed.
   (thanks to a bug reported by Michiel Luyken)
 
