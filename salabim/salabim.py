@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___       ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \     ( _ )
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |    / _ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | (_) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_) \___/
+#               _         _      _               ____   ____       ___      _   ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / | / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | || | | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | || |_| |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_| \___/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "25.0.8"
+__version__ = "25.0.11"
 import heapq
 import random
 import time
@@ -43,10 +43,7 @@ import base64
 import zipfile
 from pathlib import Path
 
-
 from typing import Any, Union, Iterable, Tuple, List, Callable, TextIO, Dict, Set, Type, Hashable, Optional
-
-# module = salabim  # for PythonInExcel runner
 
 dataframe = None  # to please PyLance
 
@@ -54,11 +51,10 @@ ColorType = Union[str, Iterable[float]]
 
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
-PyDroid = sys.platform == "linux" and any("pydroid" in v for v in os.environ.values())
+MacOS = platform.system == "Darwin"
 PyPy = platform.python_implementation() == "PyPy"
 Chromebook = "penguin" in platform.uname()
-PythonInExcel = not ("__file__" in globals())
-AnacondaCode = sys.platform == "emscripten"
+Xlwings = "xlwings" in sys.modules
 
 _color_name_to_ANSI = dict(
     dark_black="\033[0;30m",
@@ -115,70 +111,6 @@ def a_log(*args):
 class g: ...
 
 
-if PythonInExcel or AnacondaCode:
-    _pie_result = []
-
-    def pie_result():
-        return _pie_result
-
-    class b64_file_handler(io.IOBase):
-        """
-        special purpose file handler for Python in Excel
-
-        Parameters
-        ----------
-            name : str
-                name of file
-
-            result : list
-                b64 information will be added as string(s)
-
-            blocksize : int
-                b64 blocksize (default: 30000)
-
-            mode : str
-                if 't' (default): open for test
-                if 'b': open for binary
-
-        Note
-        ----
-        can be used as a file or in a context manager
-        """
-
-        def __init__(self, name, result, blocksize=30000, mode="t"):
-            self._name = name
-            self._result = result
-            self._blocksize = blocksize
-            if mode not in ("t", "b"):
-                raise ValueError(f"wrong mode ({mode})")
-            self._mode = mode
-            self._buffer = []
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            self.close()
-
-        def write(self, s):
-            self._buffer.append(s)
-
-        def close(self):
-            if self._mode == "b":
-                b = b"".join(self._buffer)
-            else:
-                b = "".join(self._buffer).encode("utf-8")
-            n = self._blocksize
-            b64 = base64.b64encode(b).decode("utf-8")
-            self._result.append(f"<file name={self._name}>")
-            while b64:
-                b64_n = b64[:n]
-                self._result.append(b64_n)
-                b64 = b64[n:]
-            self._result.append("</file>")
-            super().close()
-
-
 if Pythonista:
     try:
         import scene  # type: ignore
@@ -190,7 +122,7 @@ if Pythonista:
 inf = float("inf")
 nan = float("nan")
 
-if Pythonista or AnacondaCode or PythonInExcel:
+if Pythonista or Xlwings:
     _yieldless = False
 else:
     _yieldless = True
@@ -228,6 +160,11 @@ def yieldless(value: bool = None) -> bool:
 
     global _yieldless
     if value is not None:
+        if value:
+            if Pythonista:
+                raise ValueError("yiedless mode is not allowed under Pythonista")
+            if Xlwings:
+                raise ValueError("yiedless mode is not allowed under xlwings lite")
         _yieldless = value
     return _yieldless
 
@@ -3726,14 +3663,6 @@ class AnimateMonitor(DynamicClass):
         if False, animation monitor is not shown, shown otherwise
         (default True)
 
-    screen_coordinates : bool
-        use screen_coordinates
-
-        if False,  the scale parameters are use for positioning and scaling
-        objects.
-
-        if True (default), screen_coordinates will be used.
-
     Note
     ----
     All measures are in screen coordinates
@@ -3780,7 +3709,6 @@ class AnimateMonitor(DynamicClass):
         layer: Union[float, Callable] = 0,
         visible: Union[bool, Callable] = True,
         keep: Union[bool, Callable] = True,
-        screen_coordinates: bool = True,
         arg: Any = None,
     ):
         super().__init__()
@@ -3839,7 +3767,7 @@ class AnimateMonitor(DynamicClass):
         self._monitor = monitor
         self.as_level = monitor._level
         self.over3d = over3d
-        self.screen_coordinates = screen_coordinates
+        self.screen_coordinates = True
         self.register_dynamic_attributes(
             "linecolor linewidth fillcolor bordercolor borderlinewidth titlecolor nowcolor titlefont titlefontsize title "
             "x y offsetx offsety angle vertical_offset parent vertical_scale horizontal_scale width height "
@@ -7201,8 +7129,8 @@ class Component:
                 else:
                     self.env.print_trace("", "", self.name() + " create data component", self._modetxt())
         else:
-            _check_overlapping_parameters(self, "__init__", process_name,process=p)
-            _check_overlapping_parameters(self, "setup", process_name,process=p)
+            _check_overlapping_parameters(self, "__init__", process_name, process=p)
+            _check_overlapping_parameters(self, "setup", process_name, process=p)
 
             self.env.print_trace("", "", self.name() + " create", self._modetxt())
 
@@ -7298,7 +7226,7 @@ by adding at the end:
         """
         size_x = 50
         size_y = 50
-        ao0 = AnimateRectangle(text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg")
+        ao0 = AnimateRectangle(text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg", screen_coordinates=True)
         return (size_x, size_y, ao0)
 
     def animation3d_objects(self, id: Any) -> Tuple:
@@ -7502,7 +7430,7 @@ by adding at the end:
         return return_or_print(result, as_str, file)
 
     def _push(self, t, priority, urgent, return_value=None, switch=True):
-        if t!=inf:
+        if t != inf:
             self.env._seq += 1
             if urgent:
                 seq = -self.env._seq
@@ -10551,7 +10479,7 @@ class Environment:
         isdefault_env: bool = True,
         retina: bool = False,
         do_reset: bool = None,
-        blind_animation: bool = False,
+        blind_animation: bool = None,
         yieldless: bool = None,
         **kwargs,
     ):
@@ -10647,18 +10575,22 @@ class Environment:
         self._step_pressed = False
         self.stopped = False
         self._paused = False
+        self._zoom_factor = 1.1
+
         self.last_s0 = ""
-        if PythonInExcel or AnacondaCode:
-            self._blind_animation = True
+        if Xlwings:
+            if blind_animation is None:
+                blind_animation = True
+            if not blind_animation:
+                raise ValueError("blind_animation may not be False under xlwings lite")
         else:
-            self._blind_animation = blind_animation
+            if blind_animation is None:
+                blind_animation = False
+        self._blind_animation = blind_animation
 
         if self._blind_animation:
             with self.suppress_trace():
                 self._blind_video_maker = _BlindVideoMaker(process="", suppress_trace=True)
-        if PyDroid:
-            if g.tkinter_loaded == "?":
-                g.tkinter_loaded = "tkinter" in sys.modules
 
         if Pythonista:
             self._width, self._height = ui.get_screen_size()
@@ -10773,6 +10705,23 @@ class Environment:
         """
         if self._ui:
             self._handle_ui_event()
+        self._x0_org = self._x0
+        self._x1_org = self._x1
+        self._y0_org = self._y0
+        self._y1_org = self._y1
+        self._scale_org = self._scale
+        self._x0 = self._x0z
+        self._y0 = self._y0z
+        self._x1 = self._x1z  # 0+self._width/self._scale
+        self._y1 = self._y1z  # +self._height/self._scale
+        self._scale = self._scalez
+
+        # midx=self._x0+self._panx*(self._x1-self._x0)
+        # self._x0, self._x1= midx-(1/self._zoom)*(self._x1-self._x0)/2,midx+(1/self._zoom)*(self._x1-self._x0)/2
+
+        # midy=self._y0+self._pany*(self._y1-self._y0)
+        # self._y0, self._y1 = midy-(1/self._zoom)*(self._y1-self._y0)/2, midy+(1/self._zoom)*(self._y1-self._y0)/2
+        # self._scale = self._width / (self._x1 - self._x0)
 
     def animation_post_tick(self, t: float) -> None:
         """
@@ -10785,7 +10734,11 @@ class Environment:
         t : float
             Current (animation) time.
         """
-        ...
+        self._x0 = self._x0_org
+        self._x1 = self._x1_org
+        self._y0 = self._y0_org
+        self._y1 = self._y1_org
+        self._scale = self._scale
 
     def animation_pre_tick_sys(self, t: float) -> None:
         for ao in self.sys_objects.copy():  # copy required as ao's may be removed due to keep
@@ -11310,6 +11263,63 @@ class Environment:
     def on_closing(self):
         self.an_quit()
 
+
+    def on_mousewheel(self, event):
+        x_mouse = self.root.winfo_pointerx() - self.root.winfo_rootx()
+        y_mouse = self.height() - self.root.winfo_pointery() + self.root.winfo_rooty()
+        x = (x_mouse / self._scale) + self._x0z
+        y = (y_mouse / self._scale) + self._y0z
+
+        if Windows:
+            delta = int(event.delta / 120)  # normalize to ticks
+        elif MacOS:
+            delta = int(event.delta)  # already small, usually ±1
+        else:
+            delta = 0  # fallback
+        for _ in range(abs(delta)):
+            if delta < 0:
+                zoom_factor = self._zoom_factor
+
+            else:
+                zoom_factor = 1 / self._zoom_factor
+
+            # min_zoom = min(
+            #     (self._x0 - x) / (self._x0z - x),
+            #     (self._x0 - x) / (self._x0z - x),
+            #     (self._x1 - x) / (self._x1z - x),
+            #     (self._y0 - y) / (self._y0z - y),
+            #     (self._y1 - y) / (self._y1z - y),
+            # )
+
+            # zoom_factor = min(zoom_factor, min_zoom)
+
+            self._scalez /= zoom_factor
+            self._x0z = x - (x - self._x0z) * zoom_factor
+            self._y0z = y - (y - self._y0z) * zoom_factor
+            self._x1z = x - (x - self._x1z) * zoom_factor
+            self._y1z = y - (y - self._y1z) * zoom_factor
+
+    def start_pan(self, event):
+        g.canvas.config(cursor="fleur")  # Change cursor to "move" style
+        self.lastx = event.x
+        self.lasty = event.y
+        self.lastx0 = self._x0z
+        self.lasty0 = self._y0z
+
+    def do_pan(self, event):
+        dx = -((event.x - self.lastx) / self._scale)
+        dy = ((event.y - self.lasty) / self._scale)
+        # self._x0z = max(self._x0,self.lastx0 + dx)
+        # self._y0z = max(self._y0,self.lasty0 + dy)
+        self._x0z = self.lastx0 + dx
+        self._y0z = self.lasty0 + dy        
+        self._x1z = self._x0z + (self._x1 - self._x0) 
+        self._y1z = self._y0z + (self._y1 - self._y0) 
+
+
+    def end_pan(self, event):
+        g.canvas.config(cursor="")  # Reset to default
+
     def animation_parameters(
         self,
         animate: Union[bool, str] = None,
@@ -11516,8 +11526,6 @@ class Environment:
             like "myvideo.avi+DIVX".
 
             If no codec is given, MJPG will be used for .avi files, otherwise .mp4v
-
-            Under PyDroid only .avi files are supported.
 
         video_repeat : int
             number of times animated gif or png should be repeated
@@ -11840,8 +11848,6 @@ class Environment:
                             self._video_name = self._video_name[:-5]  # get rid of codec
                         else:
                             codec = "MJPG" if extension.lower() == ".avi" else "mp4v"
-                        if PyDroid and extension.lower() != ".avi":
-                            raise ValueError("PyDroid can only produce .avi videos, not " + extension)
                         can_video(try_only=False)
                         fourcc = cv2.VideoWriter_fourcc(*codec)
                         if video_path.is_file():
@@ -11916,12 +11922,22 @@ class Environment:
                         self.root.bind("<space>", lambda self: g.animation_env.an_menu_go())
                         self.root.bind("s", lambda self: g.animation_env.an_single_step())
                         self.root.bind("<Control-c>", lambda self: g.animation_env.an_quit())
+                        self.root.bind("<MouseWheel>", self.on_mousewheel)
+                        self.root.bind("<ButtonPress-1>", self.start_pan)
+                        self.root.bind("<B1-Motion>", self.do_pan)
+                        self.root.bind("<ButtonRelease-1>", self.end_pan)
+
 
                         g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
                         g.canvas.configure(background=self.colorspec_to_hex("bg", False))
                         g.canvas.pack()
                         g.canvas_objects = []
                         g.canvas_object_overflow_image = None
+                    
+                        # g.canvas.move("all", 1, 1)
+                        # g.canvas.update()
+                        # g.canvas.move("all", -1, -1)
+                        # g.canvas.update()
 
                     self.uninstall_uios()  # this causes all ui objects to be (re)installed
 
@@ -11945,59 +11961,34 @@ class Environment:
                     if self._video_pingpong:
                         self._images.extend(self._images[::-1])
                     if self._video_repeat == 1:  # in case of repeat == 1, loop should not be specified (otherwise, it might show twice)
-                        if PythonInExcel or AnacondaCode:
-                            with b64_file_handler(self._video_name, mode="b", result=_pie_result) as f:
+                        for _ in range(2):  # normally runs only once
+                            try:
                                 self._images[0].save(
-                                    f,
+                                    self._video_name,
                                     disposal=2,
                                     save_all=True,
                                     append_images=self._images[1:],
                                     duration=round(1000 / self._real_fps),
                                     optimize=False,
-                                    format="GIF",
                                 )
-                        else:
-                            for _ in range(2):  # normally runs only once
-                                try:
-                                    self._images[0].save(
-                                        self._video_name,
-                                        disposal=2,
-                                        save_all=True,
-                                        append_images=self._images[1:],
-                                        duration=round(1000 / self._real_fps),
-                                        optimize=False,
-                                    )
-                                    break
-                                except ValueError:  # prevent bug in Python 3.13
-                                    self._images = [image.convert("RGB") for image in self._images]
+                                break
+                            except ValueError:  # prevent bug in Python 3.13
+                                self._images = [image.convert("RGB") for image in self._images]
 
                     else:
-                        if PythonInExcel or AnacondaCode:
-                            with b64_file_handler(self._video_name, mode="b", result=_pie_result) as f:
+                        for _ in range(2):  # normally runs only once
+                            try:
                                 self._images[0].save(
-                                    f,
+                                    self._video_name,
                                     disposal=2,
                                     save_all=True,
                                     append_images=self._images[1:],
                                     loop=self._video_repeat,
                                     duration=round(1000 / self._real_fps),
                                     optimize=False,
-                                    format="GIF",
                                 )
-                        else:
-                            for _ in range(2):  # normally runs only once
-                                try:
-                                    self._images[0].save(
-                                        self._video_name,
-                                        disposal=2,
-                                        save_all=True,
-                                        append_images=self._images[1:],
-                                        loop=self._video_repeat,
-                                        duration=round(1000 / self._real_fps),
-                                        optimize=False,
-                                    )
-                                except ValueError:  # prevent bug in Python 3.13
-                                    self._images = [image.convert("RGB") for image in self._images]
+                            except ValueError:  # prevent bug in Python 3.13
+                                self._images = [image.convert("RGB") for image in self._images]
 
                     del self._images
             elif self._video_out == "png":
@@ -13404,6 +13395,12 @@ class Environment:
                 raise SimulationStopped
         else:
             self.root.after(0, self.simulate_and_animate_loop)
+            self._x0z = self._x0
+            self._y0z = self._y0
+            self._x1z = self._x1
+            self._y1z = self._y1
+
+            self._scalez = self._scale
             self.root.mainloop()
             if self._animate and self.running:
                 if self._video:
@@ -13589,13 +13586,8 @@ class Environment:
             mode = "RGB"
         else:
             raise ValueError("extension " + extension + "  not supported")
-        if PythonInExcel or AnacondaCode:
-            with b64_file_handler(str(filename), mode="b", result=_pie_result) as f:
-                format = "jpeg" if extension == ".jpg" else extension[1:]
-                self._capture_image(mode, video_mode).save(f, format=format)
-        else:
-            filename_path.parent.mkdir(parents=True, exist_ok=True)
-            self._capture_image(mode, video_mode).save(str(filename))
+        filename_path.parent.mkdir(parents=True, exist_ok=True)
+        self._capture_image(mode, video_mode).save(str(filename))
 
     def modelname_width(self):
         if Environment.cached_modelname_width[0] != self._modelname:
@@ -13918,19 +13910,19 @@ class Environment:
             if screen_coordinates:
                 return 0
             else:
-                return self._x0 / scale
+                return self._x0_org / scale
 
         if xy_anchor in ("n", "c", "center", "s"):
             if screen_coordinates:
                 return (width / 2) / scale
             else:
-                return ((self._x0 + self._x1) / 2) / scale
+                return ((self._x0_org + self._x1_org) / 2) / scale
 
         if xy_anchor in ("ne", "e", "se", ""):
             if screen_coordinates:
                 return width / scale
             else:
-                return self._x1 / scale
+                return self._x1_org / scale
 
         raise ValueError("incorrect xy_anchor", xy_anchor)
 
@@ -13945,19 +13937,19 @@ class Environment:
             if screen_coordinates:
                 return height / scale
             else:
-                return self._y1 / scale
+                return self._y1_org / scale
 
         if xy_anchor in ("w", "c", "center", "e"):
             if screen_coordinates:
                 return (height / 2) / scale
             else:
-                return ((self._y0 + self._y1) / 2) / scale
+                return ((self._y0_org + self._y1_org) / 2) / scale
 
         if xy_anchor in ("sw", "s", "se", ""):
             if screen_coordinates:
                 return 0
             else:
-                return self._y0 / scale
+                return self._y0_org / scale
 
         raise ValueError("incorrect xy_anchor", xy_anchor)
 
@@ -14606,16 +14598,14 @@ class Environment:
         note that the header is only printed if trace=True
         """
         len_s1 = len(self.time_to_str(0))
-        self.print_trace((len_s1 - 4) * " " + "time", "current component", "action", "information", "" if (PythonInExcel or AnacondaCode) else "line#")
-        self.print_trace(len_s1 * "-", 20 * "-", 35 * "-", 48 * "-", "" if (PythonInExcel or AnacondaCode) else 6 * "-")
+        self.print_trace((len_s1 - 4) * " " + "time", "current component", "action", "information", "line#")
+        self.print_trace(len_s1 * "-", 20 * "-", 35 * "-", 48 * "-", 6 * "-")
         for ref in range(len(self._source_files)):
             for fullfilename, iref in self._source_files.items():
                 if ref == iref:
                     self._print_legend(iref)
 
     def _print_legend(self, ref):
-        if PythonInExcel or AnacondaCode:
-            return
         if ref:
             s = "line numbers prefixed by " + chr(ord("A") + ref - 1) + " refer to"
         else:
@@ -14632,8 +14622,6 @@ class Environment:
         return self.filename_lineno_to_str(frameinfo.filename, frameinfo.lineno)
 
     def filename_lineno_to_str(self, filename, lineno):
-        if PythonInExcel or AnacondaCode:
-            return "n/a"
         if Path(filename).name == Path(__file__).name:  # internal salabim address
             return "n/a"
         ref = self._source_files.get(filename)
@@ -18224,7 +18212,6 @@ class AnimateQueue(DynamicClass):
         over3d=None,
         keep=True,
         visible=True,
-        screen_coordinates=True,
     ):
         super().__init__()
         _checkisqueue(queue)
@@ -18255,7 +18242,7 @@ class AnimateQueue(DynamicClass):
         self.keep = keep
         self.over3d = _default_over3d if over3d is None else over3d
         self.trajectory = trajectory
-        self.screen_coordinates = screen_coordinates
+        self.screen_coordinates = True
         self.register_dynamic_attributes(
             "xy_anchor x y id max_length direction reverse titleoffsetx titleoffsety titlefont titlefontsize titlecolor title layer visible keep trajectory"
         )
@@ -25103,7 +25090,7 @@ def _set_name(name, _nameserialize, object):
         object._name = name
 
 
-def _check_overlapping_parameters(obj, method_name0, method_name1,process=None):
+def _check_overlapping_parameters(obj, method_name0, method_name1, process=None):
     """
     this function is a helper to see whether __init__, setup and process parameters overlap
 
@@ -25121,12 +25108,12 @@ def _check_overlapping_parameters(obj, method_name0, method_name1,process=None):
     process: method
         used for process check: should be the process methoc
     """
-    method0=getattr(obj, method_name0)
+    method0 = getattr(obj, method_name0)
 
     if process is None:
-        method1=getattr(obj, method_name1)
+        method1 = getattr(obj, method_name1)
     else:
-        method1=process
+        method1 = process
 
     overlapping_parameters = set(inspect.signature(method0).parameters) & set(inspect.signature(method1).parameters)
     if overlapping_parameters:
@@ -25137,7 +25124,7 @@ def _check_overlapping_parameters(obj, method_name0, method_name1,process=None):
 
 @functools.lru_cache()
 def _screen_dimensions():
-    if PythonInExcel or AnacondaCode:
+    if Xlwings:
         return 1024, 768
     if Pythonista:
         screen_width, screen_height = ui.get_screen_size()
@@ -27165,7 +27152,7 @@ def _std_fonts():
 
 
 def fonts():
-    if PythonInExcel or AnacondaCode:
+    if Xlwings:
         return []
     if not hasattr(fonts, "font_list"):
         fonts.font_list = []
@@ -27438,7 +27425,7 @@ def can_animate(try_only: bool = True) -> bool:
         except ImportError:
             ImageGrab = None
 
-        if not Pythonista and not (PythonInExcel or AnacondaCode):
+        if not Pythonista and not Xlwings:
             from PIL import ImageTk
     except ImportError:
         if try_only:
@@ -27447,12 +27434,7 @@ def can_animate(try_only: bool = True) -> bool:
 
     g.dummy_image = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
 
-    if not Pythonista and not (PythonInExcel or AnacondaCode):
-        if PyDroid:
-            if not g.tkinter_loaded:
-                if try_only:
-                    return False
-                raise ImportError("PyDroid animation requires that the main program imports tkinter")
+    if not Pythonista and not Xlwings:
         try:
             import tkinter
             import tkinter.font
@@ -27951,7 +27933,7 @@ def captured_stdout_as_file(file: Union[str, Path, "file"], mode: str = None):
         file.write(captured_stdout_as_str())
 
 
-def captured_stdout_as_list(column_name: str = None) -> list:
+def captured_stdout_as_list() -> list:
     """
     returns the captured stdout as a list of strings
 

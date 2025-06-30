@@ -1,8 +1,28 @@
 ### changelog | salabim | discrete event simulation
 
+####  version 25.0.10  2025-07-01
+
+* With this version it is possible to zoom in and out 2D animations. This can be done with the scroll wheel of the mouse. 
+  It is now also possible to pan the 2D animation by pressing the left mouse button and moving the mouse in any direction.
+  Note that animation objects that are specified with `screen_coordinates=True` will not be zoomed or panned.
+* `AnimateQueue` and `AnimateMonitor` are now always executed with `screen_coordinates=True` (and the parameter `screen_coordinates` is even not defined anymore) .
+  It is highly recommended to always define all animation objects in `Component.animation_objects()` with `screen_coordinates=True` as otherwise zooming and panning might not work as expected.
+
+####  version 25.0.9  2025-05-08
+
+* Salabim can now also be run from within Excel with `xlwings lite`. That means that it is now possible to distribute models and have the user run a model without even installing Python or any module!
+  If run within Excel, models have to be yielded (yieldless=False), which is the default if run under xlwings, anyway.
+  Also, only blind animation is supported (and is True by default if run under xlwings lite). Animated video files can only be written to the pyodide file system. In order to make these pyodide files available to the local file system, you can use the xlwings_utils module (see www.salabim.org/xlwing_utlls) to copy these to a Dropbox file.
+  
+* The nice thing about running a salabim model in Excel is that you can build input sheets specifying a scenario easily and run the model with that scenario straight from that sheet. Then, place the output on either the same sheet or another sheet (including matplotlib/seaborn graphs, etc.).
+  
+  I intend to add a section on this in the documentation. Stay tuned.
+  
+* Special features for Microsoft's PythonInExcel, Anaconda's Anaconda Code and PyDroid3 are now deprecated. 
+
 ####  version 25.0.8  2025-03-29
 
-* The yieldless mode memory leak solution as introduced in version 25.0.5 did not work properly. Therefore, the method `Environment.cancell_all()`
+* The yieldless mode memory leak solution as introduced in version 25.0.5 did not work properly. Therefore, the method `Environment.cancel_all()`
   has been removed.
   (thanks to a bug reported by Michiel Luyken)
 
