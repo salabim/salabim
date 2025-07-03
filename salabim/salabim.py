@@ -1,8 +1,8 @@
-#               _         _      _               ____   ____       ___      _   ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / | / _ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | || | | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | || |_| |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_| \___/
+#               _         _      _               ____   ____       ___      _  _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / |/ |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | || |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | || |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_||_|
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
@@ -2890,6 +2890,14 @@ class Monitor:
 
             if False (default), the normal 2D plane will be used.
 
+        screen_coordinates : bool
+            use screen_coordinates
+
+            if True (default), screen_coordinates will be used instead.
+
+            if False, all parameters are scaled for positioning and scaling
+            objects.
+            
         Returns
         -------
         reference to AnimateMonitor object : AnimateMonitor
@@ -3663,6 +3671,14 @@ class AnimateMonitor(DynamicClass):
         if False, animation monitor is not shown, shown otherwise
         (default True)
 
+    screen_coordinates : bool
+        use screen_coordinates
+
+        if True (default), screen_coordinates will be used instead.
+
+        if False, all parameters are scaled for positioning and scaling
+        objects.
+        
     Note
     ----
     All measures are in screen coordinates
@@ -3707,6 +3723,7 @@ class AnimateMonitor(DynamicClass):
         as_points: bool = None,
         over3d: bool = None,
         layer: Union[float, Callable] = 0,
+        screen_coordinates=True,
         visible: Union[bool, Callable] = True,
         keep: Union[bool, Callable] = True,
         arg: Any = None,
@@ -3767,7 +3784,7 @@ class AnimateMonitor(DynamicClass):
         self._monitor = monitor
         self.as_level = monitor._level
         self.over3d = over3d
-        self.screen_coordinates = True
+        self.screen_coordinates = screen_coordinates
         self.register_dynamic_attributes(
             "linecolor linewidth fillcolor bordercolor borderlinewidth titlecolor nowcolor titlefont titlefontsize title "
             "x y offsetx offsety angle vertical_offset parent vertical_scale horizontal_scale width height "
@@ -4388,6 +4405,14 @@ class Queue:
 
             default: self (instance itself)
 
+        screen_coordinates : bool
+            use screen_coordinates
+
+            if True (default), screen_coordinates will be used instead.
+
+            if False, all parameters are scaled for positioning and scaling
+            objects.
+            
         Returns
         -------
         reference to AnimationQueue object : AnimationQueue
@@ -7196,7 +7221,7 @@ by adding at the end:
 
     overridden_lineno = None
 
-    def animation_objects(self, id: Any) -> Tuple:
+    def animation_objects(self, id: Any, screen_coordinates: bool = True) -> Tuple:
         """
         defines how to display a component in AnimateQueue
 
@@ -7226,7 +7251,9 @@ by adding at the end:
         """
         size_x = 50
         size_y = 50
-        ao0 = AnimateRectangle(text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg", screen_coordinates=True)
+        ao0 = AnimateRectangle(
+            text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg", screen_coordinates=screen_coordinates
+        )
         return (size_x, size_y, ao0)
 
     def animation3d_objects(self, id: Any) -> Tuple:
@@ -10738,7 +10765,8 @@ class Environment:
         self._x1 = self._x1_org
         self._y0 = self._y0_org
         self._y1 = self._y1_org
-        self._scale = self._scale
+        self._scale = self._scale_org
+        self._last_scalez = self._scalez
 
     def animation_pre_tick_sys(self, t: float) -> None:
         for ao in self.sys_objects.copy():  # copy required as ao's may be removed due to keep
@@ -11263,7 +11291,6 @@ class Environment:
     def on_closing(self):
         self.an_quit()
 
-
     def on_mousewheel(self, event):
         x_mouse = self.root.winfo_pointerx() - self.root.winfo_rootx()
         y_mouse = self.height() - self.root.winfo_pointery() + self.root.winfo_rooty()
@@ -11308,14 +11335,13 @@ class Environment:
 
     def do_pan(self, event):
         dx = -((event.x - self.lastx) / self._scale)
-        dy = ((event.y - self.lasty) / self._scale)
+        dy = (event.y - self.lasty) / self._scale
         # self._x0z = max(self._x0,self.lastx0 + dx)
         # self._y0z = max(self._y0,self.lasty0 + dy)
         self._x0z = self.lastx0 + dx
-        self._y0z = self.lasty0 + dy        
-        self._x1z = self._x0z + (self._x1 - self._x0) 
-        self._y1z = self._y0z + (self._y1 - self._y0) 
-
+        self._y0z = self.lasty0 + dy
+        self._x1z = self._x0z + (self._x1 - self._x0)
+        self._y1z = self._y0z + (self._y1 - self._y0)
 
     def end_pan(self, event):
         g.canvas.config(cursor="")  # Reset to default
@@ -11927,13 +11953,12 @@ class Environment:
                         self.root.bind("<B1-Motion>", self.do_pan)
                         self.root.bind("<ButtonRelease-1>", self.end_pan)
 
-
                         g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
                         g.canvas.configure(background=self.colorspec_to_hex("bg", False))
                         g.canvas.pack()
                         g.canvas_objects = []
                         g.canvas_object_overflow_image = None
-                    
+
                         # g.canvas.move("all", 1, 1)
                         # g.canvas.update()
                         # g.canvas.move("all", -1, -1)
@@ -13400,7 +13425,7 @@ class Environment:
             self._x1z = self._x1
             self._y1z = self._y1
 
-            self._scalez = self._scale
+            self._scalez = self._last_scalez = self._scale
             self.root.mainloop()
             if self._animate and self.running:
                 if self._video:
@@ -18212,6 +18237,7 @@ class AnimateQueue(DynamicClass):
         over3d=None,
         keep=True,
         visible=True,
+        screen_coordinates=True,
     ):
         super().__init__()
         _checkisqueue(queue)
@@ -18242,7 +18268,7 @@ class AnimateQueue(DynamicClass):
         self.keep = keep
         self.over3d = _default_over3d if over3d is None else over3d
         self.trajectory = trajectory
-        self.screen_coordinates = True
+        self.screen_coordinates = screen_coordinates
         self.register_dynamic_attributes(
             "xy_anchor x y id max_length direction reverse titleoffsetx titleoffsety titlefont titlefontsize titlecolor title layer visible keep trajectory"
         )
@@ -18267,6 +18293,7 @@ class AnimateQueue(DynamicClass):
         if not self.keep(t):
             self.remove()
             return
+        screen_coordinates = self.screen_coordinates
         prev_aos = self.current_aos
         self.current_aos = {}
         xy_anchor = self.xy_anchor(t)
@@ -18288,8 +18315,8 @@ class AnimateQueue(DynamicClass):
         titleoffsetx = self.titleoffsetx(t)
         titleoffsety = self.titleoffsety(t)
 
-        x += self._queue.env.xy_anchor_to_x(xy_anchor, screen_coordinates=True, over3d=self.over3d)
-        y += self._queue.env.xy_anchor_to_y(xy_anchor, screen_coordinates=True, over3d=self.over3d)
+        x += self._queue.env.xy_anchor_to_x(xy_anchor, screen_coordinates=screen_coordinates, over3d=self.over3d)
+        y += self._queue.env.xy_anchor_to_y(xy_anchor, screen_coordinates=screen_coordinates, over3d=self.over3d)
 
         if direction == "e":
             self.x_t = x + (-25 if titleoffsetx is None else titleoffsetx)
@@ -18321,20 +18348,21 @@ class AnimateQueue(DynamicClass):
             if ((max_length is not None) and n >= max_length) or not self.visible_t:
                 break
 
-            if c not in prev_aos:
-                nargs = c.animation_objects.__code__.co_argcount
-                if nargs == 1:
-                    animation_objects = self.current_aos[c] = c.animation_objects()
-                else:
-                    animation_objects = self.current_aos[c] = c.animation_objects(self.id(t))
-            else:
+            if c in prev_aos and self.env._scalez != self.env._last_scalez: # if scale changed (due to zooming), rerender the animation_objects
                 animation_objects = self.current_aos[c] = prev_aos[c]
                 del prev_aos[c]
+            else:
+                parameters = inspect.signature(c.animation_objects).parameters
+                kwargs = {}
+                if "id" in parameters:
+                    kwargs["id"] = self.id(t)
+                if "screen_coordinates" in parameters:
+                    kwargs["screen_coordinates"] = self.screen_coordinates
+                animation_objects = self.current_aos[c] = c.animation_objects(**kwargs)
 
             dimx = _call(animation_objects[0], t, c)
             dimy = _call(animation_objects[1], t, c)
             for ao in animation_objects[2:]:
-                ao.screen_coordinates = self.screen_coordinates
                 if isinstance(ao, AnimateClassic):
                     if direction == "t":
                         ao.x0 = xt + trajectory.x(t=x * 1.00, _t0=0)
@@ -18460,9 +18488,17 @@ class Animate3dQueue(DynamicClass):
         if given, the animation object will be removed
         automatically when the parent component is no longer accessible
 
+    screen_coordinates : bool
+        use screen_coordinates
+
+        if True (default), screen_coordinates will be used instead.
+
+        if False, all parameters are scaled for positioning and scaling
+        objects.
+        
     Note
     ----
-    All parameters, apart from queue, id, arg and parent can be specified as:
+    All parameters, apart from queue, id, arg, screen_coordinates and parent can be specified as:
 
     - a scalar, like 10
 

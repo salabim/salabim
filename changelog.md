@@ -1,5 +1,22 @@
 ### changelog | salabim | discrete event simulation
 
+####  version 25.0.11  2025-07-02
+
+* With this version, it is possible to use `screen_coordinates=False` (again) for `AnimateQueue` and `AnimateMonitor`. The animation will correctly follow the zooming and panning if screen_coordinates is False.
+  Related to this change is that the `Component.animation_objects` *may* now have a parameter `screen_coordinates`, which will be set to the `screen_coordinates` parameter of the  AnimateQueue call (default True) if called. Please note that defining this parameter is optional.
+
+  The default `Component.animation_objects()` method now reads:
+
+  ```
+      def animation_objects(self, id: Any, screen_coordinates: bool = True) -> Tuple:
+          size_x = 50
+          size_y = 50
+          ao0 = AnimateRectangle(
+              text=str(self.sequence_number()), textcolor="bg", spec=(-20, -20, 20, 20), linewidth=0, fillcolor="fg", screen_coordinates=screen_coordinates
+          )
+          return (size_x, size_y, ao0)
+  ```
+
 ####  version 25.0.10  2025-07-01
 
 * With this version it is possible to zoom in and out 2D animations. This can be done with the scroll wheel of the mouse. 
