@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      _  _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / |/ |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | || |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | || |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_||_|
+#               _         _      _               ____   ____       ___      _  ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / ||___ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | |  __) |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | | / __/
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_||_____|
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "25.0.11"
+__version__ = "25.0.12"
 import heapq
 import random
 import time
@@ -2897,7 +2897,7 @@ class Monitor:
 
             if False, all parameters are scaled for positioning and scaling
             objects.
-            
+
         Returns
         -------
         reference to AnimateMonitor object : AnimateMonitor
@@ -3678,7 +3678,7 @@ class AnimateMonitor(DynamicClass):
 
         if False, all parameters are scaled for positioning and scaling
         objects.
-        
+
     Note
     ----
     All measures are in screen coordinates
@@ -4412,7 +4412,7 @@ class Queue:
 
             if False, all parameters are scaled for positioning and scaling
             objects.
-            
+
         Returns
         -------
         reference to AnimationQueue object : AnimationQueue
@@ -13410,6 +13410,12 @@ class Environment:
                 self.step()
 
     def do_simulate_and_animate(self):
+        self._x0z = self._x0
+        self._y0z = self._y0
+        self._x1z = self._x1
+        self._y1z = self._y1
+        self._scalez = self._last_scalez = self._scale
+
         if Pythonista:
             if self._animate3d:
                 self.running = False
@@ -13420,12 +13426,7 @@ class Environment:
                 raise SimulationStopped
         else:
             self.root.after(0, self.simulate_and_animate_loop)
-            self._x0z = self._x0
-            self._y0z = self._y0
-            self._x1z = self._x1
-            self._y1z = self._y1
 
-            self._scalez = self._last_scalez = self._scale
             self.root.mainloop()
             if self._animate and self.running:
                 if self._video:
@@ -18348,7 +18349,7 @@ class AnimateQueue(DynamicClass):
             if ((max_length is not None) and n >= max_length) or not self.visible_t:
                 break
 
-            if c in prev_aos and self.env._scalez != self.env._last_scalez: # if scale changed (due to zooming), rerender the animation_objects
+            if c in prev_aos and self.env._scalez != self.env._last_scalez:  # if scale changed (due to zooming), rerender the animation_objects
                 animation_objects = self.current_aos[c] = prev_aos[c]
                 del prev_aos[c]
             else:
@@ -18495,7 +18496,7 @@ class Animate3dQueue(DynamicClass):
 
         if False, all parameters are scaled for positioning and scaling
         objects.
-        
+
     Note
     ----
     All parameters, apart from queue, id, arg, screen_coordinates and parent can be specified as:

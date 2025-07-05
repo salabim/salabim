@@ -1,5 +1,9 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 25.0.12  2025-07-05
+
+- Bug prevented any animation under Pythonista. Fixed.
+
 ####  version 25.0.11  2025-07-02
 
 * With this version, it is possible to use `screen_coordinates=False` (again) for `AnimateQueue` and `AnimateMonitor`. The animation will correctly follow the zooming and panning if screen_coordinates is False.
