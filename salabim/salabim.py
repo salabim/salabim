@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      _  ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / ||___ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | |  __) |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | | / __/
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_||_____|
+#               _         _      _               ____   ____       ___      _  _____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / ||___ /
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | |  |_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | | ___) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_||____/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "25.0.12"
+__version__ = "25.0.13"
 import heapq
 import random
 import time
@@ -54,7 +54,7 @@ Windows = sys.platform.startswith("win")
 MacOS = platform.system == "Darwin"
 PyPy = platform.python_implementation() == "PyPy"
 Chromebook = "penguin" in platform.uname()
-Xlwings = "xlwings" in sys.modules
+pyodide = "pyodide" in sys.modules
 
 _color_name_to_ANSI = dict(
     dark_black="\033[0;30m",
@@ -122,7 +122,7 @@ if Pythonista:
 inf = float("inf")
 nan = float("nan")
 
-if Pythonista or Xlwings:
+if Pythonista or pyodide:
     _yieldless = False
 else:
     _yieldless = True
@@ -163,8 +163,8 @@ def yieldless(value: bool = None) -> bool:
         if value:
             if Pythonista:
                 raise ValueError("yiedless mode is not allowed under Pythonista")
-            if Xlwings:
-                raise ValueError("yiedless mode is not allowed under xlwings lite")
+            if pyodide:
+                raise ValueError("yiedless mode is not allowed under pyodide")
         _yieldless = value
     return _yieldless
 
@@ -7680,7 +7680,6 @@ Maybe this a non yieldless model. In that case:
 - run salabim_unyield.py"""
                     )
                 self.env._any_yield = True
-                self._process = p(**kwargs)
                 self._process_isgenerator = True
             else:
                 if not self.env._yieldless and not self.env._any_yield:
@@ -7699,7 +7698,7 @@ by adding:
 
             extra = "process=" + process_name
             if self.env._yieldless:
-                self._glet = greenlet.greenlet(self._process, parent=self.env._glet)
+                self._glet = greenlet.greenlet(lambda: self._process(**kwargs), parent=self.env._glet)  # ***
 
         if self.status.value != current:
             self._remove()
@@ -10605,11 +10604,11 @@ class Environment:
         self._zoom_factor = 1.1
 
         self.last_s0 = ""
-        if Xlwings:
+        if pyodide:
             if blind_animation is None:
                 blind_animation = True
             if not blind_animation:
-                raise ValueError("blind_animation may not be False under xlwings lite")
+                raise ValueError("blind_animation may not be False under pyodide")
         else:
             if blind_animation is None:
                 blind_animation = False
@@ -25161,7 +25160,7 @@ def _check_overlapping_parameters(obj, method_name0, method_name1, process=None)
 
 @functools.lru_cache()
 def _screen_dimensions():
-    if Xlwings:
+    if pyodide:
         return 1024, 768
     if Pythonista:
         screen_width, screen_height = ui.get_screen_size()
@@ -27189,7 +27188,7 @@ def _std_fonts():
 
 
 def fonts():
-    if Xlwings:
+    if pyodide:
         return []
     if not hasattr(fonts, "font_list"):
         fonts.font_list = []
@@ -27462,7 +27461,7 @@ def can_animate(try_only: bool = True) -> bool:
         except ImportError:
             ImageGrab = None
 
-        if not Pythonista and not Xlwings:
+        if not Pythonista and not pyodide:
             from PIL import ImageTk
     except ImportError:
         if try_only:
@@ -27471,7 +27470,7 @@ def can_animate(try_only: bool = True) -> bool:
 
     g.dummy_image = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
 
-    if not Pythonista and not Xlwings:
+    if not Pythonista and not pyodide:
         try:
             import tkinter
             import tkinter.font

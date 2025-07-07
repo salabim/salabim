@@ -1,5 +1,9 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 25.0.13  2025-07-
+
+- Instead of testing for xlwings, salabim now tests for pyodide to conclude that a model runs under pyodide. Related to that are several messages that now refer to pyodide rather than xlwings. This makes it possible to use salabim under PyScript as well.
+
 #### version 25.0.12  2025-07-05
 
 - Bug prevented any animation under Pythonista. Fixed.
