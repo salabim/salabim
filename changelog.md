@@ -1,8 +1,16 @@
 ### changelog | salabim | discrete event simulation
 
-#### version 25.0.13  2025-07-
+#### version 25.0.14  2025-07-
 
-- Instead of testing for xlwings, salabim now tests for pyodide to conclude that a model runs under pyodide. Related to that are several messages that now refer to pyodide rather than xlwings. This makes it possible to use salabim under PyScript as well.
+- Upon calling `Environment.snapshot()`, the snapshot was taken at the animation time t() instead of at now(). From this version on, the snapshot is taken at t=now(), as documented.
+- Bug when a font size of (nearly) 0 was specified. In that case, a ValueError was raised. Fixed.
+  (thanks to a bug report by Heinz Ranja) 
+
+#### version 25.0.13  2025-07-07
+
+- Bug in `Component.activate()` prevented using extra keyword arguments in yieldless mode. Fixed.
+  (thanks to a bug report by Ben Moverley Smith)
+- Instead of testing for `xlwings`, salabim now tests for `pyodide` to conclude that a model runs under *pyodide*. Related to that are several messages that now refer to pyodide rather than xlwings. This makes it possible to use salabim under PyScript (and other pyodide based platforms) as well.
 
 #### version 25.0.12  2025-07-05
 
