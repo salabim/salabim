@@ -1,6 +1,6 @@
 ### changelog | salabim | discrete event simulation
 
-#### version 25.0.14  2025-07-
+#### version 25.0.14  2025-07-11
 
 - Upon calling `Environment.snapshot()`, the snapshot was taken at the animation time t() instead of at now(). From this version on, the snapshot is taken at t=now(), as documented.
 - Bug when a font size of (nearly) 0 was specified. In that case, a ValueError was raised. Fixed.
