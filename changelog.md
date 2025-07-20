@@ -1,5 +1,9 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 25.0.15  2025-07-20
+
+- Bug with Component.activate() in yielded  mode fixed.
+
 #### version 25.0.14  2025-07-11
 
 - Upon calling `Environment.snapshot()`, the snapshot was taken at the animation time t() instead of at now(). From this version on, the snapshot is taken at t=now(), as documented.

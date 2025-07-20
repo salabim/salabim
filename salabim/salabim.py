@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      _  _  _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / || || |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | || || |_
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | ||__   _|
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_|   |_|
+#               _         _      _               ____   ____       ___      _  ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / || ___|
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | ||___ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | | ___) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_||____/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "25.0.14"
+__version__ = "25.0.15"
 import heapq
 import random
 import time
@@ -7680,6 +7680,7 @@ Maybe this a non yieldless model. In that case:
 - run salabim_unyield.py"""
                     )
                 self.env._any_yield = True
+                self._process = p(**kwargs)
                 self._process_isgenerator = True
             else:
                 if not self.env._yieldless and not self.env._any_yield:
@@ -7698,7 +7699,7 @@ by adding:
 
             extra = "process=" + process_name
             if self.env._yieldless:
-                self._glet = greenlet.greenlet(lambda: self._process(**kwargs), parent=self.env._glet)  # ***
+                self._glet = greenlet.greenlet(lambda: self._process(**kwargs), parent=self.env._glet)
 
         if self.status.value != current:
             self._remove()
