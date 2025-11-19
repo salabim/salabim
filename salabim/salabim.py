@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      _  ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / || ___|
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | ||___ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | | ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_||____/
+#               _         _      _               ____   ____       ___      _   __
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / | / /_
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | || '_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | || (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_| \___/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "25.0.15"
+__version__ = "25.0.16"
 import heapq
 import random
 import time
@@ -10646,6 +10646,8 @@ class Environment:
         self._y0 = 0.0
         self._x1: float = self._width
         self._scale = 1.0
+        self._scalez=1.0
+        self._last_scalez=1.0
         self._y1 = self._y0 + self._height
         self._background_color = "white"
         self._foreground_color = "black"

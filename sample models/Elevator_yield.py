@@ -4,7 +4,7 @@ sim.yieldless(False)
 
 
 class VisitorGenerator(sim.Component):
-    def setup(self, from_, to, id, *args, **kwargs):
+    def setup(self, from_, to, id):
         self.from_ = from_
         self.to = to
         self.id = id
@@ -34,7 +34,7 @@ class VisitorGenerator(sim.Component):
 
 
 class Visitor(sim.Component):
-    def setup(self, from_, to, *args, **kwargs):
+    def setup(self, from_, to):
         self.fromfloor = floors[from_]
         self.tofloor = floors[to]
         self.direction = getdirection(self.fromfloor, self.tofloor)

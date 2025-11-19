@@ -4,9 +4,8 @@ import sys
 from pathlib import Path
 
 if __name__ == "__main__":
-    file_folder = Path(__file__).parent
-    top_folder = (file_folder / "..").resolve()
-    sys.path.insert(0, str(top_folder))
-    os.chdir(file_folder)
+    import os, sys # three lines to use the local package and chdir
+    os.chdir(os.path.dirname(__file__))
+    sys.path.insert(0, os.path.dirname(__file__) + "/../" + os.path.dirname(__file__).split(os.sep)[-2])
 
     pytest.main(["-vv", "-s"])

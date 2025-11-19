@@ -1,5 +1,4 @@
 import salabim as sim
-import random
 
 def do_animation():
 
@@ -244,7 +243,7 @@ class Visitor(sim.Component):
         self.tofloor = floors[to]
         self.direction = getdirection(self.fromfloor, self.tofloor)
 
-    def animation_objects(self, q):
+    def animation_objects(self):
         size_x = xvisitor_dim
         size_y = yvisitor_dim
         b = 0.1 * xvisitor_dim
