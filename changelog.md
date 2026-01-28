@@ -1,5 +1,23 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 26.0.0  2026-01-28
+
+- Typing of `setup()` methods now includes `**kwargs`. Also, the `_check_overlapping_parameters` now excludes `kwargs`.
+  (thanks to a PR by Won minho (kingkingburger))
+- Some minor code improvements
+
+#### version 25.0.16  2025-11-19
+
+- Salabim is tested to be compatible with Python 3.14 .
+
+- To use 3D animations under Windows, there's a new, much simpler way to install. It is documented in the manual, as follows:
+
+  The recommended way to install PyOpenGL (after having installed salabim) is to run:
+
+  ```
+  python -c "import requests;exec(requests.get('https://raw.githubusercontent.com/salabim/salabim/master/tools/opengl_installer.py').text)"
+  ```
+
 #### version 25.0.15  2025-07-20
 
 - Bug with Component.activate() in yielded  mode fixed.

@@ -1,13 +1,13 @@
-#               _         _      _               ____   ____       ___      _   __
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \ | ___|     / _ \    / | / /_
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) ||___ \    | | | |   | || '_ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/  ___) | _ | |_| | _ | || (_) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____||____/ (_) \___/ (_)|_| \___/
+#               _         _      _               ____    __        ___       ___
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / /_      / _ \     / _ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || '_ \    | | | |   | | | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | (_) | _ | |_| | _ | |_| |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_) \___/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "25.0.16"
+__version__ = "26.0.0"
 import heapq
 import random
 import time
@@ -946,7 +946,7 @@ class Monitor:
         new.isgenerated = True
         return new
 
-    def setup(self) -> None:
+    def setup(self, **kwargs: Any) -> None:
         """
         called immediately after initialization of a monitor.
 
@@ -3454,7 +3454,7 @@ class DynamicClass:
             if inspect.isfunction(c):
                 nargs = c.__code__.co_argcount
                 if c.__defaults__ is not None:
-                    c.__defaults__ = tuple(self if x == object else x for x in c.__defaults__)  # indicate that object refers to animation object itself
+                    c.__defaults__ = tuple(self if x is object else x for x in c.__defaults__)  # indicate that object refers to animation object itself
                     nargs -= len(c.__defaults__)
 
                 if nargs == 0:
@@ -3483,7 +3483,7 @@ class DynamicClass:
             if inspect.isfunction(c):
                 nargs = c.__code__.co_argcount
                 if c.__defaults__ is not None:
-                    c.__defaults__ = tuple(self if x == object else x for x in c.__defaults__)  # indicate that object refers to animation object itself
+                    c.__defaults__ = tuple(self if x is object else x for x in c.__defaults__)  # indicate that object refers to animation object itself
                     nargs -= len(c.__defaults__)
                 if nargs == 0:
                     return c()
@@ -4061,7 +4061,7 @@ if Pythonista:
         def __init__(self, env, *args, **kwargs):
             scene.Scene.__init__(self, *args, **kwargs)
 
-        def setup(self):
+        def setup(self, **kwargs: Any) -> None:
             if g.animation_env.retina:
                 self.bg = None
 
@@ -4339,7 +4339,7 @@ class Queue:
             self.env.print_trace("", "", self.name() + " create")
         self.setup(**kwargs)
 
-    def setup(self) -> None:
+    def setup(self, **kwargs: Any) -> None:
         """
         called immediately after initialization of a queue.
 
@@ -5867,7 +5867,7 @@ class Animate3dBase(DynamicClass):
         self.register_dynamic_attributes("visible keep layer")
         self.setup(**kwargs)
 
-    def setup(self) -> None:
+    def setup(self, **kwargs: Any) -> None:
         """
         called immediately after initialization of a the Animate3dBase object.
 
@@ -5906,7 +5906,7 @@ class Animate3dBase(DynamicClass):
 
 class _Movement:
     # used by trajectories
-    def __init__(self, l, vmax: float = None, v0: float = None, v1: float = None, acc: float = None, dec: float = None) -> None:
+    def __init__(self, length, vmax: float = None, v0: float = None, v1: float = None, acc: float = None, dec: float = None) -> None:
         if vmax is None:
             vmax = 1
         if v0 is None:
@@ -5923,13 +5923,13 @@ class _Movement:
         s_v0_vmax = (vmax**2 - v0**2) * acc2inv
         s_vmax_v1 = (vmax**2 - v1**2) * dec2inv
 
-        if s_v0_vmax + s_vmax_v1 > l:
-            vmax = math.sqrt((l + (v0**2 * acc2inv) + (v1**2 * dec2inv)) / (acc2inv + dec2inv))
+        if s_v0_vmax + s_vmax_v1 > length:
+            vmax = math.sqrt((length + (v0**2 * acc2inv) + (v1**2 * dec2inv)) / (acc2inv + dec2inv))
 
         self.l_v0_vmax = (vmax**2 - v0**2) * acc2inv
         self.l_vmax_v1 = (vmax**2 - v1**2) * dec2inv
 
-        self.l_vmax = l - self.l_v0_vmax - self.l_vmax_v1
+        self.l_vmax = length - self.l_v0_vmax - self.l_vmax_v1
         if self.l_v0_vmax < 0 or self.l_vmax_v1 < 0:
             raise ValueError("not feasible")
         self.t_v0_vmax = (vmax - v0) / acc
@@ -6560,7 +6560,7 @@ class TrajectoryPolygon(_Trajectory):
         self.cum_length.append(cum_length)
 
         self._length = self.cum_length[-1]
-        self.movement = _Movement(l=self._length, v0=v0, v1=v1, vmax=vmax, acc=acc, dec=dec)
+        self.movement = _Movement(length=self._length, v0=v0, v1=v1, vmax=vmax, acc=acc, dec=dec)
         self._duration = self.movement.t
         self._t1 = self._t0 + self._duration
 
@@ -6812,7 +6812,7 @@ class TrajectoryCircle(_Trajectory):
         self.x_center = x_center
         self.y_center = y_center
         self._length = abs(math.radians(self.angle1 - self.angle0)) * self.radius
-        self.movement = _Movement(l=self._length, v0=v0, v1=v1, vmax=vmax, acc=acc, dec=dec)
+        self.movement = _Movement(length=self._length, v0=v0, v1=v1, vmax=vmax, acc=acc, dec=dec)
         self._duration = self.movement.t
         self._t1 = self._t0 + self._duration
         self.orientation = orientation
@@ -7303,7 +7303,7 @@ by adding at the end:
                 ao.remove()
             del self._aos[q]
 
-    def setup(self) -> None:
+    def setup(self, **kwargs: Any) -> None:
         """
         called immediately after initialization of a component.
 
@@ -10690,7 +10690,7 @@ class Environment:
     _nameserialize = {}
     cached_modelname_width = [None, None]
 
-    def setup(self) -> None:
+    def setup(self, **kwargs: Any) -> None:
         """
         called immediately after initialization of an environment.
 
@@ -10976,7 +10976,6 @@ class Environment:
         t = self.t()
         if props is None:
             props = "x_eye y_eye z_eye x_center y_center z_center field_of_view_y"
-        s = "view("
         items = []
         for prop in props.split():
             items.append(f"{getattr(self.view, prop)(t):.4f}")
@@ -11591,9 +11590,6 @@ class Environment:
 
         """
         frame_changed = False
-        width_changed = False
-        height_changed = False
-        fps_changed = False
 
         if speed is not None:
             self._speed = speed
@@ -11618,13 +11614,11 @@ class Environment:
             if self._width != width:
                 self._width = int(width)
                 frame_changed = True
-                width_changed = True
 
         if height is not None:
             if self._height != height:
                 self._height = int(height)
                 frame_changed = True
-                height_changed = True
 
         if width3d is not None:
             if self._width != width:
@@ -11849,11 +11843,11 @@ class Environment:
                     self._video_name = video
                     self._real_fps = self._fps  # only overridden for animated gifs
                     video_path.parent.mkdir(parents=True, exist_ok=True)
-                    if extension in (".gif", ".webp") and not ("*" in video_path.stem):
+                    if extension in (".gif", ".webp") and "*" not in video_path.stem:
                         self._video_out = extension[1:]  # get rid of the leading .
                         self._images = []
                         self._real_fps = 100 / int(100 / self._fps)  # duration is always in 10 ms increments
-                    elif extension == ".png" and not ("*" in video_path.stem):
+                    elif extension == ".png" and "*" not in video_path.stem:
                         self._video_out = "png"
                         self._images = []
                     elif extension.lower() in (".jpg", ".png", ".bmp", ".ico", ".tiff", ".gif", ".webp"):
@@ -13654,7 +13648,7 @@ class Environment:
             xy_anchor="nw",
             visible=lambda: self._modelname,
         )
-        an = AnimateText(
+        AnimateText(
             text=" model",
             x=lambda: self.modelname_width() + 72,
             y=y,
@@ -14935,7 +14929,7 @@ class Environment:
             return None
         try:
             return float(spec)
-        except:
+        except Exception:
             ...
         if self._datetime0:
             if isinstance(spec, str):
@@ -14967,7 +14961,7 @@ class Environment:
             return None
         try:
             return float(spec)
-        except:
+        except Exception:
             ...
         if self._datetime0:
             if isinstance(spec, str):
@@ -15008,7 +15002,7 @@ class Environment:
             raise ImportError("in order to parse a date/time string, install dateutil with pip install python-dateutil")
         try:
             return dateutil.parser.parse(spec, dayfirst=False, yearfirst=True)
-        except:
+        except Exception:
             raise ValueError(f"{spec} is not a valid date/time")
 
     def beep(self) -> None:
@@ -15194,7 +15188,7 @@ class Environment:
         if self._last_animate != self._animate or self._last_paused != self._paused:
             for key in self._ui_window.key_dict:
                 field = self._ui_window[key]
-                if type(field) != sg.HorizontalSeparator:
+                if not isinstance(field, sg.HorizontalSeparator):
                     if self._paused:
                         field.update(visible=True)
                     else:
@@ -23378,7 +23372,7 @@ class Distribution(_Distribution):
         pre = sp[0].upper().strip()
 
         # here we have either a string starting with a ( of no ( at all
-        if (pre == "") or not ("(" in spec):
+        if (pre == "") or "(" not in spec:
             spec = spec.replace(")", "")  # get rid of closing parenthesis
             spec = spec.replace("(", "")  # get rid of starting parenthesis
             sp = spec.split(",")
@@ -23557,7 +23551,7 @@ class State:
             self.env.print_trace("", "", self.name() + " create", "value = " + repr(self._value))
         self.setup(**kwargs)
 
-    def setup(self) -> None:
+    def setup(self, **kwargs: Any) -> None:
         """
         called immediately after initialization of a state.
 
@@ -24068,7 +24062,7 @@ class Resource:
 
         return self._preemptive
 
-    def setup(self):
+    def setup(self, **kwargs: Any) -> None:
         """
         called immediately after initialization of a resource.
 
@@ -25166,7 +25160,7 @@ def _check_overlapping_parameters(obj, method_name0, method_name1, process=None)
     else:
         method1 = process
 
-    overlapping_parameters = set(inspect.signature(method0).parameters) & set(inspect.signature(method1).parameters)
+    overlapping_parameters = (set(inspect.signature(method0).parameters) & set(inspect.signature(method1).parameters)) - {"kwargs"}
     if overlapping_parameters:
         raise TypeError(
             f"{obj.__class__.__name__}.{method_name1}()  error: parameter '{list(overlapping_parameters)[0]}' not allowed, because it is also a parameter of {obj.__class__.__name__}.{method_name0}()"
@@ -25338,7 +25332,7 @@ def _get_caller_frame():
     filename0 = inspect.getframeinfo(stack[0][0]).filename
     for i in range(len(inspect.stack())):
         frame = stack[i][0]
-        if not inspect.getframeinfo(frame).filename in (filename0, "<string>"):
+        if inspect.getframeinfo(frame).filename not in (filename0, "<string>"):
             break
     return frame
 
@@ -25477,7 +25471,7 @@ class _AnimateIntro(Animate3dBase):
         self.env = env
         super().__init__(env=env)
 
-    def setup(self):
+    def setup(self, **kwargs: Any) -> None:
         self.layer = -math.inf
         self.field_of_view_y = 45
         self.z_near = 0.1
@@ -25553,7 +25547,7 @@ class _AnimateExtro(Animate3dBase):
         self.env = env
         super().__init__(env=env)
 
-    def setup(self):
+    def setup(self, **kwargs: Any) -> None:
         self.layer = math.inf
 
     def draw(self, t):
@@ -27169,6 +27163,7 @@ def draw_box3d(
         gl.glEnd()
 
     gl.glPopMatrix()
+
 
 
 def draw_sphere3d(x=0, y=0, z=0, radius=1, number_of_slices=32, number_of_stacks=None, gl_color=(1, 1, 1)):
