@@ -1,6 +1,6 @@
 ### changelog | salabim | discrete event simulation
 
-#### version 26.0.2  2026-02-06
+#### version 26.0.1  2026-02-07
 
 - Zooming didn't work properly on MacOS. Fixed, thanks to help from Lukas Hollenstein.
 - Pressing `u` or `U` now unzooms, i.e. resets zoom and pan factors.
