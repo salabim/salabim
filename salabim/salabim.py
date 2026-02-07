@@ -1,13 +1,13 @@
-#               _         _      _               ____    __        ___       ___
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / /_      / _ \     / _ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || '_ \    | | | |   | | | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | (_) | _ | |_| | _ | |_| |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_) \___/
+#               _         _      _               ____    __        ___      _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / /_      / _ \    / |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || '_ \    | | | |   | |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | (_) | _ | |_| | _ | |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|_|
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "26.0.0"
+__version__ = "26.0.1"
 import heapq
 import random
 import time
@@ -51,7 +51,7 @@ ColorType = Union[str, Iterable[float]]
 
 Pythonista = sys.platform == "ios"
 Windows = sys.platform.startswith("win")
-MacOS = platform.system == "Darwin"
+MacOS = sys.platform == "darwin"
 PyPy = platform.python_implementation() == "PyPy"
 Chromebook = "penguin" in platform.uname()
 pyodide = "pyodide" in sys.modules
@@ -10646,8 +10646,8 @@ class Environment:
         self._y0 = 0.0
         self._x1: float = self._width
         self._scale = 1.0
-        self._scalez=1.0
-        self._last_scalez=1.0
+        self._scalez = 1.0
+        self._last_scalez = 1.0
         self._y1 = self._y0 + self._height
         self._background_color = "white"
         self._foreground_color = "black"
@@ -11301,13 +11301,12 @@ class Environment:
         if Windows:
             delta = int(event.delta / 120)  # normalize to ticks
         elif MacOS:
-            delta = int(event.delta)  # already small, usually ±1
+            delta = int(event.delta / 120)
         else:
             delta = 0  # fallback
         for _ in range(abs(delta)):
             if delta < 0:
                 zoom_factor = self._zoom_factor
-
             else:
                 zoom_factor = 1 / self._zoom_factor
 
@@ -11326,6 +11325,14 @@ class Environment:
             self._y0z = y - (y - self._y0z) * zoom_factor
             self._x1z = x - (x - self._x1z) * zoom_factor
             self._y1z = y - (y - self._y1z) * zoom_factor
+
+    def on_touchpadscroll(self, event):
+        if 0 < event.delta < 10:
+            event.delta = -120  # normalize to mousewheel event
+            self.on_mousewheel(event)
+        elif 65000 < event.delta < 70000:
+            event.delta = 120  # normalize to mousewheel event
+            self.on_mousewheel(event)
 
     def start_pan(self, event):
         g.canvas.config(cursor="fleur")  # Change cursor to "move" style
@@ -11346,6 +11353,13 @@ class Environment:
 
     def end_pan(self, event):
         g.canvas.config(cursor="")  # Reset to default
+
+    def unzoom(self, event):
+        self._x0z = self._x0
+        self._y0z = self._y0
+        self._x1z = self._x1
+        self._y1z = self._y1
+        self._scalez = self._last_scalez = self._scale
 
     def animation_parameters(
         self,
@@ -11948,6 +11962,10 @@ class Environment:
                         self.root.bind("<ButtonPress-1>", self.start_pan)
                         self.root.bind("<B1-Motion>", self.do_pan)
                         self.root.bind("<ButtonRelease-1>", self.end_pan)
+                        self.root.bind("u", self.unzoom)
+                        self.root.bind("U", self.unzoom)
+                        if MacOS:
+                            self.root.bind("<TouchpadScroll>", self.on_touchpadscroll)
 
                         g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
                         g.canvas.configure(background=self.colorspec_to_hex("bg", False))
@@ -13673,101 +13691,94 @@ class Environment:
             color = "blue"
         else:
             fillcolor = "blue"
-            color = "white"
+            if MacOS:
+                x0 = 68
+                y0 = -16
+                color = "black"
+            else:
+                x0 = 38
+                y0 = -21
+                color = "white"
 
-        uio = AnimateButton(x=38, y=-21, text="Menu", width=50, action=self.env.an_menu, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
+        uio = AnimateButton(x=x0, y=y0, text="Menu", width=50, action=self.env.an_menu, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
 
         uio.in_topleft = True
 
-    def an_unsynced_buttons(self) -> None:
+    def an_all_buttons(self) -> None:
         """
-        function to initialize the unsynced buttons
+        function to initialize all (synced and unsynced) buttons
 
         may be overridden to change the standard behaviour.
         """
         self.remove_topleft_buttons()
-        if self.colorspec_to_tuple("bg")[:-1] == self.colorspec_to_tuple("green")[:-1]:
-            fillcolor = "lightgreen"
-            color = "green"
+
+        if MacOS:
+            fillcolorgo = "white"
+            fillcolorstop = "white"
+            colorgo = "black"
+            colorstop = "black"
+            colorrest = "black"
+            x0 = 68
+            y0 = -16
+            dx = 90
+
         else:
-            fillcolor = "green"
-            color = "white"
-        uio = AnimateButton(x=38, y=-21, text="Go", width=50, action=self.env.an_go, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
+            if self.colorspec_to_tuple("bg") == self.colorspec_to_tuple("green"):
+                fillcolorgo = "lightgreen"
+                colorgo = "black"
+            else:
+                fillcolorgo = "green"
+                colorgo = "white"
+            if self.colorspec_to_tuple("bg") == self.colorspec_to_tuple("red"):
+                fillcolorstop = "lightsalmon"
+                colorstop = "black"
+            else:
+                fillcolorstop = "red"
+                colorstop = "white"
+
+            colorrest = "bg"
+            x0 = 38
+            y0 = -21
+            dx = 60
+
+        uio = AnimateButton(x=x0, y=y0, text="Go", width=50, action=self.env.an_go, env=self, fillcolor=fillcolorgo, color=colorgo, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(x=38 + 1 * 60, y=-21, text="Step", width=50, action=self.env.an_step, env=self, xy_anchor="nw")
-        uio.in_topleft = True
+        if self._synced:
+            uio = AnimateButton(x=x0 + 1 * dx, y=y0, text="/2", width=50, color=colorrest, action=self.env.an_half, env=self, xy_anchor="nw")
+            uio.in_topleft = True
 
-        uio = AnimateButton(x=38 + 3 * 60, y=-21, text="Synced", width=50, action=self.env.an_synced_on, env=self, xy_anchor="nw")
-        uio.in_topleft = True
-
-        uio = AnimateButton(x=38 + 4 * 60, y=-21, text="Trace", width=50, action=self.env.an_trace, env=self, xy_anchor="nw")
-        uio.in_topleft = True
-
-        if self.colorspec_to_tuple("bg")[:-1] == self.colorspec_to_tuple("red")[:-1]:
-            fillcolor = "lightsalmon"
-            color = "white"
+            uio = AnimateButton(x=x0 + 2 * dx, y=y0, text="*2", width=50, color=colorrest, action=self.env.an_double, env=self, xy_anchor="nw")
+            uio.in_topleft = True
         else:
-            fillcolor = "red"
-            color = "white"
 
-        uio = AnimateButton(x=38 + 5 * 60, y=-21, text="Stop", width=50, action=self.env.an_quit, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
+            uio = AnimateButton(x=x0 + 1 * dx, y=y0, text="Step", width=50, color=colorrest, action=self.env.an_step, env=self, xy_anchor="nw")
+            uio.in_topleft = True
+
+        uio = AnimateButton(x=x0 + 3 * dx, y=y0, text="Synced", width=50, color=colorrest, action=self.env.an_synced, env=self, xy_anchor="nw")
+
         uio.in_topleft = True
 
-        ao = AnimateText(x=38 + 3 * 60, y=-35, text=self.syncedtext, text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw")
-        ao.in_topleft = True
-
-        ao = AnimateText(x=38 + 4 * 60, y=-35, text=self.tracetext, text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw")
-        ao.in_topleft = True
-
-    def an_synced_buttons(self) -> None:
-        """
-        function to initialize the synced buttons
-
-        may be overridden to change the standard behaviour.
-        """
-        self.remove_topleft_buttons()
-        if self.colorspec_to_tuple("bg")[:-1] == self.colorspec_to_tuple("green")[:-1]:
-            fillcolor = "lightgreen"
-            color = "green"
-        else:
-            fillcolor = "green"
-            color = "white"
-
-        uio = AnimateButton(x=38, y=-21, text="Go", width=50, action=self.env.an_go, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
+        uio = AnimateButton(x=x0 + 4 * dx, y=y0, text="Trace", width=50, color=colorrest, action=self.env.an_trace, env=self, xy_anchor="nw")
         uio.in_topleft = True
 
-        uio = AnimateButton(x=38 + 1 * 60, y=-21, text="/2", width=50, action=self.env.an_half, env=self, xy_anchor="nw")
-        uio.in_topleft = True
-
-        uio = AnimateButton(x=38 + 2 * 60, y=-21, text="*2", width=50, action=self.env.an_double, env=self, xy_anchor="nw")
-        uio.in_topleft = True
-
-        uio = AnimateButton(x=38 + 3 * 60, y=-21, text="Synced", width=50, action=self.env.an_synced_off, env=self, xy_anchor="nw")
-        uio.in_topleft = True
-
-        uio = AnimateButton(x=38 + 4 * 60, y=-21, text="Trace", width=50, action=self.env.an_trace, env=self, xy_anchor="nw")
-        uio.in_topleft = True
-
-        if self.colorspec_to_tuple("bg") == self.colorspec_to_tuple("red"):
-            fillcolor = "lightsalmon"
-            color = "white"
-        else:
-            fillcolor = "red"
-            color = "white"
-        uio = AnimateButton(x=38 + 5 * 60, y=-21, text="Stop", width=50, action=self.env.an_quit, env=self, fillcolor=fillcolor, color=color, xy_anchor="nw")
-        uio.in_topleft = True
-
-        ao = AnimateText(
-            x=38 + 1.5 * 60, y=-35, text=self.speedtext, textcolor="fg", text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw"
+        uio = AnimateButton(
+            x=x0 + 5 * dx, y=y0, text="Stop", width=50, action=self.env.an_quit, env=self, fillcolor=fillcolorstop, color=colorstop, xy_anchor="nw"
         )
+        uio.in_topleft = True
+
+        ao = AnimateText(x=x0 + 3 * dx, y=-35, text=self.syncedtext, text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw")
         ao.in_topleft = True
 
-        ao = AnimateText(x=38 + 3 * 60, y=-35, text=self.syncedtext, text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw")
+        ao = AnimateText(x=x0 + 4 * dx, y=-35, text=self.tracetext, text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw")
         ao.in_topleft = True
 
-        ao = AnimateText(x=38 + 4 * 60, y=-35, text=self.tracetext, text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw")
-        ao.in_topleft = True
+        if self._synced:
+            ao = AnimateText(
+                x=x0 + 1.5 * dx, y=-35, text=self.speedtext, textcolor="fg", text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw"
+            )
+            ao.in_topleft = True
+
 
     def remove_topleft_buttons(self):
         for uio in self.ui_objects[:]:
@@ -13840,13 +13851,9 @@ class Environment:
     def an_trace(self):
         self._trace = not self._trace
 
-    def an_synced_on(self):
-        self._synced = True
-        self.an_synced_buttons()
-
-    def an_synced_off(self):
-        self._synced = False
-        self.an_unsynced_buttons()
+    def an_synced(self):
+        self._synced = not self._synced
+        self.an_all_buttons()
 
     def an_step(self):
         self._step_pressed = True
@@ -13867,10 +13874,7 @@ class Environment:
     def an_menu(self):
         self.paused(True)
         self.set_start_animation()
-        if self._synced:
-            self.an_synced_buttons()
-        else:
-            self.an_unsynced_buttons()
+        self.an_all_buttons()
 
     def clocktext(self, t):
         s = ""
@@ -23978,7 +23982,7 @@ class Resource:
 
         if False, claims belong to a component.
 
-    prememptive : bool
+    preemptive : bool
         if True, components with a lower priority will be bumped out of the claimers queue if possible
         if False (default), no bumping
 
@@ -27163,7 +27167,6 @@ def draw_box3d(
         gl.glEnd()
 
     gl.glPopMatrix()
-
 
 
 def draw_sphere3d(x=0, y=0, z=0, radius=1, number_of_slices=32, number_of_stacks=None, gl_color=(1, 1, 1)):

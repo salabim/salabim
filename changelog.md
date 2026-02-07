@@ -1,5 +1,10 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 26.0.2  2026-02-06
+
+- Zooming didn't work properly on MacOS. Fixed, thanks to help from Lukas Hollenstein.
+- Pressing `u` or `U` now unzooms, i.e. resets zoom and pan factors.
+
 #### version 26.0.0  2026-01-28
 
 - Typing of `setup()` methods now includes `**kwargs`. Also, the `_check_overlapping_parameters` now excludes `kwargs`.

@@ -10,7 +10,7 @@ authors = [
     { name = "Ruud van der Ham", email = "rt.van.der.ham@gmail.com" },
 ]
 description = "salabim - discrete event simulation in Python"
-version = "26.0.0"
+version = "26.0.1"
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = []
