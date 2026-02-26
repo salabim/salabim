@@ -1,5 +1,11 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 26.0.2  2026-02-26
+
+- `animation3d_init` contained ` glut.glutCreateWindow("salabim3d")`, which apparently does not work with all OpenGL installations.
+  This has been changed to `glut.glutCreateWindow(b"salabim3d")`, which seems to work properly with all installations.
+  (thanks to a bug report by brmarkus)
+
 #### version 26.0.1  2026-02-07
 
 - Zooming didn't work properly on MacOS. Fixed, thanks to help from Lukas Hollenstein.

@@ -1,13 +1,13 @@
-#               _         _      _               ____    __        ___      _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / /_      / _ \    / |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || '_ \    | | | |   | |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | (_) | _ | |_| | _ | |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|_|
+#               _         _      _               ____    __        ___      ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / /_      / _ \    |___ \
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || '_ \    | | | |     __) |
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | (_) | _ | |_| | _  / __/
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|_____|
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "26.0.1"
+__version__ = "26.0.2"
 import heapq
 import random
 import time
@@ -8710,7 +8710,7 @@ by adding:
 
     def put(self, *args, **kwargs) -> None:
         """
-        equivalent to request, but anonymous quantities are negated
+        equivalent to request, but quantities are negated
         """
         return self.request(*args, called_from="put", **kwargs)
 
@@ -10780,8 +10780,7 @@ class Environment:
         glut.glutInitDisplayMode(glut.GLUT_RGBA | glut.GLUT_DOUBLE | glut.GLUT_DEPTH)
         glut.glutInitWindowSize(self._width3d, self._height3d)
         glut.glutInitWindowPosition(*self._position3d)
-
-        self.window3d = glut.glutCreateWindow("salabim3d")
+        self.window3d = glut.glutCreateWindow(b"salabim3d")
 
         gl.glClearDepth(1.0)
         gl.glDepthFunc(gl.GL_LESS)
