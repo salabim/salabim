@@ -1,13 +1,13 @@
-#               _         _      _               ____    __        ___      ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / /_      / _ \    |___ \
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || '_ \    | | | |     __) |
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | (_) | _ | |_| | _  / __/
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|_____|
+#               _         _      _               ____    __        ___      _____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / /_      / _ \    |___ /
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || '_ \    | | | |     |_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | (_) | _ | |_| | _  ___) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|____/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "26.0.2"
+__version__ = "26.0.3"
 import heapq
 import random
 import time
@@ -13750,7 +13750,6 @@ class Environment:
             uio = AnimateButton(x=x0 + 2 * dx, y=y0, text="*2", width=50, color=colorrest, action=self.env.an_double, env=self, xy_anchor="nw")
             uio.in_topleft = True
         else:
-
             uio = AnimateButton(x=x0 + 1 * dx, y=y0, text="Step", width=50, color=colorrest, action=self.env.an_step, env=self, xy_anchor="nw")
             uio.in_topleft = True
 
@@ -13777,7 +13776,6 @@ class Environment:
                 x=x0 + 1.5 * dx, y=-35, text=self.speedtext, textcolor="fg", text_anchor="N", fontsize=15, font="", screen_coordinates=True, xy_anchor="nw"
             )
             ao.in_topleft = True
-
 
     def remove_topleft_buttons(self):
         for uio in self.ui_objects[:]:
@@ -15497,16 +15495,16 @@ class Animate2dBase(DynamicClass):
                     if self.type == "rectangle":
                         as_points = self.as_points(t)
                         rectangle = tuple(de_none(self.spec(t)))
-                        self._image_ident = (tuple(rectangle), linewidth, linecolor, fillcolor, as_points, angle, self.screen_coordinates)
+                        self._image_ident = (tuple(rectangle), linewidth, linecolor, fillcolor, as_points, angle, self.env._scale, self.screen_coordinates)
                     elif self.type == "line":
                         as_points = self.as_points(t)
                         line = tuple(de_none(self.spec(t)))
                         fillcolor = (0, 0, 0, 0)
-                        self._image_ident = (tuple(line), linewidth, linecolor, as_points, angle, self.screen_coordinates)
+                        self._image_ident = (tuple(line), linewidth, linecolor, as_points, angle, self.env._scale, self.screen_coordinates)
                     elif self.type == "polygon":
                         as_points = self.as_points(t)
                         polygon = tuple(de_none(self.spec(t)))
-                        self._image_ident = (tuple(polygon), linewidth, linecolor, fillcolor, as_points, angle, self.screen_coordinates)
+                        self._image_ident = (tuple(polygon), linewidth, linecolor, fillcolor, as_points, angle, self.env._scale, self.screen_coordinates)
                     elif self.type == "circle":
                         as_points = False
                         radius0 = self.radius(t)
@@ -15527,8 +15525,10 @@ class Animate2dBase(DynamicClass):
                             linecolor,
                             fillcolor,
                             angle,
+                            self.env._scale,
                             self.screen_coordinates,
                         )
+                        print(self._image_ident)
 
                     if self._image_ident != self._image_ident_prev:
                         if self.type == "rectangle":
@@ -15750,7 +15750,7 @@ class Animate2dBase(DynamicClass):
                         t_to=self.animation_to(t),
                     )
 
-                    self._image_ident = (spec, id, width, height, angle, alpha, flip_horizontal, flip_vertical)
+                    self._image_ident = (spec, id, width, height, angle, alpha, flip_horizontal, flip_vertical, self.env._scale)
 
                     if self._image_ident != self._image_ident_prev:
                         if flip_horizontal:
@@ -15848,7 +15848,7 @@ class Animate2dBase(DynamicClass):
                             qy = (y - self.env._y0) * self.env._scale
                     max_lines = self.max_lines(t)
 
-                    self._image_ident = (text, fontname, fontsize, angle, textcolor, max_lines)
+                    self._image_ident = (text, fontname, fontsize, angle, textcolor, max_lines, self.env._scale)
                     if self._image_ident != self._image_ident_prev:
                         font, heightA = getfont(fontname, fontsize)
 
@@ -16151,7 +16151,7 @@ class Animate:
         (default True)
 
     screen_coordinates : bool
-        use screen_coordinates
+        use screen_coordinates (default: False)
 
         normally, the scale parameters are use for positioning and scaling
         objects.
@@ -18359,7 +18359,6 @@ class AnimateQueue(DynamicClass):
         for c in reversed(self._queue) if reverse else self._queue:
             if ((max_length is not None) and n >= max_length) or not self.visible_t:
                 break
-
             if c in prev_aos and self.env._scalez != self.env._last_scalez:  # if scale changed (due to zooming), rerender the animation_objects
                 animation_objects = self.current_aos[c] = prev_aos[c]
                 del prev_aos[c]

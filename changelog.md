@@ -1,5 +1,10 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 26.0.3  2026-03-06
+
+- zooming did not work properly for sim.Animate() animation objects, due to a bug in caching Pillow images. Fixed.
+  (thanks to a bug report by Lukas Hollenstein)
+  
 #### version 26.0.2  2026-02-26
 
 - `animation3d_init` contained ` glut.glutCreateWindow("salabim3d")`, which apparently does not work with all OpenGL installations.
