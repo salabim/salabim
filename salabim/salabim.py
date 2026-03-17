@@ -946,7 +946,7 @@ class Monitor:
         new.isgenerated = True
         return new
 
-    def setup(self, **kwargs: Any) -> None:
+    def setup(self) -> None:
         """
         called immediately after initialization of a monitor.
 
@@ -4061,7 +4061,7 @@ if Pythonista:
         def __init__(self, env, *args, **kwargs):
             scene.Scene.__init__(self, *args, **kwargs)
 
-        def setup(self, **kwargs: Any) -> None:
+        def setup(self) -> None:
             if g.animation_env.retina:
                 self.bg = None
 
@@ -4339,7 +4339,7 @@ class Queue:
             self.env.print_trace("", "", self.name() + " create")
         self.setup(**kwargs)
 
-    def setup(self, **kwargs: Any) -> None:
+    def setup(self) -> None:
         """
         called immediately after initialization of a queue.
 
@@ -5867,7 +5867,7 @@ class Animate3dBase(DynamicClass):
         self.register_dynamic_attributes("visible keep layer")
         self.setup(**kwargs)
 
-    def setup(self, **kwargs: Any) -> None:
+    def setup(self) -> None:
         """
         called immediately after initialization of a the Animate3dBase object.
 
@@ -7303,7 +7303,7 @@ by adding at the end:
                 ao.remove()
             del self._aos[q]
 
-    def setup(self, **kwargs: Any) -> None:
+    def setup(self) -> None:
         """
         called immediately after initialization of a component.
 
@@ -7314,7 +7314,7 @@ by adding at the end:
         Example
         -------
             class Car(sim.Component):
-                def setup(self, color):
+                color):
                     self.color = color
 
                 def process(self):
@@ -10690,7 +10690,7 @@ class Environment:
     _nameserialize = {}
     cached_modelname_width = [None, None]
 
-    def setup(self, **kwargs: Any) -> None:
+    def setup(self) -> None:
         """
         called immediately after initialization of an environment.
 
@@ -23554,7 +23554,7 @@ class State:
             self.env.print_trace("", "", self.name() + " create", "value = " + repr(self._value))
         self.setup(**kwargs)
 
-    def setup(self, **kwargs: Any) -> None:
+    def setup(self) -> None:
         """
         called immediately after initialization of a state.
 
@@ -24065,7 +24065,7 @@ class Resource:
 
         return self._preemptive
 
-    def setup(self, **kwargs: Any) -> None:
+    def setup(self) -> None:
         """
         called immediately after initialization of a resource.
 
@@ -25474,7 +25474,7 @@ class _AnimateIntro(Animate3dBase):
         self.env = env
         super().__init__(env=env)
 
-    def setup(self, **kwargs: Any) -> None:
+    def setup(self) -> None:
         self.layer = -math.inf
         self.field_of_view_y = 45
         self.z_near = 0.1
@@ -25550,7 +25550,7 @@ class _AnimateExtro(Animate3dBase):
         self.env = env
         super().__init__(env=env)
 
-    def setup(self, **kwargs: Any) -> None:
+    def setup(self) -> None:
         self.layer = math.inf
 
     def draw(self, t):

@@ -4,7 +4,17 @@
 
 - older versions of Python installations on MacOS did not support the TouchPadScroll event, thus causing an exception when animating.
   Fixed by disabling this event in that case.
-  (thanks to a bug report by Nick / nice6599}
+  (thanks to a bug report by Nick / nice6599)
+  
+- removed `**kwargs` from all default setup methods. This is done to avoid incorrect parameters being passed. E.g.
+
+  ```
+  r = sim.Resource('resource', capaciti = 200)
+  ```
+
+  used to be accepted, by ignoring the `capaciti` parameter and using the default value for `capacity` (1).
+  Now, this will cause a `TypeError: unexpected keyword argument 'capaciti'` exception to be raised.
+  This change may affect existing programs that used incorrect parameters.
 
 #### version 26.0.3  2026-03-06
 
