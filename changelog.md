@@ -1,10 +1,15 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 26.0.4  2026-03-17
+
+- older versions of Python installations on MacOS did not support the TouchPadScroll event, thus causing an exception when animating.
+  Fixed by disabling this event in that case.
+  (thanks to a bug report by Nick / nice6599}
+
 #### version 26.0.3  2026-03-06
 
 - zooming did not work properly for sim.Animate() animation objects, due to a bug in caching Pillow images. Fixed.
   (thanks to a bug report by Lukas Hollenstein)
-  
 #### version 26.0.2  2026-02-26
 
 - `animation3d_init` contained ` glut.glutCreateWindow("salabim3d")`, which apparently does not work with all OpenGL installations.

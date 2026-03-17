@@ -1,13 +1,13 @@
-#               _         _      _               ____    __        ___      _____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / /_      / _ \    |___ /
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || '_ \    | | | |     |_ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | (_) | _ | |_| | _  ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|____/
+#               _         _      _               ____    __        ___      _  _
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / /_      / _ \    | || |
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || '_ \    | | | |   | || |_
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | (_) | _ | |_| | _ |__   _|
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)   |_|
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "26.0.3"
+__version__ = "26.0.4"
 import heapq
 import random
 import time
@@ -11963,9 +11963,10 @@ class Environment:
                         self.root.bind("<ButtonRelease-1>", self.end_pan)
                         self.root.bind("u", self.unzoom)
                         self.root.bind("U", self.unzoom)
-                        if MacOS:
-                            self.root.bind("<TouchpadScroll>", self.on_touchpadscroll)
-
+                        try:
+                            self.root.bind("<TouchpadScroll>", self.on_touchpadscroll)  # onlt available on MacOS (but not always)
+                        except tkinter.TclError:
+                            ...
                         g.canvas = tkinter.Canvas(self.root, width=self._width, height=self._height)
                         g.canvas.configure(background=self.colorspec_to_hex("bg", False))
                         g.canvas.pack()
