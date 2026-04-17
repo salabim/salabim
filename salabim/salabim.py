@@ -1,13 +1,13 @@
-#               _         _      _               ____    __        ___      _  _
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / /_      / _ \    | || |
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || '_ \    | | | |   | || |_
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | (_) | _ | |_| | _ |__   _|
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)   |_|
+#               _         _      _               ____    __        ___      ____
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / /_      / _ \    | ___|
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || '_ \    | | | |   |___ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | (_) | _ | |_| | _  ___) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|____/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "26.0.4"
+__version__ = "26.0.5"
 import heapq
 import random
 import time
@@ -15529,7 +15529,6 @@ class Animate2dBase(DynamicClass):
                             self.env._scale,
                             self.screen_coordinates,
                         )
-                        print(self._image_ident)
 
                     if self._image_ident != self._image_ident_prev:
                         if self.type == "rectangle":

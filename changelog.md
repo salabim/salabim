@@ -1,5 +1,10 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 26.0.5  2026-04-02
+
+- removed a left over print. 
+  (thanks to a bug report by Rudertier)
+  
 #### version 26.0.4  2026-03-17
 
 - older versions of Python installations on MacOS did not support the TouchPadScroll event, thus causing an exception when animating.
