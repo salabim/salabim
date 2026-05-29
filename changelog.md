@@ -1,10 +1,44 @@
 ### changelog | salabim | discrete event simulation
 
+#### version 26.0.6  2026-05-29
+
+- introduced `Environment.force_t()`
+  When not animating, all level monitor statistics, like mean, xt and print_histogram add the last tallied value along at t=env.now().
+  When animating, the last tallied value along with env.t() are added, which makes that the values refer to the animation time and not env.now(). In some cases, it might be required to have the statistics based on env.now() though. That can be forced by `env.force_t(False)`. The following program demonstrates this:
+
+  ```
+  def mon_mean(force_t=True):
+      save_force_t=env.force_t()
+      env.force_t(force_t)
+      result=env.mon.mean()
+      env.force_t(save_force_t)
+      return result
+  
+  class X(sim.Component):
+      def process(self):
+          env.mon.tally(1)
+          self.hold(1)
+          env.mon.tally(2)
+          self.hold(1)
+          print("    forced t",mon_mean(force_t=True))
+          print("non forced t",mon_mean(force_t=False))
+          self.hold(100)
+  env=sim.Environment()
+  
+  sim.AnimateText(x=100,y=100,text=lambda : f"    forced_t {mon_mean(force_t=True):5.2f}")
+  sim.AnimateText(x=100,y=120,text=lambda : f"not forced_t {mon_mean(force_t=False):5.2f}")
+  
+  env.mon=sim.Monitor("mon", level=True)
+  env.animate(True)
+  X()
+  env.run()
+  ```
+  (thanks to an isse reported by Adam-Birchall)
+
 #### version 26.0.5  2026-04-02
 
 - removed a left over print. 
   (thanks to a bug report by Rudertier)
-  
 #### version 26.0.4  2026-03-17
 
 - older versions of Python installations on MacOS did not support the TouchPadScroll event, thus causing an exception when animating.

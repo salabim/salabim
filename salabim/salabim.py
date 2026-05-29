@@ -1,13 +1,13 @@
-#               _         _      _               ____    __        ___      ____
-#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / /_      / _ \    | ___|
-#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || '_ \    | | | |   |___ \
-#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | (_) | _ | |_| | _  ___) |
-#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_)|____/
+#               _         _      _               ____    __        ___       __
+#   ___   __ _ | |  __ _ | |__  (_) _ __ ___    |___ \  / /_      / _ \     / /_
+#  / __| / _` || | / _` || '_ \ | || '_ ` _ \     __) || '_ \    | | | |   | '_ \
+#  \__ \| (_| || || (_| || |_) || || | | | | |   / __/ | (_) | _ | |_| | _ | (_) |
+#  |___/ \__,_||_| \__,_||_.__/ |_||_| |_| |_|  |_____| \___/ (_) \___/ (_) \___/
 #                    discrete event simulation
 #
 #  see www.salabim.org for more information, the documentation and license information
 
-__version__ = "26.0.5"
+__version__ = "26.0.6"
 import heapq
 import random
 import time
@@ -3061,7 +3061,7 @@ class Monitor:
         t = array.array("d")
         if add_now:
             addx = [x[-1]]
-            t_extra = self.env._t if self.env._animate else self.env._now
+            t_extra = self.env._t if self.env._animate and self.env._force_t else self.env._now
             addt = [t_extra]
         else:
             addx = []
@@ -3116,7 +3116,7 @@ class Monitor:
         return tuple(reversed(self.xt(ex0=ex0, exoff=exoff, force_numeric=force_numeric, add_now=add_now)))
 
     def _xweight(self, ex0=False, force_numeric=True):
-        t_extra = self.env._t if self.env._animate else self.env._now
+        t_extra = self.env._t if self.env._animate and self.env._force_t else self.env._now
 
         if (ex0, force_numeric) in self.cached_xweight:
             if self.cached_xweight[(ex0, force_numeric)][0] == t_extra:
@@ -10590,6 +10590,7 @@ class Environment:
         self._camera_auto_print = False
         self.obj_filenames = {}
         self.running = False
+        self._force_t = True
         self._maximum_number_of_bitmaps = 4000
         self._t = 0
         self.video_t = 0
@@ -12678,6 +12679,33 @@ class Environment:
         if value is not None:
             self.animation_parameters(foreground_color=value, animate=None)
         return self._foreground_color
+
+    def force_t(self, value: bool = None):
+        """
+        force_t status
+
+        Parameters
+        ----------
+        value : bool
+            new force_t status
+
+            defines whether level monitor statistics should use env.now() or env.t() when animating
+
+            if omitted, no change
+
+        Returns
+        -------
+        force_t status : bool
+
+        Note
+        ----
+        At creation of an environment, the force_t is True, so
+        level monitor statistics use env.t() when animating, by default.
+        """
+        if value is not None:
+            self._force_t = value
+
+        return self._force_t
 
     def animate(self, value: Union[str, bool] = None):
         """

@@ -1,6 +1,5 @@
 import salabim as sim
 
-sim.yieldless(True)
 import PySimpleGUI as sg
 
 

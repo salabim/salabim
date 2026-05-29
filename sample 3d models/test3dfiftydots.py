@@ -1,12 +1,10 @@
 import salabim as sim
 import math
-from ycecream import yc
 from pathlib import Path
 import functools
 
-import fiftydots
+from ndots import fiftydots
 
-yc.show_line_number = True
 import OpenGL.GL as gl
 import OpenGL.GLU as glu
 import OpenGL.GLUT as glut
